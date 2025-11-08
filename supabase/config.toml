@@ -1,0 +1,19 @@
+project_id = "cynffvpedtleejatmxeo"
+
+[functions.generate-quote]
+verify_jwt = true
+
+[functions.ai-assistant]
+verify_jwt = true
+
+[functions.analyze-image]
+verify_jwt = true
+
+[functions.sign-quote]
+verify_jwt = true
+
+[functions.generate-stats]
+verify_jwt = true
+
+[functions.check-maintenance-reminders]
+verify_jwt = false
