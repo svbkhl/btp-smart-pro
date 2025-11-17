@@ -11,7 +11,6 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { useQueryClient } from "@tanstack/react-query";
-import { useDemoMode } from "@/hooks/useDemoMode";
 
 // Navigation pour les admins/dirigeants
 const adminNavigation = [
@@ -40,29 +39,20 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { signOut, isAdmin, isEmployee } = useAuth();
   const { fakeDataEnabled, toggleFakeData } = useFakeDataStore();
-  const { isDemoMode, enableDemoMode } = useDemoMode();
   
-  // Activer le mode démo si on est sur /demo
-  useEffect(() => {
-    if (location.pathname === "/demo") {
-      enableDemoMode();
-    }
-  }, [location.pathname, enableDemoMode]);
+  // Détecter si on est en mode démo
+  const isDemoMode = location.pathname === "/demo";
   
-  // Sélectionner la navigation selon le rôle ou mode démo
-  const navigation = isDemoMode ? adminNavigation : (isAdmin ? adminNavigation : (isEmployee ? employeeNavigation : adminNavigation));
+  // Sélectionner la navigation selon le rôle
+  const navigation = isAdmin ? adminNavigation : (isEmployee ? employeeNavigation : adminNavigation);
 
   const toggleSidebar = () => setIsOpen(!isOpen);
   const closeSidebar = () => setIsOpen(false);
 
   const handleNavClick = (e: React.MouseEvent, href: string) => {
-    // En mode démo, permettre la navigation vers toutes les pages sauf /auth
-    if (isDemoMode && href === "/auth") {
+    if (isDemoMode && href !== "/demo" && href !== "/auth") {
       e.preventDefault();
-    }
-    // Activer le mode démo pour toutes les navigations depuis /demo
-    if (location.pathname === "/demo" && href !== "/auth") {
-      enableDemoMode();
+      // Optionnel : afficher un toast
     }
   };
 
@@ -144,9 +134,8 @@ const Sidebar = () => {
 
         <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
           {navigation.map((item) => {
-            const isActive = location.pathname === item.href || (isDemoMode && location.pathname === item.href);
-            // En mode démo, permettre la navigation vers toutes les pages sauf /auth
-            const isDisabled = isDemoMode && item.href === "/auth";
+            const isActive = location.pathname === item.href;
+            const isDisabled = isDemoMode && item.href !== "/demo" && item.href !== "/auth";
             
             if (isDisabled) {
               return (
@@ -164,11 +153,6 @@ const Sidebar = () => {
                 </div>
               );
             }
-            
-            // En mode démo, préfixer les routes avec /demo ou utiliser les routes normales
-            const href = isDemoMode && item.href !== "/demo" && item.href !== "/auth" 
-              ? item.href 
-              : item.href;
             
             return (
               <Link

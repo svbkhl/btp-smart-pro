@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useDemoMode } from "@/hooks/useDemoMode";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,12 +10,6 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const { user, loading, isAdmin } = useAuth();
-  const { isDemoMode } = useDemoMode();
-  
-  // En mode démo, permettre l'accès sans authentification
-  if (isDemoMode) {
-    return <>{children}</>;
-  }
 
   // Timeout de sécurité : après 5 secondes, afficher le contenu même si loading
   // pour éviter les chargements infinis

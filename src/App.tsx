@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { DemoRoute } from "@/components/DemoRoute";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
@@ -80,25 +79,24 @@ const App = () => (
             <Route path="/candidature" element={<PublicCandidature />} />
             <Route path="/apply" element={<PublicCandidature />} />
             <Route path="/demo" element={<Demo />} />
-            {/* Routes accessibles en mode démo OU avec authentification */}
-            <Route path="/dashboard" element={<DemoRoute><ProtectedRoute><Dashboard /></ProtectedRoute></DemoRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
-            <Route path="/projects" element={<DemoRoute><ProtectedRoute><Projects /></ProtectedRoute></DemoRoute>} />
-            <Route path="/projects/:id" element={<DemoRoute><ProtectedRoute><ProjectDetail /></ProtectedRoute></DemoRoute>} />
-            <Route path="/clients" element={<DemoRoute><ProtectedRoute><Clients /></ProtectedRoute></DemoRoute>} />
-            <Route path="/quotes" element={<DemoRoute><ProtectedRoute><Quotes /></ProtectedRoute></DemoRoute>} />
-            <Route path="/calendar" element={<DemoRoute><ProtectedRoute><Calendar /></ProtectedRoute></DemoRoute>} />
-            <Route path="/admin/employees" element={<DemoRoute><ProtectedRoute requireAdmin><AdminEmployees /></ProtectedRoute></DemoRoute>} />
-            <Route path="/employees-planning" element={<DemoRoute><ProtectedRoute requireAdmin><EmployeesPlanning /></ProtectedRoute></DemoRoute>} />
-            <Route path="/my-planning" element={<DemoRoute><ProtectedRoute><MyPlanning /></ProtectedRoute></DemoRoute>} />
-            <Route path="/stats" element={<DemoRoute><ProtectedRoute><Stats /></ProtectedRoute></DemoRoute>} />
-            <Route path="/settings" element={<DemoRoute><ProtectedRoute><Settings /></ProtectedRoute></DemoRoute>} />
-            <Route path="/ai" element={<DemoRoute><ProtectedRoute><AI /></ProtectedRoute></DemoRoute>} />
+            <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+            <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
+            <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+            <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+            <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+            <Route path="/admin/employees" element={<ProtectedRoute requireAdmin><AdminEmployees /></ProtectedRoute>} />
+            <Route path="/employees-planning" element={<ProtectedRoute requireAdmin><EmployeesPlanning /></ProtectedRoute>} />
+            <Route path="/my-planning" element={<ProtectedRoute><MyPlanning /></ProtectedRoute>} />
+            <Route path="/stats" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/ai" element={<ProtectedRoute><AI /></ProtectedRoute>} />
             {/* RH Routes */}
-            <Route path="/rh/dashboard" element={<DemoRoute><ProtectedRoute requireAdmin><RHDashboard /></ProtectedRoute></DemoRoute>} />
-            <Route path="/rh/employees" element={<DemoRoute><ProtectedRoute requireAdmin><RHEmployees /></ProtectedRoute></DemoRoute>} />
-            <Route path="/rh/candidatures" element={<DemoRoute><ProtectedRoute requireAdmin><RHCandidatures /></ProtectedRoute></DemoRoute>} />
-            <Route path="/rh/taches" element={<DemoRoute><ProtectedRoute requireAdmin><RHTaches /></ProtectedRoute></DemoRoute>} />
+            <Route path="/rh/dashboard" element={<ProtectedRoute requireAdmin><RHDashboard /></ProtectedRoute>} />
+            <Route path="/rh/employees" element={<ProtectedRoute requireAdmin><RHEmployees /></ProtectedRoute>} />
+            <Route path="/rh/candidatures" element={<ProtectedRoute requireAdmin><RHCandidatures /></ProtectedRoute>} />
+            <Route path="/rh/taches" element={<ProtectedRoute requireAdmin><RHTaches /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

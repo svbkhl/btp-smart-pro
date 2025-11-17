@@ -24,20 +24,9 @@ import { FAKE_EVENTS } from "@/fakeData/calendar";
 import { FAKE_QUOTES } from "@/fakeData/quotes";
 import { FAKE_USER_STATS } from "@/fakeData/stats";
 import { useToast } from "@/components/ui/use-toast";
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useDemoMode } from "@/hooks/useDemoMode";
 
 const Demo = () => {
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const { enableDemoMode } = useDemoMode();
-
-  useEffect(() => {
-    // Activer le mode démo et rediriger vers le dashboard
-    enableDemoMode();
-    navigate("/dashboard");
-  }, [navigate, enableDemoMode]);
 
   // Utiliser directement les fake data
   const stats = FAKE_USER_STATS;
