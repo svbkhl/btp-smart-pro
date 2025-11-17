@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { signQuote } from "@/services/aiService";
 import { Loader2, FileSignature, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -25,6 +26,7 @@ export const QuoteSignature = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Charger uniquement les devis en brouillon (non signés)
     const { data, error } = await supabase
       .from("ai_quotes")
       .select("*")
@@ -101,15 +103,11 @@ export const QuoteSignature = () => {
     try {
       const signatureData = canvas.toDataURL("image/png");
 
-      const { error } = await supabase.functions.invoke("sign-quote", {
-        body: {
-          quoteId: selectedQuote.id,
-          signatureData,
-          signerName: signerName.trim(),
-        },
+      await signQuote({
+        quoteId: selectedQuote.id,
+        signatureData,
+        signerName: signerName.trim(),
       });
-
-      if (error) throw error;
 
       toast({
         title: "Devis signé !",

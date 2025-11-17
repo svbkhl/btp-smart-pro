@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { callAIAssistant } from "@/services/aiService";
 import { Loader2, Send, Bot, User } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -35,21 +35,27 @@ export const AIAssistant = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { message: userMessage },
-      });
-
-      if (error) throw error;
+      const response = await callAIAssistant({ message: userMessage });
+      
+      if (!response || !response.response) {
+        throw new Error("Réponse invalide de l'assistant IA");
+      }
 
       setConversation((prev) => [
         ...prev,
-        { role: "assistant", content: data.response },
+        { role: "assistant", content: response.response },
       ]);
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = 
+        error instanceof Error 
+          ? error.message 
+          : "Impossible de contacter l'assistant";
+      
       toast({
         title: "Erreur",
-        description: error.message || "Impossible de contacter l'assistant",
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setLoading(false);

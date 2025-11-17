@@ -1,0 +1,8 @@
+{
+  "clientName": "Test Client",
+  "surface": 100,
+  "workType": "Rénovation toiture",
+  "materials": ["Tuiles", "Isolation"],
+  "region": "Paris"
+}
+

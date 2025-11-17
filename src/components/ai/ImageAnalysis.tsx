@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { analyzeImage } from "@/services/aiService";
 import { Loader2, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,16 +30,12 @@ export const ImageAnalysis = () => {
     setResult(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-image", {
-        body: {
-          imageUrl,
-          analysisType,
-        },
+      const response = await analyzeImage({
+        imageUrl,
+        analysisType,
       });
 
-      if (error) throw error;
-
-      setResult(data.analysis);
+      setResult(response.analysis);
       toast({
         title: "Analyse terminée !",
         description: "L'IA a analysé l'image avec succès.",

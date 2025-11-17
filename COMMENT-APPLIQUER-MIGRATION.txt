@@ -1,0 +1,47 @@
+╔════════════════════════════════════════════════════════════════╗
+║  GUIDE RAPIDE : APPLIQUER LA MIGRATION                        ║
+╚════════════════════════════════════════════════════════════════╝
+
+📋 ÉTAPES SIMPLES :
+
+1️⃣  Ouvrir Supabase Dashboard
+    → https://supabase.com
+    → Connectez-vous
+    → Sélectionnez votre projet
+
+2️⃣  Ouvrir SQL Editor
+    → Menu gauche → 💬 SQL Editor
+    → Cliquez sur "New query"
+
+3️⃣  Ouvrir le fichier de migration
+    → Dans votre éditeur : supabase/APPLY-MIGRATION.sql
+    → Sélectionnez TOUT (Cmd+A / Ctrl+A)
+    → Copiez (Cmd+C / Ctrl+C)
+
+4️⃣  Coller dans Supabase
+    → Dans l'éditeur SQL de Supabase
+    → Collez (Cmd+V / Ctrl+V)
+
+5️⃣  Exécuter
+    → Cliquez sur "Run" (bouton bleu en bas à droite)
+    → OU appuyez sur Cmd+Enter / Ctrl+Enter
+
+6️⃣  Vérifier
+    → Vous devriez voir "Success"
+    → Allez dans Table Editor (📊)
+    → Vérifiez les 4 tables : clients, projects, user_stats, user_settings
+
+✅ C'EST TOUT !
+
+╔════════════════════════════════════════════════════════════════╗
+║  FICHIER DE MIGRATION : supabase/APPLY-MIGRATION.sql          ║
+╚════════════════════════════════════════════════════════════════╝
+
+💡 ASTUCE :
+   Le fichier fait environ 311 lignes.
+   Assurez-vous de copier TOUT le contenu !
+
+🆘 PROBLÈMES ?
+   → Consultez GUIDE-MIGRATION-VISUEL.md
+   → Ou APPLIQUER-MIGRATION.md
+

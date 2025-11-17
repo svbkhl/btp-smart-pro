@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rappel - Devis en attente</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <h1 style="color: #2563eb; margin-top: 0;">Rappel - Devis en attente</h1>
+  </div>
+  
+  <p>Bonjour,</p>
+  
+  <p>Nous vous rappelons que le devis suivant est en attente de votre retour :</p>
+  
+  <div style="background-color: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <h2 style="color: #1f2937; margin-top: 0;">{{QUOTE_TITLE}}</h2>
+    <p><strong>Client :</strong> {{CLIENT_NAME}}</p>
+    <p><strong>Type de travaux :</strong> {{WORK_TYPE}}</p>
+    <p><strong>Surface :</strong> {{SURFACE}} m²</p>
+    <p><strong>Montant estimé :</strong> {{ESTIMATED_COST}} €</p>
+    <p><strong>Date de création :</strong> {{CREATED_AT}}</p>
+    <p><strong>Délai depuis l'envoi :</strong> {{DAYS_PENDING}} jour(s)</p>
+  </div>
+  
+  <p>Nous vous remercions de bien vouloir nous faire part de votre décision dans les plus brefs délais.</p>
+  
+  <p>Pour toute question, n'hésitez pas à nous contacter.</p>
+  
+  <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+    <p style="margin: 0; color: #6b7280; font-size: 14px;">
+      Cordialement,<br>
+      <strong>{{COMPANY_NAME}}</strong><br>
+      {{COMPANY_PHONE}}<br>
+      {{COMPANY_EMAIL}}
+    </p>
+  </div>
+</body>
+</html>
+

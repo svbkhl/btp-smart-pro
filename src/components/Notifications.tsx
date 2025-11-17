@@ -41,14 +41,25 @@ export const Notifications = () => {
           .order("created_at", { ascending: false })
           .limit(50);
 
-        if (error) throw error;
+        if (error) {
+          // Gérer les erreurs silencieusement pour ne pas bloquer l'application
+          if (isMounted) {
+            setNotifications([]);
+            setUnreadCount(0);
+          }
+          return;
+        }
 
         if (isMounted) {
           setNotifications(data || []);
           setUnreadCount(data?.filter((n) => !n.is_read).length || 0);
         }
-      } catch (error: any) {
-        console.error("Error fetching notifications:", error);
+      } catch (error) {
+        // En cas d'erreur, on affiche un tableau vide
+        if (isMounted) {
+          setNotifications([]);
+          setUnreadCount(0);
+        }
       }
     };
 
@@ -85,18 +96,17 @@ export const Notifications = () => {
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        // Gérer les erreurs silencieusement
+        return;
+      }
 
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+        prev.map((n) => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de marquer comme lu",
-        variant: "destructive",
-      });
+    } catch (error) {
+      // Erreur silencieuse
     }
   };
 
@@ -113,20 +123,38 @@ export const Notifications = () => {
         .update({ is_read: true, read_at: new Date().toISOString() })
         .in("id", unreadIds);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error marking all notifications as read:", error);
+        
+        // Gérer les erreurs de permissions
+        if (error.message.includes("permission") || error.message.includes("row-level security") || error.message.includes("RLS")) {
+          toast({
+            title: "Erreur de permissions",
+            description: "Les politiques RLS ne sont pas configurées correctement. Exécutez FIX-PERMISSIONS-NOTIFICATIONS.sql",
+            variant: "destructive",
+            duration: 5000,
+          });
+          return;
+        }
+        
+        throw error;
+      }
 
       setNotifications((prev) =>
-        prev.map((n) => ({ ...n, is_read: true }))
+        prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
       );
       setUnreadCount(0);
 
       toast({
         title: "Notifications marquées comme lues",
+        description: `${unreadIds.length} notification${unreadIds.length > 1 ? "s" : ""} marquée${unreadIds.length > 1 ? "s" : ""} comme lue${unreadIds.length > 1 ? "s" : ""}`,
       });
     } catch (error: any) {
+      console.error("Error in markAllAsRead:", error);
+      const errorMessage = error?.message || "Impossible de marquer toutes comme lues";
       toast({
         title: "Erreur",
-        description: "Impossible de marquer toutes comme lues",
+        description: errorMessage,
         variant: "destructive",
       });
     }

@@ -1,0 +1,27 @@
+╔══════════════════════════════════════════════════════════════╗
+║  ACTION RAPIDE - Résoudre l'Erreur generate-quote           ║
+╚══════════════════════════════════════════════════════════════╝
+
+1. EXÉCUTER LE SCRIPT SQL
+   → Supabase Dashboard → SQL Editor
+   → Ouvrir: supabase/RÉSOUDRE-ERREUR-GENERATE-QUOTE.sql
+   → Copier-coller et Run
+
+2. VÉRIFIER LES SECRETS
+   → Settings → Edge Functions → Secrets
+   → Vérifier OPENAI_API_KEY (ajouter si manquant)
+
+3. REDÉPLOYER LA FONCTION
+   → supabase functions deploy generate-quote
+   → OU via Dashboard: Edge Functions → generate-quote → Deploy
+
+4. TESTER
+   → Dashboard: Edge Functions → generate-quote → Invoke
+   → Application: IA → Devis IA → Générer
+
+✅ Si erreur persiste:
+   - Consulter: RÉSOUDRE-ERREUR-ÉTAPE-PAR-ÉTAPE.md
+   - Vérifier les logs (console + Supabase)
+   - Copier les messages d'erreur
+
+📋 Guide complet: ACTION-IMMÉDIATE.md

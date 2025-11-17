@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rappel - Paiement dû</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fee2e2; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <h1 style="color: #dc2626; margin-top: 0;">💳 Rappel - Paiement dû</h1>
+  </div>
+  
+  <p>Bonjour,</p>
+  
+  <p>Nous vous rappelons qu'un paiement est dû pour le projet suivant :</p>
+  
+  <div style="background-color: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <h2 style="color: #1f2937; margin-top: 0;">{{PROJECT_NAME}}</h2>
+    <p><strong>Client :</strong> {{CLIENT_NAME}}</p>
+    <p><strong>Montant dû :</strong> <strong style="color: #dc2626; font-size: 18px;">{{AMOUNT_DUE}} €</strong></p>
+    <p><strong>Date d'échéance :</strong> {{DUE_DATE}}</p>
+    <p><strong>Statut :</strong> {{PAYMENT_STATUS}}</p>
+  </div>
+  
+  <p>Nous vous remercions de bien vouloir procéder au règlement dans les meilleurs délais.</p>
+  
+  <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+    <p style="margin: 0;"><strong>📧 Coordonnées bancaires :</strong></p>
+    <p style="margin: 5px 0 0 0;">
+      IBAN : {{BANK_IBAN}}<br>
+      BIC : {{BANK_BIC}}
+    </p>
+  </div>
+  
+  <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+    <p style="margin: 0; color: #6b7280; font-size: 14px;">
+      Cordialement,<br>
+      <strong>{{COMPANY_NAME}}</strong><br>
+      {{COMPANY_PHONE}}<br>
+      {{COMPANY_EMAIL}}
+    </p>
+  </div>
+</body>
+</html>
+
