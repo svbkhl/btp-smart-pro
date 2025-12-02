@@ -72,7 +72,9 @@ const AdminCompanies = () => {
     }
 
     try {
-      await createCompany.mutateAsync(newCompanyData);
+      console.log("🔄 Création de l'entreprise...", newCompanyData);
+      const result = await createCompany.mutateAsync(newCompanyData);
+      console.log("✅ Entreprise créée avec succès:", result);
       toast({
         title: "Entreprise créée",
         description: "L'entreprise a été créée avec succès.",
@@ -85,6 +87,7 @@ const AdminCompanies = () => {
         features: {},
       });
     } catch (error: any) {
+      console.error("❌ Erreur lors de la création de l'entreprise:", error);
       toast({
         title: "Erreur",
         description: error.message || "Impossible de créer l'entreprise",

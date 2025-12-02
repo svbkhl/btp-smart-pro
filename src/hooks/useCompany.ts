@@ -210,6 +210,15 @@ export const useCreateCompany = () => {
         throw new Error("Unauthorized");
       }
 
+      console.log("🔄 Insertion dans Supabase...", {
+        name: companyData.name,
+        plan: companyData.plan || "custom",
+        features: companyData.features || {},
+        settings: companyData.settings || {},
+        support_level: companyData.support_level || 0,
+        status: "active",
+      });
+
       const { data, error } = await supabase
         .from("companies")
         .insert({
@@ -232,9 +241,16 @@ export const useCreateCompany = () => {
         ) {
           throw new Error("La table companies n'existe pas encore. Exécutez le script CREATE-COMPANIES-SYSTEM.sql dans Supabase.");
         }
+        // Vérifier si c'est une erreur RLS
+        if (error.code === "42501" || error.message?.includes("permission denied") || error.message?.includes("new row violates")) {
+          console.error("❌ Erreur RLS lors de la création:", error);
+          throw new Error("Permission refusée. Assurez-vous d'être administrateur et d'avoir exécuté le script FIX-RLS-CREATE-COMPANIES.sql");
+        }
         console.error("❌ Error creating company:", error);
         throw error;
       }
+
+      console.log("✅ Entreprise créée:", data);
 
       return data as Company;
     },

@@ -1,0 +1,50 @@
+# 📋 VARIABLES À AJOUTER DANS VERCEL
+# Copie-colle ces variables UNE PAR UNE dans Vercel
+
+# ============================================
+# ÉTAPE 1 : Clique sur "Environment Variables"
+# ============================================
+
+# ============================================
+# VARIABLE 1
+# ============================================
+Nom: VITE_SUPABASE_URL
+Valeur: https://renmjmqlmafqjzldmsgs.supabase.co
+Environnements: ✅ Production ✅ Preview ✅ Development
+
+# ============================================
+# VARIABLE 2
+# ============================================
+Nom: VITE_SUPABASE_PUBLISHABLE_KEY
+Valeur: (COLLE TA CLÉ ANON ICI depuis Supabase Dashboard → Settings → API → anon public)
+Environnements: ✅ Production ✅ Preview ✅ Development
+
+# ============================================
+# VARIABLE 3
+# ============================================
+Nom: PUBLIC_URL
+Valeur: https://btp-smart-pro-temp.vercel.app
+Environnements: ✅ Production ✅ Preview ✅ Development
+Note: Tu mettras à jour cette URL après le déploiement avec la vraie URL que Vercel te donnera
+
+# ============================================
+# VARIABLE 4
+# ============================================
+Nom: PRODUCTION_URL
+Valeur: https://btp-smart-pro-temp.vercel.app
+Environnements: ✅ Production ✅ Preview ✅ Development
+Note: Tu mettras à jour cette URL après le déploiement avec la vraie URL que Vercel te donnera
+
+# ============================================
+# VARIABLE 5
+# ============================================
+Nom: VITE_PUBLIC_URL
+Valeur: https://btp-smart-pro-temp.vercel.app
+Environnements: ✅ Production ✅ Preview ✅ Development
+Note: Tu mettras à jour cette URL après le déploiement avec la vraie URL que Vercel te donnera
+
+# ============================================
+# ✅ C'EST TOUT !
+# ============================================
+# Après avoir ajouté ces 5 variables, clique sur "Deploy"
+

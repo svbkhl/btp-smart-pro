@@ -20,12 +20,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "VITE_SUPABASE_URL": "@vite_supabase_url",
-    "VITE_SUPABASE_PUBLISHABLE_KEY": "@vite_supabase_publishable_key",
-    "VITE_FAKE_DATA": "@vite_fake_data",
-    "VITE_APP_DEMO": "@vite_app_demo"
-  }
+  ]
 }
-
