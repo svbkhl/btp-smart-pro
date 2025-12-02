@@ -56,9 +56,7 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
                 name
               )
             `)
-            .order("start_date", { ascending: true ,
-    throwOnError: false,
-  });
+            .order("start_date", { ascending: true });
 
           if (startDate && endDate) {
             query = query
@@ -92,6 +90,7 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
     staleTime: 30000,
     gcTime: 300000, // 5 minutes
     throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 
@@ -150,6 +149,7 @@ export const useTodayEvents = () => {
     staleTime: 30000,
     gcTime: 300000,
     throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 

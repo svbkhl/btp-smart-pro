@@ -1,0 +1,36 @@
+# ============================================
+# COMMANDES DE DÉPLOIEMENT - À COPIER-COLLER
+# ============================================
+
+# 1. Se connecter à Supabase
+supabase login
+
+# 2. Lier le projet (remplacer VOTRE_PROJECT_REF)
+supabase link --project-ref VOTRE_PROJECT_REF
+
+# 3. Déployer les 4 Edge Functions
+supabase functions deploy create-signature-session --no-verify-jwt
+supabase functions deploy create-payment-session --no-verify-jwt
+supabase functions deploy send-email --no-verify-jwt
+supabase functions deploy stripe-webhook --no-verify-jwt
+
+# 4. Vérifier le déploiement
+supabase functions list
+
+# 5. Vérifier les secrets (optionnel)
+supabase secrets list
+
+# ============================================
+# Configuration des Secrets dans Dashboard
+# ============================================
+# Allez dans Supabase Dashboard → Settings → Edge Functions → Secrets
+# Ajoutez les secrets (voir CONFIG-SECRETS.md)
+
+# ============================================
+# Configuration Webhook Stripe
+# ============================================
+# Allez dans Stripe Dashboard → Developers → Webhooks
+# URL: https://[PROJECT-REF].supabase.co/functions/v1/stripe-webhook
+# Événements: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed
+# Copiez le Signing secret → Ajoutez dans Supabase comme STRIPE_WEBHOOK_SECRET
+

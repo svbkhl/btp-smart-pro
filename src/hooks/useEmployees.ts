@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_EMPLOYEES } from "@/fakeData/employees";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 export interface Employee {
   id: string;
@@ -39,9 +40,18 @@ export interface UpdateEmployeeData {
 
 // Récupérer tous les employés
 export const useEmployees = () => {
+  const { fakeDataEnabled } = useFakeDataStore();
+
   return useQuery({
-    queryKey: ["employees"],
+    queryKey: ["employees", fakeDataEnabled],
     queryFn: async () => {
+      // Si fake data est activé, retourner directement les fake data
+      if (fakeDataEnabled) {
+        console.log("🎭 Mode démo activé - Retour des fake employees");
+        return FAKE_EMPLOYEES;
+      }
+
+      // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
           const { data, error } = await supabase
@@ -55,23 +65,20 @@ export const useEmployees = () => {
             `)
             .order("nom", { ascending: true });
 
-          if (error) {
-            // En cas d'erreur, queryWithTimeout retournera automatiquement FAKE_EMPLOYEES
-            throw error;
-          }
-
-          // Retourner les données ou un tableau vide
-          return (data as Employee[]) || [];
+          if (error) throw error;
+          return (data || []) as Employee[];
         },
-        FAKE_EMPLOYEES,
+        [],
         "useEmployees"
       );
     },
+    enabled: true, // Toujours activé, même sans user en mode démo
     retry: 1,
     staleTime: 30000,
     // Ne pas bloquer l'UI en cas d'erreur
     throwOnError: false,
     gcTime: 300000,
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 

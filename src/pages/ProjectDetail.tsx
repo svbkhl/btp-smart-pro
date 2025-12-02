@@ -1,6 +1,7 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Sidebar from "@/components/Sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { KPIBlock } from "@/components/ui/KPIBlock";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -20,7 +21,9 @@ import {
 import { useProject, useDeleteProject } from "@/hooks/useProjects";
 import { safeAction } from "@/utils/safeAction";
 import { ProjectForm } from "@/components/ProjectForm";
-import { useState } from "react";
+import { ProjectTimeline } from "@/components/ProjectTimeline";
+import { ProjectComments } from "@/components/ProjectComments";
+import { useState, useMemo } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { motion } from "framer-motion";
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -58,35 +62,23 @@ const ProjectDetail = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "en_cours":
-        return "default";
-      case "en_attente":
-        return "secondary";
-      case "terminé":
-        return "outline";
-      case "planifié":
-        return "secondary";
-      case "annulé":
-        return "destructive";
-      default:
-        return "default";
+      case "en_cours": return "default";
+      case "en_attente": return "secondary";
+      case "terminé": return "outline";
+      case "planifié": return "secondary";
+      case "annulé": return "destructive";
+      default: return "default";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "en_cours":
-        return "En cours";
-      case "en_attente":
-        return "En attente";
-      case "terminé":
-        return "Terminé";
-      case "planifié":
-        return "Planifié";
-      case "annulé":
-        return "Annulé";
-      default:
-        return status;
+      case "en_cours": return "En cours";
+      case "en_attente": return "En attente";
+      case "terminé": return "Terminé";
+      case "planifié": return "Planifié";
+      case "annulé": return "Annulé";
+      default: return status;
     }
   };
 
@@ -99,345 +91,299 @@ const ProjectDetail = () => {
     });
   };
 
-  const formatCurrency = (amount: number | undefined) => {
-    if (!amount) return "Non défini";
-    return new Intl.NumberFormat('fr-FR', { 
-      style: 'currency', 
-      currency: 'EUR',
-      maximumFractionDigits: 0 
-    }).format(amount);
-  };
-
-  const calculateDaysRemaining = (endDate: string | undefined) => {
-    if (!endDate) return null;
+  const daysRemaining = useMemo(() => {
+    if (!project?.end_date) return null;
+    const endDate = new Date(project.end_date);
     const today = new Date();
-    const end = new Date(endDate);
-    const diffTime = end.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+    today.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
+  }, [project?.end_date]);
+
+  const isOverdue = useMemo(() => {
+    if (!project?.end_date || project.status === "terminé" || project.status === "annulé") return false;
+    return new Date(project.end_date) < new Date();
+  }, [project?.end_date, project?.status]);
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto w-full">
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
-              <p className="text-muted-foreground">Chargement du projet...</p>
-            </div>
-          </div>
-        </main>
-      </div>
+      <PageLayout>
+        <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </PageLayout>
     );
   }
 
   if (error || !project) {
     return (
-      <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto w-full">
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center space-y-4">
-              <FolderKanban className="h-12 w-12 text-muted-foreground mx-auto" />
-              <h2 className="text-2xl font-bold">Projet non trouvé</h2>
-              <p className="text-muted-foreground">Le projet que vous recherchez n'existe pas ou a été supprimé.</p>
-              <Button asChild>
-                <Link to="/projects">Retour aux projets</Link>
-              </Button>
+      <PageLayout>
+        <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8">
+          <GlassCard className="p-12">
+            <div className="text-center">
+              <FolderKanban className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h2 className="text-2xl font-semibold mb-2">Projet non trouvé</h2>
+              <p className="text-muted-foreground mb-4">
+                Le projet que vous recherchez n'existe pas ou a été supprimé.
+              </p>
+              <Link to="/projects">
+                <Button className="rounded-xl">Retour aux projets</Button>
+              </Link>
             </div>
-          </div>
-        </main>
-      </div>
+          </GlassCard>
+        </div>
+      </PageLayout>
     );
   }
 
-  const daysRemaining = calculateDaysRemaining(project.end_date);
-  const isOverdue = daysRemaining !== null && daysRemaining < 0 && project.status !== "terminé";
+  const progress = project.progress || 0;
   const imageUrl = project.image_url || "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800";
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto w-full">
-        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
-                <Link to="/projects">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
+    <PageLayout>
+      <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-4">
+            <Link to="/projects">
+              <Button variant="ghost" size="icon" className="rounded-xl">
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{project.name}</h1>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant={getStatusColor(project.status)}>
-                    {getStatusLabel(project.status)}
+            </Link>
+            <div>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+                {project.name}
+              </h1>
+              <div className="flex items-center gap-2">
+                <Badge variant={getStatusColor(project.status)} className="rounded-lg">
+                  {getStatusLabel(project.status)}
+                </Badge>
+                {isOverdue && (
+                  <Badge variant="destructive" className="rounded-lg">
+                    En retard
                   </Badge>
-                  {isOverdue && (
-                    <Badge variant="destructive">
-                      En retard
-                    </Badge>
-                  )}
-                </div>
+                )}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsEditOpen(true)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Modifier
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={() => setIsDeleteOpen(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </Button>
-            </div>
           </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditOpen(true)}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Modifier
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Supprimer
+            </Button>
+          </div>
+        </motion.div>
 
-          {/* Image */}
-          <Card className="overflow-hidden">
-            <div className="relative h-64 md:h-96 overflow-hidden">
+        {/* KPI Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <KPIBlock
+            title="Progression"
+            value={`${progress}%`}
+            icon={TrendingUp}
+            description="Avancement du projet"
+            delay={0.1}
+            gradient="blue"
+          />
+          <KPIBlock
+            title="Budget"
+            value={new Intl.NumberFormat('fr-FR', { 
+              style: 'currency', 
+              currency: 'EUR', 
+              maximumFractionDigits: 0 
+            }).format(project.budget || 0)}
+            icon={Euro}
+            description="Budget alloué"
+            delay={0.2}
+            gradient="green"
+          />
+          <KPIBlock
+            title={daysRemaining !== null ? (daysRemaining > 0 ? "Jours restants" : "Jours de retard") : "Date de fin"}
+            value={daysRemaining !== null ? Math.abs(daysRemaining).toString() : formatDate(project.end_date)}
+            icon={Clock}
+            description={project.end_date ? formatDate(project.end_date) : "Non définie"}
+            delay={0.3}
+            gradient={isOverdue ? "orange" : "purple"}
+          />
+          <KPIBlock
+            title="Client"
+            value={typeof project.client === "string" ? project.client : project.client?.name || "Non assigné"}
+            icon={Users}
+            description="Client assigné"
+            delay={0.4}
+            gradient="orange"
+          />
+        </div>
+
+        {/* Main Content */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Left Column - Image & Details */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Project Image */}
+            <GlassCard delay={0.5} className="overflow-hidden p-0">
               <img 
                 src={imageUrl} 
                 alt={project.name}
-                className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-64 md:h-96 object-cover"
               />
-            </div>
-          </Card>
+            </GlassCard>
 
-          {/* Main Content Grid */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Left Column - Main Info */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Progress Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Progression du projet</CardTitle>
-                  <CardDescription>
-                    {project.progress}% complété
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Progress value={project.progress} className="h-3" />
-                  <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Progression: {project.progress}%</span>
+            {/* Project Details */}
+            <GlassCard delay={0.6} className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Détails du projet</h2>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <MapPin className="w-4 h-4" />
+                    Localisation
+                  </div>
+                  <p className="font-medium">{project.location || "Non spécifiée"}</p>
+                </div>
+                <Separator />
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <Calendar className="w-4 h-4" />
+                    Dates
+                  </div>
+                  <div className="space-y-1">
+                    <p><strong>Début:</strong> {formatDate(project.start_date)}</p>
+                    <p><strong>Fin prévue:</strong> {formatDate(project.end_date)}</p>
+                  </div>
+                </div>
+                {project.description && (
+                  <>
+                    <Separator />
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-2">Description</div>
+                      <p className="text-sm whitespace-pre-line">{project.description}</p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </>
+                )}
+              </div>
+            </GlassCard>
 
-              {/* Description */}
-              {project.description && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Description</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground whitespace-pre-wrap">
-                      {project.description}
+            {/* Progress */}
+            <GlassCard delay={0.7} className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Progression</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Avancement</span>
+                  <span className="font-medium text-foreground">{progress}%</span>
+                </div>
+                <Progress value={progress} className="h-3" />
+                {isOverdue && (
+                  <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      ⚠️ Ce projet est en retard. La date de fin prévue est dépassée.
                     </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Project Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Détails du projet</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {project.client && (
-                      <div className="flex items-start gap-3">
-                        <Users className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Client</p>
-                          <p className="text-sm text-muted-foreground">{project.client.name}</p>
-                          {project.client.email && (
-                            <p className="text-xs text-muted-foreground">{project.client.email}</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {project.location && (
-                      <div className="flex items-start gap-3">
-                        <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Lieu</p>
-                          <p className="text-sm text-muted-foreground">{project.location}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {project.budget && (
-                      <div className="flex items-start gap-3">
-                        <Euro className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Budget</p>
-                          <p className="text-sm text-muted-foreground">{formatCurrency(project.budget)}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {project.start_date && (
-                      <div className="flex items-start gap-3">
-                        <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Date de début</p>
-                          <p className="text-sm text-muted-foreground">{formatDate(project.start_date)}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {project.end_date && (
-                      <div className="flex items-start gap-3">
-                        <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Date de fin</p>
-                          <p className="text-sm text-muted-foreground">{formatDate(project.end_date)}</p>
-                          {daysRemaining !== null && (
-                            <p className={`text-xs ${isOverdue ? 'text-destructive' : daysRemaining <= 7 ? 'text-orange-500' : 'text-muted-foreground'}`}>
-                              {isOverdue 
-                                ? `${Math.abs(daysRemaining)} jour(s) de retard`
-                                : daysRemaining === 0
-                                ? "Aujourd'hui"
-                                : `${daysRemaining} jour(s) restant(s)`
-                              }
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+              </div>
+            </GlassCard>
+          </div>
 
-            {/* Right Column - Sidebar */}
-            <div className="space-y-6">
-              {/* Quick Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Statistiques</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Statut</p>
-                    <Badge variant={getStatusColor(project.status)} className="mt-1">
-                      {getStatusLabel(project.status)}
-                    </Badge>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Progression</p>
-                    <p className="text-2xl font-bold mt-1">{project.progress}%</p>
-                  </div>
-                  {project.budget && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Budget</p>
-                        <p className="text-2xl font-bold mt-1">{formatCurrency(project.budget)}</p>
-                      </div>
-                    </>
+          {/* Right Column - Info Cards */}
+          <div className="space-y-6">
+            {/* Client Info */}
+            {project.client && (
+              <GlassCard delay={0.8} className="p-6">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  Client
+                </h3>
+                <div className="space-y-2">
+                  <p className="font-medium">
+                    {typeof project.client === "string" ? project.client : project.client.name}
+                  </p>
+                  {typeof project.client !== "string" && project.client.email && (
+                    <p className="text-sm text-muted-foreground">{project.client.email}</p>
                   )}
-                  {project.start_date && project.end_date && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Durée</p>
-                        <p className="text-lg font-semibold mt-1">
-                          {formatDate(project.start_date)} - {formatDate(project.end_date)}
-                        </p>
-                      </div>
-                    </>
+                  {typeof project.client !== "string" && project.client.location && (
+                    <p className="text-sm text-muted-foreground">{project.client.location}</p>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button 
-                    className="w-full" 
-                    onClick={() => setIsEditOpen(true)}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifier le projet
-                  </Button>
-                  {project.client && (
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link to={`/clients`}>
-                        <Users className="h-4 w-4 mr-2" />
-                        Voir le client
-                      </Link>
+                  <Link to={`/clients`}>
+                    <Button variant="outline" size="sm" className="w-full mt-4 rounded-xl">
+                      Voir le client
                     </Button>
-                  )}
-                </CardContent>
-              </Card>
+                  </Link>
+                </div>
+              </GlassCard>
+            )}
 
-              {/* Metadata */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informations</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Créé le</span>
-                    <span>{formatDate(project.created_at)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Modifié le</span>
-                    <span>{formatDate(project.updated_at)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Quick Actions */}
+            <GlassCard delay={0.9} className="p-6">
+              <h3 className="font-semibold mb-4">Actions rapides</h3>
+              <div className="space-y-2">
+                <Link to={`/quotes?project=${project.id}`}>
+                  <Button variant="outline" className="w-full justify-start">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Voir les devis
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => setIsEditOpen(true)}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Modifier le projet
+                </Button>
+              </div>
+            </GlassCard>
           </div>
         </div>
-      </main>
 
-      {/* Edit Dialog */}
-      <ProjectForm 
-        open={isEditOpen} 
-        onOpenChange={setIsEditOpen}
-        project={project}
-      />
+        {/* Timeline et Commentaires */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ProjectTimeline projectId={project.id} />
+          <ProjectComments projectId={project.id} />
+        </div>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer le projet</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer le projet "{project.name}" ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <ProjectForm
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          project={project}
+        />
+
+        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer le projet</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </PageLayout>
   );
 };
 
 export default ProjectDetail;
-

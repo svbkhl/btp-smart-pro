@@ -46,7 +46,23 @@ IMPORTANT:
 - Réponds UNIQUEMENT en JSON, sans texte avant ou après`;
 
   try {
-    const response = await callAIAssistant({ message: prompt });
+    // Vérifier que la description n'est pas vide
+    if (!description || description.trim().length === 0) {
+      throw new Error("La description ne peut pas être vide");
+    }
+
+    // Appeler l'assistant IA avec timeout
+    const response = await Promise.race([
+      callAIAssistant({ message: prompt }),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("La requête a pris trop de temps. Veuillez réessayer.")), 60000)
+      )
+    ]);
+    
+    // Vérifier que la réponse existe
+    if (!response || !response.response) {
+      throw new Error("Aucune réponse reçue de l'assistant IA");
+    }
     
     // Extraire le JSON de la réponse
     let jsonText = response.response.trim();
@@ -56,20 +72,50 @@ IMPORTANT:
     
     // Si le texte commence par {, c'est du JSON
     if (jsonText.startsWith('{')) {
-      const parsed = JSON.parse(jsonText);
-      return parsed as ParsedQuoteInfo;
+      try {
+        const parsed = JSON.parse(jsonText);
+        // Valider que les champs requis sont présents
+        if (!parsed.workType) {
+          throw new Error("La réponse de l'IA ne contient pas le type de travaux");
+        }
+        return parsed as ParsedQuoteInfo;
+      } catch (parseError: any) {
+        console.error('Error parsing JSON:', parseError);
+        throw new Error(`Erreur lors du parsing de la réponse: ${parseError.message || 'Format JSON invalide'}`);
+      }
     } else {
       // Essayer d'extraire le JSON du texte
       const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed as ParsedQuoteInfo;
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (!parsed.workType) {
+            throw new Error("La réponse de l'IA ne contient pas le type de travaux");
+          }
+          return parsed as ParsedQuoteInfo;
+        } catch (parseError: any) {
+          console.error('Error parsing extracted JSON:', parseError);
+          throw new Error(`Erreur lors du parsing de la réponse: ${parseError.message || 'Format JSON invalide'}`);
+        }
       } else {
-        throw new Error('Impossible de parser la réponse de l\'IA');
+        console.error('No JSON found in response:', jsonText.substring(0, 200));
+        throw new Error('Impossible de trouver du JSON dans la réponse de l\'IA. La réponse était: ' + jsonText.substring(0, 100) + '...');
       }
     }
   } catch (error: any) {
     console.error('Error parsing quote description:', error);
+    
+    // Si l'erreur est déjà bien formatée, la relancer telle quelle
+    if (error.message && (
+      error.message.includes('connexion') ||
+      error.message.includes('timeout') ||
+      error.message.includes('Session expirée') ||
+      error.message.includes('non disponible')
+    )) {
+      throw error;
+    }
+    
+    // Sinon, formater l'erreur
     throw new Error(`Erreur lors de l'analyse de la description: ${error.message || 'Erreur inconnue'}`);
   }
 }

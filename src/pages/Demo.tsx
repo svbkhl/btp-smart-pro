@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import StatsCard from "@/components/StatsCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import {
   Calendar,
   ShieldCheck
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMemo } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -24,9 +25,40 @@ import { FAKE_EVENTS } from "@/fakeData/calendar";
 import { FAKE_QUOTES } from "@/fakeData/quotes";
 import { FAKE_USER_STATS } from "@/fakeData/stats";
 import { useToast } from "@/components/ui/use-toast";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { useAuth } from "@/hooks/useAuth";
 
 const Demo = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, userRole } = useAuth();
+  const { setFakeDataEnabled } = useFakeDataStore();
+
+  // Activer automatiquement les fake data quand on arrive sur la page Demo
+  useEffect(() => {
+    console.log("🎮 Activation du mode fake data pour la page Demo");
+    
+    // Si l'utilisateur est connecté mais n'est pas administrateur, rediriger vers le dashboard réel
+    if (user && userRole !== 'administrateur') {
+      console.log("🔒 Utilisateur connecté (non-admin) détecté - Redirection vers dashboard réel");
+      setFakeDataEnabled(false);
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+    
+    // Activer le mode démo seulement si :
+    // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
+    // 2. OU l'utilisateur est administrateur (démo dans l'app)
+    if (!user || userRole === 'administrateur') {
+      setFakeDataEnabled(true);
+    }
+
+    // Nettoyer à la sortie de la page
+    return () => {
+      // Ne pas désactiver automatiquement, laisser l'utilisateur contrôler
+      // setFakeDataEnabled(false);
+    };
+  }, [user, setFakeDataEnabled, navigate]);
 
   // Utiliser directement les fake data
   const stats = FAKE_USER_STATS;
@@ -87,6 +119,8 @@ const Demo = () => {
         type: "warning",
         message: `${overdueProjects.length} chantier${overdueProjects.length > 1 ? "s" : ""} en retard`,
         description: "Nécessite votre attention",
+        action: "/projects",
+        actionLabel: "Voir les chantiers",
       });
     }
 
@@ -100,6 +134,8 @@ const Demo = () => {
         type: "info",
         message: `${pendingQuotes.length} devis en attente`,
         description: "À valider par les clients",
+        action: "/quotes",
+        actionLabel: "Voir les devis",
       });
     }
 
@@ -115,20 +151,17 @@ const Demo = () => {
     return alertsList;
   }, [projects, quotes]);
 
-  const handleDisabledAction = () => {
-    toast({
-      title: "Mode démo",
-      description: "Cette fonctionnalité est désactivée en mode démonstration. Créez un compte pour accéder à toutes les fonctionnalités.",
-      variant: "default",
-    });
-  };
+  // Si l'utilisateur est connecté, ne pas afficher la page Demo
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       
       <main className="flex-1 overflow-y-auto w-full">
-        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
           {/* Header avec badge démo */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -145,19 +178,17 @@ const Demo = () => {
                 </p>
               </div>
             </div>
-            <Button 
-              className="gap-2 w-full sm:w-auto" 
-              onClick={handleDisabledAction}
-              disabled
-            >
-              <FolderKanban className="w-4 h-4" />
-              <span className="hidden sm:inline">Nouveau chantier</span>
-              <span className="sm:hidden">Nouveau</span>
-            </Button>
+            <Link to="/projects/new">
+              <Button className="gap-2 w-full sm:w-auto">
+                <FolderKanban className="w-4 h-4" />
+                <span className="hidden sm:inline">Nouveau chantier</span>
+                <span className="sm:hidden">Nouveau</span>
+              </Button>
+            </Link>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <StatsCard
               title="Chiffre d'affaires"
               value={new Intl.NumberFormat('fr-FR', { 
@@ -193,22 +224,22 @@ const Demo = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Recent Projects */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-2 w-full">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Chantiers récents</CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="gap-2"
-                    onClick={handleDisabledAction}
-                    disabled
-                  >
-                    Voir tout
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  <Link to="/projects">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-2"
+                    >
+                      Voir tout
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
                 </div>
               </CardHeader>
               <CardContent>
@@ -221,37 +252,37 @@ const Demo = () => {
                                      project.status === "planifié" ? 20 : 10;
                       
                       return (
-                        <div
+                        <Link
                           key={project.id}
-                          className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-not-allowed opacity-90"
-                          onClick={handleDisabledAction}
+                          to={`/projects/${project.id}`}
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer gap-3 sm:gap-4"
                         >
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-3">
-                              <h3 className="font-semibold text-foreground">
+                          <div className="flex-1 space-y-2 w-full">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                              <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
                                 {project.name}
                               </h3>
                               <Badge variant={
                                 project.status === "en_cours" ? "default" :
                                 project.status === "terminé" ? "outline" :
                                 project.status === "planifié" ? "secondary" : "secondary"
-                              }>
+                              } className="text-xs w-fit">
                                 {project.status === "en_cours" ? "En cours" :
                                  project.status === "terminé" ? "Terminé" :
                                  project.status === "planifié" ? "Planifié" :
                                  project.status === "en_attente" ? "En attente" : project.status}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               {project.client && (
-                                <span className="flex items-center gap-1">
-                                  <Users className="w-3 h-3" />
-                                  {typeof project.client === "string" ? project.client : project.client.name}
+                                <span className="flex items-center gap-1 truncate">
+                                  <Users className="w-3 h-3 flex-shrink-0" />
+                                  <span className="truncate">{typeof project.client === "string" ? project.client : project.client.name}</span>
                                 </span>
                               )}
                               {project.end_date && (
                                 <span className="flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
+                                  <Calendar className="w-3 h-3 flex-shrink-0" />
                                   {format(new Date(project.end_date), "dd/MM/yyyy", { locale: fr })}
                                 </span>
                               )}
@@ -269,29 +300,29 @@ const Demo = () => {
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <p>Aucun projet récent</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={handleDisabledAction}
-                      disabled
-                    >
-                      Créer un projet
-                    </Button>
+                    <Link to="/projects/new">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                      >
+                        Créer un projet
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </CardContent>
             </Card>
 
             {/* Alerts & Quick Actions */}
-            <div className="space-y-4 md:space-y-6">
+            <div className="space-y-4 sm:space-y-6 w-full">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -304,14 +335,24 @@ const Demo = () => {
                     alerts.map((alert, index) => (
                       <div
                         key={index}
-                        className={`p-3 rounded-lg border ${
-                          alert.type === "warning" ? "bg-accent/10 border-accent/20" :
-                          alert.type === "info" ? "bg-primary/10 border-primary/20" :
-                          "bg-muted border-border"
+                        onClick={() => {
+                          if (alert.action) {
+                            navigate(alert.action);
+                          }
+                        }}
+                        className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md ${
+                          alert.type === "warning" ? "bg-accent/10 border-accent/20 hover:bg-accent/15" :
+                          alert.type === "info" ? "bg-primary/10 border-primary/20 hover:bg-primary/15" :
+                          "bg-muted border-border hover:bg-muted/80"
                         }`}
                       >
                         <p className="text-sm font-medium text-foreground">{alert.message}</p>
                         <p className="text-xs text-muted-foreground mt-1">{alert.description}</p>
+                        {alert.action && (
+                          <p className="text-xs text-primary mt-2 font-medium hover:underline">
+                            {alert.actionLabel} →
+                          </p>
+                        )}
                       </div>
                     ))
                   ) : (
@@ -363,28 +404,6 @@ const Demo = () => {
             </div>
           </div>
 
-          {/* CTA pour créer un compte */}
-          <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <ShieldCheck className="h-12 w-12 text-primary shrink-0" />
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">Accès limité en mode démo</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Cette démo est en lecture seule. Créez un compte pour débloquer toutes les fonctionnalités : 
-                      gestion complète des chantiers, plannings collaboratifs, exports, notifications, etc.
-                    </p>
-                  </div>
-                </div>
-                <Link to="/auth">
-                  <Button className="w-full md:w-auto">
-                    Créer mon compte
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>

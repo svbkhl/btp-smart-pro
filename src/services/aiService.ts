@@ -1,19 +1,9 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Service pour appeler les fonctions Edge Supabase liées à l'IA
+ * Interface pour les paramètres de génération de devis
  */
-
-export interface AIAssistantRequest {
-  message: string;
-  context?: Record<string, any>;
-}
-
-export interface AIAssistantResponse {
-  response: string;
-}
-
-export interface GenerateQuoteRequest {
+export interface GenerateQuoteParams {
   clientName: string;
   surface: number;
   workType: string;
@@ -21,290 +11,331 @@ export interface GenerateQuoteRequest {
   imageUrls?: string[];
   manualPrice?: number;
   region?: string;
+  description?: string;
+  quoteFormat?: string;
 }
 
+/**
+ * Interface pour la réponse de génération de devis
+ */
 export interface GenerateQuoteResponse {
-  quote: any;
-  aiResponse: {
+  success: boolean;
+  aiResponse?: {
     estimatedCost: number;
-    workSteps: Array<{
-      step: string;
-      description: string;
-      cost: number;
-    }>;
-    materials: Array<{
-      name: string;
-      quantity: string;
-      unitCost: number;
-    }>;
-    estimatedDuration: string;
-    recommendations: string[];
+    description: string;
+    workSteps: Array<{ step: string; description: string; cost: number }>;
+    materials?: Array<{ name: string; quantity: string; unitCost: number }>;
+    estimatedDuration?: string;
+    recommendations?: string[];
+    quote_number?: string;
     priceValidation?: {
       isValid: boolean;
       message: string;
       warning?: string;
     };
-    quote_number?: string;
+    [key: string]: any;
   };
-  companyInfo?: any;
+  quote?: {
+    id: string;
+    quote_number: string;
+    signature_data?: string;
+    [key: string]: any;
+  };
   quoteNumber?: string;
-}
-
-export interface AnalyzeImageRequest {
-  imageUrl: string;
-  analysisType?: "wall" | "roof" | "general";
-}
-
-export interface AnalyzeImageResponse {
-  analysis: {
-    defects: string[];
-    severity: "low" | "medium" | "high";
-    urgency: "low" | "medium" | "high";
-    estimatedCost: number;
-    recommendations: string[];
-    details: string;
-  };
-}
-
-export interface SignQuoteRequest {
-  quoteId: string;
-  signatureData: string;
-  signerName: string;
-}
-
-export interface SignQuoteResponse {
-  success: boolean;
-  quote: any;
+  error?: string;
 }
 
 /**
- * Appelle l'assistant IA
+ * Interface pour l'appel à l'assistant IA
  */
-export async function callAIAssistant(
-  request: AIAssistantRequest
-): Promise<AIAssistantResponse> {
-  try {
-    // Récupérer la session pour obtenir le token
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      throw new Error("Erreur d'authentification. Veuillez vous reconnecter.");
-    }
-    
-    if (!session) {
-      throw new Error("Vous devez être connecté pour utiliser l'assistant IA");
-    }
-
-    let responseData: any = null;
-    let responseError: any = null;
-
-    try {
-      const result = await supabase.functions.invoke("ai-assistant", {
-        body: request,
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      responseData = result.data;
-      responseError = result.error;
-
-      console.log("Response from ai-assistant:", { data: responseData, error: responseError });
-    } catch (invokeError: any) {
-      console.error("Exception invoking ai-assistant:", invokeError);
-      responseError = invokeError;
-    }
-
-    if (responseError) {
-      console.error("Error calling ai-assistant:", responseError);
-      
-      // Essayer d'extraire le message d'erreur de différentes sources
-      let errorMessage = "Impossible de contacter l'assistant IA";
-      
-      // 1. Message direct de l'erreur
-      if (responseError.message) {
-        errorMessage = responseError.message;
-      }
-      
-      // 2. Erreur dans le contexte (status code)
-      if (responseError.context?.status) {
-        const status = responseError.context.status;
-        errorMessage = `Erreur ${status}: ${responseError.message || "Erreur lors de l'appel à l'assistant IA"}`;
-      }
-      
-      // 3. Erreur dans le body de la réponse
-      if (responseError.context?.body) {
-        try {
-          const errorBody = typeof responseError.context.body === 'string' 
-            ? JSON.parse(responseError.context.body) 
-            : responseError.context.body;
-          if (errorBody?.error) {
-            errorMessage = typeof errorBody.error === 'string' 
-              ? errorBody.error 
-              : JSON.stringify(errorBody.error);
-          }
-        } catch (e) {
-          // Erreur silencieuse lors du parsing
-        }
-      }
-      
-      // 4. Si data contient une erreur (cas où la fonction retourne 200 mais avec {error: ...})
-      if (responseData && 'error' in responseData) {
-        errorMessage = typeof responseData.error === 'string' 
-          ? responseData.error 
-          : JSON.stringify(responseData.error);
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    // Utiliser responseData au lieu de data
-    const data = responseData;
-
-    // Vérifier si la réponse contient une erreur
-    if (!data) {
-      throw new Error("Aucune réponse reçue de l'assistant IA");
-    }
-
-    if ('error' in data) {
-      const errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-      throw new Error(errorMessage);
-    }
-
-    // Vérifier que la réponse a le bon format
-    if (!data.response || typeof data.response !== 'string') {
-      throw new Error("Format de réponse invalide de l'assistant IA");
-    }
-
-    return data as AIAssistantResponse;
-  } catch (error) {
-    // Si c'est déjà une Error avec un message, on la relance
-    if (error instanceof Error) {
-      throw error;
-    }
-    // Sinon on crée une nouvelle Error
-    throw new Error(error?.message || "Erreur inattendue lors de l'appel à l'assistant IA");
-  }
+export interface AIAssistantRequest {
+  message: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationId?: string;
+  currentPage?: string;
+  context?: Record<string, any>;
 }
 
 /**
- * Génère un devis avec l'IA
+ * Interface pour la réponse de l'assistant IA
+ */
+export interface AIAssistantResponse {
+  response: string;
+  conversationId?: string;
+  [key: string]: any;
+}
+
+/**
+ * Génère un devis avec l'IA via l'Edge Function Supabase
  */
 export async function generateQuote(
-  request: GenerateQuoteRequest
+  params: GenerateQuoteParams
 ): Promise<GenerateQuoteResponse> {
   try {
-    // Récupérer la session pour l'authentification
-    const { data: { session } } = await supabase.auth.getSession();
-    
+    // Vérifier que l'utilisateur est connecté
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
     if (!session) {
-      throw new Error("Vous devez être connecté pour générer un devis");
+      throw new Error('Vous devez être connecté pour générer un devis');
     }
 
-    const { data, error } = await supabase.functions.invoke("generate-quote", {
-      body: request,
+    // Préparer les données pour l'Edge Function
+    const requestData = {
+      clientName: params.clientName,
+      surface: params.surface,
+      workType: params.workType,
+      materials: params.materials || [],
+      imageUrls: params.imageUrls,
+      manualPrice: params.manualPrice,
+      region: params.region,
+      description: params.description,
+      quoteFormat: params.quoteFormat || 'standard',
+    };
+
+    // Appeler l'Edge Function generate-quote
+    const { data, error } = await supabase.functions.invoke('generate-quote', {
+      body: requestData,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
     });
 
     if (error) {
-      // Si la réponse contient un message d'erreur détaillé
-      if (data && typeof data === 'object' && 'error' in data) {
-        const errorMessage = (data as { error: unknown }).error;
-        throw new Error(
-          typeof errorMessage === 'string' 
-            ? errorMessage 
-            : JSON.stringify(errorMessage)
-        );
-      }
-      
+      console.error('Error calling generate-quote:', error);
       throw new Error(
-        error.message || "Impossible de générer le devis avec l'IA. Vérifiez les logs pour plus de détails."
+        error.message || 'Erreur lors de la génération du devis'
       );
     }
 
-    // Vérifier si la réponse contient une erreur
-    if (data && typeof data === 'object' && 'error' in data) {
-      const errorMessage = (data as { error: unknown }).error;
+    if (!data || !data.success) {
       throw new Error(
-        typeof errorMessage === 'string' 
-          ? errorMessage 
-          : JSON.stringify(errorMessage)
+        data?.error || 'Erreur lors de la génération du devis'
       );
-    }
-
-    // Vérifier que la réponse contient les données attendues
-    if (!data || (typeof data === 'object' && !('aiResponse' in data))) {
-      throw new Error("Réponse invalide de l'Edge Function. Structure de données inattendue.");
     }
 
     return data as GenerateQuoteResponse;
-  } catch (error) {
-    // Répercuter l'erreur avec plus de détails
-    if (error instanceof Error && error.message) {
-      throw error;
-    }
-    throw new Error("Erreur lors de la génération du devis. Veuillez réessayer.");
+  } catch (error: any) {
+    console.error('Error in generateQuote:', error);
+    throw new Error(
+      error.message || 'Impossible de générer le devis. Veuillez réessayer.'
+    );
   }
 }
 
 /**
- * Analyse une image avec l'IA
+ * Appelle l'assistant IA via l'Edge Function ai-assistant
+ */
+export async function callAIAssistant(
+  request: AIAssistantRequest
+): Promise<AIAssistantResponse> {
+  try {
+    // Vérifier que l'utilisateur est connecté
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error('Vous devez être connecté pour utiliser l\'assistant IA');
+    }
+
+    // Préparer les données pour l'Edge Function
+    const requestData = {
+      message: request.message,
+      history: request.history || [],
+      conversationId: request.conversationId,
+      currentPage: request.currentPage,
+      context: request.context,
+    };
+
+    // Appeler l'Edge Function ai-assistant
+    console.log('📤 Appel de l\'Edge Function ai-assistant avec:', {
+      message: request.message,
+      conversationId: request.conversationId,
+      historyLength: request.history?.length || 0,
+    });
+
+    const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      body: requestData,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    console.log('📥 Réponse de l\'Edge Function:', { data, error });
+
+    if (error) {
+      console.error('❌ Error calling ai-assistant:', error);
+      throw new Error(
+        error.message || 'Erreur lors de l\'appel à l\'assistant IA'
+      );
+    }
+
+    if (!data) {
+      console.error('❌ Aucune donnée retournée par l\'Edge Function');
+      throw new Error('Aucune réponse reçue de l\'assistant IA');
+    }
+
+    // Gérer différents formats de réponse
+    let responseText: string | null = null;
+    let conversationId: string | undefined = undefined;
+
+    if (data.success === false) {
+      console.error('❌ L\'Edge Function a retourné une erreur:', data.error);
+      throw new Error(
+        data?.error || 'Erreur lors de l\'appel à l\'assistant IA'
+      );
+    }
+
+    // Essayer différents formats de réponse
+    if (data.response) {
+      responseText = data.response;
+      conversationId = data.conversationId;
+    } else if (data.data?.response) {
+      responseText = data.data.response;
+      conversationId = data.data.conversationId;
+    } else if (typeof data === 'string') {
+      responseText = data;
+    } else if (data.message) {
+      responseText = data.message;
+    }
+
+    if (!responseText || responseText.trim().length === 0) {
+      console.error('❌ La réponse ne contient pas de champ "response":', data);
+      throw new Error('La réponse de l\'IA est vide');
+    }
+
+    console.log('✅ Réponse IA reçue avec succès, longueur:', responseText.length);
+    
+    return {
+      response: responseText,
+      conversationId: conversationId || request.conversationId,
+    } as AIAssistantResponse;
+  } catch (error: any) {
+    console.error('Error in callAIAssistant:', error);
+    throw new Error(
+      error.message || 'Impossible de contacter l\'assistant IA. Veuillez réessayer.'
+    );
+  }
+}
+
+/**
+ * Interface pour les paramètres d'analyse d'image
+ */
+export interface AnalyzeImageParams {
+  imageUrl: string;
+  analysisType?: 'wall' | 'roof' | 'general';
+}
+
+/**
+ * Interface pour la réponse d'analyse d'image
+ */
+export interface AnalyzeImageResponse {
+  analysis: {
+    defects: string[];
+    severity: 'low' | 'medium' | 'high';
+    estimatedCost: number;
+    recommendations: string[];
+    urgency: 'low' | 'medium' | 'high';
+    details: string;
+  };
+}
+
+/**
+ * Analyse une image avec l'IA via l'Edge Function analyze-image
  */
 export async function analyzeImage(
-  request: AnalyzeImageRequest
+  params: AnalyzeImageParams
 ): Promise<AnalyzeImageResponse> {
-  const { data, error } = await supabase.functions.invoke("analyze-image", {
-    body: request,
-  });
+  try {
+    // Vérifier que l'utilisateur est connecté
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  if (error) {
+    if (!session) {
+      throw new Error('Vous devez être connecté pour analyser une image');
+    }
+
+    // Préparer les données pour l'Edge Function
+    const requestData = {
+      imageUrl: params.imageUrl,
+      analysisType: params.analysisType || 'general',
+    };
+
+    // Appeler l'Edge Function analyze-image
+    const { data, error } = await supabase.functions.invoke('analyze-image', {
+      body: requestData,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) {
+      console.error('Error calling analyze-image:', error);
+      throw new Error(
+        error.message || 'Erreur lors de l\'analyse de l\'image'
+      );
+    }
+
+    if (!data || !data.analysis) {
+      throw new Error(
+        'Réponse invalide de l\'Edge Function'
+      );
+    }
+
+    return data as AnalyzeImageResponse;
+  } catch (error: any) {
+    console.error('Error in analyzeImage:', error);
     throw new Error(
-      error.message || "Impossible d'analyser l'image avec l'IA"
+      error.message || 'Impossible d\'analyser l\'image. Veuillez réessayer.'
     );
   }
-
-  return data as AnalyzeImageResponse;
 }
 
 /**
- * Signe un devis électroniquement
+ * Signe un devis
  */
 export async function signQuote(
-  request: SignQuoteRequest
-): Promise<SignQuoteResponse> {
-  const { data, error } = await supabase.functions.invoke("sign-quote", {
-    body: request,
-  });
+  quoteId: string,
+  signatureData: string,
+  signerName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  if (error) {
-    throw new Error(
-      error.message || "Impossible de signer le devis"
-    );
-  }
-
-  return data as SignQuoteResponse;
-}
-
-/**
- * Vérifie les rappels de maintenance (appel périodique depuis le backend)
- * Cette fonction est généralement appelée par un cron job, mais peut être appelée manuellement
- */
-export async function checkMaintenanceReminders(): Promise<any> {
-  const { data, error } = await supabase.functions.invoke(
-    "check-maintenance-reminders",
-    {
-      body: {},
+    if (!session) {
+      throw new Error('Vous devez être connecté pour signer un devis');
     }
-  );
 
-  if (error) {
-    throw new Error(
-      error.message || "Impossible de vérifier les rappels de maintenance"
+    const { data, error } = await supabase.functions.invoke(
+      'create-signature-session',
+      {
+        body: {
+          quoteId,
+          signatureData,
+          signerName,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }
     );
-  }
 
-  return data;
+    if (error) {
+      throw new Error(error.message || 'Erreur lors de la signature');
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in signQuote:', error);
+    return {
+      success: false,
+      error: error.message || 'Impossible de signer le devis',
+    };
+  }
 }
 

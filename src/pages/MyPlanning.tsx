@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Sidebar from "@/components/Sidebar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Calendar, Building2, User, ChevronLeft, ChevronRight, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { FAKE_EMPLOYEES } from "@/fakeData/employees";
+import { FAKE_ASSIGNMENTS } from "@/fakeData/planning";
 
 interface Assignment {
   id: string;
@@ -30,6 +33,7 @@ const joursSemaine = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
 const MyPlanning = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { fakeDataEnabled } = useFakeDataStore();
   const [loading, setLoading] = useState(true);
   const [employee, setEmployee] = useState<any>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -161,7 +165,7 @@ const MyPlanning = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, weekDates, toast]);
+  }, [user, weekDates, toast, fakeDataEnabled]);
 
   useEffect(() => {
     fetchEmployeeData();
@@ -220,193 +224,185 @@ const MyPlanning = () => {
       heures = Math.max(0, Math.min(24, editingHours.heures));
     }
 
-    // Mettre à jour l'affectation localement
-    setAssignments(assignments.map(assignment => 
-      assignment.id === editingHours.assignmentId 
-        ? { 
-            ...assignment, 
-            heures,
-            heure_debut: editingHours.heure_debut || undefined,
-            heure_fin: editingHours.heure_fin || undefined,
-          }
-        : assignment
-    ));
+    try {
+      // Sauvegarder dans la base de données
+      await updateAssignment.mutateAsync({
+        id: editingHours.assignmentId,
+        heures,
+        heure_debut: editingHours.heure_debut || undefined,
+        heure_fin: editingHours.heure_fin || undefined,
+      });
 
-    // TODO: Sauvegarder dans la base de données via une mutation
-    // Pour l'instant, on met à jour seulement localement
-    // await updateAssignment.mutateAsync({
-    //   id: editingHours.assignmentId,
-    //   heures,
-    //   heure_debut: editingHours.heure_debut,
-    //   heure_fin: editingHours.heure_fin,
-    // });
+      // Mettre à jour l'affectation localement pour un feedback immédiat
+      setAssignments(assignments.map(assignment => 
+        assignment.id === editingHours.assignmentId 
+          ? { 
+              ...assignment, 
+              heures,
+              heure_debut: editingHours.heure_debut || undefined,
+              heure_fin: editingHours.heure_fin || undefined,
+            }
+          : assignment
+      ));
 
-    setEditingHours(null);
-    toast({
-      title: "Horaires enregistrés",
-      description: editingHours.heure_debut && editingHours.heure_fin
-        ? `${editingHours.heure_debut} - ${editingHours.heure_fin} (${heures}h)`
-        : `${heures}h enregistrées`,
-    });
+      setEditingHours(null);
+      toast({
+        title: "Horaires enregistrés",
+        description: editingHours.heure_debut && editingHours.heure_fin
+          ? `${editingHours.heure_debut} - ${editingHours.heure_fin} (${heures}h)`
+          : `${heures}h enregistrées`,
+      });
+    } catch (error) {
+      // L'erreur est déjà gérée par le hook (toast)
+      console.error("Error saving hours:", error);
+    }
   };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto w-full">
-          <div className="p-4 md:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Chargement...</p>
-              </div>
-            </div>
+      <PageLayout>
+        <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Clock className="h-12 w-12 mx-auto mb-4 animate-pulse text-primary" />
+            <p className="text-muted-foreground">Chargement...</p>
           </div>
-        </main>
-      </div>
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto w-full">
-        <div className="p-4 md:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-          {/* En-tête */}
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2">
-              <Calendar className="h-6 w-6 md:h-8 md:w-8" />
-              Mon Planning
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Consultez vos affectations et heures travaillées
-            </p>
-          </div>
+    <PageLayout>
+      <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        {/* En-tête */}
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+            <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+            Mon Planning
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Consultez vos affectations et heures travaillées
+          </p>
+        </div>
 
-          {/* Informations employé */}
-          {employee && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Mes Informations
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Nom complet</p>
-                    <p className="font-semibold text-lg">
-                      {employee.prenom} {employee.nom}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Poste</p>
-                    <p className="font-semibold text-lg">{employee.poste}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-semibold text-lg">{employee.email}</p>
-                  </div>
-                </div>
-                {employee.specialites && employee.specialites.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm text-muted-foreground mb-2">Spécialités</p>
-                    <div className="flex flex-wrap gap-2">
-                      {employee.specialites.map((spec: string, idx: number) => (
-                        <Badge key={idx} variant="outline">
-                          {spec}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Statistiques de la semaine */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Statistiques de la semaine
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+        {/* Informations employé */}
+        {employee && (
+          <GlassCard className="p-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <User className="h-5 w-5 text-primary" />
+              <h2 className="text-lg sm:text-xl font-semibold">Mes Informations</h2>
+            </div>
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Total heures</p>
-                  <p className="text-2xl font-bold">{getTotalHoursForWeek()}h</p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Affectations</p>
-                  <p className="text-2xl font-bold">{assignments.length}</p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Chantiers</p>
-                  <p className="text-2xl font-bold">
-                    {new Set(assignments.map((a) => a.project_id)).size}
+                <div>
+                  <p className="text-sm text-muted-foreground">Nom complet</p>
+                  <p className="font-semibold text-lg">
+                    {employee.prenom} {employee.nom}
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Planning hebdomadaire */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Planning de la semaine
-                  </CardTitle>
-                  <CardDescription>
-                    Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[4])}
-                  </CardDescription>
+                  <p className="text-sm text-muted-foreground">Poste</p>
+                  <p className="font-semibold text-lg">{employee.poste}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const prevWeek = new Date(currentWeek);
-                      prevWeek.setDate(prevWeek.getDate() - 7);
-                      setCurrentWeek(prevWeek);
-                    }}
-                    className="gap-2"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Semaine précédente</span>
-                    <span className="sm:hidden">Préc.</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentWeek(new Date())}
-                  >
-                    Aujourd'hui
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const nextWeek = new Date(currentWeek);
-                      nextWeek.setDate(nextWeek.getDate() + 7);
-                      setCurrentWeek(nextWeek);
-                    }}
-                    className="gap-2"
-                  >
-                    <span className="hidden sm:inline">Semaine suivante</span>
-                    <span className="sm:hidden">Suiv.</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                <div>
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <p className="font-semibold text-lg">{employee.email}</p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+              {employee.specialites && employee.specialites.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground mb-2">Spécialités</p>
+                  <div className="flex flex-wrap gap-2">
+                    {employee.specialites.map((spec: string, idx: number) => (
+                      <Badge key={idx} variant="outline">
+                        {spec}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Statistiques de la semaine */}
+        <GlassCard className="p-6">
+          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <Clock className="h-5 w-5 text-primary" />
+            <h2 className="text-lg sm:text-xl font-semibold">Statistiques de la semaine</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-border/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Total heures</p>
+                <p className="text-2xl font-bold">{getTotalHoursForWeek()}h</p>
+              </div>
+              <div className="p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-border/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Affectations</p>
+                <p className="text-2xl font-bold">{assignments.length}</p>
+              </div>
+              <div className="p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-border/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Chantiers</p>
+                <p className="text-2xl font-bold">
+                  {new Set(assignments.map((a) => a.project_id)).size}
+                </p>
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+
+        {/* Planning hebdomadaire */}
+        <GlassCard className="p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <h2 className="text-lg sm:text-xl font-semibold">Planning de la semaine</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[4])}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const prevWeek = new Date(currentWeek);
+                  prevWeek.setDate(prevWeek.getDate() - 7);
+                  setCurrentWeek(prevWeek);
+                }}
+                className="gap-2 rounded-xl"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Semaine précédente</span>
+                <span className="sm:hidden">Préc.</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(new Date())}
+                className="rounded-xl"
+              >
+                Aujourd'hui
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const nextWeek = new Date(currentWeek);
+                  nextWeek.setDate(nextWeek.getDate() + 7);
+                  setCurrentWeek(nextWeek);
+                }}
+                className="gap-2 rounded-xl"
+              >
+                <span className="hidden sm:inline">Semaine suivante</span>
+                <span className="sm:hidden">Suiv.</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-4">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -488,8 +484,8 @@ const MyPlanning = () => {
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+          </div>
+        </GlassCard>
 
           {/* Dialog pour éditer les horaires */}
           <Dialog open={editingHours !== null} onOpenChange={() => setEditingHours(null)}>
@@ -572,12 +568,10 @@ const MyPlanning = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          </div>
         </div>
-      </main>
-    </div>
-  );
-};
+      </PageLayout>
+    );
+  };
 
 export default MyPlanning;
 

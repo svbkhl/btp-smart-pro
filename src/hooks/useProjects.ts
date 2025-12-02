@@ -4,45 +4,17 @@ import { useAuth } from "./useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_PROJECTS } from "@/fakeData/projects";
-
-export interface Project {
-  id: string;
-  user_id: string;
-  client_id?: string;
-  name: string;
-  status: "planifié" | "en_attente" | "en_cours" | "terminé" | "annulé";
-  progress: number;
-  budget?: number;
-  costs?: number;
-  benefice?: number; // Bénéfice calculé pour les projets terminés
-  location?: string;
-  start_date?: string;
-  end_date?: string;
-  description?: string;
-  image_url?: string;
-  created_at: string;
-  updated_at: string;
-  // Relation avec client (joined)
-  client?: {
-    id: string;
-    name: string;
-    email?: string;
-  };
-  // Relation avec devis (joined)
-  ai_quotes?: Array<{
-    id: string;
-    estimated_cost?: number;
-    details?: any;
-    status?: string;
-  }>;
-}
+import type { Project } from "@/fakeData/projects";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 export interface CreateProjectData {
-  client_id?: string;
   name: string;
+  client_id?: string;
   status?: "planifié" | "en_attente" | "en_cours" | "terminé" | "annulé";
   progress?: number;
   budget?: number;
+  costs?: number;
+  actual_revenue?: number;
   location?: string;
   start_date?: string;
   end_date?: string;
@@ -57,42 +29,40 @@ export interface UpdateProjectData extends Partial<CreateProjectData> {
 // Hook pour récupérer tous les projets
 export const useProjects = () => {
   const { user } = useAuth();
+  const { fakeDataEnabled } = useFakeDataStore();
 
   return useQuery({
-    queryKey: ["projects", user?.id],
+    queryKey: ["projects", user?.id, fakeDataEnabled],
     queryFn: async () => {
+      // Si fake data est activé, retourner directement les fake data
+      if (fakeDataEnabled) {
+        console.log("🎭 Mode démo activé - Retour des fake projects");
+        return FAKE_PROJECTS;
+      }
+
+      // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
 
           const { data, error } = await supabase
             .from("projects")
-            .select(`
-              *,
-              client:clients(id, name, email),
-              ai_quotes(id, estimated_cost, details, status)
-            `)
+            .select("*, client:clients(id, name, email)")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false });
 
-          if (error) {
-            // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
-            // Si fake data activé → retourne FAKE_PROJECTS
-            // Si fake data désactivé → retourne []
-            throw error;
-          }
-          // Retourner les vraies données (même si vide)
-          // queryWithTimeout gère le fallback automatiquement
-          return (data as Project[]) || [];
+          if (error) throw error;
+          return data as Project[];
         },
-        FAKE_PROJECTS,
+        [],
         "useProjects"
       );
     },
-    enabled: !!user,
+    enabled: !!user || fakeDataEnabled,
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 
@@ -109,19 +79,12 @@ export const useProject = (id: string | undefined) => {
 
           const { data, error } = await supabase
             .from("projects")
-            .select(`
-              *,
-              client:clients(id, name, email),
-              ai_quotes(id, estimated_cost, details, status)
-            `)
+            .select("*, client:clients(id, name, email)")
             .eq("id", id)
             .eq("user_id", user.id)
             .single();
 
-          if (error) {
-            // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
-            throw error;
-          }
+          if (error) throw error;
           return data as Project;
         },
         FAKE_PROJECTS[0] || null,
@@ -132,7 +95,6 @@ export const useProject = (id: string | undefined) => {
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
-    throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
   });
 };
 
@@ -144,43 +106,26 @@ export const useCreateProject = () => {
 
   return useMutation({
     mutationFn: async (projectData: CreateProjectData) => {
-      if (!user) {
-        console.error("User not authenticated");
-        throw new Error("User not authenticated");
-      }
+      if (!user) throw new Error("User not authenticated");
 
-      // Préparer les données pour l'insertion
+      // Construire l'objet d'insertion en excluant les champs undefined
       const insertData: any = {
-        name: projectData.name,
         user_id: user.id,
+        name: projectData.name,
         status: projectData.status || "planifié",
-        progress: projectData.progress ?? 0,
+        progress: projectData.progress || 0,
       };
 
       // Ajouter les champs optionnels seulement s'ils sont définis
-      if (projectData.client_id) {
-        insertData.client_id = projectData.client_id;
-      }
-      if (projectData.budget !== undefined && projectData.budget !== null) {
-        insertData.budget = projectData.budget;
-      }
-      if (projectData.location) {
-        insertData.location = projectData.location;
-      }
-      // Les dates doivent être au format DATE (sans heure) ou NULL
-      if (projectData.start_date) {
-        // Extraire seulement la date (YYYY-MM-DD) si c'est un datetime
-        insertData.start_date = projectData.start_date.split('T')[0];
-      }
-      if (projectData.end_date) {
-        insertData.end_date = projectData.end_date.split('T')[0];
-      }
-      if (projectData.description) {
-        insertData.description = projectData.description;
-      }
-      if (projectData.image_url) {
-        insertData.image_url = projectData.image_url;
-      }
+      if (projectData.client_id) insertData.client_id = projectData.client_id;
+      if (projectData.budget !== undefined) insertData.budget = projectData.budget;
+      if (projectData.costs !== undefined) insertData.costs = projectData.costs;
+      if (projectData.actual_revenue !== undefined) insertData.actual_revenue = projectData.actual_revenue;
+      if (projectData.location) insertData.location = projectData.location;
+      if (projectData.start_date) insertData.start_date = projectData.start_date;
+      if (projectData.end_date) insertData.end_date = projectData.end_date;
+      if (projectData.description) insertData.description = projectData.description;
+      if (projectData.image_url) insertData.image_url = projectData.image_url;
 
       const { data, error } = await supabase
         .from("projects")
@@ -188,28 +133,20 @@ export const useCreateProject = () => {
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       return data as Project;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["user_stats"] });
       toast({
         title: "Projet créé",
         description: "Le projet a été créé avec succès.",
       });
     },
-    onError: (error: unknown) => {
-      const errorMessage = 
-        error instanceof Error 
-          ? error.message 
-          : "Erreur lors de la création du projet";
+    onError: (error: Error) => {
       toast({
         title: "Erreur",
-        description: errorMessage,
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -226,9 +163,25 @@ export const useUpdateProject = () => {
     mutationFn: async ({ id, ...projectData }: UpdateProjectData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Construire l'objet de mise à jour en excluant les champs undefined
+      const updateData: any = {};
+      
+      if (projectData.name !== undefined) updateData.name = projectData.name;
+      if (projectData.client_id !== undefined) updateData.client_id = projectData.client_id;
+      if (projectData.status !== undefined) updateData.status = projectData.status;
+      if (projectData.progress !== undefined) updateData.progress = projectData.progress;
+      if (projectData.budget !== undefined) updateData.budget = projectData.budget;
+      if (projectData.costs !== undefined) updateData.costs = projectData.costs;
+      if (projectData.actual_revenue !== undefined) updateData.actual_revenue = projectData.actual_revenue;
+      if (projectData.location !== undefined) updateData.location = projectData.location;
+      if (projectData.start_date !== undefined) updateData.start_date = projectData.start_date;
+      if (projectData.end_date !== undefined) updateData.end_date = projectData.end_date;
+      if (projectData.description !== undefined) updateData.description = projectData.description;
+      if (projectData.image_url !== undefined) updateData.image_url = projectData.image_url;
+
       const { data, error } = await supabase
         .from("projects")
-        .update(projectData)
+        .update(updateData)
         .eq("id", id)
         .eq("user_id", user.id)
         .select()
@@ -240,7 +193,6 @@ export const useUpdateProject = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["project"] });
-      queryClient.invalidateQueries({ queryKey: ["user_stats"] });
       toast({
         title: "Projet mis à jour",
         description: "Le projet a été mis à jour avec succès.",
@@ -277,7 +229,6 @@ export const useDeleteProject = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["user_stats"] });
       toast({
         title: "Projet supprimé",
         description: "Le projet a été supprimé avec succès.",
@@ -292,4 +243,6 @@ export const useDeleteProject = () => {
     },
   });
 };
+
+
 

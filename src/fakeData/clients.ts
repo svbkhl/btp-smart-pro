@@ -1,54 +1,46 @@
-import { Client } from "@/hooks/useClients";
+import type { Client } from "@/hooks/useClients";
 
 export const FAKE_CLIENTS: Client[] = [
   {
     id: "fake-client-1",
     user_id: "fake-user",
     name: "M. Martin",
-    email: "martin@example.fr",
-    phone: "+33 6 11 22 33 44",
-    location: "12 Rue de la République, 75001 Paris",
+    email: "martin@example.com",
+    phone: "+33 6 12 34 56 78",
+    location: "Paris, 75001",
     status: "actif",
     total_spent: 45000,
-    created_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "fake-client-2",
     user_id: "fake-user",
     name: "Mme. Dupont",
-    email: "dupont@example.fr",
-    phone: "+33 6 22 33 44 55",
-    location: "45 Avenue des Champs, 69000 Lyon",
+    email: "dupont@example.com",
+    phone: "+33 6 23 45 67 89",
+    location: "Lyon, 69001",
     status: "actif",
     total_spent: 18000,
-    created_at: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "fake-client-3",
     user_id: "fake-user",
     name: "Entreprise Bernard",
-    email: "bernard@example.fr",
-    phone: "+33 6 33 44 55 66",
-    location: "78 Rue du Commerce, 13000 Marseille",
+    email: "contact@bernard.fr",
+    phone: "+33 1 23 45 67 89",
+    location: "Marseille, 13001",
     status: "VIP",
     total_spent: 125000,
-    created_at: new Date(Date.now() - 300 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "fake-client-4",
-    user_id: "fake-user",
-    name: "SARL Dubois",
-    email: "dubois@example.fr",
-    phone: "+33 6 44 55 66 77",
-    location: "23 Boulevard Saint-Michel, 75005 Paris",
-    status: "actif",
-    total_spent: 32000,
-    created_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
+
+
+
+
 
 

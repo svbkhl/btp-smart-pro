@@ -51,10 +51,6 @@ export async function safeAction<T = any>(
   try {
     const result = await asyncFn();
 
-    // Log de succès
-    if (successMessage && logError) {
-      console.log("✅ Action réussie:", successMessage);
-    }
 
     // Toast de succès
     if (successMessage && showSuccessToast) {
@@ -118,10 +114,6 @@ export function safeActionSync<T = any>(
   try {
     const result = fn();
 
-    // Log de succès
-    if (successMessage && logError) {
-      console.log("✅ Action réussie:", successMessage);
-    }
 
     // Toast de succès
     if (successMessage && showSuccessToast) {

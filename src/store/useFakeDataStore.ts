@@ -19,38 +19,24 @@ interface FakeDataState {
 export const useFakeDataStore = create<FakeDataState>()(
   persist(
     (set, get) => ({
-      fakeDataEnabled: 
-        import.meta.env.VITE_FAKE_DATA === "true" || 
-        import.meta.env.VITE_FAKE_DATA === "ON",
+      // Par défaut, le fake data est désactivé
+      // Il ne sera activé QUE par le mode démo de la landing page
+      fakeDataEnabled: false,
       
       toggleFakeData: () => {
+        // Cette fonction n'est plus utilisée (toggle supprimé du Sidebar)
+        // Conservée pour compatibilité mais ne devrait pas être appelée
         const currentState = get();
         const newState = !currentState.fakeDataEnabled;
-        
-        // Invalider le cache React Query pour forcer le rechargement des données
-        // Import dynamique pour éviter les problèmes de dépendances circulaires
-        import("@tanstack/react-query").then(({ useQueryClient }) => {
-          // Cette fonction sera appelée depuis un composant qui a accès au QueryClient
-          // On invalide toutes les queries pour forcer le rechargement
-        });
-        
         set({ fakeDataEnabled: newState });
-        
-        // Rafraîchir la page pour appliquer le changement immédiatement
-        // et recharger les données avec le nouveau mode
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
       },
       
       setFakeDataEnabled: (enabled: boolean) => {
+        console.log("🔄 setFakeDataEnabled appelé avec:", enabled);
         set({ fakeDataEnabled: enabled });
-        
-        // Rafraîchir la page pour appliquer le changement immédiatement
-        // et recharger les données avec le nouveau mode
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
+        console.log("✅ État mis à jour, nouveau fakeDataEnabled:", get().fakeDataEnabled);
+        // Ne pas rafraîchir la page automatiquement
+        // Le rechargement sera géré par les composants qui utilisent ce store
       },
     }),
     {

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_USER_STATS } from "@/fakeData/stats";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 export interface UserStats {
   id: string;
@@ -20,10 +21,18 @@ export interface UserStats {
 // Hook pour récupérer les statistiques utilisateur
 export const useUserStats = () => {
   const { user } = useAuth();
+  const { fakeDataEnabled } = useFakeDataStore();
 
   return useQuery({
-    queryKey: ["user_stats", user?.id],
+    queryKey: ["user_stats", user?.id, fakeDataEnabled],
     queryFn: async () => {
+      // Si fake data est activé, retourner directement les fake data
+      if (fakeDataEnabled) {
+        console.log("🎭 Mode démo activé - Retour des fake user stats");
+        return FAKE_USER_STATS;
+      }
+
+      // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
@@ -43,34 +52,22 @@ export const useUserStats = () => {
                 .select()
                 .single();
 
-              if (insertError) {
-                // Si erreur d'insertion et fake data activé, retourner fake data
-                const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-                if (isFakeDataEnabled()) {
-                  return FAKE_USER_STATS;
-                }
-                throw insertError;
-              }
+              if (insertError) throw insertError;
               return newStats as UserStats;
-            }
-            // Si autre erreur et fake data activé, retourner fake data
-            // Sinon, lancer l'erreur pour que React Query gère l'état d'erreur
-            const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-            if (isFakeDataEnabled()) {
-              return FAKE_USER_STATS;
             }
             throw error;
           }
           return data as UserStats;
         },
-        FAKE_USER_STATS,
+        null,
         "useUserStats"
       );
     },
-    enabled: !!user,
+    enabled: !!user || fakeDataEnabled,
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 

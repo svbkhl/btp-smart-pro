@@ -73,7 +73,7 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 240 10% 4%;
+    --background: 240 10% 7%;
     --foreground: 0 0% 98%;
 
     --card: 240 6% 10%;
@@ -147,7 +147,25 @@ All colors MUST be HSL.
   /* Optimisation du scroll pour toutes les sections */
   section {
     scroll-margin-top: 0;
-    will-change: transform;
+    contain: layout style;
+  }
+  
+  /* Optimisation des animations pour la performance */
+  @media (prefers-reduced-motion: no-preference) {
+    * {
+      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  }
+  
+  /* Réduction des animations pour les utilisateurs qui préfèrent moins de mouvement */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -381,6 +399,81 @@ button,
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+}
+
+/* Styles de boutons restaurés - utilisation des variantes standard de Shadcn UI */
+
+/* ============================================
+   OPTIMISATION DES TRANSITIONS GLOBALES - FLUIDITÉ MAXIMALE
+   ============================================ */
+@layer base {
+  /* Transitions globales ultra rapides pour fluidité */
+  * {
+    transition: all 0.15s ease-out;
+  }
+  
+  /* Exceptions pour les animations complexes (Framer Motion, etc.) */
+  [class*="motion-"],
+  [data-framer-name],
+  [data-radix-scroll-area-viewport],
+  video,
+  canvas,
+  svg,
+  path {
+    transition: none !important;
+  }
+  
+  /* Transitions spécifiques optimisées pour les interactions */
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    transition: all 0.15s ease-out;
+  }
+  
+  /* Optimisation des hover - instantané et fluide */
+  button:hover,
+  a:hover,
+  [role="button"]:hover {
+    transition: all 0.1s ease-out;
+  }
+  
+  /* Transitions pour les cards - smooth */
+  [class*="card"],
+  [class*="Card"] {
+    transition: all 0.2s ease-out;
+  }
+  
+  /* Transitions pour les pages et navigation - rapide */
+  [class*="Page"],
+  [class*="Layout"],
+  main,
+  section {
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  }
+  
+  /* Transitions pour les onglets et menus - instantané */
+  [role="tab"],
+  [role="menuitem"],
+  [class*="Tab"],
+  [class*="Menu"] {
+    transition: all 0.1s ease-out;
+  }
+  
+  /* Scroll smooth optimisé */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Optimisation des transform pour performance */
+  button,
+  a,
+  [role="button"] {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+  }
 }
 
 /* Classes utilitaires pour la couleur IA */

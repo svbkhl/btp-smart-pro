@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_CLIENTS } from "@/fakeData/clients";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 export interface Client {
   id: string;
@@ -35,10 +36,18 @@ export interface UpdateClientData extends Partial<CreateClientData> {
 // Hook pour récupérer tous les clients
 export const useClients = () => {
   const { user } = useAuth();
+  const { fakeDataEnabled } = useFakeDataStore();
 
   return useQuery({
-    queryKey: ["clients", user?.id],
+    queryKey: ["clients", user?.id, fakeDataEnabled],
     queryFn: async () => {
+      // Si fake data est activé, retourner directement les fake data
+      if (fakeDataEnabled) {
+        console.log("🎭 Mode démo activé - Retour des fake clients");
+        return FAKE_CLIENTS;
+      }
+
+      // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
@@ -50,33 +59,24 @@ export const useClients = () => {
             .order("created_at", { ascending: false });
 
           if (error) {
-            // Si erreur et fake data activé, retourner fake data
-            // Sinon, lancer l'erreur pour que React Query gère l'état d'erreur
-            const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-            if (isFakeDataEnabled()) {
-              return FAKE_CLIENTS;
+            // Gérer les erreurs 404 (table n'existe pas ou RLS bloque)
+            if (error.code === 'PGRST116' || error.message?.includes('404') || error.message?.includes('does not exist')) {
+              console.warn('Table clients non accessible. Vérifiez que la table existe et que les RLS policies sont configurées.');
+              return [];
             }
             throw error;
           }
-          // Si pas de données et fake data activé, retourner fake data
-          // Sinon, retourner un tableau vide
-          if (!data || data.length === 0) {
-            const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-            if (isFakeDataEnabled()) {
-              return FAKE_CLIENTS;
-            }
-            return [];
-          }
-          return data as Client[];
+          return (data || []) as Client[];
         },
-        FAKE_CLIENTS,
+        [],
         "useClients"
       );
     },
-    enabled: !!user,
+    enabled: !!user || fakeDataEnabled,
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 
@@ -126,17 +126,125 @@ export const useCreateClient = () => {
     mutationFn: async (clientData: CreateClientData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Vérifier si le mode fake data est activé
+      const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
+      if (isFakeDataEnabled()) {
+        // En mode fake data, créer un faux client
+        const fakeClient: Client = {
+          id: `fake-client-${Date.now()}`,
+          user_id: user.id,
+          name: clientData.name,
+          email: clientData.email,
+          phone: clientData.phone,
+          location: clientData.location,
+          avatar_url: clientData.avatar_url,
+          status: clientData.status || "actif",
+          total_spent: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        console.log("Created fake client:", fakeClient);
+        return fakeClient;
+      }
+
+      console.log("Creating client with data:", clientData);
+      console.log("User ID:", user.id);
+      console.log("User ID type:", typeof user.id);
+      console.log("User ID is valid UUID:", /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id));
+
+      // Vérifier que user_id est bien un UUID valide
+      if (!user.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+        throw new Error(`User ID invalide: ${user.id}`);
+      }
+
+      // Construire l'objet d'insertion de manière explicite avec seulement les champs nécessaires
+      const insertData: {
+        user_id: string;
+        name: string;
+        status: string;
+        email?: string;
+        phone?: string;
+        location?: string;
+        avatar_url?: string;
+      } = {
+        user_id: user.id,
+        name: clientData.name.trim(),
+        status: clientData.status || "actif",
+      };
+
+      // Ajouter les champs optionnels seulement s'ils sont définis et non vides
+      if (clientData.email?.trim()) {
+        insertData.email = clientData.email.trim();
+      }
+      if (clientData.phone?.trim()) {
+        insertData.phone = clientData.phone.trim();
+      }
+      if (clientData.location?.trim()) {
+        insertData.location = clientData.location.trim();
+      }
+      if (clientData.avatar_url?.trim()) {
+        insertData.avatar_url = clientData.avatar_url.trim();
+      }
+
+      console.log("Inserting into Supabase:", JSON.stringify(insertData, null, 2));
+      console.log("Insert data keys:", Object.keys(insertData));
+      console.log("Insert data values:", Object.values(insertData));
+
+      // S'assurer que les champs optionnels NULL ne sont pas envoyés si vides
+      // Cela évite les problèmes avec les triggers de validation qui vérifient email/phone
+      const cleanInsertData: {
+        user_id: string;
+        name: string;
+        status: string;
+        email?: string;
+        phone?: string;
+        location?: string;
+        avatar_url?: string;
+      } = {
+        user_id: user.id,
+        name: insertData.name,
+        status: insertData.status,
+      };
+
+      // Ajouter seulement les champs non vides (les triggers de validation peuvent échouer si on envoie des chaînes vides)
+      if (insertData.email && insertData.email.trim().length > 0) {
+        cleanInsertData.email = insertData.email.trim();
+      }
+      if (insertData.phone && insertData.phone.trim().length > 0) {
+        cleanInsertData.phone = insertData.phone.trim();
+      }
+      if (insertData.location && insertData.location.trim().length > 0) {
+        cleanInsertData.location = insertData.location.trim();
+      }
+      if (insertData.avatar_url && insertData.avatar_url.trim().length > 0) {
+        cleanInsertData.avatar_url = insertData.avatar_url.trim();
+      }
+
+      console.log("Clean insert data:", JSON.stringify(cleanInsertData, null, 2));
+
+      // Essayer l'insertion
       const { data, error } = await supabase
         .from("clients")
-        .insert({
-          ...clientData,
-          user_id: user.id,
-          status: clientData.status || "actif",
-        })
+        .insert(cleanInsertData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        console.error("Full error details:", JSON.stringify(error, null, 2));
+        console.error("Error code:", error.code);
+        console.error("Error hint:", error.hint);
+        
+        // Si l'erreur mentionne "clients" comme UUID, c'est probablement un problème de trigger
+        if (error.message?.includes('invalid input syntax for type uuid: "clients"')) {
+          console.error("⚠️ Erreur causée par un trigger. Le trigger notify_on_client_created essaie probablement d'utiliser 'clients' comme UUID.");
+          console.error("💡 Solution: Exécutez le script SQL: supabase/FIX-CLIENTS-INSERT-TRIGGER.sql dans Supabase Dashboard > SQL Editor");
+          throw new Error("Erreur lors de la création du client. Le trigger de notification est mal configuré. Veuillez exécuter le script de correction SQL.");
+        }
+        
+        throw new Error(error.message || "Impossible de créer le client");
+      }
+      
       return data as Client;
     },
     onSuccess: () => {
@@ -147,9 +255,10 @@ export const useCreateClient = () => {
       });
     },
     onError: (error: Error) => {
+      console.error("Create client error:", error);
       toast({
         title: "Erreur",
-        description: error.message,
+        description: error.message || "Impossible de créer le client",
         variant: "destructive",
       });
     },

@@ -89,6 +89,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
   }, [client, open, reset]);
 
   const onSubmit = async (data: ClientFormData) => {
+    console.log("Client form submitted:", data);
     setIsSubmitting(true);
     try {
       const clientData: CreateClientData = {
@@ -107,8 +108,10 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
       }
       onOpenChange(false);
       reset();
-    } catch (error) {
+      setAvatarUrl("");
+    } catch (error: any) {
       console.error("Error saving client:", error);
+      alert(`Erreur: ${error.message || "Impossible de sauvegarder le client"}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -116,7 +119,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{client ? "Modifier le client" : "Nouveau client"}</DialogTitle>
           <DialogDescription>

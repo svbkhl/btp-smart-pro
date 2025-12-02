@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Sidebar from "@/components/Sidebar";
-import { Card, CardContent } from "@/components/ui/card";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { KPIBlock } from "@/components/ui/KPIBlock";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,8 +19,7 @@ import {
   Trash2,
   FolderKanban,
   Download,
-  CheckCircle2,
-  Clock
+  X
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useProjects, useDeleteProject } from "@/hooks/useProjects";
@@ -26,7 +27,7 @@ import { ProjectForm } from "@/components/ProjectForm";
 import { Pagination } from "@/components/Pagination";
 import { AdvancedFilters, AdvancedFiltersProps } from "@/components/AdvancedFilters";
 import { useClients } from "@/hooks/useClients";
-import { exportProjectsToCSV, exportProjectsToJSON } from "@/services/exportService";
+import { exportProjectsToCSV } from "@/services/exportService";
 import { safeAction } from "@/utils/safeAction";
 import {
   Select,
@@ -45,11 +46,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { motion } from "framer-motion";
 
 const ITEMS_PER_PAGE = 12;
 
 const Projects = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // Debounce 300ms
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersProps["filters"]>({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,30 +60,23 @@ const Projects = () => {
   const [editingProject, setEditingProject] = useState<any>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   
-  // Les hooks retournent déjà des données mock en cas de timeout (3 secondes)
-  // Cette approche évite les chargements infinis en affichant toujours du contenu
   const { data: projects, isLoading } = useProjects();
   const { data: clients } = useClients();
   const deleteProject = useDeleteProject();
   
-  // Utiliser des données par défaut pour éviter les chargements infinis
   const displayProjects = projects || [];
 
-  // Filtrer les projets selon la recherche, le statut et les filtres avancés avec useMemo
   const filteredProjects = useMemo(() => {
     if (!displayProjects || displayProjects.length === 0) return [];
     return displayProjects.filter(project => {
-      // Recherche
-      const searchLower = searchQuery.toLowerCase();
+      const searchLower = debouncedSearchQuery.toLowerCase(); // Utilise la valeur debouncée
       const matchesSearch = 
         project.name.toLowerCase().includes(searchLower) ||
         project.location?.toLowerCase().includes(searchLower) ||
         project.client?.name.toLowerCase().includes(searchLower);
       
-      // Statut
       const matchesStatus = statusFilter === "all" || project.status === statusFilter;
       
-      // Filtres avancés
       const matchesClient = !advancedFilters.clientId || project.client_id === advancedFilters.clientId;
       
       const matchesBudget = 
@@ -95,9 +91,8 @@ const Projects = () => {
       
       return matchesSearch && matchesStatus && matchesClient && matchesBudget && matchesStartDate && matchesEndDate;
     });
-  }, [displayProjects, searchQuery, statusFilter, advancedFilters]);
+  }, [displayProjects, debouncedSearchQuery, statusFilter, advancedFilters]); // Utilise debouncedSearchQuery
 
-  // Pagination avec useMemo
   const paginationData = useMemo(() => {
     const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -108,7 +103,6 @@ const Projects = () => {
   
   const { totalPages, paginatedProjects, startIndex, endIndex } = paginationData;
 
-  // Réinitialiser la page quand les filtres changent
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, advancedFilters]);
@@ -175,63 +169,145 @@ const Projects = () => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
-  return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      
-      <main className="flex-1 overflow-y-auto w-full">
-        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Chantiers</h1>
-              <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                Gérez tous vos chantiers en un seul endroit
-              </p>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              {filteredProjects.length > 0 && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => safeAction(
-                      () => exportProjectsToCSV(filteredProjects),
-                      {
-                        successMessage: "Export CSV réussi",
-                        errorMessage: "Erreur lors de l'export CSV",
-                        showSuccessToast: false, // L'export ne nécessite pas de toast de succès
-                      }
-                    )}
-                    className="gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline">Export CSV</span>
-                  </Button>
-                </div>
-              )}
-              <Button className="gap-2 flex-1 sm:flex-initial" onClick={handleCreateNew}>
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Nouveau chantier</span>
-                <span className="sm:hidden">Nouveau</span>
-              </Button>
-            </div>
-          </div>
+  // Calculer les KPIs
+  const stats = useMemo(() => {
+    const active = filteredProjects.filter(p => p.status === "en_cours").length;
+    const completed = filteredProjects.filter(p => p.status === "terminé").length;
+    const totalBudget = filteredProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
+    return { active, completed, totalBudget, total: filteredProjects.length };
+  }, [filteredProjects]);
 
-          {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-            <div className="relative flex-1 max-w-full sm:max-w-md">
+  return (
+    <PageLayout>
+      <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-4 sm:space-y-6 md:space-y-8 bg-transparent">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+              Chantiers
+            </h1>
+            <p className="text-muted-foreground text-base">
+              Gérez tous vos chantiers en un seul endroit
+            </p>
+          </div>
+          <Button
+            onClick={handleCreateNew}
+            className="gap-2 rounded-xl bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30 hover:border-white/30 dark:hover:border-white/20 hover:shadow-lg"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nouveau chantier</span>
+            <span className="sm:hidden">Nouveau</span>
+          </Button>
+        </motion.div>
+
+        {/* KPI Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            className="rounded-xl bg-card/50 backdrop-blur-xl border border-border/30 shadow-lg hover:shadow-xl transition-shadow duration-200 p-6"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Total chantiers</p>
+                <h3 className="text-3xl font-bold text-foreground">{stats.total}</h3>
+                <p className="text-xs text-muted-foreground mt-2">{stats.active} en cours</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/20 dark:to-cyan-500/20 flex items-center justify-center">
+                <FolderKanban className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            className="rounded-xl bg-card/50 backdrop-blur-xl border border-border/30 shadow-lg hover:shadow-xl transition-shadow duration-200 p-6"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground mb-1">En cours</p>
+                <h3 className="text-3xl font-bold text-foreground">{stats.active}</h3>
+                <p className="text-xs text-muted-foreground mt-2">Chantiers actifs</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+            className="rounded-xl bg-card/50 backdrop-blur-xl border border-border/30 shadow-lg hover:shadow-xl transition-shadow duration-200 p-6"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Terminés</p>
+                <h3 className="text-3xl font-bold text-foreground">{stats.completed}</h3>
+                <p className="text-xs text-muted-foreground mt-2">Chantiers complétés</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 flex items-center justify-center">
+                <ArrowRight className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+            className="rounded-xl bg-card/50 backdrop-blur-xl border border-border/30 shadow-lg hover:shadow-xl transition-shadow duration-200 p-6"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Budget total</p>
+                <h3 className="text-3xl font-bold text-foreground">
+                  {new Intl.NumberFormat('fr-FR', { 
+                    style: 'currency', 
+                    currency: 'EUR', 
+                    maximumFractionDigits: 0 
+                  }).format(stats.totalBudget)}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-2">Budget cumulé</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/20 flex items-center justify-center">
+                <Euro className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Search and Filters */}
+        <GlassCard delay={0.5} className="p-6">
+          <div className="space-y-4">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 placeholder="Rechercher un chantier..." 
-                className="pl-10"
+                className="pl-10 rounded-xl border-white/20 dark:border-gray-700/30"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 rounded-lg"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            <div className="flex gap-3 md:gap-4 flex-wrap">
+            <div className="flex gap-3 flex-wrap">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] rounded-xl border-white/20 dark:border-gray-700/30">
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>
@@ -251,172 +327,192 @@ const Projects = () => {
               />
             </div>
           </div>
+        </GlassCard>
 
-          {/* Projects Grid */}
-          {/* Afficher toujours le contenu, même pendant le chargement initial
-              Les hooks retournent des données mock après 3 secondes de timeout
-              Cela évite les chargements infinis */}
-          {isLoading && filteredProjects.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        {/* Projects Grid */}
+        {isLoading && filteredProjects.length === 0 ? (
+          <GlassCard className="p-12">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <span className="ml-2 text-sm text-muted-foreground">Chargement des projets...</span>
             </div>
-          ) : filteredProjects.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-                {paginatedProjects.map((project) => {
+          </GlassCard>
+        ) : filteredProjects.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {paginatedProjects.map((project, index) => {
                 const imageUrl = project.image_url || "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=400";
                 
                 return (
-                  <Card key={project.id} className="overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 group">
-                    <div className="relative h-48 overflow-hidden">
-                      <img 
-                        src={imageUrl} 
-                        alt={project.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                      <div className="absolute top-4 right-4 flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleEdit(project);
-                          }}
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setDeletingProjectId(project.id);
-                          }}
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-destructive text-destructive hover:text-destructive-foreground"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Badge variant={getStatusColor(project.status)} className="backdrop-blur-sm">
-                          {getStatusLabel(project.status)}
-                        </Badge>
+                  <motion.div
+                    key={project.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 + index * 0.05 }}
+                  >
+                    <GlassCard delay={0.6 + index * 0.05} className="overflow-hidden hover:scale-[1.02] transition-all">
+                      <div className="relative h-48 overflow-hidden rounded-t-2xl">
+                        <img 
+                          src={imageUrl} 
+                          alt={project.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover transition-transform duration-150 hover:scale-110"
+                          style={{ willChange: 'transform' }}
+                        />
+                        <div className="absolute top-4 right-4 flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleEdit(project);
+                            }}
+                            className="h-8 w-8"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setDeletingProjectId(project.id);
+                            }}
+                            className="h-8 w-8"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Badge variant={getStatusColor(project.status)} className="backdrop-blur-sm rounded-lg">
+                            {getStatusLabel(project.status)}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                    <CardContent className="p-6 space-y-4">
-                      <div>
+                      <div className="p-6 space-y-4">
+                        <div>
+                          <Link to={`/projects/${project.id}`}>
+                            <h3 className="font-semibold text-lg text-foreground mb-2 hover:text-primary transition-colors cursor-pointer">
+                              {project.name}
+                            </h3>
+                          </Link>
+                          <div className="space-y-2 text-sm text-muted-foreground">
+                            {project.client && (
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4" />
+                                {project.client.name}
+                              </div>
+                            )}
+                            {project.location && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                {project.location}
+                              </div>
+                            )}
+                            {project.budget && (
+                              <div className="flex items-center gap-2">
+                                <Euro className="w-4 h-4" />
+                                {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(project.budget)}
+                              </div>
+                            )}
+                            {(project.start_date || project.end_date) && (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4" />
+                                {formatDate(project.start_date)} - {formatDate(project.end_date)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Progression</span>
+                            <span className="font-medium text-foreground">{project.progress}%</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <motion.div 
+                              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${project.progress}%` }}
+                              transition={{ duration: 0.2, delay: 0.7 + index * 0.05 }}
+                            />
+                          </div>
+                        </div>
+
                         <Link to={`/projects/${project.id}`}>
-                          <h3 className="font-semibold text-lg text-foreground mb-2 group-hover:text-primary transition-colors cursor-pointer">
-                            {project.name}
-                          </h3>
+                          <Button variant="outline" className="w-full gap-2">
+                            Voir les détails
+                            <ArrowRight className="w-4 h-4" />
+                          </Button>
                         </Link>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                          {project.client && (
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4" />
-                              {project.client.name}
-                            </div>
-                          )}
-                          {project.location && (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-4 h-4" />
-                              {project.location}
-                            </div>
-                          )}
-                          {project.budget && (
-                            <div className="flex items-center gap-2">
-                              <Euro className="w-4 h-4" />
-                              {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(project.budget)}
-                            </div>
-                          )}
-                          {(project.start_date || project.end_date) && (
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {formatDate(project.start_date)} - {formatDate(project.end_date)}
-                            </div>
-                          )}
-                        </div>
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progression</span>
-                          <span className="font-medium text-foreground">{project.progress}%</span>
-                        </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-primary to-accent transition-all"
-                            style={{ width: `${project.progress}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <Link to={`/projects/${project.id}`}>
-                        <Button variant="ghost" className="w-full gap-2 group-hover:bg-primary/10 group-hover:text-primary">
-                          Voir les détails
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </Card>
+                    </GlassCard>
+                  </motion.div>
                 );
               })}
-              </div>
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                />
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <FolderKanban className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>{searchQuery || statusFilter !== "all" ? "Aucun projet trouvé" : "Aucun projet pour le moment"}</p>
+            </div>
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </>
+        ) : (
+          <GlassCard className="p-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <FolderKanban className="h-16 w-16 text-muted-foreground mb-4 opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">
+                {searchQuery || statusFilter !== "all" ? "Aucun projet trouvé" : "Aucun projet pour le moment"}
+              </h3>
               {!searchQuery && statusFilter === "all" && (
-                <Button variant="outline" className="mt-4" onClick={handleCreateNew}>
+                <Button variant="outline" className="mt-4 rounded-xl" onClick={handleCreateNew}>
                   Créer votre premier projet
                 </Button>
               )}
             </div>
-          )}
+          </GlassCard>
+        )}
 
-          {/* Info sur la pagination */}
-          {filteredProjects.length > 0 && (
-            <div className="text-center text-sm text-muted-foreground">
-              Affichage de {startIndex + 1} à {Math.min(endIndex, filteredProjects.length)} sur {filteredProjects.length} projet{filteredProjects.length > 1 ? "s" : ""}
-            </div>
-          )}
+        {/* Info sur la pagination */}
+        {filteredProjects.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="text-center text-sm text-muted-foreground bg-card/50 backdrop-blur-sm border border-border/30 rounded-xl px-4 py-2 inline-block"
+          >
+            Affichage de {startIndex + 1} à {Math.min(endIndex, filteredProjects.length)} sur {filteredProjects.length} projet{filteredProjects.length > 1 ? "s" : ""}
+          </motion.div>
+        )}
 
-          <ProjectForm 
-            open={isFormOpen} 
-            onOpenChange={setIsFormOpen}
-            project={editingProject || undefined}
-          />
+        <ProjectForm 
+          open={isFormOpen} 
+          onOpenChange={setIsFormOpen}
+          project={editingProject || undefined}
+        />
 
-          <AlertDialog open={!!deletingProjectId} onOpenChange={(open) => !open && setDeletingProjectId(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Supprimer le projet</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => deletingProjectId && handleDelete(deletingProjectId)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Supprimer
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </main>
-    </div>
+        <AlertDialog open={!!deletingProjectId} onOpenChange={(open) => !open && setDeletingProjectId(null)}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer le projet</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingProjectId && handleDelete(deletingProjectId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </PageLayout>
   );
 };
 

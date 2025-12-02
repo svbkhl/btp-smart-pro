@@ -1,821 +1,997 @@
-import { useState, useMemo } from "react";
-import Sidebar from "@/components/Sidebar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useMemo } from "react";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Building2,
+  Clock,
+  Users,
+  Edit2,
+  Loader2,
+  Plus,
+  Download,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, User, Calendar, Building2, X, Clock, Edit2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees";
-import { useProjects } from "@/hooks/useProjects";
+import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
+import { fr } from "date-fns/locale";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { FAKE_EMPLOYEES } from "@/fakeData/employees";
+import { FAKE_PROJECTS } from "@/fakeData/projects";
+import { FAKE_ASSIGNMENTS } from "@/fakeData/planning";
+import { exportPlanningPDF } from "@/services/planningPdfService";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 interface Employee {
-  id: number;
+  id: string;
   nom: string;
-  poste: string;
+  prenom?: string;
+  poste?: string;
   specialites?: string[];
 }
 
-interface Chantier {
-  id: number;
-  nom: string;
-}
-
-interface PlanningEntry {
+interface Project {
   id: string;
-  employeeId: number;
-  chantierId: number;
-  jour: string; // "lundi", "mardi", etc.
-  heures?: number; // Nombre d'heures travaillées (calculé automatiquement si horaires fournis)
-  heure_debut?: string; // Format HH:mm (ex: "08:00")
-  heure_fin?: string; // Format HH:mm (ex: "17:00")
+  name: string;
+  location?: string;
 }
 
-const joursSemaine = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
+interface Assignment {
+  id: string;
+  employee_id: string;
+  project_id: string;
+  jour: string;
+  heures: number;
+  date: string;
+  heure_debut?: string;
+  heure_fin?: string;
+}
+
+const JOURS_SEMAINE = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
 
 const EmployeesPlanning = () => {
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
+  const { fakeDataEnabled } = useFakeDataStore();
+  const { data: settings } = useUserSettings();
+  const [loading, setLoading] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  
-  // Récupérer les vraies données depuis les hooks
-  // Les hooks utilisent queryWithTimeout qui gère automatiquement le fallback
-  // Si fake data activé → les hooks retournent fake data
-  // Si fake data désactivé → les hooks retournent vraies données (même si vide) ou tableau vide en cas d'erreur
-  const { data: employeesData, isLoading: employeesLoading } = useEmployees();
-  const { data: projectsData, isLoading: projectsLoading } = useProjects();
-  
-  // Calculer les dates de la semaine avec useMemo
-  const weekDates = useMemo(() => {
-    const date = new Date(currentWeek);
-    const day = date.getDay();
-    // Ajuster pour lundi (1) comme premier jour
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
-    const week = [];
-    for (let i = 0; i < 5; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      week.push(d);
-    }
-    return week;
-  }, [currentWeek]);
-  
-  // Fonction pour formater les dates
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-  };
-  
-  // Transformer les données des hooks en format attendu par le composant
-  const employees = useMemo(() => {
-    if (!employeesData || employeesData.length === 0) return [];
-    return employeesData.map((emp, index) => ({
-      id: index + 1, // ID numérique pour compatibilité avec le code existant
-      nom: `${emp.prenom || ""} ${emp.nom}`.trim() || emp.nom,
-      poste: emp.poste,
-      specialites: emp.specialites || [],
-    }));
-  }, [employeesData]);
-  
-  const chantiers = useMemo(() => {
-    if (!projectsData || projectsData.length === 0) return [];
-    return projectsData.map((proj, index) => ({
-      id: index + 1, // ID numérique pour compatibilité avec le code existant
-      nom: proj.name,
-    }));
-  }, [projectsData]);
-  
-  const [localEmployees, setLocalEmployees] = useState<Employee[]>([]);
-  
-  // Utiliser les données des hooks comme source principale
-  // Les données locales sont utilisées pour les modifications temporaires (ajout d'employés, etc.)
-  const displayEmployees = useMemo(() => {
-    // Combiner les employés de la DB avec les employés locaux ajoutés
-    const allEmployees = [...employees];
-    // Ajouter les employés locaux qui ne sont pas déjà dans la liste
-    localEmployees.forEach(localEmp => {
-      if (!allEmployees.find(e => e.nom === localEmp.nom && e.poste === localEmp.poste)) {
-        allEmployees.push(localEmp);
-      }
-    });
-    return allEmployees;
-  }, [employees, localEmployees]);
-  const [planning, setPlanning] = useState<PlanningEntry[]>([]);
-  const [selectedChantier, setSelectedChantier] = useState<number | "all">("all");
-  const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
-  const [editingHours, setEditingHours] = useState<{ 
-    entryId: string; 
-    heures: number;
-    heure_debut?: string;
-    heure_fin?: string;
-  } | null>(null);
-  
-  // Formulaire nouvel employé
-  const [newEmployee, setNewEmployee] = useState({
+  const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean;
+    employeeId?: string;
+    jour?: string;
+    date?: string;
+    assignment?: Assignment;
+  }>({ open: false });
+  const [editForm, setEditForm] = useState({
+    project_id: "",
+    heures: 8,
+    heure_debut: "08:00",
+    heure_fin: "17:00",
+  });
+  const [addEmployeeDialog, setAddEmployeeDialog] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState({
     nom: "",
+    prenom: "",
     poste: "",
     specialites: "",
   });
 
-  const handleAddEmployee = () => {
-    if (!newEmployee.nom || !newEmployee.poste) {
+  // Calculer les dates de la semaine
+  const weekDates = useMemo(() => {
+    const monday = startOfWeek(currentWeek, { weekStartsOn: 1 });
+    return JOURS_SEMAINE.map((_, index) => addDays(monday, index));
+  }, [currentWeek]);
+
+  // Export PDF
+  const handleExportPDF = async () => {
+    try {
+      const weekStart = weekDates[0];
+      const weekEnd = weekDates[4];
+      
+      await exportPlanningPDF({
+        employees,
+        projects,
+        assignments,
+        weekStart,
+        weekEnd,
+        companyName: settings?.company_name || "BTP Smart Pro",
+        companyLogo: settings?.company_logo_url,
+      });
+      
+      toast({
+        title: "PDF généré",
+        description: "Le planning global a été exporté en PDF.",
+      });
+    } catch (error: any) {
+      console.error("Erreur export PDF:", error);
       toast({
         title: "Erreur",
-        description: "Veuillez remplir au moins le nom et le poste",
+        description: error.message || "Impossible d'exporter le PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Charger les données
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, currentWeek]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      // Mode démo : utiliser les données fake
+      if (fakeDataEnabled) {
+        setEmployees(FAKE_EMPLOYEES.map(emp => ({
+          id: emp.id,
+          nom: emp.nom,
+          prenom: emp.prenom,
+          poste: emp.poste,
+          specialites: emp.specialites,
+        })));
+        setProjects(FAKE_PROJECTS.map(proj => ({
+          id: proj.id,
+          name: proj.name,
+          location: proj.location,
+        })));
+        setAssignments(FAKE_ASSIGNMENTS);
+        setLoading(false);
+        return;
+      }
+
+      // Mode production : charger depuis Supabase
+      // Récupérer les employés
+      const { data: employeesData, error: employeesError } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("nom");
+
+      if (employeesError) throw employeesError;
+      setEmployees(employeesData || []);
+
+      // Récupérer les projets
+      const { data: projectsData, error: projectsError } = await supabase
+        .from("projects")
+        .select("id, name, location")
+        .eq("user_id", user?.id)
+        .order("name");
+
+      if (projectsError) throw projectsError;
+      setProjects(projectsData || []);
+
+      // Récupérer les affectations de la semaine
+      const weekStart = weekDates[0];
+      const weekEnd = weekDates[4];
+
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from("employee_assignments")
+        .select("*")
+        .gte("date", format(weekStart, "yyyy-MM-dd"))
+        .lte("date", format(weekEnd, "yyyy-MM-dd"));
+
+      if (assignmentsError) throw assignmentsError;
+      setAssignments(assignmentsData || []);
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les données",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Obtenir les affectations pour un employé et un jour
+  const getAssignments = (employeeId: string, date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return assignments.filter(
+      (a) => a.employee_id === employeeId && a.date === dateStr
+    );
+  };
+
+  // Obtenir le projet d'une affectation
+  const getProject = (projectId: string) => {
+    return projects.find((p) => p.id === projectId);
+  };
+
+  // Ouvrir le dialog d'édition
+  const openEditDialog = (
+    employeeId: string,
+    jour: string,
+    date: Date,
+    assignment?: Assignment
+  ) => {
+    if (assignment) {
+      setEditForm({
+        project_id: assignment.project_id,
+        heures: assignment.heures,
+        heure_debut: assignment.heure_debut || "08:00",
+        heure_fin: assignment.heure_fin || "17:00",
+      });
+    } else {
+      setEditForm({
+        project_id: "",
+        heures: 8,
+        heure_debut: "08:00",
+        heure_fin: "17:00",
+      });
+    }
+
+    setEditDialog({
+      open: true,
+      employeeId,
+      jour,
+      date: format(date, "yyyy-MM-dd"),
+      assignment,
+    });
+  };
+
+  // Sauvegarder l'affectation
+  const saveAssignment = async () => {
+    if (!editDialog.employeeId || !editDialog.date || !editForm.project_id) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs",
         variant: "destructive",
       });
       return;
     }
 
-    const specialites = newEmployee.specialites
-      ? newEmployee.specialites.split(",").map(s => s.trim()).filter(s => s)
-      : [];
+    try {
+      if (editDialog.assignment) {
+        // Mise à jour
+        const { error } = await supabase
+          .from("employee_assignments")
+          .update({
+            project_id: editForm.project_id,
+            heures: editForm.heures,
+            heure_debut: editForm.heure_debut,
+            heure_fin: editForm.heure_fin,
+          })
+          .eq("id", editDialog.assignment.id);
 
-    const newEmp: Employee = {
-      id: displayEmployees.length + 1,
-      nom: newEmployee.nom,
-      poste: newEmployee.poste,
-      specialites: specialites.length > 0 ? specialites : undefined,
+        if (error) throw error;
+      } else {
+        // Création
+        const { error } = await supabase.from("employee_assignments").insert({
+          employee_id: editDialog.employeeId,
+          project_id: editForm.project_id,
+          jour: editDialog.jour!,
+          date: editDialog.date,
+          heures: editForm.heures,
+          heure_debut: editForm.heure_debut,
+          heure_fin: editForm.heure_fin,
+        });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Succès",
+        description: "Affectation enregistrée",
+      });
+
+      setEditDialog({ open: false });
+      fetchData();
+    } catch (error: any) {
+      console.error("Error saving assignment:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer l'affectation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Supprimer une affectation
+  const deleteAssignment = async (assignmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from("employee_assignments")
+        .delete()
+        .eq("id", assignmentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Succès",
+        description: "Affectation supprimée",
+      });
+
+      fetchData();
+    } catch (error: any) {
+      console.error("Error deleting assignment:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'affectation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Filtrer les employés par projet
+  const filteredEmployees = useMemo(() => {
+    if (selectedProject === "all") return employees;
+
+    return employees.filter((emp) => {
+      return assignments.some(
+        (a) => a.employee_id === emp.id && a.project_id === selectedProject
+      );
+    });
+  }, [employees, assignments, selectedProject]);
+
+  // Calculer les statistiques
+  const stats = useMemo(() => {
+    const weekStart = weekDates[0];
+    const weekEnd = weekDates[4];
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+
+    const weekAssignments = assignments.filter(
+      (a) => a.date >= weekStartStr && a.date <= weekEndStr
+    );
+
+    const totalHeures = weekAssignments.reduce((sum, a) => sum + a.heures, 0);
+    const employeesCount = new Set(weekAssignments.map((a) => a.employee_id))
+      .size;
+    const projectsCount = new Set(weekAssignments.map((a) => a.project_id)).size;
+
+    return {
+      totalHeures,
+      employeesCount,
+      projectsCount,
     };
+  }, [assignments, weekDates]);
 
-    // Ajouter à la liste locale (pas à la DB directement depuis cette page)
-    setLocalEmployees([...localEmployees, newEmp]);
-    setNewEmployee({ nom: "", poste: "", specialites: "" });
-    setIsAddEmployeeOpen(false);
-    
-    toast({
-      title: "Employé ajouté",
-      description: `${newEmp.nom} a été ajouté à l'équipe`,
-    });
-  };
-
-  const handleAssignEmployee = (employeeId: number, jour: string) => {
-    if (selectedChantier === "all") {
-      toast({
-        title: "Sélectionnez un chantier",
-        description: "Veuillez d'abord sélectionner un chantier pour affecter l'employé",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Vérifier si l'employé est déjà affecté ce jour-là
-    const existing = planning.find(
-      p => p.employeeId === employeeId && p.jour === jour
+  if (loading) {
+    return (
+      <PageLayout>
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8">
+          <GlassCard className="p-12">
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <p className="text-muted-foreground">Chargement du planning...</p>
+            </div>
+          </GlassCard>
+        </div>
+      </PageLayout>
     );
-
-    if (existing) {
-      // Retirer l'affectation
-      setPlanning(planning.filter(p => p.id !== existing.id));
-      toast({
-        title: "Affectation retirée",
-        description: "L'employé a été retiré de ce jour",
-      });
-    } else {
-      // Ajouter l'affectation avec 0 heures par défaut
-      const newEntry: PlanningEntry = {
-        id: `${employeeId}-${jour}-${Date.now()}`,
-        employeeId,
-        chantierId: selectedChantier as number,
-        jour,
-        heures: 0,
-      };
-      setPlanning([...planning, newEntry]);
-      
-      const employee = displayEmployees.find(e => e.id === employeeId);
-      const chantier = chantiers.find(c => c.id === selectedChantier);
-      
-      toast({
-        title: "Employé affecté",
-        description: `${employee?.nom} affecté au ${chantier?.nom} le ${jour}`,
-      });
-    }
-  };
-
-  // Fonction pour calculer les heures à partir des horaires
-  const calculateHoursFromTime = (heure_debut?: string, heure_fin?: string): number => {
-    if (!heure_debut || !heure_fin) return 0;
-    
-    const [startHour, startMin] = heure_debut.split(':').map(Number);
-    const [endHour, endMin] = heure_fin.split(':').map(Number);
-    
-    const startMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-    
-    if (endMinutes <= startMinutes) return 0; // Pas de calcul si fin <= début
-    
-    const diffMinutes = endMinutes - startMinutes;
-    return Math.round((diffMinutes / 60) * 10) / 10; // Arrondir à 0.1h près
-  };
-
-  const handleEditHours = (entryId: string, currentHours: number = 0, heure_debut?: string, heure_fin?: string) => {
-    setEditingHours({ entryId, heures: currentHours, heure_debut, heure_fin });
-  };
-
-  const handleSaveHours = () => {
-    if (!editingHours) return;
-
-    let heures = editingHours.heures;
-    
-    // Si des horaires sont fournis, calculer automatiquement les heures
-    if (editingHours.heure_debut && editingHours.heure_fin) {
-      heures = calculateHoursFromTime(editingHours.heure_debut, editingHours.heure_fin);
-    } else {
-      // Sinon, utiliser le nombre d'heures saisi (limiter entre 0 et 24h)
-      heures = Math.max(0, Math.min(24, editingHours.heures));
-    }
-
-    setPlanning(planning.map(entry => 
-      entry.id === editingHours.entryId 
-        ? { 
-            ...entry, 
-            heures,
-            heure_debut: editingHours.heure_debut || undefined,
-            heure_fin: editingHours.heure_fin || undefined,
-          }
-        : entry
-    ));
-
-    setEditingHours(null);
-    toast({
-      title: "Horaires enregistrés",
-      description: editingHours.heure_debut && editingHours.heure_fin
-        ? `${editingHours.heure_debut} - ${editingHours.heure_fin} (${heures}h)`
-        : `${heures}h enregistrées`,
-    });
-  };
-
-  const getTotalHoursForEmployee = (employeeId: number) => {
-    return planning
-      .filter(p => p.employeeId === employeeId && p.heures)
-      .reduce((total, p) => total + (p.heures || 0), 0);
-  };
-
-  const getTotalHoursForChantier = (chantierId: number) => {
-    return planning
-      .filter(p => p.chantierId === chantierId && p.heures)
-      .reduce((total, p) => total + (p.heures || 0), 0);
-  };
-
-  const handleRemoveAssignment = (entryId: string) => {
-    setPlanning(planning.filter(p => p.id !== entryId));
-    toast({
-      title: "Affectation supprimée",
-      description: "L'affectation a été retirée",
-    });
-  };
-
-  const getEmployeeAssignments = (employeeId: number, jour: string) => {
-    return planning.filter(
-      p => p.employeeId === employeeId && p.jour === jour
-    );
-  };
-
-  const filteredPlanning = selectedChantier === "all"
-    ? planning
-    : planning.filter(p => p.chantierId === selectedChantier);
-
-  const getChantierName = (chantierId: number) => {
-    return chantiers.find(c => c.id === chantierId)?.nom || "Chantier inconnu";
-  };
+  }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto w-full">
-        <div className="p-4 md:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* En-tête */}
-          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2">
-                <Calendar className="h-6 w-6 md:h-8 md:w-8" />
-                Planning Employés
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground">
-                Gérez les affectations des employés aux chantiers
-              </p>
-            </div>
-            
-            <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full md:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Ajouter un employé
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Nouvel employé</DialogTitle>
-                  <DialogDescription>
-                    Ajoutez un nouvel employé à l'équipe
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="nom">Nom *</Label>
-                    <Input
-                      id="nom"
-                      placeholder="Ex: Jean Dupont"
-                      value={newEmployee.nom}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, nom: e.target.value })}
-                    />
+    <PageLayout>
+      <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        {/* En-tête */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
+              Planning Employés
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Gérez les affectations des employés aux chantiers
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              className="gap-2 rounded-xl"
+              onClick={handleExportPDF}
+            >
+              <Download className="h-4 w-4" />
+              Exporter en PDF
+            </Button>
+            {isAdmin && (
+              <Button 
+                className="gap-2 rounded-xl"
+                onClick={() => setAddEmployeeDialog(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Ajouter un employé
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Liste des employés */}
+        <GlassCard className="p-4 sm:p-6">
+          <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Liste des employés ({employees.length})
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Cliquez sur un nom dans le planning pour affecter/modifier un employé
+          </p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {employees.map((employee) => (
+              <div
+                key={employee.id}
+                className="p-3 rounded-lg border border-white/20 dark:border-white/10 hover:border-white/30 dark:hover:border-white/15 transition-all cursor-pointer bg-white/10 dark:bg-black/20 backdrop-blur-sm"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {employee.prenom} {employee.nom}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {employee.poste}
+                      </p>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="poste">Poste *</Label>
-                    <Input
-                      id="poste"
-                      placeholder="Ex: Maçon, Électricien..."
-                      value={newEmployee.poste}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, poste: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="specialites">Spécialités (séparées par des virgules)</Label>
-                    <Input
-                      id="specialites"
-                      placeholder="Ex: Maçonnerie, Enduit, Carrelage"
-                      value={newEmployee.specialites}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, specialites: e.target.value })}
-                    />
-                  </div>
+                  <Plus className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>
-                    Annuler
-                  </Button>
-                  <Button onClick={handleAddEmployee}>
-                    Ajouter
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {employee.specialites?.slice(0, 3).map((spec, idx) => (
+                    <Badge
+                      key={idx}
+                      variant="secondary"
+                      className="text-xs px-2 py-0.5"
+                    >
+                      {spec}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
+        {/* Planning hebdomadaire */}
+        <GlassCard className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <h3 className="font-semibold text-base flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Planning hebdomadaire
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+                className="rounded-xl"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-sm font-medium px-3">
+                Semaine du {format(weekDates[0], "d", { locale: fr })} au{" "}
+                {format(weekDates[4], "d MMM", { locale: fr })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+                className="rounded-xl"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(new Date())}
+                className="rounded-xl"
+              >
+                Aujourd'hui
+              </Button>
+              {selectedProject !== "all" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedProject("all")}
+                  className="rounded-xl text-xs"
+                >
+                  Réinitialiser
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Filtre par chantier */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                <Label htmlFor="chantier-filter" className="flex items-center gap-2 whitespace-nowrap">
-                  <Building2 className="h-4 w-4" />
-                  Filtrer par chantier :
-                </Label>
+          {filteredEmployees.length === 0 ? (
+            <div className="text-center py-12">
+              <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">Aucun employé</h3>
+              <p className="text-muted-foreground">
+                Aucun employé disponible pour ce filtre
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border/50">
+                    <th className="text-left p-3 font-semibold min-w-[150px]">
+                      Employé
+                    </th>
+                    {weekDates.map((date, index) => (
+                      <th key={index} className="text-center p-3 font-semibold min-w-[120px]">
+                        <div>
+                          <div className="capitalize">
+                            {format(date, "EEE", { locale: fr })}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-normal">
+                            {format(date, "d MMM", { locale: fr })}
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEmployees.map((employee) => (
+                    <tr
+                      key={employee.id}
+                      className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {employee.prenom} {employee.nom}
+                            </div>
+                            {employee.poste && (
+                              <div className="text-xs text-muted-foreground">
+                                {employee.poste}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      {weekDates.map((date, dayIndex) => {
+                        const dayAssignments = getAssignments(employee.id, date);
+                        const hasAssignments = dayAssignments.length > 0;
+
+                        return (
+                          <td
+                            key={dayIndex}
+                            className="p-2 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() =>
+                              openEditDialog(
+                                employee.id,
+                                JOURS_SEMAINE[dayIndex],
+                                date,
+                                dayAssignments[0]
+                              )
+                            }
+                          >
+                            {hasAssignments ? (
+                              <div className="space-y-1.5">
+                                {dayAssignments.map((assignment) => {
+                                  const project = getProject(assignment.project_id);
+                                  return (
+                                    <div
+                                      key={assignment.id}
+                                      className="text-xs p-2.5 rounded-xl bg-white/50 dark:bg-black/20 backdrop-blur-sm border border-white/30 dark:border-white/10 hover:bg-white/70 dark:hover:bg-black/30 hover:border-white/40 dark:hover:border-white/15 transition-all shadow-sm"
+                                    >
+                                      <div className="font-medium truncate">
+                                        {project?.name || "Chantier"}
+                                      </div>
+                                      <div className="text-muted-foreground">
+                                        {assignment.heures}h
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground py-2">
+                                Disponible
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
+
+        {/* Statistiques */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Heures par employé */}
+          <GlassCard className="p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold text-base">Heures par employé</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Total des heures travaillées cette semaine
+            </p>
+            <div className="space-y-2">
+              {employees.map((employee) => {
+                // Filtrer par employé ET par semaine en cours
+                const weekStart = format(weekDates[0], "yyyy-MM-dd");
+                const weekEnd = format(weekDates[4], "yyyy-MM-dd");
+                const employeeAssignments = assignments.filter(
+                  (a) =>
+                    a.employee_id === employee.id &&
+                    a.date >= weekStart &&
+                    a.date <= weekEnd
+                );
+                const totalHeures = employeeAssignments.reduce(
+                  (sum, a) => sum + a.heures,
+                  0
+                );
+                
+                // Ne pas afficher si 0 heures cette semaine
+                if (totalHeures === 0) return null;
+                
+                return (
+                  <div
+                    key={employee.id}
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">
+                          {employee.prenom} {employee.nom}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {employee.poste}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="font-semibold">
+                      {totalHeures}h
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </GlassCard>
+
+          {/* Heures par chantier */}
+          <GlassCard className="p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Building2 className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold text-base">Heures par chantier</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Total des heures investies par projet
+            </p>
+            <div className="space-y-2">
+              {projects.map((project) => {
+                // Filtrer par projet ET par semaine en cours
+                const weekStart = format(weekDates[0], "yyyy-MM-dd");
+                const weekEnd = format(weekDates[4], "yyyy-MM-dd");
+                const projectAssignments = assignments.filter(
+                  (a) =>
+                    a.project_id === project.id &&
+                    a.date >= weekStart &&
+                    a.date <= weekEnd
+                );
+                const totalHeures = projectAssignments.reduce(
+                  (sum, a) => sum + a.heures,
+                  0
+                );
+                
+                // Ne pas afficher si 0 heures cette semaine
+                if (totalHeures === 0) return null;
+                
+                return (
+                  <div
+                    key={project.id}
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">{project.name}</p>
+                        {project.location && (
+                          <p className="text-xs text-muted-foreground">
+                            {project.location}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="font-semibold">
+                      {totalHeures}h
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Dialog d'ajout d'employé */}
+        <Dialog open={addEmployeeDialog} onOpenChange={setAddEmployeeDialog}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Ajouter un employé</DialogTitle>
+              <DialogDescription>
+                Créez un nouvel employé pour le planning
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Prénom *</Label>
+                  <Input
+                    value={employeeForm.prenom}
+                    onChange={(e) =>
+                      setEmployeeForm({ ...employeeForm, prenom: e.target.value })
+                    }
+                    placeholder="Ex: Jean"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom *</Label>
+                  <Input
+                    value={employeeForm.nom}
+                    onChange={(e) =>
+                      setEmployeeForm({ ...employeeForm, nom: e.target.value })
+                    }
+                    placeholder="Ex: Dupont"
+                    className="rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Poste *</Label>
+                <Input
+                  value={employeeForm.poste}
+                  onChange={(e) =>
+                    setEmployeeForm({ ...employeeForm, poste: e.target.value })
+                  }
+                  placeholder="Ex: Maçon, Plombier, Électricien..."
+                  className="rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Spécialités</Label>
+                <Input
+                  value={employeeForm.specialites}
+                  onChange={(e) =>
+                    setEmployeeForm({ ...employeeForm, specialites: e.target.value })
+                  }
+                  placeholder="Séparées par des virgules (ex: Maçonnerie, Enduit, Carrelage)"
+                  className="rounded-xl"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Séparez les spécialités par des virgules
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddEmployeeDialog(false);
+                  setEmployeeForm({
+                    nom: "",
+                    prenom: "",
+                    poste: "",
+                    specialites: "",
+                  });
+                }}
+                className="rounded-xl"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!employeeForm.nom || !employeeForm.prenom || !employeeForm.poste) {
+                    toast({
+                      title: "Champs requis",
+                      description: "Veuillez remplir tous les champs obligatoires",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
+                  try {
+                    if (fakeDataEnabled) {
+                      // Mode démo : ajouter localement
+                      const newEmployee: Employee = {
+                        id: `emp-${Date.now()}`,
+                        nom: employeeForm.nom,
+                        prenom: employeeForm.prenom,
+                        poste: employeeForm.poste,
+                        specialites: employeeForm.specialites
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter((s) => s),
+                      };
+                      setEmployees([...employees, newEmployee]);
+                      toast({
+                        title: "Employé ajouté",
+                        description: `${newEmployee.prenom} ${newEmployee.nom} a été ajouté avec succès`,
+                      });
+                    } else {
+                      // Mode production : sauvegarder dans Supabase
+                      const specialitesArray = employeeForm.specialites
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter((s) => s);
+
+                      const { data, error } = await supabase
+                        .from("employees")
+                        .insert([
+                          {
+                            user_id: user?.id,
+                            nom: employeeForm.nom,
+                            prenom: employeeForm.prenom,
+                            poste: employeeForm.poste,
+                            specialites: specialitesArray,
+                          },
+                        ])
+                        .select()
+                        .single();
+
+                      if (error) throw error;
+
+                      setEmployees([...employees, data]);
+                      toast({
+                        title: "Employé ajouté",
+                        description: `${data.prenom} ${data.nom} a été ajouté avec succès`,
+                      });
+                    }
+
+                    setAddEmployeeDialog(false);
+                    setEmployeeForm({
+                      nom: "",
+                      prenom: "",
+                      poste: "",
+                      specialites: "",
+                    });
+                  } catch (error) {
+                    console.error("Error adding employee:", error);
+                    toast({
+                      title: "Erreur",
+                      description: "Impossible d'ajouter l'employé",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="rounded-xl"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog d'édition d'affectation */}
+        <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open })}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {editDialog.assignment ? "Modifier" : "Ajouter"} une affectation
+              </DialogTitle>
+              <DialogDescription>
+                {editDialog.jour && `Pour ${editDialog.jour}`}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Chantier</Label>
                 <Select
-                  value={selectedChantier === "all" ? "all" : selectedChantier.toString()}
-                  onValueChange={(value) => setSelectedChantier(value === "all" ? "all" : parseInt(value))}
+                  value={editForm.project_id}
+                  onValueChange={(value) =>
+                    setEditForm({ ...editForm, project_id: value })
+                  }
                 >
-                  <SelectTrigger id="chantier-filter" className="w-full md:w-[300px]">
+                  <SelectTrigger className="rounded-xl">
                     <SelectValue placeholder="Sélectionner un chantier" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tous les chantiers</SelectItem>
-                    {chantiers.map((chantier) => (
-                      <SelectItem key={chantier.id} value={chantier.id.toString()}>
-                        {chantier.nom}
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Liste des employés */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Liste des employés ({displayEmployees.length})
-              </CardTitle>
-              <CardDescription>
-                Cliquez sur un jour dans le planning pour affecter/désaffecter un employé
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {employeesLoading ? (
-                  <div className="col-span-full flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : displayEmployees.length === 0 ? (
-                  <div className="col-span-full text-center py-8 text-muted-foreground">
-                    <p>Aucun employé trouvé</p>
-                  </div>
-                ) : (
-                  displayEmployees.map((employee) => (
-                    <Card key={employee.id} className="border-2">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold text-lg">{employee.nom}</h3>
-                            <p className="text-sm text-muted-foreground">{employee.poste}</p>
-                          </div>
-                          <Badge variant="secondary">{employee.id}</Badge>
-                        </div>
-                        {employee.specialites && employee.specialites.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1">
-                            {employee.specialites.map((spec, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {spec}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Planning hebdomadaire */}
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Planning hebdomadaire
-                  </CardTitle>
-                  <CardDescription>
-                    {selectedChantier !== "all" 
-                      ? `Affectations pour : ${getChantierName(selectedChantier as number)}`
-                      : "Toutes les affectations"}
-                    <br />
-                    Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[4])}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const prevWeek = new Date(currentWeek);
-                      prevWeek.setDate(prevWeek.getDate() - 7);
-                      setCurrentWeek(prevWeek);
-                    }}
-                    className="gap-2"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Semaine précédente</span>
-                    <span className="sm:hidden">Préc.</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentWeek(new Date())}
-                  >
-                    Aujourd'hui
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const nextWeek = new Date(currentWeek);
-                      nextWeek.setDate(nextWeek.getDate() + 7);
-                      setCurrentWeek(nextWeek);
-                    }}
-                    className="gap-2"
-                  >
-                    <span className="hidden sm:inline">Semaine suivante</span>
-                    <span className="sm:hidden">Suiv.</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="border border-border p-3 text-left bg-muted/50 font-semibold min-w-[200px]">
-                        Employé
-                      </th>
-                      {joursSemaine.map((jour, idx) => (
-                        <th
-                          key={jour}
-                          className="border border-border p-3 text-center bg-muted/50 font-semibold min-w-[150px] capitalize"
-                        >
-                          <div>{jour}</div>
-                          <div className="text-xs font-normal text-muted-foreground mt-1">
-                            {formatDate(weekDates[idx])}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(employeesLoading ? (
-                      <tr>
-                        <td colSpan={6} className="text-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-                        </td>
-                      </tr>
-                    ) : displayEmployees.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="text-center py-8 text-muted-foreground">
-                          <p>Aucun employé trouvé</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      displayEmployees.map((employee) => (
-                      <tr key={employee.id} className="hover:bg-muted/30">
-                        <td className="border border-border p-3">
-                          <div>
-                            <div className="font-semibold">{employee.nom}</div>
-                            <div className="text-sm text-muted-foreground">{employee.poste}</div>
-                          </div>
-                        </td>
-                        {joursSemaine.map((jour) => {
-                          const assignments = getEmployeeAssignments(employee.id, jour);
-                          const isAssigned = assignments.length > 0;
-                          
-                          return (
-                            <td
-                              key={jour}
-                              className="border border-border p-2 text-center align-top cursor-pointer hover:bg-primary/10 transition-colors"
-                              onClick={() => handleAssignEmployee(employee.id, jour)}
-                              title={isAssigned ? "Cliquer pour retirer l'affectation" : "Cliquer pour affecter au chantier sélectionné"}
-                            >
-                              {assignments.map((assignment) => {
-                                const chantier = chantiers.find(c => c.id === assignment.chantierId);
-                                const heures = assignment.heures || 0;
-                                const hasHoraires = assignment.heure_debut && assignment.heure_fin;
-                                return (
-                                  <div
-                                    key={assignment.id}
-                                    className="mb-1 p-2 bg-primary/20 border border-primary/30 rounded text-xs group"
-                                  >
-                                    <div className="flex items-center justify-between gap-1 mb-1">
-                                      <span className="font-medium truncate">{chantier?.nom}</span>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemoveAssignment(assignment.id);
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <X className="h-3 w-3 text-destructive" />
-                                      </button>
-                                    </div>
-                                    <div 
-                                      className="flex items-center gap-1 cursor-pointer hover:bg-primary/30 rounded px-1 py-0.5 transition-colors"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditHours(assignment.id, heures, assignment.heure_debut, assignment.heure_fin);
-                                      }}
-                                      title="Cliquer pour modifier les horaires"
-                                    >
-                                      <Clock className="h-3 w-3 text-muted-foreground" />
-                                      <span className={heures > 0 ? "font-semibold text-primary" : "text-muted-foreground"}>
-                                        {hasHoraires 
-                                          ? `${assignment.heure_debut} - ${assignment.heure_fin} (${heures}h)`
-                                          : heures > 0 
-                                            ? `${heures}h` 
-                                            : "0h"}
-                                      </span>
-                                      <Edit2 className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {!isAssigned && (
-                                <div className="text-muted-foreground text-xs py-2">
-                                  Disponible
-                                </div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Résumé des affectations */}
-          {filteredPlanning.length > 0 && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Résumé des affectations</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  {filteredPlanning.map((entry) => {
-                    const employee = displayEmployees.find(e => e.id === entry.employeeId);
-                    const chantier = chantiers.find(c => c.id === entry.chantierId);
-                    const heures = entry.heures || 0;
-                    const hasHoraires = entry.heure_debut && entry.heure_fin;
-                    return (
-                      <div
-                        key={entry.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <span className="font-semibold">{employee?.nom}</span>
-                            <span className="text-muted-foreground mx-2">→</span>
-                            <span>{chantier?.nom}</span>
-                            <span className="text-muted-foreground mx-2">•</span>
-                            <span className="capitalize">{entry.jour}</span>
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className={heures > 0 ? "font-semibold" : "text-muted-foreground"}>
-                              {hasHoraires 
-                                ? `${entry.heure_debut} - ${entry.heure_fin} (${heures}h)`
-                                : `${heures}h`}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2"
-                              onClick={() => handleEditHours(entry.id, heures, entry.heure_debut, entry.heure_fin)}
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveAssignment(entry.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Statistiques des heures */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            {/* Total heures par employé */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Heures par employé
-                </CardTitle>
-                <CardDescription>
-                  Total des heures travaillées cette semaine
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {displayEmployees.map((employee) => {
-                    const totalHours = getTotalHoursForEmployee(employee.id);
-                    return (
-                      <div
-                        key={employee.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div>
-                          <div className="font-semibold">{employee.nom}</div>
-                          <div className="text-sm text-muted-foreground">{employee.poste}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-bold text-lg">{totalHours}h</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Total heures par chantier */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Heures par chantier
-                </CardTitle>
-                <CardDescription>
-                  Total des heures travaillées par chantier
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {chantiers.map((chantier) => {
-                    const totalHours = getTotalHoursForChantier(chantier.id);
-                    return (
-                      <div
-                        key={chantier.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div className="font-semibold truncate flex-1">{chantier.nom}</div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-bold text-lg">{totalHours}h</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Dialog pour éditer les heures */}
-          <Dialog open={editingHours !== null} onOpenChange={() => setEditingHours(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Modifier les horaires</DialogTitle>
-                <DialogDescription>
-                  Saisissez les horaires de travail ou le nombre d'heures pour cette affectation
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="heure_debut">Heure de début</Label>
-                    <Input
-                      id="heure_debut"
-                      type="time"
-                      value={editingHours?.heure_debut || ""}
-                      onChange={(e) => {
-                        setEditingHours(editingHours ? { ...editingHours, heure_debut: e.target.value } : null);
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Format HH:mm (ex: 08:00)
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="heure_fin">Heure de fin</Label>
-                    <Input
-                      id="heure_fin"
-                      type="time"
-                      value={editingHours?.heure_fin || ""}
-                      onChange={(e) => {
-                        setEditingHours(editingHours ? { ...editingHours, heure_fin: e.target.value } : null);
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Format HH:mm (ex: 17:00)
-                    </p>
-                  </div>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">ou</span>
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="heures">Nombre d'heures (si horaires non spécifiés)</Label>
+                  <Label>Heure début</Label>
                   <Input
-                    id="heures"
-                    type="number"
-                    min="0"
-                    max="24"
-                    step="0.5"
-                    placeholder="Ex: 8"
-                    value={editingHours?.heures || 0}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      setEditingHours(editingHours ? { ...editingHours, heures: Math.max(0, Math.min(24, value)) } : null);
-                    }}
-                    disabled={!!(editingHours?.heure_debut && editingHours?.heure_fin)}
+                    type="time"
+                    value={editForm.heure_debut}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, heure_debut: e.target.value })
+                    }
+                    className="rounded-xl"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {editingHours?.heure_debut && editingHours?.heure_fin
-                      ? `Calcul automatique: ${calculateHoursFromTime(editingHours.heure_debut, editingHours.heure_fin)}h`
-                      : "Valeur entre 0 et 24 heures"}
-                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Heure fin</Label>
+                  <Input
+                    type="time"
+                    value={editForm.heure_fin}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, heure_fin: e.target.value })
+                    }
+                    className="rounded-xl"
+                  />
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingHours(null)}>
-                  Annuler
-                </Button>
-                <Button onClick={handleSaveHours}>
-                  Enregistrer
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          </div>
-        </div>
-      </main>
-    </div>
+
+              <div className="space-y-2">
+                <Label>Nombre d'heures</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={editForm.heures}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, heures: parseInt(e.target.value) || 0 })
+                  }
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditDialog({ open: false })}
+                className="rounded-xl"
+              >
+                Annuler
+              </Button>
+              <Button onClick={saveAssignment} className="rounded-xl">
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageLayout>
   );
 };
 
 export default EmployeesPlanning;
-

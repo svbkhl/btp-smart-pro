@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,17 +22,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateProject, useUpdateProject, CreateProjectData, Project } from "@/hooks/useProjects";
+import { useCreateProject, useUpdateProject, CreateProjectData } from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
 import { ImageUpload } from "@/components/ImageUpload";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
+import type { Project } from "@/fakeData/projects";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
   client_id: z.string().optional(),
   status: z.enum(["planifié", "en_attente", "en_cours", "terminé", "annulé"]).optional(),
-  progress: z.number().min(0).max(100).optional(),
-  budget: z.string().optional(),
+  budget: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
+  costs: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
+  actual_revenue: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
   location: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
@@ -48,9 +51,10 @@ interface ProjectFormProps {
 
 export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
-  const { data: clients, error: clientsError, isLoading: clientsLoading } = useClients();
+  const { data: clients } = useClients();
 
   const {
     register,
@@ -63,10 +67,11 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: "",
-      client_id: "none",
+      client_id: "",
       status: "planifié",
-      progress: 0,
       budget: "",
+      costs: "",
+      actual_revenue: "",
       location: "",
       start_date: "",
       end_date: "",
@@ -74,18 +79,17 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
     },
   });
 
-  const status = watch("status");
-  const clientId = watch("client_id");
   const [imageUrl, setImageUrl] = useState<string>("");
 
   useEffect(() => {
     if (project) {
       reset({
         name: project.name,
-        client_id: project.client_id || "none",
+        client_id: project.client_id || "",
         status: project.status || "planifié",
-        progress: project.progress || 0,
         budget: project.budget?.toString() || "",
+        costs: project.costs?.toString() || "",
+        actual_revenue: project.actual_revenue?.toString() || "",
         location: project.location || "",
         start_date: project.start_date || "",
         end_date: project.end_date || "",
@@ -95,10 +99,11 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
     } else {
       reset({
         name: "",
-        client_id: "none",
+        client_id: "",
         status: "planifié",
-        progress: 0,
         budget: "",
+        costs: "",
+        actual_revenue: "",
         location: "",
         start_date: "",
         end_date: "",
@@ -109,19 +114,21 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
   }, [project, open, reset]);
 
   const onSubmit = async (data: ProjectFormData) => {
+    console.log("Project form submitted:", data);
     setIsSubmitting(true);
     try {
       const projectData: CreateProjectData = {
         name: data.name.trim(),
-        client_id: data.client_id && data.client_id !== "" && data.client_id !== "none" ? data.client_id : undefined,
+        client_id: (data.client_id && data.client_id !== "none") ? data.client_id : undefined,
         status: data.status || "planifié",
-        progress: data.progress || 0,
-        budget: data.budget && data.budget !== "" ? parseFloat(data.budget) : undefined,
-        location: data.location && data.location.trim() !== "" ? data.location : undefined,
-        start_date: data.start_date && data.start_date !== "" ? data.start_date : undefined,
-        end_date: data.end_date && data.end_date !== "" ? data.end_date : undefined,
-        description: data.description && data.description.trim() !== "" ? data.description : undefined,
-        image_url: imageUrl && imageUrl !== "" ? imageUrl : undefined,
+        budget: data.budget ? parseFloat(data.budget.toString()) : undefined,
+        costs: data.costs ? parseFloat(data.costs.toString()) : undefined,
+        actual_revenue: data.actual_revenue ? parseFloat(data.actual_revenue.toString()) : undefined,
+        location: data.location?.trim() || undefined,
+        start_date: data.start_date || undefined,
+        end_date: data.end_date || undefined,
+        description: data.description?.trim() || undefined,
+        image_url: imageUrl?.trim() || undefined,
       };
 
       if (project) {
@@ -129,17 +136,13 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
       } else {
         await createProject.mutateAsync(projectData);
       }
-      
-      // Attendre un peu pour que la mutation se termine
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       onOpenChange(false);
       reset();
       setImageUrl("");
     } catch (error: any) {
-      // L'erreur est déjà gérée par le hook (toast)
-      // Mais on ne ferme pas le dialog en cas d'erreur pour que l'utilisateur puisse corriger
       console.error("Error saving project:", error);
+      const errorMessage = error?.message || error?.error?.message || "Impossible de sauvegarder le chantier";
+      alert(`Erreur: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -147,22 +150,24 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{project ? "Modifier le projet" : "Nouveau projet"}</DialogTitle>
+          <DialogTitle>
+            {project ? "Modifier le chantier" : "Nouveau chantier"}
+          </DialogTitle>
           <DialogDescription>
-            {project ? "Modifiez les informations du projet." : "Créez un nouveau projet/chantier."}
+            {project
+              ? "Modifiez les informations du chantier"
+              : "Créez un nouveau chantier pour suivre vos travaux"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">
-              Nom du projet <span className="text-red-500">*</span>
-            </Label>
+            <Label htmlFor="name">Nom du chantier *</Label>
             <Input
               id="name"
               {...register("name")}
-              placeholder="Rénovation Maison Martin"
+              placeholder="Ex: Rénovation Maison Martin"
             />
             {errors.name && (
               <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -171,26 +176,35 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
 
           <div className="space-y-2">
             <Label htmlFor="client_id">Client</Label>
-            <Select 
-              value={clientId || "none"} 
-              onValueChange={(value) => setValue("client_id", value === "none" ? "" : value)}
+            <Select
+              value={watch("client_id") || ""}
+              onValueChange={(value) => {
+                if (value === "new") {
+                  navigate("/clients?action=create");
+                  onOpenChange(false);
+                } else {
+                  setValue("client_id", value);
+                }
+              }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un client (optionnel)" />
+                <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Aucun client</SelectItem>
-                {clientsLoading ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">Chargement...</div>
-                ) : clientsError ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">Erreur de chargement</div>
-                ) : (
-                  clients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))
-                )}
+                {clients?.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+                <div className="border-t border-border mt-1 pt-1">
+                  <SelectItem value="new" className="text-primary font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Nouveau client
+                    </div>
+                  </SelectItem>
+                </div>
               </SelectContent>
             </Select>
           </div>
@@ -198,9 +212,12 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Statut</Label>
-              <Select value={status} onValueChange={(value) => setValue("status", value as any)}>
+              <Select
+                value={watch("status") || "planifié"}
+                onValueChange={(value) => setValue("status", value as any)}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un statut" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="planifié">Planifié</SelectItem>
@@ -212,36 +229,48 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="progress">Progression (%)</Label>
-              <Input
-                id="progress"
-                type="number"
-                min="0"
-                max="100"
-                {...register("progress", { valueAsNumber: true })}
-                placeholder="0"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="budget">Budget prévu (€)</Label>
+                <Input
+                  id="budget"
+                  type="number"
+                  {...register("budget")}
+                  placeholder="10000"
+                />
+                <p className="text-xs text-muted-foreground">Montant estimé du devis</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="costs">Coûts engagés (€)</Label>
+                <Input
+                  id="costs"
+                  type="number"
+                  {...register("costs")}
+                  placeholder="7000"
+                />
+                <p className="text-xs text-muted-foreground">Dépenses réelles</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="actual_revenue">CA réel (€)</Label>
+                <Input
+                  id="actual_revenue"
+                  type="number"
+                  {...register("actual_revenue")}
+                  placeholder="10000"
+                />
+                <p className="text-xs text-muted-foreground">Montant réellement facturé</p>
+              </div>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="budget">Budget (€)</Label>
-            <Input
-              id="budget"
-              type="number"
-              step="0.01"
-              {...register("budget")}
-              placeholder="28000"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="location">Lieu du chantier</Label>
+            <Label htmlFor="location">Lieu</Label>
             <Input
               id="location"
               {...register("location")}
-              placeholder="Paris 15e"
+              placeholder="Adresse du chantier"
             />
           </div>
 
@@ -270,18 +299,17 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
             <Textarea
               id="description"
               {...register("description")}
-              placeholder="Description du projet..."
-              rows={3}
+              placeholder="Description du chantier..."
+              rows={4}
             />
           </div>
 
           <div className="space-y-2">
+            <Label>Image du chantier</Label>
             <ImageUpload
               value={imageUrl}
               onChange={setImageUrl}
               folder="projects"
-              label="Image du projet"
-              disabled={isSubmitting}
             />
           </div>
 
@@ -304,4 +332,6 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
     </Dialog>
   );
 };
+
+
 

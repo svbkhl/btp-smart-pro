@@ -117,7 +117,7 @@ export const MultiImageUpload = ({
       {images.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {images.map((url, idx) => (
-            <div key={idx} className="relative group">
+            <div key={url || `image-${idx}`} className="relative group">
               <div className="relative w-full h-20 rounded-lg overflow-hidden border border-border">
                 <img
                   src={url}

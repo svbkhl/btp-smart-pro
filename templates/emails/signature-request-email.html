@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Signature requise</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; line-height: 1.6;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); padding: 40px 30px; text-align: center;">
+              <div style="width: 60px; height: 60px; background-color: rgba(255, 255, 255, 0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                <span style="font-size: 32px;">✍️</span>
+              </div>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Signature requise</h1>
+              <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">{{DOCUMENT_TYPE}} {{DOCUMENT_NUMBER}}</p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 24px 0; color: #1f2937; font-size: 16px;">Bonjour <strong>{{CLIENT_NAME}}</strong>,</p>
+              
+              <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px;">
+                Nous vous demandons de bien vouloir signer le document suivant :
+              </p>
+
+              <!-- Document Card -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #faf5ff; border: 2px solid #c4b5fd; border-radius: 8px; margin: 24px 0;">
+                <tr>
+                  <td style="padding: 24px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+                    <h2 style="margin: 0 0 8px 0; color: #1f2937; font-size: 20px; font-weight: 600;">{{DOCUMENT_TYPE}}</h2>
+                    <p style="margin: 0; color: #6b7280; font-size: 16px;">{{DOCUMENT_NUMBER}}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 32px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{SIGNATURE_URL}}" style="display: inline-block; padding: 18px 40px; background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 17px; box-shadow: 0 4px 6px rgba(139, 92, 246, 0.3);">
+                      ✍️ Signer maintenant
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top: 16px;">
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px;">
+                      Signature électronique sécurisée • Valable 30 jours
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Info Box -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #eff6ff; border-radius: 8px; padding: 16px; margin: 24px 0;">
+                <tr>
+                  <td>
+                    <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                      ℹ️ <strong>Important :</strong> Ce lien de signature est personnel et sécurisé. Votre signature électronique a la même valeur juridique qu'une signature manuscrite.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              {{#if CUSTOM_MESSAGE}}
+              <p style="margin: 24px 0 0 0; padding: 16px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; color: #78350f; font-size: 14px;">
+                💬 <strong>Message :</strong> {{CUSTOM_MESSAGE}}
+              </p>
+              {{/if}}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; border-top: 1px solid #e5e7eb; text-align: center;">
+              <p style="margin: 0 0 16px 0; color: #1f2937; font-weight: 600; font-size: 15px;">{{COMPANY_NAME}}</p>
+              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">📧 {{COMPANY_EMAIL}}</p>
+              <p style="margin: 0 0 16px 0; color: #6b7280; font-size: 14px;">📞 {{COMPANY_PHONE}}</p>
+              <p style="margin: 16px 0 0 0; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
+                © {{YEAR}} {{COMPANY_NAME}}. Tous droits réservés.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+
+
+
+
+

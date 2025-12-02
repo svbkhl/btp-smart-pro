@@ -7,45 +7,83 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Fonction helper pour retourner une réponse standardisée
+function createResponse(success: boolean, data?: any, error?: string, status: number = 200) {
+  return new Response(
+    JSON.stringify({ success, data, error }),
+    { 
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  );
+}
+
 serve(async (req) => {
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  
+  console.log("🚀 ===== GENERATE-QUOTE FUNCTION CALLED =====");
+  console.log("🚀 Request ID:", requestId);
+  console.log("🚀 Timestamp:", new Date().toISOString());
+  console.log("🚀 Method:", req.method);
+  console.log("🚀 URL:", req.url);
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    console.log("🚀 OPTIONS request, returning CORS headers");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Valider les variables d'environnement
+    // Vérifier les variables d'environnement
+    console.log("🔍 Checking environment variables...");
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log("🔍 OPENAI_API_KEY exists:", !!openAIApiKey);
+    console.log("🔍 OPENAI_API_KEY length:", openAIApiKey?.length || 0);
+    
     if (!openAIApiKey) {
-      console.error('OPENAI_API_KEY is not set');
-      return new Response(
-        JSON.stringify({ error: 'OPENAI_API_KEY is not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("❌ OPENAI_API_KEY is not set");
+      return createResponse(false, null, 'OPENAI_API_KEY is not configured in Supabase secrets', 500);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
+    console.log("🔍 SUPABASE_URL exists:", !!supabaseUrl);
+    console.log("🔍 SUPABASE_SERVICE_ROLE_KEY exists:", !!supabaseKey);
+    
     if (!supabaseUrl || !supabaseKey) {
-      console.error('Supabase credentials not set');
-      return new Response(
-        JSON.stringify({ error: 'Supabase configuration error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("❌ Supabase credentials not set");
+      return createResponse(false, null, 'Supabase configuration error', 500);
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log("✅ Supabase client created");
 
     // Parser le body de la requête
+    console.log("📥 Parsing request body...");
     let requestData;
     try {
-      requestData = await req.json();
+      const bodyText = await req.text();
+      console.log("📥 Request body length:", bodyText?.length || 0);
+      console.log("📥 Request body (first 500 chars):", bodyText?.substring(0, 500) || 'EMPTY');
+      
+      if (!bodyText || bodyText.trim() === '') {
+        console.error('❌ Empty request body');
+        return createResponse(false, null, 'Le corps de la requête est vide', 400);
+      }
+      
+      try {
+        requestData = JSON.parse(bodyText);
+        console.log("✅ Request parsed successfully");
+        console.log("📥 Request data keys:", Object.keys(requestData || {}));
+      } catch (jsonError) {
+        console.error('❌ JSON parse error:', jsonError);
+        return createResponse(false, null, 'Format JSON invalide: ' + (jsonError instanceof Error ? jsonError.message : 'Unknown error'), 400);
+      }
     } catch (parseError) {
-      console.error('Error parsing request body:', parseError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ Error parsing request body:', parseError);
+      return createResponse(false, null, 'Erreur lors du parsing: ' + (parseError instanceof Error ? parseError.message : 'Unknown error'), 400);
     }
 
     const { 
@@ -55,422 +93,289 @@ serve(async (req) => {
       materials, 
       imageUrls,
       manualPrice,
-      region
+      region,
+      description,
+      quoteFormat
     } = requestData;
+
+    console.log("📥 Extracted data:", {
+      clientName: !!clientName,
+      surface: surface,
+      workType: !!workType,
+      materialsCount: Array.isArray(materials) ? materials.length : 0,
+      hasImageUrls: !!imageUrls,
+      hasManualPrice: !!manualPrice,
+      region: !!region
+    });
 
     // Valider les paramètres requis
     if (!clientName || !surface || !workType || !materials || !Array.isArray(materials) || materials.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: clientName, surface, workType, materials' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ Missing required fields');
+      return createResponse(false, null, 'Missing required fields: clientName, surface, workType, materials', 400);
     }
 
     // Get user from authorization header
+    console.log("🔐 Checking authorization...");
     const authHeader = req.headers.get('authorization');
+    console.log("🔐 Authorization header exists:", !!authHeader);
+    
     if (!authHeader) {
-      console.error('No authorization header');
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ No authorization header');
+      return createResponse(false, null, 'No authorization header', 401);
     }
     
     let user;
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      );
+      const token = authHeader.replace('Bearer ', '');
+      console.log("🔐 Token length:", token.length);
+      
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
       
       if (userError || !userData?.user) {
-        console.error('User authentication error:', userError);
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error('❌ User authentication error:', userError?.message);
+        return createResponse(false, null, 'Unauthorized: ' + (userError?.message || 'Invalid token'), 401);
       }
       user = userData.user;
+      console.log("✅ User authenticated:", user.id);
     } catch (authError) {
-      console.error('Auth error:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Authentication failed' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ Auth error:', authError);
+      return createResponse(false, null, 'Authentication failed: ' + (authError instanceof Error ? authError.message : 'Unknown error'), 401);
     }
 
-    // Récupérer les informations de l'entreprise depuis user_settings (optionnel, ne pas faire échouer si absent)
+    // Récupérer les informations de l'entreprise
+    console.log("🏢 Fetching company info...");
     let companyInfo = null;
     try {
       const { data: companyData, error: companyError } = await supabase
         .from('user_settings')
-        .select('company_name, email, phone, address, city, postal_code, country, siret, vat_number, company_logo_url, terms_and_conditions, signature_data, signature_name')
+        .select('company_name, email, phone, address, city, postal_code, country, siret, vat_number, company_logo_url, terms_and_conditions')
         .eq('user_id', user.id)
         .single();
       
       if (!companyError && companyData) {
         companyInfo = companyData;
+        console.log("✅ Company info found");
       } else {
-        console.warn('Company info not found or error:', companyError?.message);
-        // Ne pas faire échouer si les infos entreprise ne sont pas trouvées
+        console.warn('⚠️ Company info not found:', companyError?.message);
       }
     } catch (companyError) {
-      console.warn('Error fetching company info:', companyError);
-      // Continuer sans les infos entreprise
+      console.warn('⚠️ Error fetching company info:', companyError);
     }
 
-    // Déterminer la saison actuelle
-    const month = new Date().getMonth() + 1; // 1-12
-    let season = 'printemps';
-    if (month >= 3 && month <= 5) season = 'printemps';
-    else if (month >= 6 && month <= 8) season = 'été';
-    else if (month >= 9 && month <= 11) season = 'automne';
-    else season = 'hiver';
+    // Créer le prompt pour OpenAI
+    console.log("🤖 Creating OpenAI prompt...");
+    const isSimplified = quoteFormat === "simplified";
+    const formatInstruction = isSimplified 
+      ? "Génère un devis SIMPLIFIÉ avec uniquement le type de travaux et le prix total HT/TTC. Pas de détail des prestations ni des matériaux."
+      : "Génère un devis DÉTAILLÉ avec toutes les prestations et matériaux listés avec leurs prix.";
+    
+    let prompt = `Tu es un expert en devis pour le secteur du BTP en France. ${formatInstruction}
 
-    // Créer le prompt pour OpenAI avec prix manuel si fourni
-    let prompt = `Tu es un expert en devis pour le secteur du BTP en France. Génère un devis détaillé basé sur les informations suivantes:
+${description ? `DESCRIPTION PRÉCISE DU CHANTIER (OBLIGATOIRE - UTILISE CES INFORMATIONS, NE PAS INVENTER):
+${description}
 
+` : ''}Informations techniques:
 Client: ${clientName}
-Surface: ${surface} m²
 Type de travaux: ${workType}
+Surface: ${surface} m²
 Matériaux: ${materials.join(', ')}
 ${region ? `Région: ${region}` : ''}
-Saison: ${season}
-${imageUrls?.length ? `Photos fournies: ${imageUrls.length} image(s)` : ''}`;
+${manualPrice ? `Prix manuel suggéré: ${manualPrice} €` : ''}
 
-    // Si prix manuel fourni, demander à l'IA de valider sa cohérence
-    if (manualPrice && manualPrice > 0) {
-      prompt += `
+${isSimplified ? `
+Pour le format SIMPLIFIÉ, génère uniquement:
+- Une description courte des prestations (basée sur la description fournie)
+- Le prix total HT et TTC
+- Une durée estimée
 
-PRIX MANUEL FOURNI: ${manualPrice} €
-IMPORTANT: L'utilisateur a fourni un prix manuel. Tu dois:
-1. Analyser la cohérence de ce prix avec le marché (surface, type de travaux, matériaux, région)
-2. Si le prix semble anormalement bas (< 30% du prix moyen estimé), ajouter un avertissement dans "priceValidation"
-3. Si le prix semble anormalement élevé (> 200% du prix moyen estimé), ajouter un avertissement dans "priceValidation"
-4. Utiliser ce prix comme coût estimé total, mais le décomposer en étapes et matériaux cohérents`;
-    } else {
-      prompt += `
-
-Calcule le coût estimé total selon:
-- La surface (${surface} m²)
-- Le type de travaux (${workType})
-- Les matériaux nécessaires (${materials.join(', ')})
-- La région ${region ? `(${region})` : '(coûts moyens France)'}
-- La saison (${season})
-- Les coûts moyens du marché BTP en France`;
-    }
-
-    prompt += `
-
-Fournis:
-1. Coût estimé total (en euros) ${manualPrice ? `(utiliser ${manualPrice} € comme référence)` : ''}
-2. Détails des travaux par étape avec coûts
-3. Liste des matériaux nécessaires avec quantités et prix unitaires
-4. Durée estimée des travaux (en jours ouvrés)
-5. Recommandations spécifiques
-6. Validation du prix (si prix manuel fourni, analyser sa cohérence)
-
-Format la réponse en JSON avec la structure suivante:
+Structure JSON simplifiée:
 {
-  "estimatedCost": number,
-  "workSteps": [{"step": string, "description": string, "cost": number}],
-  "materials": [{"name": string, "quantity": string, "unitCost": number}],
-  "estimatedDuration": string,
-  "recommendations": [string],
-  "priceValidation": {
-    "isValid": boolean,
-    "message": string,
-    "warning": string (optionnel, seulement si prix anormal)
-  }
-}`;
+  "estimatedCost": 0,
+  "description": "Description courte basée sur la description fournie",
+  "estimatedDuration": "",
+  "workSteps": [],
+  "materials": []
+}` : `
+Génère un devis professionnel avec:
+- Une description détaillée des prestations (basée sur la description fournie)
+- Les étapes de travail avec coûts
+- Les matériaux nécessaires avec quantités et prix unitaires
+- Une durée estimée
+- Des recommandations
+- Une validation du prix
 
-    // Appel à l'API OpenAI avec timeout
+Structure JSON détaillée:
+{
+  "estimatedCost": 0,
+  "description": "Description détaillée basée sur la description fournie",
+  "workSteps": [{"step": "", "description": "", "cost": 0}],
+  "materials": [{"name": "", "quantity": "", "unitCost": 0}],
+  "estimatedDuration": "",
+  "recommendations": [""],
+  "priceValidation": {"isValid": true, "message": "", "warning": ""}
+}`}
+
+IMPORTANT: 
+- Utilise UNIQUEMENT les informations de la description fournie, ne pas inventer de détails
+- Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sans texte autour
+- Si une description est fournie, base-toi dessus pour générer le devis`;
+
+    console.log("🤖 Prompt created, length:", prompt.length);
+
+    // Appel à l'API OpenAI
+    console.log("🤖 Calling OpenAI API...");
     let openaiResponse;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 28000); // 28 secondes max
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
 
-      try {
-        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { 
-                role: 'system', 
-                content: 'Tu es un expert en devis BTP en France. Tu fournis toujours des estimations précises et détaillées en JSON. Tu connais les coûts moyens du marché, les variations régionales, et les saisons. Tu valides toujours la cohérence des prix.' 
-              },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-          }),
-          signal: controller.signal,
-        });
+      const openaiStartTime = Date.now();
+      openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { 
+              role: 'system', 
+              content: 'Tu es un expert en devis BTP en France. Tu réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sans texte autour.' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.1,
+          max_tokens: 2000,
+        }),
+        signal: controller.signal,
+      });
 
-        clearTimeout(timeoutId);
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          console.error('OpenAI API request timed out');
-          return new Response(
-            JSON.stringify({ error: 'La requête a pris trop de temps. Veuillez réessayer.' }),
-            { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        throw fetchError;
-      }
+      clearTimeout(timeoutId);
+      const openaiDuration = Date.now() - openaiStartTime;
+      console.log("🤖 OpenAI response received, status:", openaiResponse.status, "duration:", openaiDuration, "ms");
     } catch (fetchError) {
-      console.error('Error calling OpenAI API:', fetchError);
-      return new Response(
-        JSON.stringify({ error: 'Erreur lors de l\'appel à l\'API OpenAI' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ Error calling OpenAI API:', fetchError);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return createResponse(false, null, 'La requête OpenAI a pris trop de temps', 504);
+      }
+      return createResponse(false, null, 'Erreur OpenAI: ' + (fetchError instanceof Error ? fetchError.message : 'Unknown error'), 500);
     }
 
     if (!openaiResponse.ok) {
       const errorData = await openaiResponse.json().catch(() => ({}));
-      console.error('OpenAI API error:', errorData);
-      return new Response(
-        JSON.stringify({ error: 'Erreur de l\'API OpenAI: ' + (errorData.error?.message || 'Unknown error') }),
-        { status: openaiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ OpenAI API error:', errorData);
+      return createResponse(false, null, 'Erreur OpenAI API: ' + (errorData.error?.message || 'Unknown error'), openaiResponse.status);
     }
 
     const data = await openaiResponse.json();
+    console.log("🤖 OpenAI data received, has choices:", !!data.choices);
     
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error('Invalid OpenAI response structure:', data);
-      return new Response(
-        JSON.stringify({ error: 'Réponse invalide de l\'API OpenAI' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ Invalid OpenAI response structure');
+      return createResponse(false, null, 'Réponse invalide de l\'API OpenAI', 500);
     }
 
     // Parser la réponse JSON de l'IA
+    console.log("🔧 Parsing AI response...");
     let aiResponse;
     try {
       const content = data.choices[0].message.content;
+      console.log("🔧 AI content length:", content?.length || 0);
+      console.log("🔧 AI content (first 500 chars):", content?.substring(0, 500));
+      
       if (!content) {
-        console.error('Empty response from AI');
-        throw new Error('Empty response from AI');
+        console.error('❌ Empty response from AI');
+        return createResponse(false, null, 'Réponse vide de l\'IA', 500);
       }
       
-      console.log('Raw AI response (first 500 chars):', content.substring(0, 500));
+      // Nettoyer le contenu (supprimer markdown, backticks)
+      let cleaned = content
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .replace(/\s*```/g, '')
+        .replace(/`/g, '')
+        .trim();
       
-      // Nettoyer le contenu (enlever les markdown code blocks si présents)
-      let cleanedContent = content.trim();
+      // Extraire le JSON (premier { jusqu'au dernier })
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
       
-      // Enlever les marqueurs markdown
-      cleanedContent = cleanedContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-      
-      // Si le contenu commence par {, c'est du JSON
-      if (cleanedContent.startsWith('{')) {
-        try {
-          aiResponse = JSON.parse(cleanedContent);
-        } catch (e) {
-          // Essayer d'extraire le JSON du texte si le parsing échoue
-          const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            aiResponse = JSON.parse(jsonMatch[0]);
-          } else {
-            throw e;
-          }
-        }
-      } else {
-        // Essayer d'extraire le JSON du texte
-        const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          aiResponse = JSON.parse(jsonMatch[0]);
-        } else {
-          console.error('No JSON found in response. Content:', cleanedContent.substring(0, 200));
-          throw new Error('No JSON found in AI response');
-        }
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
       }
       
-      console.log('Parsed AI response:', JSON.stringify(aiResponse, null, 2).substring(0, 500));
-    } catch (parseError: any) {
-      console.error('Error parsing AI response:', parseError);
-      console.error('Parse error details:', {
-        message: parseError?.message,
-        stack: parseError?.stack
-      });
-      console.error('Raw response content:', data.choices[0].message.content?.substring(0, 1000));
+      console.log("🔧 Cleaned JSON (first 500 chars):", cleaned.substring(0, 500));
       
-      return new Response(
-        JSON.stringify({ 
-          error: 'Erreur lors du parsing de la réponse de l\'IA. Veuillez réessayer.',
-          details: parseError?.message || 'Unknown parsing error'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Valider et corriger la structure de la réponse
-    if (aiResponse.estimatedCost === undefined || aiResponse.estimatedCost === null) {
-      console.warn('Invalid AI response: missing estimatedCost', JSON.stringify(aiResponse, null, 2));
-      
-      // Si prix manuel fourni, l'utiliser
-      if (manualPrice && manualPrice > 0) {
-        aiResponse.estimatedCost = manualPrice;
-        console.warn('Using manual price as estimatedCost was missing');
-      } else {
-        // Calculer un coût approximatif basé sur la surface (estimation très basique)
-        const baseCostPerSquareMeter = 50; // Coût de base par m²
-        aiResponse.estimatedCost = parseFloat(String(surface)) * baseCostPerSquareMeter;
-        console.warn('Estimated cost missing, using fallback calculation:', aiResponse.estimatedCost);
-      }
-    }
-    
-    // S'assurer que estimatedCost est un nombre
-    aiResponse.estimatedCost = parseFloat(String(aiResponse.estimatedCost)) || 0;
-
-    // Si prix manuel fourni, utiliser ce prix mais garder la validation de l'IA
-    if (manualPrice && manualPrice > 0) {
-      aiResponse.estimatedCost = manualPrice;
-      // Si l'IA n'a pas fourni de validation, en créer une basique
-      if (!aiResponse.priceValidation) {
-        aiResponse.priceValidation = {
-          isValid: true,
-          message: "Prix manuel utilisé",
-          warning: "L'IA a validé la cohérence de ce prix avec le marché."
-        };
-      }
-    }
-
-    // Assurer que priceValidation existe même si l'IA ne l'a pas fourni
-    if (!aiResponse.priceValidation) {
-      aiResponse.priceValidation = {
-        isValid: true,
-        message: "Prix calculé par l'IA",
-      };
-    }
-
-    // Assurer que les tableaux existent
-    if (!aiResponse.workSteps) aiResponse.workSteps = [];
-    if (!aiResponse.materials) aiResponse.materials = [];
-    if (!aiResponse.recommendations) aiResponse.recommendations = [];
-    if (!aiResponse.estimatedDuration) aiResponse.estimatedDuration = 'Non spécifié';
-
-    // Sauvegarder le devis dans la base de données (ne pas faire échouer si la sauvegarde échoue)
-    let quote = null;
-    try {
-      // Obtenir le prochain numéro de devis
-      let quoteNumber = null;
+      // Parser le JSON
       try {
-        const { data: quoteNumberData, error: quoteNumberError } = await supabase
-          .rpc('get_next_quote_number');
-        
-        if (!quoteNumberError && quoteNumberData) {
-          quoteNumber = quoteNumberData;
-        } else {
-          console.warn('Error getting quote number:', quoteNumberError?.message);
-          // Générer un numéro de secours basé sur la date
-          const year = new Date().getFullYear();
-          const timestamp = Date.now().toString().slice(-6);
-          quoteNumber = `DEV-${year}-${timestamp}`;
-        }
-      } catch (quoteNumberError) {
-        console.warn('Exception getting quote number:', quoteNumberError);
-        // Générer un numéro de secours
-        const year = new Date().getFullYear();
-        const timestamp = Date.now().toString().slice(-6);
-        quoteNumber = `DEV-${year}-${timestamp}`;
+        aiResponse = JSON.parse(cleaned);
+        console.log("✅ AI response parsed successfully");
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        console.error('❌ Cleaned text (first 1000 chars):', cleaned.substring(0, 1000));
+        return createResponse(false, null, 'Erreur parsing JSON: ' + (parseError instanceof Error ? parseError.message : 'Unknown error') + '. Contenu (premiers 200 chars): ' + cleaned.substring(0, 200), 500);
       }
+    } catch (parseError) {
+      console.error('❌ Error parsing AI response:', parseError);
+      return createResponse(false, null, 'Erreur parsing: ' + (parseError instanceof Error ? parseError.message : 'Unknown error'), 500);
+    }
 
-      // Préparer les données à insérer
-      // Inclure la signature automatique si elle existe dans les paramètres
-      const quoteDataToInsert: any = {
-        user_id: user.id,
-        client_name: clientName,
-        surface: parseFloat(surface) || null,
-        work_type: workType,
-        materials: Array.isArray(materials) ? materials : [],
-        image_urls: Array.isArray(imageUrls) ? imageUrls : [],
-        estimated_cost: aiResponse.estimatedCost || null,
-        quote_number: quoteNumber,
-        details: {
-          ...aiResponse,
-          company_info: companyInfo,
-          region: region || null,
-          season: season,
-          manual_price: manualPrice || null,
-          quote_number: quoteNumber,
-        },
-        status: 'signed', // Marquer comme signé si signature automatique présente
-        signature_data: companyInfo?.signature_data || null,
-        signed_by: companyInfo?.signature_name || null,
-        signed_at: companyInfo?.signature_data ? new Date().toISOString() : null,
-      };
+    // Construire la réponse
+    console.log("📝 Building response...");
+    const responseData = {
+      aiResponse: aiResponse,
+      clientName: clientName,
+      surface: surface,
+      workType: workType,
+      materials: materials,
+      region: region || null,
+      manualPrice: manualPrice || null,
+      companyInfo: companyInfo,
+    };
 
-      const { data: quoteData, error: dbError } = await supabase
+    // Sauvegarder dans la base de données (optionnel, non-bloquant)
+    console.log("💾 Saving to database...");
+    try {
+      const { error: dbError } = await supabase
         .from('ai_quotes')
-        .insert(quoteDataToInsert)
-        .select()
-        .single();
+        .insert({
+          user_id: user.id,
+          client_name: clientName,
+          work_type: workType,
+          surface: surface,
+          estimated_cost: aiResponse.estimatedCost || 0,
+          details: aiResponse,
+          status: 'draft',
+        });
 
       if (dbError) {
-        console.error('Database error:', dbError);
-        console.error('Error details:', {
-          code: dbError.code,
-          message: dbError.message,
-          details: dbError.details,
-          hint: dbError.hint
-        });
-        
-        // Si l'erreur est due à la table qui n'existe pas, retourner une erreur explicite
-        if (dbError.code === '42P01' || dbError.message?.includes('does not exist')) {
-          console.error('Table ai_quotes does not exist. Please run VERIFIER-ET-CREER-AI-QUOTES.sql');
-          // Ne pas faire échouer, mais logger l'erreur
-        }
-        
-        // Ne pas faire échouer la requête si la sauvegarde échoue
-        console.warn('Failed to save quote to database, but continuing with AI response');
+        console.warn('⚠️ Error saving to database (non-blocking):', dbError.message);
       } else {
-        quote = quoteData;
-        if (quote && 'id' in quote) {
-          console.log('Quote saved successfully:', (quote as any).id);
-        }
+        console.log("✅ Quote saved to database");
       }
-    } catch (dbError: any) {
-      console.error('Database exception:', dbError);
-      console.error('Exception details:', {
-        message: dbError?.message,
-        stack: dbError?.stack
-      });
-      // Continuer même si la sauvegarde échoue
+    } catch (dbError) {
+      console.warn('⚠️ Error saving to database (non-blocking):', dbError);
     }
 
-    // Retourner la réponse même si la sauvegarde a échoué
-    // Inclure le numéro de devis dans la réponse
-    return new Response(JSON.stringify({ 
-      quote: quote ? {
-        ...quote,
-        quote_number: quoteNumber || quote.quote_number || null
-      } : null,
-      aiResponse: {
-        ...aiResponse,
-        quote_number: quoteNumber || null
-      },
-      companyInfo: companyInfo || null,
-      quoteNumber: quoteNumber || null
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const totalDuration = Date.now() - startTime;
+    console.log("✅ ===== GENERATE-QUOTE SUCCESS =====");
+    console.log("✅ Request ID:", requestId);
+    console.log("✅ Total duration:", totalDuration, "ms");
+    
+    return createResponse(true, responseData, null, 200);
 
   } catch (error) {
-    console.error('Unexpected error in generate-quote function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ 
-      error: errorMessage,
-      details: error instanceof Error ? error.stack : undefined
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const totalDuration = Date.now() - startTime;
+    console.error('❌ ===== GENERATE-QUOTE UNEXPECTED ERROR =====');
+    console.error('❌ Request ID:', requestId);
+    console.error('❌ Error:', error);
+    console.error('❌ Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('❌ Total duration:', totalDuration, "ms");
+    
+    const errorMessage = error instanceof Error ? error.message : 'Erreur inattendue';
+    return createResponse(false, null, errorMessage, 500);
   }
 });

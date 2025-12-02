@@ -1,53 +1,87 @@
-import Sidebar from "@/components/Sidebar";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AIQuoteGenerator } from "@/components/ai/AIQuoteGenerator";
-import { AIAssistant } from "@/components/ai/AIAssistant";
-import { ImageAnalysis } from "@/components/ai/ImageAnalysis";
-import { MaintenanceReminders } from "@/components/ai/MaintenanceReminders";
+import { Brain, Sparkles, FileText, Receipt, Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { useEffect, useState, lazy, Suspense } from "react";
+
+// Lazy loading des composants lourds (chargés seulement quand l'onglet est activé)
+const AIAssistant = lazy(() => import("@/components/ai/AIAssistant").then(m => ({ default: m.AIAssistant })));
+const SimpleQuoteForm = lazy(() => import("@/components/ai/SimpleQuoteForm").then(m => ({ default: m.SimpleQuoteForm })));
+const SimpleInvoiceForm = lazy(() => import("@/components/ai/SimpleInvoiceForm").then(m => ({ default: m.SimpleInvoiceForm })));
+
+// Composant de loading
+const TabLoader = () => (
+  <div className="flex items-center justify-center py-12">
+    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+  </div>
+);
 
 const AI = () => {
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState("assistant");
+
+  // Ouvrir l'onglet spécifié dans l'URL
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && ["assistant", "quotes", "invoices"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto w-full">
-        <div className="p-4 md:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-4 md:mb-6">
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-1 md:mb-2">Fonctionnalités IA</h1>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                Utilisez l'intelligence artificielle pour optimiser votre travail
-              </p>
-            </div>
-
-            <Tabs defaultValue="assistant" className="w-full">
-              <TabsList className="flex overflow-x-auto w-full mb-4 md:mb-6 h-auto flex-nowrap gap-1 p-1">
-                <TabsTrigger value="assistant" className="flex-shrink-0 text-xs md:text-base px-3 md:px-6 py-2 md:py-3">Assistant IA</TabsTrigger>
-                <TabsTrigger value="quote" className="flex-shrink-0 text-xs md:text-base px-3 md:px-6 py-2 md:py-3">Devis IA</TabsTrigger>
-                <TabsTrigger value="analysis" className="flex-shrink-0 text-xs md:text-base px-3 md:px-6 py-2 md:py-3">Analyse</TabsTrigger>
-                <TabsTrigger value="reminders" className="flex-shrink-0 text-xs md:text-base px-3 md:px-6 py-2 md:py-3">Rappels</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="assistant">
-                <AIAssistant />
-              </TabsContent>
-
-              <TabsContent value="quote">
-                <AIQuoteGenerator />
-              </TabsContent>
-
-              <TabsContent value="analysis">
-                <ImageAnalysis />
-              </TabsContent>
-
-              <TabsContent value="reminders">
-                <MaintenanceReminders />
-              </TabsContent>
-            </Tabs>
-          </div>
+    <PageLayout>
+      <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+            <Brain className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            IA
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Utilisez l'intelligence artificielle pour générer des devis, analyser des images et obtenir des conseils
+          </p>
         </div>
-      </main>
-    </div>
+
+        <GlassCard className="p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto">
+              <TabsTrigger value="assistant" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="truncate">Assistant</span>
+              </TabsTrigger>
+              <TabsTrigger value="quotes" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="truncate">Devis</span>
+              </TabsTrigger>
+              <TabsTrigger value="invoices" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                <Receipt className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="truncate">Facture</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="assistant" className="mt-0">
+              <Suspense fallback={<TabLoader />}>
+                <AIAssistant />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="quotes" className="mt-0">
+              <Suspense fallback={<TabLoader />}>
+                <SimpleQuoteForm />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="invoices" className="mt-0">
+              <Suspense fallback={<TabLoader />}>
+                <SimpleInvoiceForm />
+              </Suspense>
+            </TabsContent>
+          </Tabs>
+        </GlassCard>
+      </div>
+    </PageLayout>
   );
 };
 
 export default AI;
+

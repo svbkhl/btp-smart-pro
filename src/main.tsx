@@ -1,27 +1,33 @@
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import "./index.css";
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App';
+import { ThemeProvider } from './components/ThemeProvider';
+import { SidebarProvider } from './contexts/SidebarContext';
+import './index.css';
 
-// Vérifier que l'élément root existe
-const rootElement = document.getElementById("root");
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
-if (!rootElement) {
-  document.body.innerHTML = `
-    <div style="padding: 20px; font-family: Arial; text-align: center;">
-      <h1 style="color: red;">Erreur : Élément #root introuvable</h1>
-      <p>L'élément avec l'id "root" n'existe pas dans le fichier index.html</p>
-    </div>
-  `;
-} else {
-  try {
-    createRoot(rootElement).render(<App />);
-  } catch (error) {
-    rootElement.innerHTML = `
-      <div style="padding: 20px; font-family: Arial; text-align: center;">
-        <h1 style="color: red;">Erreur de démarrage</h1>
-        <p>${error instanceof Error ? error.message : "Erreur inconnue"}</p>
-        <p style="margin-top: 20px; color: #666;">Vérifiez la console pour plus de détails (F12)</p>
-      </div>
-    `;
-  }
-}
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="system" storageKey="btp-smart-pro-theme">
+        <SidebarProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </SidebarProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </StrictMode>
+);
+
+

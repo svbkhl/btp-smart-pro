@@ -1,20 +1,16 @@
-import { useLocation } from "react-router-dom";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 /**
  * Hook pour détecter si on est en mode démo
- * Le mode démo est activé quand on est sur /demo ou n'importe quelle route en mode démo
+ * Le mode démo est activé quand fakeDataEnabled est true
  */
 export const useDemoMode = () => {
-  const location = useLocation();
-  const isDemoMode = location.pathname.startsWith("/demo") || 
-                     location.pathname === "/demo" ||
-                     // Permettre la navigation depuis /demo vers d'autres pages en mode démo
-                     (sessionStorage.getItem("demo_mode") === "true");
+  const { fakeDataEnabled } = useFakeDataStore();
   
   return {
-    isDemoMode,
-    enableDemoMode: () => sessionStorage.setItem("demo_mode", "true"),
-    disableDemoMode: () => sessionStorage.removeItem("demo_mode"),
+    isDemoMode: fakeDataEnabled,
+    enableDemoMode: () => {},
+    disableDemoMode: () => {},
   };
 };
 

@@ -1,284 +1,245 @@
 import { useState, useEffect } from "react";
-import { Bell, X, Check } from "lucide-react";
+import { Bell, Check, CheckCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { supabase } from "@/integrations/supabase/client";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useNotifications, Notification } from "@/hooks/useNotifications";
 import { useToast } from "@/components/ui/use-toast";
+import { formatDistanceToNow } from "date-fns";
+import { fr } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  is_read: boolean;
-  created_at: string;
-  related_table?: string;
-  related_id?: string;
-}
+const getTypeColor = (type: Notification["type"]) => {
+  switch (type) {
+    case "success":
+      return "bg-green-500";
+    case "warning":
+      return "bg-yellow-500";
+    case "urgent":
+      return "bg-red-500";
+    case "error":
+      return "bg-red-600";
+    default:
+      return "bg-blue-500";
+  }
+};
+
+const getTypeLabel = (type: Notification["type"]) => {
+  switch (type) {
+    case "success":
+      return "Succès";
+    case "warning":
+      return "Avertissement";
+    case "urgent":
+      return "Urgent";
+    case "error":
+      return "Erreur";
+    default:
+      return "Information";
+  }
+};
 
 export const Notifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchNotifications = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("notifications")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (error) {
-          // Gérer les erreurs silencieusement pour ne pas bloquer l'application
-          if (isMounted) {
-            setNotifications([]);
-            setUnreadCount(0);
-          }
-          return;
-        }
-
-        if (isMounted) {
-          setNotifications(data || []);
-          setUnreadCount(data?.filter((n) => !n.is_read).length || 0);
-        }
-      } catch (error) {
-        // En cas d'erreur, on affiche un tableau vide
-        if (isMounted) {
-          setNotifications([]);
-          setUnreadCount(0);
-        }
-      }
-    };
-
-    fetchNotifications();
-
-    // Subscribe to realtime notifications
-    const channel = supabase
-      .channel("notifications-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-        },
-        () => {
-          if (isMounted) {
-            fetchNotifications();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const markAsRead = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq("id", id);
-
-      if (error) {
-        // Gérer les erreurs silencieusement
-        return;
-      }
-
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      // Erreur silencieuse
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.is_read) {
+      markAsRead(notification.id);
     }
-  };
 
-  const markAllAsRead = async () => {
-    try {
-      const unreadIds = notifications
-        .filter((n) => !n.is_read)
-        .map((n) => n.id);
-
-      if (unreadIds.length === 0) return;
-
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .in("id", unreadIds);
-
-      if (error) {
-        console.error("Error marking all notifications as read:", error);
-        
-        // Gérer les erreurs de permissions
-        if (error.message.includes("permission") || error.message.includes("row-level security") || error.message.includes("RLS")) {
-          toast({
-            title: "Erreur de permissions",
-            description: "Les politiques RLS ne sont pas configurées correctement. Exécutez FIX-PERMISSIONS-NOTIFICATIONS.sql",
-            variant: "destructive",
-            duration: 5000,
-          });
-          return;
-        }
-        
-        throw error;
+    // Naviguer vers l'élément lié si disponible
+    if (notification.related_table && notification.related_id) {
+      switch (notification.related_table) {
+        case "projects":
+          navigate(`/projects/${notification.related_id}`);
+          break;
+        case "quotes":
+          navigate("/quotes");
+          break;
+        case "clients":
+          navigate("/clients");
+          break;
+        default:
+          break;
       }
-
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
-      );
-      setUnreadCount(0);
-
-      toast({
-        title: "Notifications marquées comme lues",
-        description: `${unreadIds.length} notification${unreadIds.length > 1 ? "s" : ""} marquée${unreadIds.length > 1 ? "s" : ""} comme lue${unreadIds.length > 1 ? "s" : ""}`,
-      });
-    } catch (error: any) {
-      console.error("Error in markAllAsRead:", error);
-      const errorMessage = error?.message || "Impossible de marquer toutes comme lues";
-      toast({
-        title: "Erreur",
-        description: errorMessage,
-        variant: "destructive",
-      });
     }
+
+    setOpen(false);
   };
 
-  const getTypeBadgeVariant = (type: string) => {
-    switch (type) {
-      case "urgent":
-        return "destructive";
-      case "warning":
-        return "outline";
-      case "success":
-        return "default";
-      default:
-        return "secondary";
-    }
+  const handleMarkAllAsRead = () => {
+    markAllAsRead();
+    toast({
+      title: "Notifications marquées comme lues",
+      description: "Toutes les notifications ont été marquées comme lues.",
+    });
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "À l'instant";
-    if (minutes < 60) return `Il y a ${minutes}min`;
-    if (hours < 24) return `Il y a ${hours}h`;
-    if (days < 7) return `Il y a ${days}j`;
-    return date.toLocaleDateString("fr-FR");
-  };
+  const unreadNotifications = notifications.filter((n) => !n.is_read);
+  const readNotifications = notifications.filter((n) => n.is_read);
 
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl relative"
+        >
+          <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+              className="absolute -top-1 -right-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
             >
-              {unreadCount}
+              {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
           )}
         </Button>
-      </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="flex items-center justify-between">
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-0" sideOffset={8}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <DropdownMenuLabel className="p-0 font-semibold">
             Notifications
             {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="text-xs"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Tout marquer comme lu
-              </Button>
+              <Badge variant="secondary" className="ml-2">
+                {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
+              </Badge>
             )}
-          </SheetTitle>
-          <SheetDescription>
-            {unreadCount > 0
-              ? `${unreadCount} notification${unreadCount > 1 ? "s" : ""} non lue${unreadCount > 1 ? "s" : ""}`
-              : "Aucune nouvelle notification"}
-          </SheetDescription>
-        </SheetHeader>
-        <ScrollArea className="h-[calc(100vh-120px)] mt-4">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-              <Bell className="h-8 w-8 mb-2 opacity-50" />
-              <p>Aucune notification</p>
+          </DropdownMenuLabel>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              className="h-8 text-xs"
+            >
+              <CheckCheck className="w-3 h-3 mr-1" />
+              Tout marquer
+            </Button>
+          )}
+        </div>
+
+        <ScrollArea className="h-[400px]">
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <Bell className="w-8 h-8 mx-auto mb-2 opacity-50 animate-pulse" />
+              <p className="text-sm">Chargement...</p>
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Aucune notification</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 rounded-lg border ${
-                    !notification.is_read
-                      ? "bg-accent/50 border-accent"
-                      : "bg-card"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={getTypeBadgeVariant(notification.type)}>
-                          {notification.type}
-                        </Badge>
-                        {!notification.is_read && (
-                          <span className="h-2 w-2 rounded-full bg-primary" />
-                        )}
+            <div className="divide-y">
+              {/* Notifications non lues */}
+              {unreadNotifications.length > 0 && (
+                <div>
+                  {unreadNotifications.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className="flex items-start gap-3 p-4 cursor-pointer focus:bg-muted/50"
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className={cn("w-2 h-2 rounded-full mt-2 flex-shrink-0", getTypeColor(notification.type))} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-medium text-foreground line-clamp-1">
+                            {notification.title}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(notification.id);
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
+                          {notification.message}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            {getTypeLabel(notification.type)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(notification.created_at), {
+                              addSuffix: true,
+                              locale: fr,
+                            })}
+                          </span>
+                        </div>
                       </div>
-                      <h4 className="font-semibold text-sm">
-                        {notification.title}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(notification.created_at)}
-                      </p>
-                    </div>
-                    {!notification.is_read && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => markAsRead(notification.id)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                    </DropdownMenuItem>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Notifications lues */}
+              {readNotifications.length > 0 && (
+                <div>
+                  {readNotifications.slice(0, 5).map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className="flex items-start gap-3 p-4 cursor-pointer focus:bg-muted/50 opacity-60"
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className={cn("w-2 h-2 rounded-full mt-2 flex-shrink-0", getTypeColor(notification.type))} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground line-clamp-1 mb-1">
+                          {notification.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {notification.message}
+                        </p>
+                        <span className="text-xs text-muted-foreground mt-1 block">
+                          {formatDistanceToNow(new Date(notification.created_at), {
+                            addSuffix: true,
+                            locale: fr,
+                          })}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </ScrollArea>
-      </SheetContent>
-    </Sheet>
+
+        {notifications.length > 0 && (
+          <div className="p-2 border-t">
+            <Button
+              variant="ghost"
+              className="w-full text-sm"
+              onClick={() => {
+                navigate("/settings");
+                setOpen(false);
+              }}
+            >
+              Voir toutes les notifications
+            </Button>
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
+

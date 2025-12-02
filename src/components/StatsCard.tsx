@@ -37,3 +37,4 @@ const StatsCard = ({ title, value, icon: Icon, trend, trendUp }: StatsCardProps)
 };
 
 export default StatsCard;
+export { StatsCard };

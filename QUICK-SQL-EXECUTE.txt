@@ -1,0 +1,28 @@
+📊 EXÉCUTION RAPIDE DES SCRIPTS SQL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 OUVREZ : https://app.supabase.com/project/renmjmqlmafqjzldmsgs/sql/new
+
+📄 POUR CHAQUE SCRIPT (4 au total) :
+
+1. Ouvrez le fichier .sql dans votre éditeur
+2. Cmd+A (sélectionner tout)
+3. Cmd+C (copier)
+4. Collez dans SQL Editor (Cmd+V)
+5. Cmd+Enter (exécuter)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 SCRIPTS (dans l'ordre) :
+
+1. supabase/CREATE-INVOICES-SYSTEM-FIXED.sql
+2. supabase/CREATE-IMAP-MAILBOX-SYSTEM.sql
+3. supabase/CREATE-AUTOMATIONS-SYSTEM.sql
+4. supabase/ADD-EMAIL-SIGNATURE.sql
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️ Temps total : ~5 minutes
+
+✅ Vérification : Exécutez dans SQL Editor pour voir les 8 tables créées
+

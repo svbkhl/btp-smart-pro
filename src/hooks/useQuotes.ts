@@ -4,91 +4,86 @@ import { useAuth } from "./useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_QUOTES } from "@/fakeData/quotes";
+import { generateQuoteNumber } from "@/utils/documentNumbering";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 export interface Quote {
   id: string;
   user_id: string;
-  client_name: string | null;
-  surface: number | null;
-  work_type: string | null;
-  materials: string[] | null;
-  image_urls: string[] | null;
-  estimated_cost: number | null;
-  details: any;
-  status: string | null;
-  signature_data: string | null;
-  signed_at: string | null;
-  signed_by: string | null;
-  quote_number: string | null;
+  client_name: string;
+  project_id?: string;
+  quote_number: string;
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+  estimated_cost: number;
+  details?: {
+    estimatedCost: number;
+    items: Array<{
+      name: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+  };
   created_at: string;
   updated_at: string;
 }
 
-export interface QuoteFilters {
-  status?: string;
-  client_name?: string;
-  date_from?: string;
-  date_to?: string;
+export interface CreateQuoteData {
+  client_name: string;
+  project_id?: string;
+  quote_number?: string;
+  status?: "draft" | "sent" | "accepted" | "rejected" | "expired";
+  estimated_cost: number;
+  details?: {
+    estimatedCost: number;
+    items: Array<{
+      name: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+  };
+}
+
+export interface UpdateQuoteData extends Partial<CreateQuoteData> {
+  id: string;
 }
 
 // Hook pour récupérer tous les devis
-export const useQuotes = (filters?: QuoteFilters) => {
+export const useQuotes = () => {
   const { user } = useAuth();
+  const { fakeDataEnabled } = useFakeDataStore();
 
   return useQuery({
-    queryKey: ["quotes", user?.id, filters],
+    queryKey: ["quotes", user?.id, fakeDataEnabled],
     queryFn: async () => {
+      // Si fake data est activé, retourner directement les fake data
+      if (fakeDataEnabled) {
+        console.log("🎭 Mode démo activé - Retour des fake quotes");
+        return FAKE_QUOTES;
+      }
+
+      // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
 
-          let query = supabase
+          const { data, error } = await supabase
             .from("ai_quotes")
             .select("*")
             .eq("user_id", user.id)
-            .order("quote_number", { ascending: false, nullsFirst: false ,
-    throwOnError: false,
-  })
             .order("created_at", { ascending: false });
 
-          // Appliquer les filtres
-          if (filters?.status) {
-            query = query.eq("status", filters.status);
-          }
-          if (filters?.client_name) {
-            query = query.ilike("client_name", `%${filters.client_name}%`);
-          }
-          if (filters?.date_from) {
-            query = query.gte("created_at", filters.date_from);
-          }
-          if (filters?.date_to) {
-            query = query.lte("created_at", filters.date_to);
-          }
-
-          const { data, error } = await query;
-
-          if (error) {
-            // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
-            // Si fake data activé → retourne FAKE_QUOTES
-            // Si fake data désactivé → retourne []
-            throw error;
-          }
-          const quotes = (data || []) as Quote[];
-          // Retourner les vraies données (même si vide)
-          // queryWithTimeout gère le fallback automatiquement
-          return quotes;
+          if (error) throw error;
+          return (data || []) as Quote[];
         },
-        filters?.status 
-          ? FAKE_QUOTES.filter(q => q.status === filters.status)
-          : FAKE_QUOTES,
+        [],
         "useQuotes"
       );
     },
-    enabled: !!user,
+    enabled: !!user || fakeDataEnabled,
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
-    throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
+    refetchInterval: 60000, // Polling automatique toutes les 60s
   });
 };
 
@@ -110,10 +105,7 @@ export const useQuote = (id: string | undefined) => {
             .eq("user_id", user.id)
             .single();
 
-          if (error) {
-            // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
-            throw error;
-          }
+          if (error) throw error;
           return data as Quote;
         },
         FAKE_QUOTES[0] || null,
@@ -124,7 +116,137 @@ export const useQuote = (id: string | undefined) => {
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
-    throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
+  });
+};
+
+// Hook pour créer un devis
+export const useCreateQuote = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (quoteData: CreateQuoteData) => {
+      if (!user) throw new Error("User not authenticated");
+
+      // Générer le numéro de devis automatiquement
+      const quoteNumber = await generateQuoteNumber(user.id);
+      console.log("📄 Numéro de devis généré:", quoteNumber);
+
+      const { data, error } = await supabase
+        .from("ai_quotes")
+        .insert({
+          ...quoteData,
+          user_id: user.id,
+          quote_number: quoteNumber,
+          status: quoteData.status || "draft",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Quote;
+    },
+    onSuccess: async (quote) => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      
+      // Vérifier si l'envoi automatique est activé
+      try {
+        const { data: settings } = await supabase
+          .from("user_settings")
+          .select("auto_send_email")
+          .eq("user_id", user?.id)
+          .single();
+
+        if (settings?.auto_send_email && quote.client_email) {
+          // Envoyer automatiquement le devis par email
+          try {
+            const { sendQuoteEmail } = await import("@/services/emailService");
+            await sendQuoteEmail({
+              to: quote.client_email,
+              quoteId: quote.id,
+              quoteNumber: quote.quote_number || quote.id.substring(0, 8),
+              clientName: quote.client_name || "Client",
+            });
+            
+            // Mettre à jour le statut
+            await supabase
+              .from("ai_quotes")
+              .update({ status: "sent", sent_at: new Date().toISOString() })
+              .eq("id", quote.id);
+
+            toast({
+              title: "Devis créé et envoyé",
+              description: `Le devis a été créé et envoyé automatiquement à ${quote.client_email}`,
+            });
+          } catch (emailError: any) {
+            console.error("Erreur envoi automatique devis:", emailError);
+            toast({
+              title: "Devis créé",
+              description: "Le devis a été créé, mais l'envoi automatique a échoué.",
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Devis créé",
+            description: "Le devis a été créé avec succès.",
+          });
+        }
+      } catch (error) {
+        console.error("Erreur vérification auto_send_email:", error);
+        toast({
+          title: "Devis créé",
+          description: "Le devis a été créé avec succès.",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+// Hook pour mettre à jour un devis
+export const useUpdateQuote = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, ...quoteData }: UpdateQuoteData) => {
+      if (!user) throw new Error("User not authenticated");
+
+      const { data, error } = await supabase
+        .from("ai_quotes")
+        .update(quoteData)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Quote;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["quote"] });
+      toast({
+        title: "Devis mis à jour",
+        description: "Le devis a été mis à jour avec succès.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 };
 
@@ -149,7 +271,6 @@ export const useDeleteQuote = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["quote"] });
       toast({
         title: "Devis supprimé",
         description: "Le devis a été supprimé avec succès.",
@@ -158,49 +279,12 @@ export const useDeleteQuote = () => {
     onError: (error: Error) => {
       toast({
         title: "Erreur",
-        description: error.message || "Impossible de supprimer le devis",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 };
 
-// Hook pour mettre à jour le statut d'un devis
-export const useUpdateQuoteStatus = () => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
 
-  return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      if (!user) throw new Error("User not authenticated");
-
-      const { data, error } = await supabase
-        .from("ai_quotes")
-        .update({ status })
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as Quote;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["quote"] });
-      toast({
-        title: "Statut mis à jour",
-        description: "Le statut du devis a été mis à jour.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible de mettre à jour le statut",
-        variant: "destructive",
-      });
-    },
-  });
-};
 

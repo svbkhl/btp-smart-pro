@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,11 +10,24 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, userRole } = useAuth();
+  const { fakeDataEnabled, setFakeDataEnabled } = useFakeDataStore();
 
   // Timeout de sécurité : après 5 secondes, afficher le contenu même si loading
   // pour éviter les chargements infinis
   const [showContent, setShowContent] = useState(false);
+  
+  // Contrôler le mode démo selon le rôle de l'utilisateur
+  useEffect(() => {
+    // Si l'utilisateur est connecté et le mode démo est activé
+    if (user && fakeDataEnabled && !loading) {
+      // Si l'utilisateur n'est pas administrateur, désactiver le mode démo
+      if (userRole !== 'administrateur') {
+        console.log("🔒 Utilisateur non-admin détecté - Désactivation du mode démo");
+        setFakeDataEnabled(false);
+      }
+    }
+  }, [user, userRole, fakeDataEnabled, loading, setFakeDataEnabled]);
   
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -52,6 +66,22 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     
     return () => clearTimeout(timeoutId);
   }, [user, loading, isAdmin, requireAdmin, navigate, showContent]);
+
+  // En mode démo (fakeDataEnabled), permettre l'accès SEULEMENT si :
+  // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
+  // 2. OU l'utilisateur est administrateur (démo dans l'app)
+  if (fakeDataEnabled) {
+    // Si l'utilisateur n'est pas connecté, permettre l'accès (démo publique depuis landing page)
+    if (!user) {
+      return <>{children}</>;
+    }
+    // Si l'utilisateur est connecté et est administrateur, permettre l'accès
+    if (user && userRole === 'administrateur') {
+      return <>{children}</>;
+    }
+    // Si l'utilisateur est connecté mais n'est pas administrateur, continuer avec la vérification normale
+    // (le mode démo sera désactivé par le useEffect ci-dessus)
+  }
 
   // Afficher le spinner seulement si loading ET pas encore de timeout
   if (loading && !showContent) {

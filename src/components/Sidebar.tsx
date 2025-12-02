@@ -1,60 +1,245 @@
-import { Home, FolderKanban, Users, BarChart3, Settings, LogOut, Menu, X, Sparkles, Calendar, FileText, UserCheck, Briefcase, Database, ShieldCheck } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  LayoutDashboard, 
+  Users, 
+  FileText, 
+  FolderKanban, 
+  Calendar,
+  Mail,
+  Brain,
+  Settings,
+  BarChart3,
+  Briefcase,
+  UserCircle,
+  LogOut,
+  LogIn,
+  Menu,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Pin,
+  PinOff,
+  ShieldCheck
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
-import { useState, useEffect } from "react";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
-import { Notifications } from "./Notifications";
-import { ThemeToggle } from "./ThemeToggle";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Separator } from "@/components/ui/separator";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { useCompany } from "@/hooks/useCompany";
+import { isFeatureEnabled } from "@/utils/companyFeatures";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
-import { Switch } from "./ui/switch";
-import { Label } from "./ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 
-// Navigation pour les admins/dirigeants
-const adminNavigation = [
-  { name: "Tableau de bord", href: "/dashboard", icon: Home },
-  { name: "Chantiers", href: "/projects", icon: FolderKanban },
-  { name: "Clients", href: "/clients", icon: Users },
-  { name: "Devis", href: "/quotes", icon: FileText },
-  { name: "Calendrier", href: "/calendar", icon: Calendar },
-  { name: "Gestion Employés", href: "/admin/employees", icon: UserCheck },
-  { name: "Planning Employés", href: "/employees-planning", icon: Calendar },
-  { name: "RH", href: "/rh/dashboard", icon: Briefcase },
-  { name: "Statistiques", href: "/stats", icon: BarChart3 },
-  { name: "IA", href: "/ai", icon: Sparkles },
-  { name: "Paramètres", href: "/settings", icon: Settings },
+// Types pour les items de menu
+type MenuItem = {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  path: string;
+  subItems?: Array<{ label: string; path: string }>;
+  feature?: string | null; // Feature requise pour afficher cet item
+};
+
+type MenuGroup = {
+  items: MenuItem[];
+};
+
+// Structure de base des menu items par groupes avec mapping des features
+const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null }> }> = [
+  {
+    items: [
+      // 1️⃣ Tableau de bord (toujours visible)
+      { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard", feature: null },
+    ],
+  },
+  {
+    items: [
+      // 3️⃣ Clients (toujours visible)
+      { icon: Users, label: "Clients", path: "/clients", feature: null },
+    ],
+  },
+  {
+    items: [
+      // 4️⃣ Chantiers (Projets / Interventions)
+      { icon: FolderKanban, label: "Chantiers", path: "/projects", feature: "projets" },
+    ],
+  },
+  {
+    items: [
+      // 5️⃣ Calendrier (planning)
+      { icon: Calendar, label: "Calendrier", path: "/calendar", feature: "planning" },
+    ],
+  },
+  {
+    items: [
+      // 6️⃣ Employés & RH
+      { icon: UserCircle, label: "Employés & RH", path: "/employees-rh", feature: "employes" },
+    ],
+  },
+  {
+    items: [
+      // 7️⃣ IA (Assistant)
+      { icon: Brain, label: "IA", path: "/ai", feature: "ia_assistant" },
+    ],
+  },
+  {
+    items: [
+      // 8️⃣ Facturation
+      { icon: FileText, label: "Facturation", path: "/facturation", feature: "facturation" },
+    ],
+  },
+  {
+    items: [
+      // 9️⃣ Messagerie
+      { icon: Mail, label: "Messagerie", path: "/mailbox", feature: "messagerie" },
+    ],
+  },
 ];
 
-// Navigation pour les employés
-const employeeNavigation = [
-  { name: "Mon Planning", href: "/my-planning", icon: Calendar },
-  { name: "Paramètres", href: "/settings", icon: Settings },
-];
+// Fonction pour filtrer les menu items selon les features
+const getMenuGroups = (company: ReturnType<typeof useCompany>["data"]): MenuGroup[] => {
+  // Si pas de company, afficher tous les items (mode démo ou pas encore configuré)
+  if (!company) {
+    return baseMenuGroups.map((group) => ({
+      items: group.items.map(({ feature, ...item }) => item), // Retirer la propriété feature
+    }));
+  }
+  
+  return baseMenuGroups
+    .map((group) => ({
+      items: group.items
+        .filter((item) => {
+          // Si pas de feature associée, toujours visible
+          if (!item.feature) return true;
+          // Sinon, vérifier si la feature est activée
+          return isFeatureEnabled(company, item.feature as keyof NonNullable<typeof company>["features"]);
+        })
+        .map(({ feature, ...item }) => item), // Retirer la propriété feature des items filtrés
+    }))
+    .filter((group) => group.items.length > 0); // Retirer les groupes vides
+};
 
-const Sidebar = () => {
+// Groupe de menu pour les paramètres (toujours visible)
+const settingsMenuGroup: MenuGroup = {
+  items: [
+    { icon: Settings, label: "Paramètres", path: "/settings" },
+  ],
+};
+
+export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAdmin, userRole } = useAuth();
+  const queryClient = useQueryClient();
+  const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
+  const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
   const isMobile = useIsMobile();
-  const [isOpen, setIsOpen] = useState(false);
-  const { signOut, isAdmin, isEmployee } = useAuth();
-  const { fakeDataEnabled, toggleFakeData } = useFakeDataStore();
-  
-  // Détecter si on est en mode démo
-  const isDemoMode = location.pathname === "/demo";
-  
-  // Sélectionner la navigation selon le rôle
-  const navigation = isAdmin ? adminNavigation : (isEmployee ? employeeNavigation : adminNavigation);
+  const { isPinned, isVisible, setIsPinned, setIsVisible, setIsHovered: setGlobalIsHovered } = useSidebar();
+  const [isOpen, setIsOpen] = useState(!isMobile);
+  const [isHovered, setIsHovered] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { data: company } = useCompany();
+  const menuGroups = getMenuGroups(company);
 
-  const toggleSidebar = () => setIsOpen(!isOpen);
-  const closeSidebar = () => setIsOpen(false);
-
-  const handleNavClick = (e: React.MouseEvent, href: string) => {
-    if (isDemoMode && href !== "/demo" && href !== "/auth") {
-      e.preventDefault();
-      // Optionnel : afficher un toast
+  // Fonction pour vérifier si un chemin est actif
+  const isActive = (path: string) => {
+    if (path === "/dashboard") {
+      return location.pathname === "/dashboard";
     }
+    return location.pathname.startsWith(path);
   };
+
+  // Initialiser expandedGroups après la définition de isActive
+  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(() => {
+    // Ouvrir automatiquement les groupes qui contiennent la page active
+    const expanded: Record<number, boolean> = {};
+    const currentPath = location.pathname;
+    
+    const checkIsActive = (path: string) => {
+      if (path === "/dashboard") {
+        return currentPath === "/dashboard";
+      }
+      return currentPath.startsWith(path);
+    };
+    
+    menuGroups.forEach((group, groupIndex) => {
+      group.items.forEach((item) => {
+        if (item.subItems) {
+          const hasActiveSubItem = item.subItems.some(sub => checkIsActive(sub.path));
+          if (hasActiveSubItem || checkIsActive(item.path)) {
+            expanded[groupIndex] = true;
+          }
+        }
+      });
+    });
+    return expanded;
+  });
+
+  // Fermer la sidebar quand on change de route (sauf si épinglée)
+  useEffect(() => {
+    // Nettoyer le timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    if (isMobile) {
+      setIsOpen(false);
+    } else if (!isPinned) {
+      // Sur desktop, fermer la sidebar si pas épinglée
+      setIsHovered(false);
+      setIsVisible(false);
+      setGlobalIsHovered(false);
+    }
+  }, [location.pathname, isMobile, isPinned, setIsVisible, setGlobalIsHovered]);
+
+  // Initialiser l'état visible selon le pinned
+  useEffect(() => {
+    if (isMobile) {
+      setIsHovered(true);
+      setIsVisible(true);
+    } else if (isPinned) {
+      setIsHovered(true);
+      setIsVisible(true);
+    } else {
+      setIsHovered(false);
+      setIsVisible(false);
+    }
+  }, [isMobile, isPinned, setIsVisible]);
+
+  const toggleGroup = (groupIndex: number) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupIndex]: !prev[groupIndex]
+    }));
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
+
+  // Ouvrir automatiquement les groupes avec des pages actives
+  useEffect(() => {
+    menuGroups.forEach((group, groupIndex) => {
+      group.items.forEach((item) => {
+        if (item.subItems) {
+          const hasActiveSubItem = item.subItems.some(sub => isActive(sub.path));
+          if (hasActiveSubItem || isActive(item.path)) {
+            setExpandedGroups(prev => ({ ...prev, [groupIndex]: true }));
+          }
+        }
+      });
+    });
+  }, [location.pathname]);
 
   return (
     <>
@@ -63,141 +248,419 @@ const Sidebar = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="fixed top-4 left-4 z-50 bg-background shadow-md md:hidden"
-          onClick={toggleSidebar}
+          className="fixed top-4 left-4 z-50 rounded-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/30 dark:border-gray-700/40 shadow-lg"
+          onClick={() => setIsOpen(!isOpen)}
         >
           {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
       )}
 
-      {/* Overlay for mobile */}
-      {isMobile && isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={closeSidebar}
-        />
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isMobile && isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Hover Zone (Desktop) - Zone fine à gauche pour révéler la sidebar */}
+      {!isMobile && !isPinned && (
+        <motion.div
+          className="fixed left-0 top-0 bottom-0 w-2 z-30 group cursor-pointer"
+          onMouseEnter={() => {
+            // Ouverture immédiate quand on se colle à gauche
+            if (!isPinned) {
+              setIsHovered(true);
+              setIsVisible(true);
+              setGlobalIsHovered(true);
+            }
+          }}
+          onMouseLeave={() => {
+            // Annuler le timeout si on quitte avant le délai
+            if (hoverTimeoutRef.current) {
+              clearTimeout(hoverTimeoutRef.current);
+              hoverTimeoutRef.current = null;
+            }
+          }}
+        >
+          {/* Indicateur visuel au hover - plus subtil */}
+          <motion.div
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-gradient-to-b from-transparent via-primary/50 to-transparent rounded-r-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          />
+        </motion.div>
       )}
 
       {/* Sidebar */}
-      <div 
+      <motion.aside
+        initial={isMobile ? { x: -320 } : { x: -320 }}
+        animate={isMobile 
+          ? { x: isOpen ? 0 : -320 }
+          : {
+              x: isPinned || isHovered ? 0 : -320,
+            }
+        }
+        onMouseEnter={() => {
+          if (!isMobile && !isPinned) {
+            setIsHovered(true);
+            setIsVisible(true);
+            setGlobalIsHovered(true);
+          }
+        }}
+        onMouseLeave={() => {
+          if (!isMobile && !isPinned) {
+            setIsHovered(false);
+            setIsVisible(false);
+            setGlobalIsHovered(false);
+          }
+        }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 1000, 
+          damping: 30, 
+          mass: 0.2,
+        }}
         className={cn(
-          "flex h-screen flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 z-40",
-          isMobile ? "fixed w-64" : "w-64",
-          isMobile && !isOpen && "-translate-x-full"
+          "flex flex-col z-40",
+          "bg-white/90 dark:bg-gray-900/90 backdrop-blur-3xl",
+          "border border-white/40 dark:border-gray-700/50",
+          "shadow-2xl shadow-black/10 dark:shadow-black/30",
+          "transition-shadow duration-300 ease-out",
+          "hover:shadow-[0_25px_70px_-20px_rgba(59,130,246,0.4)] dark:hover:shadow-[0_25px_70px_-20px_rgba(139,92,246,0.4)]",
+          "rounded-2xl",
+          isMobile 
+            ? "fixed w-80 h-screen" 
+            : "fixed w-72 h-[calc(100vh-2rem)] top-4 left-4 bottom-4"
         )}
+        style={{ 
+          willChange: "transform, box-shadow, opacity",
+          pointerEvents: isMobile || isPinned || isHovered ? "auto" : "none"
+        }}
       >
-        <div className="flex h-16 items-center justify-between gap-2 border-b border-sidebar-border px-6">
-          <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xl">B</span>
-          </div>
-            <span className="font-bold text-lg text-sidebar-foreground">BTP Smart Pro</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent/50" />
-            <Notifications />
-          </div>
-        </div>
-
-        {/* Fake Data Toggle - Masqué en mode démo */}
-        {!isDemoMode && (
-          <div className="px-3 py-2 border-b border-sidebar-border">
-            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-sidebar-accent/30">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Database className="h-4 w-4 text-sidebar-foreground flex-shrink-0" />
-                <Label htmlFor="fake-data-toggle" className="text-xs font-medium text-sidebar-foreground cursor-pointer truncate">
-                  Fake Data
-                </Label>
-              </div>
-              <Switch
-                id="fake-data-toggle"
-                checked={fakeDataEnabled}
-                onCheckedChange={toggleFakeData}
-                className="flex-shrink-0"
-              />
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="p-6 border-b border-white/20 dark:border-gray-700/30"
+        >
+          <Link to="/dashboard" className="flex items-center gap-3 group">
+            <motion.div
+              whileHover={{ scale: 1.05, rotate: 5 }}
+              className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+            >
+              <span className="text-primary-foreground font-bold text-xl">B</span>
+            </motion.div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">BTP Smart Pro</h2>
             </div>
-            <p className="text-[10px] text-sidebar-foreground/70 mt-1 px-2">
-              {fakeDataEnabled ? "ON" : "OFF"}
-            </p>
-          </div>
-        )}
-        
-        {/* Badge démo */}
-        {isDemoMode && (
-          <div className="px-3 py-2 border-b border-sidebar-border">
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-accent/20">
-              <ShieldCheck className="h-4 w-4 text-accent flex-shrink-0" />
-              <span className="text-xs font-medium text-sidebar-foreground">Mode démo</span>
-            </div>
-          </div>
+          </Link>
+        </motion.div>
+
+        {/* Pin/Unpin Button (Desktop) */}
+        {!isMobile && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              const newPinned = !isPinned;
+              setIsPinned(newPinned);
+              if (newPinned) {
+                setIsHovered(true);
+                setIsVisible(true);
+              } else {
+                setIsHovered(false);
+                setIsVisible(false);
+              }
+            }}
+            className={cn(
+              "absolute top-4 right-4 z-50 w-10 h-10 rounded-xl",
+              "bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl",
+              "border-2 border-white/40 dark:border-gray-700/40",
+              "flex items-center justify-center",
+              "hover:bg-white dark:hover:bg-gray-700",
+              "transition-all duration-200 shadow-lg",
+              isPinned 
+                ? "bg-primary/10 border-primary/30 text-primary" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            title={isPinned ? "Désépingler (auto-hide activé)" : "Épingler (toujours visible)"}
+          >
+            {isPinned ? (
+              <PinOff className="w-5 h-5" />
+            ) : (
+              <Pin className="w-5 h-5" />
+            )}
+          </motion.button>
         )}
 
-        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            const isDisabled = isDemoMode && item.href !== "/demo" && item.href !== "/auth";
-            
-            if (isDisabled) {
-              return (
-                <div
-                  key={item.name}
-                  onClick={(e) => handleNavClick(e, item.href)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-not-allowed opacity-50",
-                    "text-sidebar-foreground"
-                  )}
-                  title="Fonctionnalité désactivée en mode démo"
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
-                </div>
-              );
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+          {menuGroups.map((group, groupIndex) => {
+            let itemIndex = 0;
+            // Calculer l'index de départ pour les animations
+            for (let i = 0; i < groupIndex; i++) {
+              itemIndex += menuGroups[i].items.length;
             }
             
             return (
-              <Link
-                key={item.name}
-                to={item.href}
-                onClick={closeSidebar}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                )}
+              <div key={groupIndex} className="space-y-1">
+                {group.items.map((item, itemIdx) => {
+                  const Icon = item.icon;
+                  const hasSubItems = item.subItems && item.subItems.length > 0;
+                  const isGroupExpanded = expandedGroups[groupIndex];
+                  const active = hasSubItems
+                    ? (item.subItems?.some(sub => isActive(sub.path)) || isActive(item.path))
+                    : isActive(item.path);
+                  const globalIndex = itemIndex + itemIdx;
+                  
+                  return (
+                    <div key={item.path} className="space-y-1">
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 + globalIndex * 0.03 }}
+                        whileHover={{ 
+                          scale: 1.05, 
+                          x: 8,
+                          transition: { duration: 0.2, ease: "easeOut" }
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        {hasSubItems ? (
+                          <div>
+                            <button
+                              onClick={() => toggleGroup(groupIndex)}
+                              className={cn(
+                                "group w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                                "relative hover:shadow-lg hover:shadow-primary/20",
+                                active
+                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                              )}
+                            >
+                              <div className="flex items-center gap-3 flex-1">
+                                <Icon className={cn(
+                                  "w-5 h-5 transition-colors",
+                                  active && "text-primary"
+                                )} />
+                                <span>{item.label}</span>
+                              </div>
+                              {isGroupExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </button>
+                            <AnimatePresence>
+                              {isGroupExpanded && item.subItems && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="ml-8 mt-1 space-y-1 pb-1">
+                                    {item.subItems.map((subItem) => {
+                                      const subActive = isActive(subItem.path);
+                                      return (
+                                        <Link
+                                          key={subItem.path}
+                                          to={subItem.path}
+                                          className={cn(
+                                            "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                                            subActive
+                                              ? "bg-primary/10 text-primary font-medium"
+                                              : "text-muted-foreground hover:text-foreground hover:bg-white/40 dark:hover:bg-gray-800/40"
+                                          )}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
+                                          {subItem.label}
+                                        </Link>
+                                      );
+                                    })}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ) : (
+                          <Link
+                            to={item.path}
+                            className={cn(
+                              "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                              "relative hover:shadow-lg hover:shadow-primary/20",
+                              active
+                                ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                                : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                            )}
+                          >
+                            {active && (
+                              <motion.div
+                                layoutId="activeTab"
+                                className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                              />
+                            )}
+                            <motion.div
+                              whileHover={{ scale: 1.1 }}
+                              className="relative z-10"
+                            >
+                              <Icon className={cn(
+                                "w-5 h-5 transition-colors",
+                                active && "text-primary"
+                              )} />
+                            </motion.div>
+                            <span className="relative z-10">{item.label}</span>
+                          </Link>
+                        )}
+                      </motion.div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          
+          {/* Paramètres (toujours visible) */}
+          {settingsMenuGroup.items.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.path);
+            
+            return (
+              <motion.div
+                key={item.path}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  x: 8,
+                  transition: { duration: 0.2, ease: "easeOut" }
+                }}
+                whileTap={{ scale: 0.95 }}
               >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </Link>
+                <Link
+                  to={item.path}
+                  className={cn(
+                    "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
+                    "hover:shadow-lg hover:shadow-primary/20",
+                    active
+                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                  )}
+                >
+                  {active && (
+                    <motion.div
+                      layoutId="activeTabSettings"
+                      className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className="relative z-10"
+                  >
+                    <Icon className={cn(
+                      "w-5 h-5 transition-colors",
+                      active && "text-primary"
+                    )} />
+                  </motion.div>
+                  <span className="relative z-10">{item.label}</span>
+                </Link>
+              </motion.div>
             );
           })}
         </nav>
 
-        <div className="border-t border-sidebar-border p-4">
-          {isDemoMode ? (
-            <Link to="/auth" className="w-full">
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.5 }}
+          className="p-4 border-t border-white/20 dark:border-gray-700/30 space-y-3"
+        >
+
+          {/* User Actions */}
+          <div className="pt-2 space-y-1">
+            {user ? (
+              <>
+                {/* Toggle Mode démo pour les administrateurs */}
+                {userRole === 'administrateur' && (
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 mb-2">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-primary" />
+                      {isOpen && (
+                        <Label htmlFor="demo-mode-sidebar" className="text-xs font-medium cursor-pointer">
+                          Mode démo
+                        </Label>
+                      )}
+                    </div>
+                    <Switch
+                      id="demo-mode-sidebar"
+                      checked={fakeDataEnabled}
+                      onCheckedChange={(checked) => {
+                        console.log("🔄 Toggle mode démo:", checked);
+                        console.log("📊 État actuel fakeDataEnabled:", fakeDataEnabled);
+                        setFakeDataEnabled(checked);
+                        console.log("✅ setFakeDataEnabled appelé avec:", checked);
+                        
+                        // Invalider toutes les queries immédiatement pour forcer le rechargement
+                        queryClient.invalidateQueries();
+                        console.log("🔄 Toutes les queries invalidées pour recharger les données");
+                        
+                        // Forcer un refetch de toutes les queries actives
+                        queryClient.refetchQueries();
+                      }}
+                    />
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="w-4 h-4" />
+                  {isOpen && "Déconnexion"}
+                </Button>
+              </>
+            ) : fakeDataEnabled ? (
+              <div className="space-y-2">
+                <Badge variant="secondary" className="w-full justify-center gap-2 py-1.5 text-xs">
+                  <ShieldCheck className="w-3 h-3" />
+                  {isOpen && "Mode démo"}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  className="w-full gap-2"
+                  onClick={() => navigate("/auth")}
+                >
+                  <LogIn className="w-4 h-4" />
+                  {isOpen && "Créer un compte"}
+                </Button>
+              </div>
+            ) : (
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50"
+                className="w-full gap-2"
+                onClick={() => navigate("/auth")}
               >
-                <LogOut className="h-5 w-5" />
-                Créer un compte
+                <LogIn className="w-4 h-4" />
+                {isOpen && "Créer un compte"}
               </Button>
-            </Link>
-          ) : (
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50"
-              onClick={signOut}
-            >
-              <LogOut className="h-5 w-5" />
-              Déconnexion
-            </Button>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.aside>
     </>
   );
-};
-
-export default Sidebar;
+}

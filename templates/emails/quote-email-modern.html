@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Devis {{QUOTE_NUMBER}}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td {font-family: Arial, sans-serif !important;}
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; line-height: 1.6;">
+  <!-- Wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <!-- Container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <div style="width: 60px; height: 60px; background-color: rgba(255, 255, 255, 0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                      <span style="font-size: 32px;">📄</span>
+                    </div>
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Nouveau Devis</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">{{QUOTE_NUMBER}}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 24px 0; color: #1f2937; font-size: 16px;">Bonjour <strong>{{CLIENT_NAME}}</strong>,</p>
+                    
+                    <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px;">{{CUSTOM_MESSAGE}}</p>
+
+                    <!-- Quote Details Card -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin: 24px 0;">
+                      <tr>
+                        <td style="padding: 24px;">
+                          <h2 style="margin: 0 0 16px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Détails du devis</h2>
+                          
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Référence</td>
+                              <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right; font-weight: 600;">{{QUOTE_NUMBER}}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Type de travaux</td>
+                              <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">{{WORK_TYPE}}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Surface</td>
+                              <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">{{SURFACE}} m²</td>
+                            </tr>
+                            <tr style="border-top: 2px solid #e5e7eb;">
+                              <td style="padding: 16px 0 8px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Montant total</td>
+                              <td style="padding: 16px 0 8px 0; color: #3b82f6; font-size: 20px; text-align: right; font-weight: 700;">{{ESTIMATED_COST}} €</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- CTA Button -->
+                    {{#if SIGNATURE_URL}}
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 32px 0;">
+                      <tr>
+                        <td align="center">
+                          <a href="{{SIGNATURE_URL}}" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+                            ✍️ Signer le devis en ligne
+                          </a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td align="center" style="padding-top: 12px;">
+                          <p style="margin: 0; color: #9ca3af; font-size: 13px;">Ce lien est valable 30 jours</p>
+                        </td>
+                      </tr>
+                    </table>
+                    {{/if}}
+
+                    <p style="margin: 24px 0 0 0; color: #4b5563; font-size: 15px;">
+                      Pour toute question ou modification, n'hésitez pas à nous contacter.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; border-top: 1px solid #e5e7eb;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center;">
+                    <p style="margin: 0 0 16px 0; color: #1f2937; font-weight: 600; font-size: 15px;">{{COMPANY_NAME}}</p>
+                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
+                      📧 {{COMPANY_EMAIL}}
+                    </p>
+                    <p style="margin: 0 0 16px 0; color: #6b7280; font-size: 14px;">
+                      📞 {{COMPANY_PHONE}}
+                    </p>
+                    <p style="margin: 16px 0 0 0; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
+                      © {{YEAR}} {{COMPANY_NAME}}. Tous droits réservés.<br>
+                      Ce message est confidentiel et destiné uniquement au destinataire.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+
+
+
+
+

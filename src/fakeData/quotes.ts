@@ -6,7 +6,7 @@ export const FAKE_QUOTES: Quote[] = [
     user_id: "fake-user",
     client_name: "M. Martin",
     project_id: "fake-proj-1",
-    quote_number: "DEV-2024-001",
+    quote_number: "DEVIS-2024-001",
     status: "sent",
     estimated_cost: 45000,
     details: {
@@ -25,7 +25,7 @@ export const FAKE_QUOTES: Quote[] = [
     user_id: "fake-user",
     client_name: "Mme. Dupont",
     project_id: "fake-proj-2",
-    quote_number: "DEV-2024-002",
+    quote_number: "DEVIS-2024-002",
     status: "draft",
     estimated_cost: 18000,
     details: {
@@ -42,7 +42,7 @@ export const FAKE_QUOTES: Quote[] = [
     user_id: "fake-user",
     client_name: "Entreprise Bernard",
     project_id: "fake-proj-3",
-    quote_number: "DEV-2024-003",
+    quote_number: "DEVIS-2024-003",
     status: "accepted",
     estimated_cost: 8500,
     details: {

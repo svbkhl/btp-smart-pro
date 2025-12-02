@@ -1,16 +1,20 @@
-import { UserStats } from "@/hooks/useUserStats";
+import type { UserStats } from "@/hooks/useUserStats";
 
 export const FAKE_USER_STATS: UserStats = {
   id: "fake-stats-1",
-  user_id: "fake-user",
-  total_projects: 8,
-  total_clients: 24,
-  total_revenue: 45280,
-  total_profit: 14500,
+  user_id: "fake-user-1",
+  total_projects: 12,
+  total_clients: 8,
+  total_revenue: 125000,
+  total_profit: 45000,
   active_projects: 5,
-  completed_projects: 3,
-  created_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
+  completed_projects: 7,
+  created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
+
+
+
+
 
 

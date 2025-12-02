@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Facture {{INVOICE_NUMBER}}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td {font-family: Arial, sans-serif !important;}
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; line-height: 1.6;">
+  <!-- Wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <!-- Container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <div style="width: 60px; height: 60px; background-color: rgba(255, 255, 255, 0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                      <span style="font-size: 32px;">🧾</span>
+                    </div>
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Facture</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">{{INVOICE_NUMBER}}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 24px 0; color: #1f2937; font-size: 16px;">Bonjour <strong>{{CLIENT_NAME}}</strong>,</p>
+                    
+                    <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px;">{{CUSTOM_MESSAGE}}</p>
+
+                    <!-- Invoice Details Card -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; margin: 24px 0;">
+                      <tr>
+                        <td style="padding: 24px;">
+                          <h2 style="margin: 0 0 16px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Détails de la facture</h2>
+                          
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">N° Facture</td>
+                              <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right; font-weight: 600;">{{INVOICE_NUMBER}}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Date d'émission</td>
+                              <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">{{INVOICE_DATE}}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Date d'échéance</td>
+                              <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">{{DUE_DATE}}</td>
+                            </tr>
+                            <tr style="border-top: 2px solid #86efac;">
+                              <td style="padding: 16px 0 8px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Montant TTC</td>
+                              <td style="padding: 16px 0 8px 0; color: #10b981; font-size: 24px; text-align: right; font-weight: 700;">{{AMOUNT_TTC}} €</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Action Buttons -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 32px 0;">
+                      {{#if PAYMENT_LINK}}
+                      <tr>
+                        <td align="center" style="padding-bottom: 12px;">
+                          <a href="{{PAYMENT_LINK}}" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                            💳 Payer en ligne
+                          </a>
+                        </td>
+                      </tr>
+                      {{/if}}
+                      {{#if SIGNATURE_URL}}
+                      <tr>
+                        <td align="center" style="padding-top: 12px;">
+                          <a href="{{SIGNATURE_URL}}" style="display: inline-block; padding: 14px 28px; background-color: #ffffff; color: #10b981; text-decoration: none; border: 2px solid #10b981; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                            ✍️ Signer la facture
+                          </a>
+                        </td>
+                      </tr>
+                      {{/if}}
+                    </table>
+
+                    <!-- Payment Info -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                      <tr>
+                        <td>
+                          <p style="margin: 0 0 12px 0; color: #1f2937; font-weight: 600; font-size: 15px;">💰 Informations de paiement</p>
+                          <p style="margin: 0; color: #4b5563; font-size: 14px; line-height: 1.8;">
+                            <strong>IBAN:</strong> {{BANK_IBAN}}<br>
+                            <strong>BIC:</strong> {{BANK_BIC}}<br>
+                            <strong>Référence:</strong> {{INVOICE_NUMBER}}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="margin: 24px 0 0 0; color: #4b5563; font-size: 15px;">
+                      Pour toute question concernant cette facture, n'hésitez pas à nous contacter.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; border-top: 1px solid #e5e7eb;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center;">
+                    <p style="margin: 0 0 16px 0; color: #1f2937; font-weight: 600; font-size: 15px;">{{COMPANY_NAME}}</p>
+                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
+                      📧 {{COMPANY_EMAIL}}
+                    </p>
+                    <p style="margin: 0 0 16px 0; color: #6b7280; font-size: 14px;">
+                      📞 {{COMPANY_PHONE}}
+                    </p>
+                    <p style="margin: 16px 0 0 0; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
+                      © {{YEAR}} {{COMPANY_NAME}}. Tous droits réservés.<br>
+                      SIRET: {{COMPANY_SIRET}} | TVA: {{COMPANY_TVA}}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+
+
+
+
+
