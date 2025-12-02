@@ -96,9 +96,29 @@ const Auth = () => {
 
     setLoading(true);
 
-    const redirectUrl = `${window.location.origin}/dashboard`;
-
     try {
+      // VÉRIFIER QU'IL Y A UNE INVITATION VALIDE
+      const { data: hasInvitation, error: checkError } = await supabase.rpc(
+        'has_valid_invitation',
+        { p_email: email }
+      );
+
+      if (checkError) {
+        console.error('Error checking invitation:', checkError);
+      }
+
+      if (!hasInvitation) {
+        toast({
+          title: "Inscription non autorisée",
+          description: "Vous devez avoir reçu une invitation pour créer un compte. Contactez votre administrateur.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const redirectUrl = `${window.location.origin}/dashboard`;
+
       // Inscription avec métadonnées utilisateur
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -202,11 +222,46 @@ const Auth = () => {
     }
   };
 
-  const handlePasswordReset = async () => {
-    if (!email) {
+  const handlePasswordReset = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
+    // Si l'email n'est pas rempli, ouvrir un dialog pour demander l'email
+    if (!email || email.trim() === "") {
+      const emailInput = document.getElementById("signin-email") as HTMLInputElement;
+      if (emailInput && emailInput.value) {
+        setEmail(emailInput.value);
+        // Réessayer avec l'email du champ
+        const emailToUse = emailInput.value;
+        setResettingPassword(true);
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(emailToUse, {
+            redirectTo: `${window.location.origin}/auth`,
+          });
+
+          if (error) {
+            throw error;
+          }
+
+          toast({
+            title: "Email envoyé",
+            description: "Un lien de réinitialisation a été envoyé à votre adresse email.",
+          });
+        } catch (error: any) {
+          toast({
+            title: "Erreur d'envoi",
+            description: error.message || "Impossible d'envoyer l'email de réinitialisation.",
+            variant: "destructive",
+          });
+        } finally {
+          setResettingPassword(false);
+        }
+        return;
+      }
+      
       toast({
         title: "Email requis",
-        description: "Veuillez saisir votre email avant de demander une réinitialisation.",
+        description: "Veuillez saisir votre email dans le champ ci-dessus avant de demander une réinitialisation.",
         variant: "destructive",
       });
       return;
@@ -337,35 +392,35 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-screen bg-background flex items-center justify-center p-3 sm:p-4 md:p-6">
+      <div className="w-full max-w-md space-y-4 sm:space-y-6">
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-2xl">B</span>
+          <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-xl sm:text-2xl">B</span>
             </div>
-            <span className="font-bold text-2xl text-foreground">BTP Smart Pro</span>
+            <span className="font-bold text-xl sm:text-2xl text-foreground">BTP Smart Pro</span>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Bienvenue</h1>
-          <p className="text-muted-foreground">Connectez-vous pour accéder à votre espace</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Bienvenue</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Connectez-vous pour accéder à votre espace</p>
         </div>
 
-        <Card>
+        <Card className="bg-card/80 backdrop-blur-xl border border-border/50">
           <CardHeader>
             <CardTitle>Authentification</CardTitle>
             <CardDescription>Créez un compte ou connectez-vous</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="signin">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Connexion</TabsTrigger>
-                <TabsTrigger value="signup">Inscription</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 text-xs sm:text-sm">
+                <TabsTrigger value="signin" className="text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">Connexion</TabsTrigger>
+                <TabsTrigger value="signup" className="text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">Inscription</TabsTrigger>
               </TabsList>
 
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
+                    <Label htmlFor="signin-email" className="text-sm sm:text-base">Email</Label>
                     <Input
                       id="signin-email"
                       type="email"
@@ -374,10 +429,11 @@ const Auth = () => {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
+                      className="text-sm sm:text-base h-9 sm:h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password">Mot de passe</Label>
+                    <Label htmlFor="signin-password" className="text-sm sm:text-base">Mot de passe</Label>
                     <Input
                       id="signin-password"
                       type="password"
@@ -387,6 +443,7 @@ const Auth = () => {
                       required
                       disabled={loading}
                       minLength={6}
+                      className="text-sm sm:text-base h-9 sm:h-10"
                     />
                     <div className="flex justify-end">
                       <Button
@@ -400,7 +457,7 @@ const Auth = () => {
                       </Button>
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full text-sm sm:text-base h-9 sm:h-10" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Se connecter
                   </Button>
@@ -418,15 +475,15 @@ const Auth = () => {
                   </div>
 
                   {/* Boutons OAuth */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleGoogleSignIn}
                       disabled={loading}
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm h-9 sm:h-10 bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30"
                     >
-                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                      <svg className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24">
                         <path
                           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                           fill="#4285F4"
@@ -464,9 +521,9 @@ const Auth = () => {
 
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="signup-prenom">Prénom *</Label>
+                      <Label htmlFor="signup-prenom" className="text-sm sm:text-base">Prénom *</Label>
                       <Input
                         id="signup-prenom"
                         type="text"
@@ -475,10 +532,11 @@ const Auth = () => {
                         onChange={(e) => setPrenom(e.target.value)}
                         required
                         disabled={loading}
+                        className="text-sm sm:text-base h-9 sm:h-10"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signup-nom">Nom *</Label>
+                      <Label htmlFor="signup-nom" className="text-sm sm:text-base">Nom *</Label>
                       <Input
                         id="signup-nom"
                         type="text"
@@ -487,11 +545,12 @@ const Auth = () => {
                         onChange={(e) => setNom(e.target.value)}
                         required
                         disabled={loading}
+                        className="text-sm sm:text-base h-9 sm:h-10"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email *</Label>
+                    <Label htmlFor="signup-email" className="text-sm sm:text-base">Email *</Label>
                     <Input
                       id="signup-email"
                       type="email"
@@ -500,12 +559,13 @@ const Auth = () => {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
+                      className="text-sm sm:text-base h-9 sm:h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-statut">Statut *</Label>
+                    <Label htmlFor="signup-statut" className="text-sm sm:text-base">Statut *</Label>
                     <Select value={statut} onValueChange={(value: UserRole) => setStatut(value)} disabled={loading}>
-                      <SelectTrigger id="signup-statut">
+                      <SelectTrigger id="signup-statut" className="text-sm sm:text-base h-9 sm:h-10">
                         <SelectValue placeholder="Sélectionnez votre statut" />
                       </SelectTrigger>
                       <SelectContent>
@@ -516,7 +576,7 @@ const Auth = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Mot de passe *</Label>
+                    <Label htmlFor="signup-password" className="text-sm sm:text-base">Mot de passe *</Label>
                     <Input
                       id="signup-password"
                       type="password"
@@ -526,12 +586,13 @@ const Auth = () => {
                       required
                       disabled={loading}
                       minLength={6}
+                      className="text-sm sm:text-base h-9 sm:h-10"
                     />
                     <p className="text-xs text-muted-foreground">
                       Minimum 6 caractères
                     </p>
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full text-sm sm:text-base h-9 sm:h-10" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Créer un compte
                   </Button>
@@ -547,15 +608,15 @@ const Auth = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleGoogleSignIn}
                       disabled={loading}
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm h-9 sm:h-10 bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30"
                     >
-                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                      <svg className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24">
                         <path
                           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                           fill="#4285F4"
@@ -580,9 +641,9 @@ const Auth = () => {
                       variant="outline"
                       onClick={handleAppleSignIn}
                       disabled={loading}
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm h-9 sm:h-10 bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30"
                     >
-                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <svg className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
                       </svg>
                       Apple
