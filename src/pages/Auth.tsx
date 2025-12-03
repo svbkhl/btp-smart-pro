@@ -207,14 +207,51 @@ const Auth = () => {
       });
 
       if (error) {
-        throw error;
+        // Gérer les erreurs spécifiques de Supabase
+        let errorMessage = "Identifiant ou mot de passe incorrect.";
+        
+        // Vérifier les différents types d'erreurs
+        if (error.message) {
+          const errorLower = error.message.toLowerCase();
+          
+          // Erreurs d'identifiants incorrects
+          if (
+            errorLower.includes("invalid login credentials") ||
+            errorLower.includes("invalid credentials") ||
+            errorLower.includes("email not confirmed") ||
+            errorLower.includes("wrong password") ||
+            errorLower.includes("user not found")
+          ) {
+            errorMessage = "Identifiant ou mot de passe incorrect.";
+          }
+          // Erreurs de compte non confirmé
+          else if (errorLower.includes("email not confirmed") || errorLower.includes("signup_disabled")) {
+            errorMessage = "Votre compte n'a pas été confirmé. Vérifiez votre email.";
+          }
+          // Erreurs de réseau
+          else if (errorLower.includes("network") || errorLower.includes("fetch")) {
+            errorMessage = "Erreur de connexion. Vérifiez votre connexion internet.";
+          }
+          // Autres erreurs
+          else {
+            errorMessage = error.message;
+          }
+        }
+        
+        toast({
+          title: "Erreur de connexion",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
       }
 
       // La navigation se fait automatiquement via useEffect
     } catch (error: any) {
+      // Erreur inattendue
       toast({
         title: "Erreur de connexion",
-        description: error.message || "Email ou mot de passe incorrect.",
+        description: error?.message || "Une erreur inattendue s'est produite. Veuillez réessayer.",
         variant: "destructive",
       });
     } finally {

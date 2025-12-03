@@ -19,6 +19,7 @@ import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -151,6 +152,9 @@ const AdminCompanies = () => {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Créer une nouvelle entreprise</DialogTitle>
+              <DialogDescription>
+                Remplissez les informations pour créer une nouvelle entreprise et configurez les modules à activer.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div>
@@ -206,26 +210,148 @@ const AdminCompanies = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Modules à activer</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {ALL_FEATURES.map((feature) => (
-                    <div key={feature.key} className="flex items-center space-x-2">
-                      <Switch
-                        checked={newCompanyData.features[feature.key] === true}
-                        onCheckedChange={(checked) => {
-                          setNewCompanyData({
-                            ...newCompanyData,
-                            features: {
-                              ...newCompanyData.features,
-                              [feature.key]: checked,
-                            },
-                          });
-                        }}
-                      />
-                      <Label className="text-sm">{feature.label}</Label>
-                    </div>
-                  ))}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Modules à activer</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allSelected = 
+                        newCompanyData.features.projets === true &&
+                        newCompanyData.features.planning === true &&
+                        newCompanyData.features.employes === true &&
+                        newCompanyData.features.ia_assistant === true &&
+                        newCompanyData.features.facturation === true &&
+                        newCompanyData.features.messagerie === true;
+                      
+                      setNewCompanyData({
+                        ...newCompanyData,
+                        features: {
+                          projets: !allSelected,
+                          planning: !allSelected,
+                          employes: !allSelected,
+                          ia_assistant: !allSelected,
+                          facturation: !allSelected,
+                          messagerie: !allSelected,
+                        },
+                      });
+                    }}
+                    className="text-xs h-7 rounded-lg"
+                  >
+                    {newCompanyData.features.projets === true &&
+                    newCompanyData.features.planning === true &&
+                    newCompanyData.features.employes === true &&
+                    newCompanyData.features.ia_assistant === true &&
+                    newCompanyData.features.facturation === true &&
+                    newCompanyData.features.messagerie === true
+                      ? "Tout désélectionner"
+                      : "Tout sélectionner"}
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {/* Chantiers */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                    <Switch
+                      checked={newCompanyData.features.projets === true}
+                      onCheckedChange={(checked) => {
+                        setNewCompanyData({
+                          ...newCompanyData,
+                          features: {
+                            ...newCompanyData.features,
+                            projets: checked,
+                          },
+                        });
+                      }}
+                    />
+                    <Label className="text-sm cursor-pointer">Chantiers</Label>
+                  </div>
+
+                  {/* Calendrier */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                    <Switch
+                      checked={newCompanyData.features.planning === true}
+                      onCheckedChange={(checked) => {
+                        setNewCompanyData({
+                          ...newCompanyData,
+                          features: {
+                            ...newCompanyData.features,
+                            planning: checked,
+                          },
+                        });
+                      }}
+                    />
+                    <Label className="text-sm cursor-pointer">Calendrier</Label>
+                  </div>
+
+                  {/* Employés & RH */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                    <Switch
+                      checked={newCompanyData.features.employes === true}
+                      onCheckedChange={(checked) => {
+                        setNewCompanyData({
+                          ...newCompanyData,
+                          features: {
+                            ...newCompanyData.features,
+                            employes: checked,
+                          },
+                        });
+                      }}
+                    />
+                    <Label className="text-sm cursor-pointer">Employés & RH</Label>
+                  </div>
+
+                  {/* IA */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                    <Switch
+                      checked={newCompanyData.features.ia_assistant === true}
+                      onCheckedChange={(checked) => {
+                        setNewCompanyData({
+                          ...newCompanyData,
+                          features: {
+                            ...newCompanyData.features,
+                            ia_assistant: checked,
+                          },
+                        });
+                      }}
+                    />
+                    <Label className="text-sm cursor-pointer">IA</Label>
+                  </div>
+
+                  {/* Facturation */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                    <Switch
+                      checked={newCompanyData.features.facturation === true}
+                      onCheckedChange={(checked) => {
+                        setNewCompanyData({
+                          ...newCompanyData,
+                          features: {
+                            ...newCompanyData.features,
+                            facturation: checked,
+                          },
+                        });
+                      }}
+                    />
+                    <Label className="text-sm cursor-pointer">Facturation</Label>
+                  </div>
+
+                  {/* Messagerie */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                    <Switch
+                      checked={newCompanyData.features.messagerie === true}
+                      onCheckedChange={(checked) => {
+                        setNewCompanyData({
+                          ...newCompanyData,
+                          features: {
+                            ...newCompanyData.features,
+                            messagerie: checked,
+                          },
+                        });
+                      }}
+                    />
+                    <Label className="text-sm cursor-pointer">Messagerie</Label>
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-4">
@@ -236,9 +362,22 @@ const AdminCompanies = () => {
                 >
                   Annuler
                 </Button>
-                <Button onClick={handleCreateCompany} className="gap-2 rounded-xl">
-                  <Save className="w-4 h-4" />
-                  Créer
+                <Button 
+                  onClick={handleCreateCompany} 
+                  disabled={createCompany.isPending}
+                  className="gap-2 rounded-xl"
+                >
+                  {createCompany.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Création...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Créer
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

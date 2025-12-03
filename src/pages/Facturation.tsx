@@ -199,7 +199,7 @@ const Facturation = () => {
                   {searchQuery ? "Aucun devis ne correspond à votre recherche." : "Commencez par créer votre premier devis."}
                 </p>
                 {!searchQuery && (
-                  <Link to="/ai">
+                  <Link to="/ai?tab=quotes">
                     <Button>
                       <Plus className="w-4 h-4 mr-2" />
                       Créer un devis
