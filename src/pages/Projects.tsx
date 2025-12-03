@@ -307,7 +307,7 @@ const Projects = () => {
             </div>
             <div className="flex gap-3 flex-wrap">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px] rounded-xl border-white/20 dark:border-gray-700/30">
+                <SelectTrigger className="w-full sm:w-auto min-w-[140px] sm:min-w-[180px] rounded-xl border-white/20 dark:border-gray-700/30">
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>

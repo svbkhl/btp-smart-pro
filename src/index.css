@@ -488,3 +488,202 @@ button,
 .border-ai {
   border-color: hsl(var(--ai-color));
 }
+
+/* ============================================
+   RESPONSIVE GLOBAL - MOBILE FIRST
+   ============================================ */
+@layer utilities {
+  /* Container responsive avec max-width */
+  .container-responsive {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .container-responsive {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container-responsive {
+      max-width: 1280px;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .container-responsive {
+      max-width: 1536px;
+    }
+  }
+
+  /* Text responsive - évite les débordements */
+  .text-responsive {
+    font-size: clamp(0.875rem, 2vw, 1rem);
+    line-height: 1.5;
+  }
+
+  .text-responsive-lg {
+    font-size: clamp(1.125rem, 3vw, 1.5rem);
+    line-height: 1.4;
+  }
+
+  .text-responsive-xl {
+    font-size: clamp(1.5rem, 4vw, 2.25rem);
+    line-height: 1.3;
+  }
+
+  .text-responsive-2xl {
+    font-size: clamp(1.875rem, 5vw, 3rem);
+    line-height: 1.2;
+  }
+
+  /* Padding responsive */
+  .p-responsive {
+    padding: clamp(0.75rem, 2vw, 1.5rem);
+  }
+
+  .px-responsive {
+    padding-left: clamp(0.75rem, 2vw, 1.5rem);
+    padding-right: clamp(0.75rem, 2vw, 1.5rem);
+  }
+
+  .py-responsive {
+    padding-top: clamp(0.75rem, 2vw, 1.5rem);
+    padding-bottom: clamp(0.75rem, 2vw, 1.5rem);
+  }
+
+  /* Gap responsive */
+  .gap-responsive {
+    gap: clamp(0.5rem, 1.5vw, 1rem);
+  }
+
+  /* Width responsive */
+  .w-responsive {
+    width: min(100%, 100vw - 2rem);
+  }
+
+  /* Max width responsive */
+  .max-w-responsive {
+    max-width: min(100%, calc(100vw - 2rem));
+  }
+
+  /* Overflow handling */
+  .overflow-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Grid responsive */
+  .grid-responsive {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: clamp(1rem, 2vw, 1.5rem);
+  }
+
+  /* Flex responsive */
+  .flex-responsive {
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(0.5rem, 1.5vw, 1rem);
+  }
+
+  /* Images responsive */
+  img {
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+  }
+
+  /* Tables responsive */
+  .table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (min-width: 768px) {
+    .table-responsive {
+      display: table;
+    }
+  }
+
+  /* Cards responsive */
+  .card-responsive {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Buttons responsive */
+  .btn-responsive {
+    width: 100%;
+    min-height: 2.5rem;
+    font-size: clamp(0.875rem, 2vw, 1rem);
+    padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(1rem, 3vw, 1.5rem);
+  }
+
+  @media (min-width: 640px) {
+    .btn-responsive {
+      width: auto;
+    }
+  }
+
+  /* Forms responsive */
+  .form-responsive input,
+  .form-responsive textarea,
+  .form-responsive select {
+    width: 100%;
+    min-width: 0;
+    font-size: clamp(0.875rem, 2vw, 1rem);
+  }
+
+  /* Prevent horizontal scroll on mobile */
+  @media (max-width: 640px) {
+    * {
+      max-width: 100vw;
+    }
+
+    body {
+      overflow-x: hidden;
+      position: relative;
+    }
+  }
+
+  /* Touch targets - minimum 44x44px for mobile */
+  @media (max-width: 768px) {
+    button,
+    a,
+    [role="button"],
+    input[type="checkbox"],
+    input[type="radio"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Safe area for notched devices */
+  @supports (padding: max(0px)) {
+    .safe-top {
+      padding-top: max(1rem, env(safe-area-inset-top));
+    }
+
+    .safe-bottom {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    .safe-left {
+      padding-left: max(1rem, env(safe-area-inset-left));
+    }
+
+    .safe-right {
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+  }
+}

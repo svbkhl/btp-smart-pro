@@ -570,7 +570,7 @@ const Mailbox = () => {
         {/* Dialog de composition */}
         {isComposing && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <GlassCard className="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <GlassCard className="p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-auto">
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold">Nouveau message</h2>
                 <div className="space-y-2">

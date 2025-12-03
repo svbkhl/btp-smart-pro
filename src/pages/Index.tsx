@@ -163,7 +163,7 @@ const Index = () => {
       {/* Features Section avec animations optimisées */}
       <section 
         ref={featuresRef}
-        className={`py-12 md:py-20 px-4 bg-muted/30 transition-opacity duration-200 ${
+        className={`py-12 md:py-20 px-4 transition-opacity duration-200 ${
           featuresVisible ? 'opacity-100' : 'opacity-0'
         }`}
         style={{ 
@@ -207,22 +207,22 @@ const Index = () => {
               },
               {
                 icon: MessageSquare,
-                title: "Communication simplifiée",
-                description: "Chat intégré et notifications automatiques pour vos clients",
+                title: "Facturation automatisée",
+                description: "Envoi automatique de devis et factures par email avec liens de signature électronique et de paiement. Simplifiez votre suivi client",
                 color: "text-accent",
                 delay: "delay-400"
               },
               {
                 icon: Sparkles,
-                title: "Devis intelligents avec IA",
-                description: "Génération automatique de devis professionnels en quelques secondes grâce à l'IA. Analyse intelligente des besoins et tarification optimisée",
+                title: "Devis et factures intelligents avec IA",
+                description: "Génération automatique de devis et factures professionnels en quelques secondes grâce à l'IA. Analyse intelligente des besoins et tarification optimisée",
                 color: "text-[hsl(320_80%_60%)]",
                 delay: "delay-500"
               },
               {
                 icon: CheckCircle,
                 title: "Gestion d'équipe",
-                description: "Planning, géolocalisation et suivi du matériel en temps réel",
+                description: "Planning des interventions, suivi des employés et gestion des documents. Organisez vos équipes et suivez l'avancement des chantiers efficacement",
                 color: "text-accent",
                 delay: "delay-600"
               }
@@ -260,7 +260,7 @@ const Index = () => {
       {/* AI Features Section avec animations optimisées */}
       <section 
         ref={aiRef}
-        className={`py-12 md:py-20 px-4 bg-gradient-to-br from-[hsl(320_80%_60%)]/5 via-[hsl(320_80%_60%)]/10 to-[hsl(320_80%_60%)]/5 dark:from-[hsl(320_80%_60%)]/10 dark:via-[hsl(320_80%_60%)]/15 dark:to-[hsl(320_80%_60%)]/10 transition-opacity duration-200 ${
+        className={`py-12 md:py-20 px-4 transition-opacity duration-200 ${
           aiVisible ? 'opacity-100' : 'opacity-0'
         }`}
         style={{ 
@@ -298,7 +298,7 @@ const Index = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-12 md:py-20 px-4 bg-muted/20">
+      <section className="py-12 md:py-20 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-8 sm:mb-10 md:mb-16 px-2">
             <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3 md:mb-4">
@@ -469,9 +469,9 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-6 md:py-8 px-4 bg-muted/30">
+      <footer className="border-t border-border py-6 md:py-8 px-4">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p className="text-sm md:text-base">&copy; 2024 BTP Smart Pro. Tous droits réservés.</p>
+          <p className="text-sm md:text-base">&copy; {new Date().getFullYear()} BTP Smart Pro. Tous droits réservés.</p>
         </div>
       </footer>
 
