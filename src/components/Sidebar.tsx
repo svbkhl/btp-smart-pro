@@ -98,7 +98,7 @@ const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null 
   {
     items: [
       // 9️⃣ Messagerie
-      { icon: Mail, label: "Messagerie", path: "/mailbox", feature: "messagerie" },
+      { icon: Mail, label: "Emails envoyés", path: "/messaging", feature: "messagerie" },
     ],
   },
 ];
@@ -595,7 +595,7 @@ export default function Sidebar() {
             {user ? (
               <>
                 {/* Toggle Mode démo pour les administrateurs */}
-                {userRole === 'administrateur' && (
+                {userRole === 'admin' && (
                   <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 mb-2">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-primary" />
@@ -645,7 +645,7 @@ export default function Sidebar() {
                   onClick={() => navigate("/auth")}
                 >
                   <LogIn className="w-4 h-4" />
-                  {isOpen && "Créer un compte"}
+                  {isOpen && "Se connecter"}
                 </Button>
               </div>
             ) : (
@@ -655,7 +655,7 @@ export default function Sidebar() {
                 onClick={() => navigate("/auth")}
               >
                 <LogIn className="w-4 h-4" />
-                {isOpen && "Créer un compte"}
+                {isOpen && "Se connecter"}
               </Button>
             )}
           </div>

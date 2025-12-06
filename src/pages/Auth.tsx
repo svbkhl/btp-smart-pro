@@ -6,14 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -22,10 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, AlertCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
-
-type UserRole = "dirigeant" | "salarie" | "administrateur";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -33,11 +24,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
-  // Champs d'inscription supplémentaires
-  const [nom, setNom] = useState("");
-  const [prenom, setPrenom] = useState("");
-  const [statut, setStatut] = useState<UserRole>("dirigeant");
+  const [error, setError] = useState<string | null>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -50,6 +37,13 @@ const Auth = () => {
   };
 
   useEffect(() => {
+    // Rediriger les anciennes routes d'inscription vers la connexion
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('signup') || window.location.pathname.includes('signup')) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+
     const handlePostAuthNavigation = (sessionUser: User) => {
       if (requiresProfileCompletion(sessionUser)) {
         navigate("/complete-profile");
@@ -81,124 +75,11 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validation des champs requis
-    if (!nom || !prenom || !email || !password) {
-      toast({
-        title: "Champs requis",
-        description: "Veuillez remplir tous les champs obligatoires.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // VÉRIFIER QU'IL Y A UNE INVITATION VALIDE
-      const { data: hasInvitation, error: checkError } = await supabase.rpc(
-        'has_valid_invitation',
-        { p_email: email }
-      );
-
-      if (checkError) {
-        console.error('Error checking invitation:', checkError);
-      }
-
-      if (!hasInvitation) {
-        toast({
-          title: "Inscription non autorisée",
-          description: "Vous devez avoir reçu une invitation pour créer un compte. Contactez votre administrateur.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      const redirectUrl = `${window.location.origin}/dashboard`;
-
-      // Inscription avec métadonnées utilisateur
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            nom,
-            prenom,
-            statut,
-            full_name: `${prenom} ${nom}`,
-          },
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Si l'inscription réussit, créer un profil utilisateur dans la table profiles ou employees
-      if (data.user) {
-        // Créer un profil dans la table profiles si elle existe
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            nom,
-            prenom,
-            statut,
-            full_name: `${prenom} ${nom}`,
-          })
-          .select()
-          .single();
-
-        // Si la table profiles n'existe pas, essayer employees
-        if (profileError) {
-          const { error: employeeError } = await supabase
-            .from("employees")
-            .insert({
-              user_id: data.user.id,
-              nom,
-              prenom,
-              poste: statut === "dirigeant" ? "Dirigeant" : statut === "administrateur" ? "Administrateur" : "Salarié",
-            })
-            .select()
-            .single();
-
-          if (employeeError) {
-            // Si aucune table n'existe, on continue quand même
-            // Les métadonnées sont déjà dans user_metadata
-          }
-        }
-      }
-
-      toast({
-        title: "Inscription réussie !",
-        description: "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
-      });
-
-      // Réinitialiser le formulaire
-      setEmail("");
-      setPassword("");
-      setNom("");
-      setPrenom("");
-      setStatut("dirigeant");
-    } catch (error: any) {
-      toast({
-        title: "Erreur d'inscription",
-        description: error.message || "Une erreur est survenue lors de l'inscription.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -238,6 +119,9 @@ const Auth = () => {
           }
         }
         
+        // Afficher l'erreur dans l'interface
+        setError(errorMessage);
+        
         toast({
           title: "Erreur de connexion",
           description: errorMessage,
@@ -249,9 +133,12 @@ const Auth = () => {
       // La navigation se fait automatiquement via useEffect
     } catch (error: any) {
       // Erreur inattendue
+      const errorMessage = error?.message || "Une erreur inattendue s'est produite. Veuillez réessayer.";
+      setError(errorMessage);
+      
       toast({
         title: "Erreur de connexion",
-        description: error?.message || "Une erreur inattendue s'est produite. Veuillez réessayer.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -380,8 +267,36 @@ const Auth = () => {
     }
   };
 
-  // Connexion avec Google
+  // Connexion avec Google - Nécessite une invitation
   const handleGoogleSignIn = async () => {
+    if (!email || email.trim() === "") {
+      toast({
+        title: "Email requis",
+        description: "Veuillez saisir votre email pour vérifier votre invitation avant de continuer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Vérifier qu'il y a une invitation valide
+    const { data: hasInvitation, error: checkError } = await supabase.rpc(
+      'has_valid_invitation',
+      { p_email: email }
+    );
+
+    if (checkError) {
+      console.error('Error checking invitation:', checkError);
+    }
+
+    if (!hasInvitation) {
+      toast({
+        title: "Connexion non autorisée",
+        description: "Vous devez avoir reçu une invitation pour vous connecter. Contactez votre administrateur.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -404,8 +319,36 @@ const Auth = () => {
     }
   };
 
-  // Connexion avec Apple
+  // Connexion avec Apple - Nécessite une invitation
   const handleAppleSignIn = async () => {
+    if (!email || email.trim() === "") {
+      toast({
+        title: "Email requis",
+        description: "Veuillez saisir votre email pour vérifier votre invitation avant de continuer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Vérifier qu'il y a une invitation valide
+    const { data: hasInvitation, error: checkError } = await supabase.rpc(
+      'has_valid_invitation',
+      { p_email: email }
+    );
+
+    if (checkError) {
+      console.error('Error checking invitation:', checkError);
+    }
+
+    if (!hasInvitation) {
+      toast({
+        title: "Connexion non autorisée",
+        description: "Vous devez avoir reçu une invitation pour vous connecter. Contactez votre administrateur.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -444,17 +387,11 @@ const Auth = () => {
 
         <Card className="bg-card/80 backdrop-blur-xl border border-border/50">
           <CardHeader>
-            <CardTitle>Authentification</CardTitle>
-            <CardDescription>Créez un compte ou connectez-vous</CardDescription>
+            <CardTitle>Connexion</CardTitle>
+            <CardDescription>Connectez-vous à votre compte</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin">
-              <TabsList className="grid w-full grid-cols-2 text-xs sm:text-sm">
-                <TabsTrigger value="signin" className="text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">Connexion</TabsTrigger>
-                <TabsTrigger value="signup" className="text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">Inscription</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signin">
+            <div>
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email" className="text-sm sm:text-base">Email</Label>
@@ -463,10 +400,16 @@ const Auth = () => {
                       type="email"
                       placeholder="votre@email.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        // Effacer l'erreur quand l'utilisateur modifie l'email
+                        if (error) setError(null);
+                      }}
                       required
                       disabled={loading}
-                      className="text-sm sm:text-base h-9 sm:h-10"
+                      className={`text-sm sm:text-base h-9 sm:h-10 ${
+                        error ? "border-destructive focus-visible:ring-destructive" : ""
+                      }`}
                     />
                   </div>
                   <div className="space-y-2">
@@ -476,12 +419,24 @@ const Auth = () => {
                       type="password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        // Effacer l'erreur quand l'utilisateur modifie le mot de passe
+                        if (error) setError(null);
+                      }}
                       required
                       disabled={loading}
                       minLength={6}
-                      className="text-sm sm:text-base h-9 sm:h-10"
+                      className={`text-sm sm:text-base h-9 sm:h-10 ${
+                        error ? "border-destructive focus-visible:ring-destructive" : ""
+                      }`}
                     />
+                    {error && (
+                      <Alert variant="destructive" className="p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2 [&>svg]:relative [&>svg]:left-0 [&>svg]:top-0 [&>svg~*]:pl-0 [&>svg+div]:translate-y-0">
+                        <AlertCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+                        <AlertDescription className="text-xs leading-tight">{error}</AlertDescription>
+                      </Alert>
+                    )}
                     <div className="flex justify-end">
                       <Button
                         type="button"
@@ -554,141 +509,7 @@ const Auth = () => {
                     </Button>
                   </div>
                 </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-prenom" className="text-sm sm:text-base">Prénom *</Label>
-                      <Input
-                        id="signup-prenom"
-                        type="text"
-                        placeholder="Jean"
-                        value={prenom}
-                        onChange={(e) => setPrenom(e.target.value)}
-                        required
-                        disabled={loading}
-                        className="text-sm sm:text-base h-9 sm:h-10"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-nom" className="text-sm sm:text-base">Nom *</Label>
-                      <Input
-                        id="signup-nom"
-                        type="text"
-                        placeholder="Dupont"
-                        value={nom}
-                        onChange={(e) => setNom(e.target.value)}
-                        required
-                        disabled={loading}
-                        className="text-sm sm:text-base h-9 sm:h-10"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm sm:text-base">Email *</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="text-sm sm:text-base h-9 sm:h-10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-statut" className="text-sm sm:text-base">Statut *</Label>
-                    <Select value={statut} onValueChange={(value: UserRole) => setStatut(value)} disabled={loading}>
-                      <SelectTrigger id="signup-statut" className="text-sm sm:text-base h-9 sm:h-10">
-                        <SelectValue placeholder="Sélectionnez votre statut" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dirigeant">Dirigeant</SelectItem>
-                        <SelectItem value="salarie">Salarié</SelectItem>
-                        <SelectItem value="administrateur">Administrateur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm sm:text-base">Mot de passe *</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                      minLength={6}
-                      className="text-sm sm:text-base h-9 sm:h-10"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Minimum 6 caractères
-                    </p>
-                  </div>
-                  <Button type="submit" className="w-full text-sm sm:text-base h-9 sm:h-10" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Créer un compte
-                  </Button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">
-                        Ou continuer avec
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleGoogleSignIn}
-                      disabled={loading}
-                      className="w-full text-xs sm:text-sm h-9 sm:h-10 bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30"
-                    >
-                      <svg className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24">
-                        <path
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          fill="#4285F4"
-                        />
-                        <path
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          fill="#34A853"
-                        />
-                        <path
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          fill="#FBBC05"
-                        />
-                        <path
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          fill="#EA4335"
-                        />
-                      </svg>
-                      Google
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleAppleSignIn}
-                      disabled={loading}
-                      className="w-full text-xs sm:text-sm h-9 sm:h-10 bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30"
-                    >
-                      <svg className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-                      </svg>
-                      Apple
-                    </Button>
-                  </div>
-                </form>
-              </TabsContent>
-            </Tabs>
+            </div>
           </CardContent>
         </Card>
       </div>

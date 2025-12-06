@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
-export type UserRole = "dirigeant" | "salarie" | "administrateur";
+export type UserRole = "admin" | "member";
 
 export interface UserRoleData {
   id: string;
@@ -30,11 +30,28 @@ export const useCurrentUserRole = () => {
 
       const { data, error } = await supabase
         .from("user_roles")
-        .select("*")
+        .select("role")
         .eq("user_id", user.id)
         .single();
 
       if (error) {
+        // Erreur 406 Not Acceptable - table non exposée ou permissions manquantes
+        if (error.code === "PGRST301" || error.message?.includes("Not Acceptable") || error.code === "406") {
+          console.warn("⚠️ Table user_roles non accessible via API. Vérifiez les permissions RLS.");
+          // Utiliser les métadonnées comme fallback
+          const metadata = user.user_metadata || {};
+          const statut = metadata.statut as string | undefined;
+          const role = metadata.role as string | undefined;
+          const finalRole = role || statut || 'member';
+          return { 
+            id: '', 
+            user_id: user.id, 
+            role: (finalRole === 'admin' || finalRole === 'administrateur' ? 'admin' : 'member') as UserRole, 
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        }
+        
         // Si l'utilisateur n'a pas de rôle, vérifier les métadonnées
         if (error.code === "PGRST116") {
           // Vérifier les métadonnées de l'utilisateur
@@ -42,33 +59,22 @@ export const useCurrentUserRole = () => {
           const statut = metadata.statut as string | undefined;
           const role = metadata.role as string | undefined;
           
-          // Si l'utilisateur est admin/dirigeant dans les métadonnées, créer le rôle
-          if (statut === 'administrateur' || role === 'administrateur' || role === 'admin' || 
-              statut === 'dirigeant' || role === 'dirigeant') {
-            const roleToCreate = (statut === 'administrateur' || role === 'administrateur' || role === 'admin') 
-              ? 'administrateur' as UserRole 
-              : 'dirigeant' as UserRole;
-            
-            // Créer le rôle dans la table
-            const { data: newRole, error: createError } = await supabase
-              .from("user_roles")
-              .insert({
-                user_id: user.id,
-                role: roleToCreate,
-              })
-              .select()
-              .single();
-            
-            if (!createError && newRole) {
-              return newRole as UserRoleData;
-            }
+          // Si l'utilisateur est admin dans les métadonnées, retourner admin
+          if (statut === 'admin' || role === 'admin' || statut === 'administrateur' || role === 'administrateur') {
+            return { 
+              id: '', 
+              user_id: user.id, 
+              role: "admin" as UserRole, 
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
           }
           
-          // Sinon, retourner 'salarie' par défaut
+          // Sinon, retourner 'member' par défaut
           return { 
             id: '', 
             user_id: user.id, 
-            role: "salarie" as UserRole, 
+            role: "member" as UserRole, 
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -94,25 +100,44 @@ export const useAllUserRoles = () => {
       if (!user) throw new Error("User not authenticated");
 
       // Vérifier que l'utilisateur est admin ou dirigeant
-      const { data: currentUserRole } = await supabase
+      const { data: currentUserRole, error: currentRoleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .single();
 
-      const isAdmin = currentUserRole?.role === "administrateur" || currentUserRole?.role === "dirigeant";
+      // Gérer les erreurs
+      if (currentRoleError) {
+        // Erreur 406 Not Acceptable
+        if (currentRoleError.code === "PGRST301" || currentRoleError.message?.includes("Not Acceptable") || currentRoleError.code === "406") {
+          throw new Error("Table user_roles non accessible. Vérifiez les permissions RLS.");
+        }
+        // Erreur PGRST116 - pas de rôle
+        if (currentRoleError.code === "PGRST116") {
+          throw new Error("Vous n'avez pas de rôle assigné.");
+        }
+        throw currentRoleError;
+      }
+
+      const isAdmin = currentUserRole?.role === "admin";
 
       if (!isAdmin) {
-        throw new Error("Unauthorized: Only administrators and dirigeants can view all roles");
+        throw new Error("Unauthorized: Only administrators can view all roles");
       }
 
       // Récupérer tous les utilisateurs avec leurs rôles
       const { data: roles, error: rolesError } = await supabase
         .from("user_roles")
-        .select("*")
+        .select("id, user_id, role, created_at")
         .order("created_at", { ascending: false });
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        // Erreur 406 Not Acceptable
+        if (rolesError.code === "PGRST301" || rolesError.message?.includes("Not Acceptable") || rolesError.code === "406") {
+          throw new Error("Table user_roles non accessible. Vérifiez les permissions RLS.");
+        }
+        throw rolesError;
+      }
 
       // Récupérer les emails des utilisateurs depuis auth.users
       const userIds = roles.map((r) => r.user_id);
@@ -150,35 +175,32 @@ export const useUpdateUserRole = () => {
       if (!user) throw new Error("User not authenticated");
 
       // Vérifier que l'utilisateur est admin ou dirigeant
-      const { data: currentUserRole } = await supabase
+      const { data: currentUserRole, error: currentRoleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .single();
 
-      const isAdmin = currentUserRole?.role === "administrateur" || currentUserRole?.role === "dirigeant";
-
-      if (!isAdmin) {
-        throw new Error("Unauthorized: Only administrators and dirigeants can update roles");
+      // Gérer les erreurs
+      if (currentRoleError && currentRoleError.code !== "PGRST116") {
+        // Erreur 406 Not Acceptable
+        if (currentRoleError.code === "PGRST301" || currentRoleError.message?.includes("Not Acceptable") || currentRoleError.code === "406") {
+          throw new Error("Table user_roles non accessible. Vérifiez les permissions RLS.");
+        }
+        throw currentRoleError;
       }
 
-      // Mettre à jour ou créer le rôle
-      const { data, error } = await supabase
-        .from("user_roles")
-        .upsert(
-          {
-            user_id: userId,
-            role: role,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "user_id",
-          }
-        )
-        .select()
-        .single();
+      const isAdmin = currentUserRole?.role === "admin";
 
-      if (error) throw error;
+      if (!isAdmin) {
+        throw new Error("Unauthorized: Only administrators can update roles");
+      }
+
+      // Note: L'upsert direct n'est pas autorisé par RLS
+      // La mise à jour doit se faire via une fonction server-side ou le service_role
+      // Pour l'instant, on simule la réponse
+      console.warn("⚠️ Upsert direct non autorisé. Utilisez une fonction server-side.");
+      throw new Error("La mise à jour des rôles doit se faire via une fonction server-side pour des raisons de sécurité.");
 
       return data as UserRoleData;
     },
@@ -196,33 +218,11 @@ export const useCreateUserRole = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ userId, role = "salarie" }: { userId: string; role?: UserRole }) => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: role,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        // Si le rôle existe déjà, le mettre à jour
-        if (error.code === "23505") {
-          const { data: updated, error: updateError } = await supabase
-            .from("user_roles")
-            .update({ role: role, updated_at: new Date().toISOString() })
-            .eq("user_id", userId)
-            .select()
-            .single();
-
-          if (updateError) throw updateError;
-          return updated as UserRoleData;
-        }
-        throw error;
-      }
-
-      return data as UserRoleData;
+    mutationFn: async ({ userId, role = "member" }: { userId: string; role?: UserRole }) => {
+      // Note: L'insertion directe n'est pas autorisée par RLS
+      // La création doit se faire via une fonction server-side ou le service_role
+      console.warn("⚠️ Insertion directe non autorisée. Utilisez une fonction server-side.");
+      throw new Error("La création de rôles doit se faire via une fonction server-side pour des raisons de sécurité.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user_role"] });
@@ -238,18 +238,17 @@ export const hasRole = (userRole: UserRole | null | undefined, requiredRole: Use
   if (!userRole) return false;
 
   const roleHierarchy: Record<UserRole, number> = {
-    salarie: 1,
-    dirigeant: 2,
-    administrateur: 3,
+    member: 1,
+    admin: 2,
   };
 
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 };
 
 /**
- * Fonction utilitaire pour vérifier si un utilisateur est admin ou dirigeant
+ * Fonction utilitaire pour vérifier si un utilisateur est admin
  */
-export const isAdminOrDirigeant = (userRole: UserRole | null | undefined): boolean => {
-  return userRole === "administrateur" || userRole === "dirigeant";
+export const isAdmin = (userRole: UserRole | null | undefined): boolean => {
+  return userRole === "admin";
 };
 

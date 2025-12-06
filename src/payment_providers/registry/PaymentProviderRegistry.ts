@@ -8,11 +8,25 @@ import type { IPaymentProvider } from '../interfaces/IPaymentProvider';
 import type { PaymentProviderType, PaymentProviderConfig } from '../types/PaymentTypes';
 
 // Import des adapters (lazy loading pour optimiser le bundle)
-import { StripeAdapter } from '../adapters/stripe_adapter';
-import { SumUpAdapter } from '../adapters/sumup_adapter';
-import { PayPlugAdapter } from '../adapters/payplug_adapter';
-import { StancerAdapter } from '../adapters/stancer_adapter';
-import { GoCardlessAdapter } from '../adapters/gocardless_adapter';
+// Utilisation d'imports dynamiques pour éviter les erreurs si les packages ne sont pas installés
+
+// Types pour les adapters
+type AdapterClass = new () => IPaymentProvider;
+
+// Fonction pour charger les adapters dynamiquement
+async function loadAdapter(adapterPath: string): Promise<AdapterClass | null> {
+  try {
+    const module = await import(adapterPath);
+    const adapterKey = Object.keys(module).find(key => key.includes('Adapter'));
+    if (!adapterKey) {
+      return null;
+    }
+    return (module as any)[adapterKey] as AdapterClass;
+  } catch (error) {
+    console.warn(`⚠️ Adapter not available: ${adapterPath}`, error);
+    return null;
+  }
+}
 
 export class PaymentProviderRegistry {
   private static instance: PaymentProviderRegistry;
@@ -63,24 +77,45 @@ export class PaymentProviderRegistry {
       }
     }
 
-    // Créer une nouvelle instance du provider
+    // Créer une nouvelle instance du provider avec chargement dynamique
     let provider: IPaymentProvider;
+    let AdapterClass: AdapterClass | null = null;
 
     switch (type) {
       case 'stripe':
-        provider = new StripeAdapter();
+        AdapterClass = await loadAdapter('../adapters/stripe_adapter');
+        if (!AdapterClass) {
+          throw new Error('Stripe adapter is not available. Please install stripe package: npm install stripe');
+        }
+        provider = new AdapterClass();
         break;
       case 'sumup':
-        provider = new SumUpAdapter();
+        AdapterClass = await loadAdapter('../adapters/sumup_adapter');
+        if (!AdapterClass) {
+          throw new Error('SumUp adapter is not available');
+        }
+        provider = new AdapterClass();
         break;
       case 'payplug':
-        provider = new PayPlugAdapter();
+        AdapterClass = await loadAdapter('../adapters/payplug_adapter');
+        if (!AdapterClass) {
+          throw new Error('PayPlug adapter is not available');
+        }
+        provider = new AdapterClass();
         break;
       case 'stancer':
-        provider = new StancerAdapter();
+        AdapterClass = await loadAdapter('../adapters/stancer_adapter');
+        if (!AdapterClass) {
+          throw new Error('Stancer adapter is not available');
+        }
+        provider = new AdapterClass();
         break;
       case 'gocardless':
-        provider = new GoCardlessAdapter();
+        AdapterClass = await loadAdapter('../adapters/gocardless_adapter');
+        if (!AdapterClass) {
+          throw new Error('GoCardless adapter is not available');
+        }
+        provider = new AdapterClass();
         break;
       default:
         throw new Error(`Unsupported payment provider: ${type}`);
@@ -129,4 +164,7 @@ export class PaymentProviderRegistry {
 
 // Export singleton instance
 export const paymentProviderRegistry = PaymentProviderRegistry.getInstance();
+
+
+
 

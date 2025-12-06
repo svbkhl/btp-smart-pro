@@ -38,3 +38,9 @@ COMMENT ON FUNCTION get_next_quote_number() IS 'Génère le prochain numéro de 
 
 
 
+
+
+
+
+
+

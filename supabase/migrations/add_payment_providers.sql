@@ -186,3 +186,9 @@ COMMENT ON COLUMN public.payment_provider_credentials.provider_type IS 'Type of 
 COMMENT ON COLUMN public.payment_provider_credentials.credentials IS 'Encrypted JSON containing API keys and secrets for the provider';
 COMMENT ON COLUMN public.payment_provider_credentials.is_active IS 'Whether this provider configuration is currently active';
 
+
+
+
+
+
+

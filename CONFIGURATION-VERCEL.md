@@ -134,3 +134,9 @@ Une fois déployé, configure les webhooks Supabase pour pointer vers ton domain
 
 **💡 Astuce** : Tu peux d'abord déployer avec les variables minimales (juste Supabase), puis ajouter les autres progressivement.
 
+
+
+
+
+
+

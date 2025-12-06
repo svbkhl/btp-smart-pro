@@ -12,15 +12,15 @@ const NotFound = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center space-y-6 p-8">
+      <div className="text-center space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8">
         <div className="flex justify-center">
-          <div className="rounded-full bg-destructive/10 p-6">
-            <AlertCircle className="h-16 w-16 text-destructive" />
+          <div className="rounded-full bg-destructive/10 p-4 sm:p-6">
+            <AlertCircle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-6xl font-bold text-foreground">404</h1>
-          <h2 className="text-2xl font-semibold text-foreground">Page non trouvée</h2>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground">404</h1>
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Page non trouvée</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
             La page que vous recherchez n'existe pas ou a été déplacée.
           </p>

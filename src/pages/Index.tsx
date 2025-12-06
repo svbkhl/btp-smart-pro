@@ -146,13 +146,13 @@ const Index = () => {
             <div className="relative mt-8 lg:mt-0 group" style={{ willChange: 'transform', transform: 'translateZ(0)' }}>
               <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/20 rounded-2xl md:rounded-3xl blur-3xl group-hover:blur-2xl transition-all duration-150" style={{ willChange: 'opacity, filter' }} />
               <div className="relative rounded-2xl md:rounded-3xl shadow-2xl w-full h-auto bg-gradient-to-br from-primary via-primary/80 to-primary aspect-video flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-150" style={{ willChange: 'transform' }}>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent)]" />
-                <div className="text-center space-y-4 p-8 relative z-10">
-                  <div className="w-24 h-24 mx-auto bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm group-hover:rotate-12 transition-transform duration-150 animate-float">
-                    <Building2 className="w-12 h-12 text-white" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent)] rounded-2xl md:rounded-3xl" />
+                <div className="text-center space-y-4 p-4 sm:p-6 md:p-8 relative z-10">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm group-hover:rotate-12 transition-transform duration-150 animate-float">
+                    <Building2 className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white">Gestion BTP Moderne</h3>
-                  <p className="text-white/80 text-sm">Tout votre chantier dans une seule application</p>
+                  <h3 className="text-lg sm:text-xl font-semibold text-white">Gestion BTP Moderne</h3>
+                  <p className="text-white/80 text-xs sm:text-sm">Tout votre chantier dans une seule application</p>
                 </div>
               </div>
             </div>
@@ -469,9 +469,9 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-6 md:py-8 px-4">
+      <footer className="py-6 md:py-8 px-4">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p className="text-sm md:text-base">&copy; {new Date().getFullYear()} BTP Smart Pro. Tous droits réservés.</p>
+          <p className="text-sm md:text-base">&copy; 2024 BTP Smart Pro. Tous droits réservés.</p>
         </div>
       </footer>
 

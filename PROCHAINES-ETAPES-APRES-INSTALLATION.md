@@ -150,3 +150,9 @@ Si tu rencontres des erreurs :
 
 **🎉 Félicitations ! Le système est maintenant installé et prêt à être utilisé !**
 
+
+
+
+
+
+

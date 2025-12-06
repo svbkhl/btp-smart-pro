@@ -21,8 +21,24 @@ import type {
 } from '../types/PaymentTypes';
 
 // Stripe SDK (à installer: npm install stripe)
-// @ts-ignore - Stripe sera installé
-import Stripe from 'stripe';
+// Type pour Stripe (sera défini dynamiquement)
+type StripeType = any;
+let Stripe: StripeType | null = null;
+
+// Fonction pour charger Stripe dynamiquement
+async function loadStripe(): Promise<StripeType | null> {
+  if (Stripe) return Stripe;
+  
+  try {
+    // @ts-ignore - Import dynamique de Stripe
+    const stripeModule = await import('stripe');
+    Stripe = stripeModule.default || stripeModule;
+    return Stripe;
+  } catch (error) {
+    console.warn('⚠️ Stripe package not installed. Install it with: npm install stripe');
+    return null;
+  }
+}
 
 export class StripeAdapter implements IPaymentProvider {
   public readonly name = 'Stripe';
@@ -32,6 +48,11 @@ export class StripeAdapter implements IPaymentProvider {
   private config: PaymentProviderConfig | null = null;
 
   async initialize(config: PaymentProviderConfig): Promise<void> {
+    const StripeClass = await loadStripe();
+    if (!StripeClass) {
+      throw new Error('Stripe package is not installed. Please run: npm install stripe');
+    }
+
     this.config = config;
     
     const secretKey = config.credentials.secretKey || config.credentials.apiKey;
@@ -40,7 +61,7 @@ export class StripeAdapter implements IPaymentProvider {
     }
 
     // @ts-ignore
-    this.stripe = new Stripe(secretKey, {
+    this.stripe = new StripeClass(secretKey, {
       apiVersion: '2024-11-20.acacia',
     });
   }
@@ -266,4 +287,7 @@ export class StripeAdapter implements IPaymentProvider {
     return statusMap[stripeStatus] || 'pending';
   }
 }
+
+
+
 

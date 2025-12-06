@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import "https://deno.land/x/xhr@0.2.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +8,39 @@ const corsHeaders = {
 
 // Configuration Resend
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
+// RESEND_FROM_EMAIL peut être au format "Name <email@domain.com>" ou juste "email@domain.com"
+const RESEND_FROM_EMAIL_RAW = Deno.env.get("RESEND_FROM_EMAIL") || "contact@btpsmartpro.com";
 const FROM_NAME = Deno.env.get("FROM_NAME") || "BTP Smart Pro";
+
+// Parser RESEND_FROM_EMAIL pour extraire le nom et l'email
+function parseFromEmail(fromEmailRaw: string): { name: string | null; email: string } {
+  // Si le format est "Name <email@domain.com>"
+  const match = fromEmailRaw.match(/^"?(.+?)"?\s*<(.+?)>$/);
+  if (match) {
+    return {
+      name: match[1].trim(),
+      email: match[2].trim(),
+    };
+  }
+  // Sinon, c'est juste l'email
+  return {
+    name: null,
+    email: fromEmailRaw.trim(),
+  };
+}
+
+const parsedFromEmail = parseFromEmail(RESEND_FROM_EMAIL_RAW);
+const RESEND_FROM_EMAIL = parsedFromEmail.email;
+const RESEND_FROM_NAME = parsedFromEmail.name || FROM_NAME;
+
+// Log de la configuration au démarrage (une seule fois)
+console.log("🔧 [send-email] Configuration Resend:", {
+  RESEND_FROM_EMAIL_RAW: RESEND_FROM_EMAIL_RAW.substring(0, 50) + (RESEND_FROM_EMAIL_RAW.length > 50 ? "..." : ""),
+  RESEND_FROM_EMAIL: RESEND_FROM_EMAIL,
+  RESEND_FROM_NAME: RESEND_FROM_NAME,
+  RESEND_API_KEY_CONFIGURED: !!RESEND_API_KEY,
+  RESEND_API_KEY_TYPE: RESEND_API_KEY ? (RESEND_API_KEY.includes("test") ? "TEST" : "PRODUCTION") : "NON CONFIGURÉ",
+});
 
 interface EmailAttachment {
   filename: string;
@@ -20,7 +51,7 @@ interface EmailAttachment {
 interface SendEmailRequest {
   to: string;
   subject: string;
-  html: string;
+  html?: string;
   text?: string;
   type?: string;
   attachments?: EmailAttachment[];
@@ -53,14 +84,16 @@ serve(async (req) => {
     }
 
     // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
+    const supabaseClient = await import("https://esm.sh/@supabase/supabase-js@2").then(
+      (mod) => mod.createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        }
+      )
     );
 
     // Get user from session
@@ -84,36 +117,18 @@ serve(async (req) => {
     let body: SendEmailRequest;
     try {
       const rawBody = await req.text();
-      console.log("📥 Raw request body (first 1000 chars):", rawBody.substring(0, 1000));
-      console.log("📥 Raw request body length:", rawBody.length);
-      
-      if (!rawBody || rawBody.trim().length === 0) {
-        console.error("❌ Empty request body");
-        return new Response(
-          JSON.stringify({ error: "Request body is empty" }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400,
-          }
-        );
-      }
-      
       body = JSON.parse(rawBody);
-      console.log("📥 Parsed request body keys:", Object.keys(body));
-      console.log("📥 Parsed request body:", { 
+      console.log("📥 Request received:", { 
         to: body.to, 
         subject: body.subject, 
         hasHtml: !!body.html,
         hasText: !!body.text,
-        htmlLength: body.html?.length || 0,
-        textLength: body.text?.length || 0,
         type: body.type,
-        allKeys: Object.keys(body)
       });
     } catch (parseError: any) {
       console.error("❌ Error parsing request body:", parseError);
       return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body", details: parseError?.message || String(parseError) }),
+        JSON.stringify({ error: "Invalid JSON in request body", details: parseError?.message }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,
@@ -128,7 +143,6 @@ serve(async (req) => {
       text,
       type = "notification",
       attachments = [],
-      template,
       invoice_id,
       quote_id,
       replyTo,
@@ -136,59 +150,82 @@ serve(async (req) => {
       bcc,
     } = body;
 
-    if (!to || !subject) {
-      console.error("❌ Missing required fields:", { to: !!to, subject: !!subject });
+    // Vérification basique des champs
+    if (!to || !subject || (!html && !text)) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: to, subject" }),
+        JSON.stringify({ error: "Missing required fields: to, subject, and (html or text)" }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,
-        }
-      );
-    }
-
-    if (!html && !text) {
-      console.error("❌ Missing email content: both html and text are missing", { html: !!html, text: !!text, bodyKeys: Object.keys(body) });
-      return new Response(
-        JSON.stringify({ error: "Missing email content: either html or text is required", received: { hasHtml: !!html, hasText: !!text } }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
-    }
-
-    // Get email configuration from user_email_settings
-    const { data: emailConfig, error: emailConfigError } = await supabaseClient
-      .from("user_email_settings")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (emailConfigError && emailConfigError.code !== "PGRST116") {
-      // PGRST116 means no row found, which is OK (will use defaults)
-      console.error("❌ Error fetching user_email_settings:", emailConfigError);
-      return new Response(
-        JSON.stringify({ error: "Failed to retrieve email configuration", details: emailConfigError.message }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
         }
       );
     }
 
     // Get user settings for signature
-    const { data: settings, error: settingsError } = await supabaseClient
+    const { data: settings } = await supabaseClient
       .from("user_settings")
       .select("company_name, signature_name, email, phone, signature_data")
       .eq("user_id", user.id)
       .single();
 
-    if (settingsError && settingsError.code !== "PGRST116") {
-      // PGRST116 means no row found, which is OK (will use defaults)
-      console.error("❌ Error fetching user_settings:", settingsError);
+    // Generate signature HTML and Text
+    const signatureHtml = generateEmailSignature(settings);
+    const signatureText = generateEmailSignatureText(settings);
+
+    // Générer le lien de signature si quote_id est fourni
+    let signatureUrl: string | null = null;
+    if (quote_id) {
+      const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("VITE_APP_URL") || "https://btpsmartpro.com";
+      signatureUrl = `${APP_URL}/sign/${quote_id}`;
+      console.log("📝 [send-email] Lien de signature généré:", signatureUrl);
+    }
+
+    // Préparer le contenu HTML avec signature et lien de signature
+    let htmlWithSignature: string | undefined;
+    let textWithSignature: string | undefined;
+
+    // Ajouter le lien de signature au HTML si disponible
+    let htmlContent = html || "";
+    if (signatureUrl && quote_id) {
+      const signatureButton = `
+        <div style="margin: 30px 0; text-align: center;">
+          <a href="${signatureUrl}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+            ✍️ Signer le devis
+          </a>
+        </div>
+      `;
+      htmlContent = htmlContent + signatureButton;
+    }
+
+    if (htmlContent) {
+      htmlWithSignature = `${htmlContent}\n\n${signatureHtml}`;
+    } else if (text) {
+      htmlWithSignature = `<pre style="font-family: Arial, sans-serif; white-space: pre-wrap;">${text.replace(/\n/g, '<br>')}</pre>\n\n${signatureHtml}`;
+    }
+
+    if (text) {
+      let textContent = text;
+      if (signatureUrl && quote_id) {
+        textContent = textContent + `\n\nPour signer le devis, cliquez sur ce lien : ${signatureUrl}`;
+      }
+      textWithSignature = `${textContent}\n\n${signatureText}`;
+    } else if (html) {
+      const textFromHtml = html.replace(/<[^>]*>/g, "").replace(/\n\s*\n/g, "\n").trim();
+      if (signatureUrl && quote_id) {
+        textWithSignature = `${textFromHtml}\n\nPour signer le devis, cliquez sur ce lien : ${signatureUrl}\n\n${signatureText}`;
+      } else {
+        textWithSignature = `${textFromHtml}\n\n${signatureText}`;
+      }
+    }
+
+    // Vérifier que RESEND_FROM_EMAIL est configuré
+    if (!RESEND_FROM_EMAIL || !RESEND_FROM_EMAIL.includes("@")) {
+      console.error("❌ [send-email] RESEND_FROM_EMAIL non configuré ou invalide:", RESEND_FROM_EMAIL);
       return new Response(
-        JSON.stringify({ error: "Failed to retrieve user settings", details: settingsError.message }),
+        JSON.stringify({
+          error: "RESEND_FROM_EMAIL not configured",
+          details: "Configurez RESEND_FROM_EMAIL dans Supabase Dashboard > Settings > Edge Functions > Secrets avec une adresse email valide (ex: contact@btpsmartpro.com)",
+        }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500,
@@ -196,53 +233,50 @@ serve(async (req) => {
       );
     }
 
-    // Generate signature HTML and Text
-    const signatureHtml = generateEmailSignature(settings);
-    const signatureText = generateEmailSignatureText(settings);
+    // Déterminer l'adresse "from" à utiliser
+    // 1. Si l'utilisateur a configuré from_email dans user_email_settings, l'utiliser
+    // 2. Sinon, utiliser RESEND_FROM_EMAIL comme fallback
+    let fromEmail = RESEND_FROM_EMAIL;
+    // Utiliser le nom depuis RESEND_FROM_EMAIL si configuré, sinon depuis settings, sinon depuis FROM_NAME
+    const fromName = settings?.signature_name || RESEND_FROM_NAME;
 
-    // Prepare email content with signature
-    let htmlWithSignature: string | undefined;
-    let textWithSignature: string | undefined;
+    // Vérifier si l'utilisateur a une configuration email avec un domaine vérifié
+    const { data: emailConfig } = await supabaseClient
+      .from("user_email_settings")
+      .select("from_email, smtp_user, provider")
+      .eq("user_id", user.id)
+      .single();
 
-    if (html) {
-      htmlWithSignature = `${html}\n\n${signatureHtml}`;
-    } else if (text) {
-      // If only text provided, use it as HTML too (basic)
-      htmlWithSignature = `<pre style="font-family: Arial, sans-serif; white-space: pre-wrap;">${text.replace(/\n/g, '<br>')}</pre>\n\n${signatureHtml}`;
-    }
-
-    if (text) {
-      textWithSignature = `${text}\n\n${signatureText}`;
-    } else if (html) {
-      // If only HTML provided, extract text from it
-      const textFromHtml = html.replace(/<[^>]*>/g, "").replace(/\n\s*\n/g, "\n").trim();
-      textWithSignature = `${textFromHtml}\n\n${signatureText}`;
-    }
-
-    // Ensure we have at least one content type
-    if (!htmlWithSignature && !textWithSignature) {
-      console.error("❌ No email content available after processing");
-      return new Response(
-        JSON.stringify({ error: "No email content available after processing" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
+    if (emailConfig) {
+      // Utiliser l'email de l'utilisateur s'il est configuré
+      const userEmail = emailConfig.from_email || emailConfig.smtp_user;
+      if (userEmail && userEmail.includes("@")) {
+        const userDomain = userEmail.split("@")[1];
+        const verifiedDomain = RESEND_FROM_EMAIL.split("@")[1];
+        
+        // Si le domaine de l'utilisateur est vérifié, l'utiliser
+        // Sinon, utiliser RESEND_FROM_EMAIL mais mettre l'email utilisateur en Reply-To
+        if (userDomain === verifiedDomain) {
+          fromEmail = userEmail;
+          console.log("✅ [send-email] Utilisation de l'email utilisateur (domaine vérifié):", fromEmail);
+        } else {
+          // Utiliser le fallback mais garder Reply-To
+          console.log("⚠️ [send-email] Domaine utilisateur non vérifié, utilisation du fallback:", {
+            userEmail,
+            verifiedDomain,
+            fallback: RESEND_FROM_EMAIL,
+          });
         }
-      );
+      }
     }
-
-    // Prepare email data
-    // Use user's email configuration if available, otherwise use default
-    let fromEmail = emailConfig?.from_email || emailConfig?.smtp_user || FROM_EMAIL;
-    const fromName = emailConfig?.from_name || settings?.signature_name || FROM_NAME;
 
     // Valider et nettoyer l'email "from"
     if (!fromEmail || !fromEmail.includes("@")) {
-      console.error("❌ Invalid from_email:", fromEmail);
+      console.error("❌ [send-email] Email 'from' invalide:", fromEmail);
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid from_email configuration", 
-          details: "L'adresse email 'from' n'est pas valide. Configurez une adresse email valide dans les paramètres." 
+        JSON.stringify({
+          error: "Invalid from email",
+          details: `L'adresse email 'from' n'est pas valide: ${fromEmail}. Configurez RESEND_FROM_EMAIL dans Supabase Secrets.`,
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -251,35 +285,50 @@ serve(async (req) => {
       );
     }
 
-    // Si on utilise Resend et que l'email n'est pas d'un domaine vérifié, utiliser un email par défaut
-    // Resend permet d'utiliser "onboarding@resend.dev" pour les tests, ou un domaine vérifié
-    const isGmailOrOutlook = fromEmail.includes("@gmail.com") || fromEmail.includes("@outlook.com") || fromEmail.includes("@hotmail.com") || fromEmail.includes("@yahoo.com");
-    let resendFromEmail = fromEmail;
-    
-    // Toujours utiliser un email par défaut pour Gmail/Outlook si on utilise Resend
-    if (isGmailOrOutlook) {
-      // Utiliser un email par défaut de Resend
-      // Resend permet d'utiliser "onboarding@resend.dev" pour les tests
-      resendFromEmail = FROM_EMAIL;
-      console.log(`⚠️ Email Gmail/Outlook détecté (${fromEmail}), utilisation de ${resendFromEmail} pour Resend`);
-      console.log(`⚠️ RESEND_API_KEY configuré: ${RESEND_API_KEY ? "Oui" : "Non"}`);
+    // Nettoyer le nom pour éviter les caractères qui cassent le format
+    const cleanFromName = fromName 
+      ? fromName.replace(/[<>]/g, "").trim() // Enlever les < et > du nom
+      : null;
+
+    // Construire le champ "from" au format Resend
+    // Format attendu: "Name <email@example.com>" ou "email@example.com"
+    const from = cleanFromName 
+      ? `${cleanFromName} <${fromEmail}>`
+      : fromEmail;
+
+    console.log("📧 [send-email] Configuration email finale:", {
+      fromEmail,
+      fromName,
+      from,
+      RESEND_FROM_EMAIL,
+      RESEND_FROM_NAME,
+      userEmailConfig: emailConfig ? {
+        from_email: emailConfig.from_email,
+        smtp_user: emailConfig.smtp_user,
+        provider: emailConfig.provider,
+      } : null,
+    });
+
+    if (!RESEND_API_KEY) {
+      return new Response(
+        JSON.stringify({ 
+          error: "RESEND_API_KEY not configured",
+          details: "Configurez RESEND_API_KEY (clé API de production) dans Supabase Dashboard > Settings > Edge Functions > Secrets"
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
     }
 
-    // Resend accepte le format "Name <email@domain.com>" ou juste "email@domain.com"
-    // Utiliser resendFromEmail pour Resend si le domaine original n'est pas vérifié
+    // Prepare email data for Resend API
     const emailData: any = {
-      from: fromName ? `${fromName} <${resendFromEmail}>` : resendFromEmail,
+      from,
       to: [to],
-      subject: subject,
+      subject,
     };
-    
-    // Ajouter un Reply-To avec l'email original si différent
-    if (resendFromEmail !== fromEmail) {
-      emailData.reply_to = fromEmail;
-      console.log(`📧 Reply-To configuré avec l'email original: ${fromEmail}`);
-    }
 
-    // Add HTML or text content
     if (htmlWithSignature) {
       emailData.html = htmlWithSignature;
     }
@@ -287,8 +336,17 @@ serve(async (req) => {
       emailData.text = textWithSignature;
     }
 
-    // Add optional fields
-    if (replyTo) emailData.reply_to = replyTo;
+    // Add Reply-To si l'email utilisateur est différent de "from"
+    if (emailConfig && emailConfig.from_email && emailConfig.from_email !== fromEmail) {
+      emailData.reply_to = emailConfig.from_email;
+      console.log("📧 [send-email] Reply-To configuré:", emailConfig.from_email);
+    } else if (settings?.email && settings.email !== fromEmail) {
+      emailData.reply_to = settings.email;
+      console.log("📧 [send-email] Reply-To configuré (depuis settings):", settings.email);
+    } else if (replyTo) {
+      emailData.reply_to = replyTo;
+    }
+    
     if (cc) emailData.cc = [cc];
     if (bcc) emailData.bcc = [bcc];
 
@@ -301,230 +359,136 @@ serve(async (req) => {
       }));
     }
 
-    let emailId: string | null = null;
-    let emailStatus: "sent" | "failed" = "sent";
-    let errorMessage: string | null = null;
+    console.log("📧 Sending email via Resend:", {
+      from,
+      to,
+      subject,
+      hasHtml: !!emailData.html,
+      hasText: !!emailData.text,
+      hasAttachments: attachments.length > 0,
+    });
 
-    // Détecter si l'utilisateur a configuré SMTP (Gmail/Outlook)
-    const hasSMTPConfig = emailConfig && (
-      (emailConfig.provider === "gmail" || emailConfig.provider === "outlook") &&
-      emailConfig.smtp_host &&
-      emailConfig.smtp_port &&
-      emailConfig.smtp_user &&
-      emailConfig.smtp_password
-    );
+    // Envoi via Resend API
+    const resendResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(emailData),
+    });
 
-    // Si SMTP est configuré, essayer d'utiliser SMTP directement
-    // Sinon, utiliser Resend si disponible
-    if (hasSMTPConfig) {
-      try {
-        console.log("📧 Tentative d'envoi via SMTP:", emailConfig.smtp_host);
-        await sendViaSMTP({
-          host: emailConfig.smtp_host!,
-          port: parseInt(emailConfig.smtp_port!.toString()),
-          user: emailConfig.smtp_user!,
-          password: emailConfig.smtp_password!,
-          from: fromEmail,
-          fromName: fromName,
-          to: to,
-          subject: subject,
-          html: htmlWithSignature,
-          text: textWithSignature,
-        });
-        emailId = `smtp-${Date.now()}`;
-        emailStatus = "sent";
-        console.log("✅ Email sent successfully via SMTP");
-      } catch (error: any) {
-        console.error("❌ Error sending email via SMTP:", error);
-        // Si SMTP échoue, essayer Resend en fallback si disponible
-        if (RESEND_API_KEY) {
-          console.log("📧 Fallback vers Resend après échec SMTP");
-          try {
-            // Utiliser resendFromEmail pour Resend si le domaine original n'est pas vérifié
-            const resendEmailData = {
-              ...emailData,
-              from: fromName ? `${fromName} <${resendFromEmail}>` : resendFromEmail,
-            };
-            
-            // Ajouter Reply-To avec l'email original si différent
-            if (resendFromEmail !== fromEmail) {
-              resendEmailData.reply_to = fromEmail;
-              console.log(`📧 Reply-To configuré avec l'email original: ${fromEmail}`);
-            }
-            
-            const resendResponse = await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${RESEND_API_KEY}`,
-              },
-              body: JSON.stringify(resendEmailData),
-            });
+    const resendData = await resendResponse.json();
+    console.log("📧 Resend API response:", {
+      status: resendResponse.status,
+      ok: resendResponse.ok,
+      data: resendData,
+    });
 
-            const resendData = await resendResponse.json();
-            console.log("📧 Resend API response (fallback):", {
-              status: resendResponse.status,
-              ok: resendResponse.ok,
-              data: resendData,
-            });
-
-            if (!resendResponse.ok) {
-              let errorMsg = resendData.message || resendData.error?.message || "Failed to send email via Resend";
-              if (errorMsg.includes("domain is not verified") || errorMsg.includes("not verified")) {
-                errorMsg = `Le domaine de l'adresse email "${fromEmail}" n'est pas vérifié sur Resend. ` +
-                  `Options : 1) Vérifiez votre domaine sur https://resend.com/domains, ` +
-                  `2) Utilisez une adresse email d'un domaine vérifié, ` +
-                  `3) Vérifiez votre configuration SMTP (Gmail/Outlook nécessite un "App Password").`;
-              }
-              throw new Error(errorMsg);
-            }
-
-            emailId = resendData.id;
-            emailStatus = "sent";
-            console.log("✅ Email sent successfully via Resend (fallback):", emailId);
-            errorMessage = null; // Clear error since Resend succeeded
-          } catch (resendError: any) {
-            emailStatus = "failed";
-            errorMessage = `SMTP échoué: ${error?.message || "Unknown SMTP error"}. ` +
-              `Resend fallback échoué: ${resendError?.message || "Unknown Resend error"}. ` +
-              `Vérifiez votre configuration SMTP (Gmail/Outlook nécessite un "App Password") ou configurez Resend avec un domaine vérifié.`;
-          }
-        } else {
-          emailStatus = "failed";
-          errorMessage = error?.message || error?.toString() || "Unknown SMTP error";
-          // Si c'est l'erreur de non-implémentation, donner des instructions claires
-          if (errorMessage.includes("n'est pas encore implémenté") || errorMessage.includes("SMTP direct")) {
-            errorMessage = "L'envoi SMTP direct n'est pas encore disponible. " +
-              "Options : 1) Utilisez Resend avec votre propre domaine vérifié, " +
-              "2) Configurez Mailgun (MAILGUN_API_KEY et MAILGUN_DOMAIN), " +
-              "3) Utilisez l'API Gmail avec OAuth2 (à venir).";
-          }
-        }
+    if (!resendResponse.ok) {
+      let errorMsg = resendData.message || resendData.error?.message || "Failed to send email via Resend";
+      
+      // Message d'erreur plus clair
+      if (errorMsg.includes("only send testing emails to your own email address") || 
+          errorMsg.includes("testing emails to your own")) {
+        errorMsg = `⚠️ Mode test Resend : Vous ne pouvez envoyer qu'à votre propre adresse email (${user.email || "votre email"}). ` +
+          `Pour envoyer à d'autres destinataires : ` +
+          `1) Vérifiez un domaine sur https://resend.com/domains, ` +
+          `2) Utilisez une clé API de production (pas de test), ` +
+          `3) Ou configurez RESEND_FROM_EMAIL avec un domaine vérifié.`;
+      } else if (errorMsg.includes("domain is not verified") || errorMsg.includes("not verified")) {
+        errorMsg = `Le domaine de l'adresse email "${RESEND_FROM_EMAIL}" n'est pas vérifié sur Resend. ` +
+          `Options : 1) Vérifiez votre domaine sur https://resend.com/domains, ` +
+          `2) Utilisez onboarding@resend.dev (déjà configuré), ` +
+          `3) Configurez RESEND_FROM_EMAIL avec un domaine vérifié.`;
       }
-    } else if (RESEND_API_KEY) {
-      // Send email via Resend if API key is configured and no SMTP config
-      try {
-        console.log("📧 Envoi via Resend depuis:", resendFromEmail);
-        console.log("📧 Email original:", fromEmail);
-        console.log("📧 Email data:", JSON.stringify({
-          from: emailData.from,
-          to: emailData.to,
-          subject: emailData.subject,
-          hasHtml: !!emailData.html,
-          hasText: !!emailData.text,
-          replyTo: emailData.reply_to,
-        }));
-        
-        const resendResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${RESEND_API_KEY}`,
-          },
-          body: JSON.stringify(emailData),
-        });
-
-        const resendData = await resendResponse.json();
-        console.log("📧 Resend API response:", {
-          status: resendResponse.status,
-          ok: resendResponse.ok,
-          data: resendData,
-        });
-
-        if (!resendResponse.ok) {
-          let errorMsg = resendData.message || resendData.error?.message || "Failed to send email via Resend";
-          
-          // Message d'erreur plus clair pour les domaines non vérifiés
-          if (errorMsg.includes("domain is not verified") || errorMsg.includes("not verified")) {
-            errorMsg = `Le domaine de l'adresse email "${resendFromEmail}" n'est pas vérifié sur Resend. ` +
-              `Email original: ${fromEmail}. ` +
-              `Options : 1) Configurez FROM_EMAIL dans Supabase avec un domaine vérifié, ` +
-              `2) Vérifiez votre domaine sur https://resend.com/domains, ` +
-              `3) Assurez-vous que RESEND_API_KEY est configuré dans Supabase.`;
-            console.error(`❌ Resend error details:`, {
-              fromEmail,
-              resendFromEmail,
-              emailDataFrom: emailData.from,
-              resendResponse: resendData,
-            });
-          }
-          
-          console.error("❌ Resend API error:", errorMsg, resendData);
-          throw new Error(errorMsg);
+      
+      console.error("❌ Resend API error:", errorMsg, resendData);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMsg,
+          details: resendData,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: resendResponse.status || 500,
         }
-
-        emailId = resendData.id;
-        emailStatus = "sent";
-        console.log("✅ Email sent successfully via Resend:", emailId);
-      } catch (error: any) {
-        console.error("❌ Error sending email via Resend:", error);
-        emailStatus = "failed";
-        errorMessage = error?.message || error?.toString() || "Unknown error from Resend";
-        // Ne pas throw ici, on continue pour logger l'email en base
-      }
-    } else {
-      console.warn("⚠️ RESEND_API_KEY not configured. Email will be logged but not sent.");
-      emailStatus = "failed";
-      errorMessage = "RESEND_API_KEY not configured. Configurez Resend dans les variables d'environnement de Supabase.";
+      );
     }
+
+    const emailId = resendData.id;
+    console.log("✅ Email sent successfully via Resend:", emailId);
 
     // Log email message in database
     try {
-      await supabaseClient.from("email_messages").insert({
+      // Déterminer document_id et document_type
+      const document_id = quote_id || invoice_id || null;
+      const document_type = quote_id ? "quote" : invoice_id ? "invoice" : null;
+
+      const insertData: any = {
         user_id: user.id,
         recipient_email: to,
         subject,
         body_html: htmlWithSignature || null,
         body_text: textWithSignature || text || null,
         email_type: type,
-        status: emailStatus,
+        status: "sent",
         external_id: emailId,
-        error_message: errorMessage,
-        sent_at: emailStatus === "sent" ? new Date().toISOString() : null,
+        sent_at: new Date().toISOString(),
         invoice_id: invoice_id || null,
         quote_id: quote_id || null,
-      });
+      };
+
+      // Ajouter document_id si disponible (pour compatibilité avec la colonne)
+      if (document_id) {
+        insertData.document_id = document_id;
+      }
+      if (document_type) {
+        insertData.document_type = document_type;
+      }
+
+      const { error: insertError } = await supabaseClient
+        .from("email_messages")
+        .insert(insertData);
+
+      if (insertError) {
+        // Si document_id n'existe pas, essayer sans
+        if (insertError.message?.includes("document_id")) {
+          console.warn("⚠️ Colonne document_id manquante, insertion sans cette colonne");
+          const { document_id: _, document_type: __, ...dataWithoutDocId } = insertData;
+          await supabaseClient.from("email_messages").insert(dataWithoutDocId);
+        } else {
+          throw insertError;
+        }
+      } else {
+        console.log("✅ Email message enregistré dans email_messages");
+      }
     } catch (error) {
       console.warn("⚠️ Could not log email message:", error);
+      // Ne pas bloquer l'envoi si l'enregistrement échoue
     }
 
     // Update document status if invoice_id or quote_id provided
-    if (emailStatus === "sent") {
-      if (invoice_id) {
-        await supabaseClient
-          .from("invoices")
-          .update({
-            email_sent_at: new Date().toISOString(),
-            status: "sent",
-          })
-          .eq("id", invoice_id)
-          .eq("user_id", user.id);
-      } else if (quote_id) {
-        await supabaseClient
-          .from("ai_quotes")
-          .update({
-            email_sent_at: new Date().toISOString(),
-            status: "sent",
-          })
-          .eq("id", quote_id)
-          .eq("user_id", user.id);
-      }
-    }
-
-    // Si l'email a échoué, retourner une erreur 500 avec les détails
-    if (emailStatus === "failed") {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: errorMessage || "Email failed to send",
-          message: "L'envoi de l'email a échoué. Vérifiez votre configuration Resend ou SMTP.",
-          email_id: emailId,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        }
-      );
+    if (invoice_id) {
+      await supabaseClient
+        .from("invoices")
+        .update({
+          email_sent_at: new Date().toISOString(),
+          status: "sent",
+        })
+        .eq("id", invoice_id)
+        .eq("user_id", user.id);
+    } else if (quote_id) {
+      await supabaseClient
+        .from("ai_quotes")
+        .update({
+          email_sent_at: new Date().toISOString(),
+          status: "sent",
+        })
+        .eq("id", quote_id)
+        .eq("user_id", user.id);
     }
 
     return new Response(
@@ -541,19 +505,15 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("❌ Uncaught error in send-email Edge Function:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    const errorDetails = error?.details || error?.context || {};
     
     return new Response(
       JSON.stringify({
         error: errorMessage || "Failed to send email",
-        details: errorStack || errorDetails,
-        type: error?.name || typeof error,
+        details: error?.stack || {},
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: errorMessage.includes("Unauthorized") || errorMessage.includes("authorization") ? 401 : 
-                errorMessage.includes("Missing") || errorMessage.includes("Invalid") ? 400 : 500,
+        status: 500,
       }
     );
   }
@@ -603,72 +563,4 @@ function generateEmailSignatureText(settings: any): string {
   if (phone) signature += `Tél: ${phone}\n`;
   signature += "\nCe message et toutes les pièces jointes sont confidentiels.";
   return signature;
-}
-
-/**
- * Envoie un email via SMTP directement
- * Utilise Mailgun si configuré, sinon utilise une bibliothèque SMTP pour Deno
- */
-async function sendViaSMTP(params: {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  from: string;
-  fromName: string;
-  to: string;
-  subject: string;
-  html?: string;
-  text?: string;
-}): Promise<void> {
-  // Option 1 : Utiliser Mailgun (si configuré) - plus fiable pour l'envoi SMTP
-  const MAILGUN_API_KEY = Deno.env.get("MAILGUN_API_KEY");
-  const MAILGUN_DOMAIN = Deno.env.get("MAILGUN_DOMAIN");
-  
-  if (MAILGUN_API_KEY && MAILGUN_DOMAIN) {
-    try {
-      const formData = new FormData();
-      formData.append("from", params.fromName ? `${params.fromName} <${params.from}>` : params.from);
-      formData.append("to", params.to);
-      formData.append("subject", params.subject);
-      if (params.html) formData.append("html", params.html);
-      if (params.text) formData.append("text", params.text);
-      
-      const response = await fetch(`https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${btoa(`api:${MAILGUN_API_KEY}`)}`,
-        },
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Mailgun error: ${error}`);
-      }
-      
-      console.log("✅ Email sent via Mailgun");
-      return;
-    } catch (error: any) {
-      console.error("❌ Mailgun error:", error);
-      throw error;
-    }
-  }
-  
-  // Option 2 : Utiliser une bibliothèque SMTP pour Deno
-  // Note: Deno Edge Functions ne supportent pas directement les connexions TCP/SMTP
-  // Il faut utiliser un service proxy ou une API HTTP comme Mailgun ou Resend
-  
-  // Pour Gmail/Outlook, l'envoi SMTP direct n'est pas possible dans les Edge Functions
-  // Solutions recommandées :
-  // 1. Utiliser Mailgun (si configuré avec MAILGUN_API_KEY et MAILGUN_DOMAIN)
-  // 2. Utiliser Resend avec un domaine vérifié
-  // 3. Utiliser l'API Gmail avec OAuth2 (nécessite une implémentation supplémentaire)
-  
-  throw new Error(
-    "L'envoi SMTP direct n'est pas disponible dans les Edge Functions Deno. " +
-    "Pour utiliser Gmail/Outlook, configurez Mailgun (MAILGUN_API_KEY et MAILGUN_DOMAIN) " +
-    "ou utilisez Resend avec un domaine vérifié. " +
-    "Le système essaiera automatiquement Resend en fallback si configuré."
-  );
 }

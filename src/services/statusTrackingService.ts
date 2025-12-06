@@ -88,7 +88,20 @@ export const trackEmailSent = async (
 
   // Enregistrer l'événement dans email_messages si la table existe
   try {
-    const { error } = await supabase.from("email_messages").insert({
+    // Vérifier d'abord si la table existe en essayant une requête SELECT
+    const { error: checkError } = await supabase
+      .from("email_messages")
+      .select("id")
+      .limit(1);
+    
+    // Si la table n'existe pas, on ignore silencieusement
+    if (checkError && checkError.code === '42P01') {
+      console.log("ℹ️ Table email_messages n'existe pas encore, création ignorée");
+      return;
+    }
+
+    // Insérer l'enregistrement
+    const insertData: any = {
       user_id: session.user.id,
       recipient_email: recipientEmail,
       subject: emailSubject || `${documentType === "quote" ? "Devis" : "Facture"}`,
@@ -96,11 +109,30 @@ export const trackEmailSent = async (
       document_id: documentId,
       status: "sent",
       sent_at: new Date().toISOString(),
-    });
+    };
+
+    const { error } = await supabase.from("email_messages").insert(insertData);
     
     if (error) {
-      // Table peut ne pas exister ou avoir des contraintes différentes
-      console.warn("⚠️ Impossible d'enregistrer dans email_messages:", error);
+      // Si document_id n'existe pas, essayer sans
+      if (error.message?.includes("document_id")) {
+        console.warn("⚠️ Colonne document_id manquante, tentative sans cette colonne");
+        const { error: retryError } = await supabase.from("email_messages").insert({
+          user_id: session.user.id,
+          recipient_email: recipientEmail,
+          subject: emailSubject || `${documentType === "quote" ? "Devis" : "Facture"}`,
+          document_type: documentType,
+          status: "sent",
+          sent_at: new Date().toISOString(),
+        });
+        if (retryError) {
+          console.warn("⚠️ Impossible d'enregistrer dans email_messages:", retryError);
+        }
+      } else {
+        console.warn("⚠️ Impossible d'enregistrer dans email_messages:", error);
+      }
+    } else {
+      console.log("✅ Email message enregistré avec succès");
     }
   } catch (error) {
     // Table peut ne pas exister, on ignore l'erreur

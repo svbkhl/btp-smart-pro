@@ -48,20 +48,30 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
+          // Vérifier que les dates sont valides avant de les utiliser
+          const hasValidDates = startDate && endDate && 
+            startDate instanceof Date && 
+            endDate instanceof Date &&
+            !isNaN(startDate.getTime()) && 
+            !isNaN(endDate.getTime());
+
+          // Construire la requête de base
           let query = supabase
             .from("events")
-            .select(`
-              *,
-              projects (
-                name
-              )
-            `)
+            .select("*")
             .order("start_date", { ascending: true });
 
-          if (startDate && endDate) {
-            query = query
-              .gte("start_date", startDate.toISOString())
-              .lte("start_date", endDate.toISOString());
+          // Appliquer les filtres uniquement si les dates sont valides
+          if (hasValidDates) {
+            const startISO = startDate.toISOString();
+            const endISO = endDate.toISOString();
+            
+            // Vérifier que les dates ne sont pas undefined avant d'appliquer les filtres
+            if (startISO && endISO) {
+              query = query
+                .gte("start_date", startISO)
+                .lte("start_date", endISO);
+            }
           }
 
           const { data, error } = await query;
@@ -73,14 +83,35 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
             throw error;
           }
 
-          const events = (data || []).map((event: any) => ({
-            ...event,
-            project_name: event.projects?.name,
-          })) as Event[];
+          // Récupérer les noms de projets séparément si nécessaire
+          const eventsWithProjects = await Promise.all(
+            (data || []).map(async (event: any) => {
+              let project_name: string | undefined;
+              
+              if (event.project_id) {
+                try {
+                  const { data: project } = await supabase
+                    .from("projects")
+                    .select("name")
+                    .eq("id", event.project_id)
+                    .single();
+                  project_name = project?.name;
+                } catch (err) {
+                  // Ignorer les erreurs de récupération du projet
+                  console.warn("Erreur récupération projet:", err);
+                }
+              }
+              
+              return {
+                ...event,
+                project_name,
+              } as Event;
+            })
+          );
 
           // Retourner les vraies données (même si vide)
           // queryWithTimeout gère le fallback automatiquement
-          return events;
+          return eventsWithProjects;
         },
         FAKE_EVENTS,
         "useEvents"
@@ -106,16 +137,20 @@ export const useTodayEvents = () => {
           const tomorrow = new Date(today);
           tomorrow.setDate(tomorrow.getDate() + 1);
 
+          // Vérifier que les dates sont valides
+          const todayISO = today.toISOString();
+          const tomorrowISO = tomorrow.toISOString();
+
+          if (!todayISO || !tomorrowISO) {
+            console.error('Invalid date range for today events');
+            return [];
+          }
+
           const { data, error } = await supabase
             .from("events")
-            .select(`
-              *,
-              projects (
-                name
-              )
-            `)
-            .gte("start_date", today.toISOString())
-            .lt("start_date", tomorrow.toISOString())
+            .select("*")
+            .gte("start_date", todayISO)
+            .lt("start_date", tomorrowISO)
             .order("start_date", { ascending: true });
 
           if (error) {
@@ -125,10 +160,33 @@ export const useTodayEvents = () => {
             throw error;
           }
 
-          const events = (data || []).map((event: any) => ({
-            ...event,
-            project_name: event.projects?.name,
-          })) as Event[];
+          // Récupérer les noms de projets séparément si nécessaire
+          const eventsWithProjects = await Promise.all(
+            (data || []).map(async (event: any) => {
+              let project_name: string | undefined;
+              
+              if (event.project_id) {
+                try {
+                  const { data: project } = await supabase
+                    .from("projects")
+                    .select("name")
+                    .eq("id", event.project_id)
+                    .single();
+                  project_name = project?.name;
+                } catch (err) {
+                  // Ignorer les erreurs de récupération du projet
+                  console.warn("Erreur récupération projet:", err);
+                }
+              }
+              
+              return {
+                ...event,
+                project_name,
+              } as Event;
+            })
+          );
+
+          return eventsWithProjects;
 
           // Retourner les vraies données (même si vide)
           // queryWithTimeout gère le fallback automatiquement
@@ -159,14 +217,31 @@ export const useCreateEvent = () => {
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
+      // Nettoyer les données pour éviter les valeurs undefined
+      const cleanData: any = {
+        all_day: data.all_day ?? false,
+        type: data.type ?? "meeting",
+        color: data.color ?? "#3b82f6",
+      };
+
+      // Ajouter uniquement les champs définis
+      if (data.project_id) cleanData.project_id = data.project_id;
+      if (data.title) cleanData.title = data.title;
+      if (data.description) cleanData.description = data.description;
+      if (data.start_date) cleanData.start_date = data.start_date;
+      if (data.end_date) cleanData.end_date = data.end_date;
+      if (data.location) cleanData.location = data.location;
+      if (data.reminder_minutes !== undefined) cleanData.reminder_minutes = data.reminder_minutes;
+      if (data.reminder_recurring !== undefined) cleanData.reminder_recurring = data.reminder_recurring;
+
+      // Vérifier que start_date est présent et valide
+      if (!cleanData.start_date || typeof cleanData.start_date !== 'string') {
+        throw new Error('start_date is required and must be a valid ISO string');
+      }
+
       const { data: event, error } = await supabase
         .from("events")
-        .insert({
-          ...data,
-          all_day: data.all_day ?? false,
-          type: data.type ?? "meeting",
-          color: data.color ?? "#3b82f6",
-        })
+        .insert(cleanData)
         .select()
         .single();
 

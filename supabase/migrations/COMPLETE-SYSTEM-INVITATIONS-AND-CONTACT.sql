@@ -519,3 +519,9 @@ BEGIN
   RAISE NOTICE '✅ Triggers configurés';
 END $$;
 
+
+
+
+
+
+

@@ -24,10 +24,10 @@ export const DemoModeGuard = () => {
       
       // Désactiver le fake data UNIQUEMENT si l'utilisateur n'est PAS administrateur
       // Les administrateurs peuvent activer le mode démo manuellement
-      if (fakeDataEnabled && userRole !== 'administrateur') {
+      if (fakeDataEnabled && userRole !== 'admin') {
         console.log("🔒 Désactivation du mode fake data - Utilisateur non-admin connecté");
         setFakeDataEnabled(false);
-      } else if (fakeDataEnabled && userRole === 'administrateur') {
+      } else if (fakeDataEnabled && userRole === 'admin') {
         console.log("✅ Mode démo maintenu - Utilisateur administrateur");
       }
     }

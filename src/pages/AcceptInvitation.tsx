@@ -128,7 +128,7 @@ const AcceptInvitation = () => {
           data: {
             nom,
             prenom,
-            statut: invitation.role === 'owner' ? 'dirigeant' : 'salarie',
+            statut: invitation.role === 'owner' ? 'admin' : 'member',
             full_name: `${prenom} ${nom}`,
           },
         },
@@ -203,14 +203,14 @@ const AcceptInvitation = () => {
 
   if (error || !invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/5 p-4">
-        <GlassCard className="p-12 max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/5 p-3 sm:p-4">
+        <GlassCard className="p-6 sm:p-8 md:p-12 max-w-md w-full">
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-6">
               <XCircle className="h-16 w-16 text-red-500" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold">Invitation invalide</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">Invitation invalide</h1>
               <p className="text-muted-foreground">
                 {error || 'Cette invitation n\'existe pas ou a expiré'}
               </p>
@@ -225,8 +225,8 @@ const AcceptInvitation = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/5 p-4">
-      <GlassCard className="p-8 max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/5 p-3 sm:p-4">
+      <GlassCard className="p-4 sm:p-6 md:p-8 max-w-md w-full">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -237,7 +237,7 @@ const AcceptInvitation = () => {
             <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-4 w-16 h-16 mx-auto flex items-center justify-center">
               <Mail className="h-8 w-8 text-green-500" />
             </div>
-            <h1 className="text-2xl font-bold">Invitation reçue</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Invitation reçue</h1>
             <p className="text-muted-foreground">
               Vous avez été invité à rejoindre <strong>{invitation.companies?.name}</strong>
             </p>
@@ -258,7 +258,7 @@ const AcceptInvitation = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="prenom">Prénom *</Label>
                 <Input
@@ -337,4 +337,5 @@ const AcceptInvitation = () => {
 };
 
 export default AcceptInvitation;
+
 

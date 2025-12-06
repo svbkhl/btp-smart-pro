@@ -12,22 +12,22 @@ interface DownloadInvoicePDFParams {
  * Formate un montant en euros (format professionnel sans espaces ni caractères spéciaux)
  */
 function formatCurrency(amount: number | undefined): string {
-  if (!amount && amount !== 0) return '0,00€';
+  if (!amount && amount !== 0) return '0,00 €';
   // S'assurer que c'est un nombre valide
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(numAmount)) return '0,00€';
+  if (isNaN(numAmount)) return '0,00 €';
   
-  // Formater manuellement pour un format professionnel : 1234,56€ (sans espaces)
+  // Formater manuellement pour un format professionnel : 1234,56 € (sans slash)
   const fixed = numAmount.toFixed(2);
   const parts = fixed.split('.');
   const integerPart = parts[0];
   const decimalPart = parts[1] || '00';
   
   // Ajouter les séparateurs de milliers (espaces) mais seulement pour les grands nombres
-  // Format français : 1 234,56€ (avec espace pour les milliers, virgule pour les décimales)
+  // Format français : 1 234,56 € (avec espace pour les milliers, virgule pour les décimales, pas de slash)
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   
-  return `${formattedInteger},${decimalPart}€`;
+  return `${formattedInteger},${decimalPart} €`;
 }
 
 /**

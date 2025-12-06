@@ -1,9 +1,8 @@
 /**
  * Invite User Dialog
  * 
- * Composant pour inviter un utilisateur (dirigeant ou employé) à rejoindre une entreprise
- * Utilisé par l'admin pour inviter des dirigeants
- * Utilisé par les dirigeants pour inviter des employés
+ * Composant pour inviter un utilisateur à rejoindre une entreprise
+ * Utilisé par l'admin pour inviter des membres
  */
 
 import { useState } from 'react';
@@ -29,6 +28,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Mail, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface InviteUserDialogProps {
   companyId: string;
@@ -46,15 +46,20 @@ export const InviteUserDialog = ({
   onSuccess,
 }: InviteUserDialogProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'owner' | 'admin' | 'member'>(defaultRole);
 
+  // Vérifier que companyId est chargé avant de permettre l'ouverture du dialog
+  const isCompanyIdReady = companyId && companyId.trim() !== '';
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !email.includes('@')) {
+    // Validation email
+    if (!email || email.trim() === '' || !email.includes('@') || !email.includes('.')) {
       toast({
         title: 'Erreur',
         description: 'Veuillez entrer un email valide',
@@ -66,32 +71,60 @@ export const InviteUserDialog = ({
     setLoading(true);
 
     try {
+      // Appeler UNIQUEMENT l'Edge Function avec l'email
       const { data, error } = await supabase.functions.invoke('send-invitation', {
-        body: {
-          email,
-          company_id: companyId,
-          role,
-        },
+        body: { email: email.trim().toLowerCase() },
       });
 
       if (error) {
-        throw error;
+        // Extraire le message d'erreur
+        let errorMessage = error.message || 'Impossible d\'envoyer l\'invitation';
+        
+        // Si l'erreur contient un body JSON avec un message d'erreur
+        if (error.context?.body) {
+          try {
+            const errorBody = typeof error.context.body === 'string' 
+              ? JSON.parse(error.context.body) 
+              : error.context.body;
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Ignorer l'erreur de parsing
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      toast({
-        title: 'Invitation envoyée',
-        description: `Une invitation a été envoyée à ${email}`,
-      });
+      // Vérifier la réponse
+      if (data?.success === true || data?.error) {
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // Succès
+        toast({
+          title: '✅ Invitation envoyée avec succès',
+          description: `Une invitation a été envoyée à ${email}`,
+          duration: 5000,
+        });
 
-      setEmail('');
-      setOpen(false);
-      onSuccess?.();
+        setEmail('');
+        setOpen(false);
+        onSuccess?.();
+      } else {
+        throw new Error('Réponse inattendue de la fonction');
+      }
     } catch (error: any) {
-      console.error('Error sending invitation:', error);
+      console.error('❌ Error sending invitation:', error);
+      
+      // Toast d'erreur avec le message exact
       toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible d\'envoyer l\'invitation',
+        title: '❌ Erreur',
+        description: error.message || 'Impossible d\'envoyer l\'invitation. Veuillez réessayer.',
         variant: 'destructive',
+        duration: 5000,
       });
     } finally {
       setLoading(false);
@@ -138,13 +171,13 @@ export const InviteUserDialog = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="owner">Dirigeant (Owner)</SelectItem>
+                <SelectItem value="owner">Propriétaire (Owner)</SelectItem>
                 <SelectItem value="admin">Administrateur (Admin)</SelectItem>
-                <SelectItem value="member">Membre (Employé)</SelectItem>
+                <SelectItem value="member">Membre (Member)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {role === 'owner' && 'Le dirigeant aura tous les droits sur l\'entreprise'}
+              {role === 'owner' && 'Le propriétaire aura tous les droits sur l\'entreprise'}
               {role === 'admin' && 'L\'administrateur pourra gérer les utilisateurs et les paramètres'}
               {role === 'member' && 'Le membre aura un accès standard à l\'application'}
             </p>
@@ -179,4 +212,5 @@ export const InviteUserDialog = ({
     </Dialog>
   );
 };
+
 

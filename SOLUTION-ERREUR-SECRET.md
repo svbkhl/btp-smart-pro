@@ -113,3 +113,9 @@ Si tu as plusieurs variables avec le même problème :
 
 **🎯 Résumé** : Supprime la variable et recrée-la avec la valeur directe (sans @, sans guillemets, sans espaces).
 
+
+
+
+
+
+

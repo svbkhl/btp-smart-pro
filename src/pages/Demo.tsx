@@ -41,7 +41,7 @@ const Demo = () => {
     console.log("🎮 Activation du mode fake data pour la page Demo");
     
     // Si l'utilisateur est connecté mais n'est pas administrateur, rediriger vers le dashboard réel
-    if (user && userRole !== 'administrateur') {
+    if (user && userRole !== 'admin') {
       console.log("🔒 Utilisateur connecté (non-admin) détecté - Redirection vers dashboard réel");
       setFakeDataEnabled(false);
       navigate("/dashboard", { replace: true });
@@ -51,7 +51,7 @@ const Demo = () => {
     // Activer le mode démo seulement si :
     // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
     // 2. OU l'utilisateur est administrateur (démo dans l'app)
-    if (!user || userRole === 'administrateur') {
+    if (!user || userRole === 'admin') {
       setFakeDataEnabled(true);
     }
 
@@ -256,7 +256,7 @@ const Demo = () => {
   }, [invoices, projects]);
 
   // Si l'utilisateur est connecté (non-admin), ne pas afficher la page Demo
-  if (user && userRole !== 'administrateur') {
+  if (user && userRole !== 'admin') {
     return null;
   }
 

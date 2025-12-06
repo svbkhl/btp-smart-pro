@@ -11,27 +11,23 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 
 const roleLabels: Record<UserRole, string> = {
-  salarie: "Salarié",
-  dirigeant: "Dirigeant",
-  administrateur: "Administrateur",
+  member: "Membre",
+  admin: "Administrateur",
 };
 
 const roleIcons: Record<UserRole, typeof User> = {
-  salarie: User,
-  dirigeant: Briefcase,
-  administrateur: Crown,
+  member: User,
+  admin: Crown,
 };
 
 const roleDescriptions: Record<UserRole, string> = {
-  salarie: "Accès limité aux fonctionnalités de base",
-  dirigeant: "Accès complet aux fonctionnalités de gestion",
-  administrateur: "Accès complet à toutes les fonctionnalités, y compris la gestion des utilisateurs",
+  member: "Accès limité aux fonctionnalités de base",
+  admin: "Accès complet à toutes les fonctionnalités, y compris la gestion des utilisateurs et des entreprises",
 };
 
 const roleColors: Record<UserRole, string> = {
-  salarie: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-  dirigeant: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
-  administrateur: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
+  member: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+  admin: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
 };
 
 export const RolesAndPermissionsSettings = () => {
@@ -45,7 +41,7 @@ export const RolesAndPermissionsSettings = () => {
   // Vérifier si l'utilisateur peut gérer les rôles
   // Utiliser isAdmin de useAuth OU le rôle de la table user_roles
   const userRole = currentUserRole?.role;
-  const canManageRoles = isAdmin || userRole === "administrateur" || userRole === "dirigeant";
+  const canManageRoles = isAdmin || userRole === "admin";
 
   // Afficher un loader pendant le chargement du rôle
   if (isLoadingRole) {
@@ -67,7 +63,7 @@ export const RolesAndPermissionsSettings = () => {
           <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-xl font-semibold mb-2">Accès restreint</h3>
           <p className="text-muted-foreground">
-            Seuls les administrateurs et dirigeants peuvent gérer les rôles et permissions.
+            Seuls les administrateurs peuvent gérer les rôles et permissions.
           </p>
         </div>
       </GlassCard>
@@ -137,7 +133,7 @@ export const RolesAndPermissionsSettings = () => {
 
         {/* Informations sur les rôles */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {(["salarie", "dirigeant", "administrateur"] as UserRole[]).map((role) => {
+          {(["member", "admin"] as UserRole[]).map((role) => {
             const Icon = roleIcons[role];
             return (
               <div
@@ -203,15 +199,14 @@ export const RolesAndPermissionsSettings = () => {
                       <Select
                         value={currentRole}
                         onValueChange={(value) => handleRoleChange(userRole.user_id, value as UserRole)}
-                        disabled={isCurrentUser && currentUserRole?.role !== "administrateur"}
+                        disabled={isCurrentUser && currentUserRole?.role !== "admin"}
                       >
                         <SelectTrigger className="w-[140px] rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="salarie">Salarié</SelectItem>
-                          <SelectItem value="dirigeant">Dirigeant</SelectItem>
-                          <SelectItem value="administrateur">Administrateur</SelectItem>
+                          <SelectItem value="member">Membre</SelectItem>
+                          <SelectItem value="admin">Administrateur</SelectItem>
                         </SelectContent>
                       </Select>
 

@@ -22,7 +22,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     // Si l'utilisateur est connecté et le mode démo est activé
     if (user && fakeDataEnabled && !loading) {
       // Si l'utilisateur n'est pas administrateur, désactiver le mode démo
-      if (userRole !== 'administrateur') {
+      if (userRole !== 'admin') {
         console.log("🔒 Utilisateur non-admin détecté - Désactivation du mode démo");
         setFakeDataEnabled(false);
       }
@@ -76,7 +76,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
       return <>{children}</>;
     }
     // Si l'utilisateur est connecté et est administrateur, permettre l'accès
-    if (user && userRole === 'administrateur') {
+    if (user && userRole === 'admin') {
       return <>{children}</>;
     }
     // Si l'utilisateur est connecté mais n'est pas administrateur, continuer avec la vérification normale

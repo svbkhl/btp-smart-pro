@@ -54,30 +54,57 @@ export const SendToClientModal = ({
 
     let clientEmail = "";
 
-    // 1. Essayer d'abord depuis le document directement
+    // 1. Essayer d'abord depuis le document directement (client_email)
     if (document.client_email) {
       clientEmail = document.client_email;
+      console.log("📧 [SendToClientModal] Email trouvé dans document.client_email:", clientEmail);
     }
-    // 2. Sinon, chercher dans la liste des clients via client_id
+    // 2. Chercher dans la liste des clients via client_id
     else if (document.client_id && clients && clients.length > 0) {
       const client = clients.find(c => c.id === document.client_id);
       if (client?.email) {
         clientEmail = client.email;
+        console.log("📧 [SendToClientModal] Email trouvé via client_id:", clientEmail);
       }
     }
-    // 3. Sinon, essayer depuis les détails du document (pour les devis)
+    // 3. Chercher par nom de client si client_name est disponible
+    else if (document.client_name && clients && clients.length > 0) {
+      const client = clients.find(c => 
+        c.name?.toLowerCase() === document.client_name?.toLowerCase() ||
+        c.name?.toLowerCase().includes(document.client_name?.toLowerCase() || "")
+      );
+      if (client?.email) {
+        clientEmail = client.email;
+        console.log("📧 [SendToClientModal] Email trouvé via client_name:", clientEmail);
+      }
+    }
+    // 4. Essayer depuis les détails du document (pour les devis)
     else if (document.details && typeof document.details === 'object') {
       const details = document.details as any;
       if (details.clientEmail) {
         clientEmail = details.clientEmail;
+        console.log("📧 [SendToClientModal] Email trouvé dans details.clientEmail:", clientEmail);
       } else if (details.client?.email) {
         clientEmail = details.client.email;
+        console.log("📧 [SendToClientModal] Email trouvé dans details.client.email:", clientEmail);
+      }
+    }
+    // 5. Pour les devis, chercher dans client_name si c'est un email valide
+    else if (document.client_name && document.client_name.includes("@")) {
+      // Si client_name contient un @, c'est peut-être un email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(document.client_name)) {
+        clientEmail = document.client_name;
+        console.log("📧 [SendToClientModal] Email trouvé dans client_name (format email):", clientEmail);
       }
     }
 
     // Mettre à jour l'email quand le modal s'ouvre ou quand le document change
     if (clientEmail) {
       setEmail(clientEmail);
+      console.log("✅ [SendToClientModal] Email pré-rempli:", clientEmail);
+    } else {
+      console.log("⚠️ [SendToClientModal] Aucun email trouvé pour le client");
     }
   }, [open, document, clients]);
 
@@ -185,9 +212,10 @@ export const SendToClientModal = ({
         });
       }
 
-      // Marquer comme envoyé
+      // Marquer comme envoyé (l'Edge Function enregistre déjà dans email_messages)
       await trackEmailSent(documentType, document.id, email, `${documentType === "quote" ? "Devis" : "Facture"} ${document.quote_number || document.invoice_number}`);
 
+      // Notification de succès immédiate
       toast({
         title: "✅ Email envoyé avec succès",
         description: `Le ${documentType === "quote" ? "devis" : "facture"} ${document.quote_number || document.invoice_number} a été envoyé avec succès à ${email}${includePDF ? " (PDF inclus)" : ""}${includeSignatureLink && signatureUrl ? " (lien de signature inclus)" : ""}`,
@@ -198,10 +226,13 @@ export const SendToClientModal = ({
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error sending email:", error);
+      
+      // Notification d'erreur immédiate
       toast({
-        title: "Erreur",
-        description: error.message || "Impossible d'envoyer l'email",
+        title: "❌ Erreur d'envoi",
+        description: error.message || "Impossible d'envoyer l'email. Veuillez réessayer.",
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setLoading(false);

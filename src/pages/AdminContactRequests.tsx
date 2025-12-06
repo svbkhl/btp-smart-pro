@@ -154,17 +154,26 @@ const AdminContactRequests = () => {
         },
       });
 
-      // Envoyer l'invitation
+      // Récupérer la session pour obtenir l'utilisateur
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        throw new Error('Vous devez être connecté pour envoyer une invitation');
+      }
+
+      // Envoyer l'invitation (uniquement avec l'email)
       const { data, error: inviteError } = await supabase.functions.invoke('send-invitation', {
         body: {
           email: request.email,
-          company_id: company.id,
-          role: 'owner',
         },
       });
 
       if (inviteError) {
-        throw inviteError;
+        const errorMessage = inviteError.message || inviteError.error || 'Impossible d\'envoyer l\'invitation';
+        throw new Error(errorMessage);
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Impossible d\'envoyer l\'invitation');
       }
 
       // Mettre à jour le statut de la demande
@@ -177,13 +186,20 @@ const AdminContactRequests = () => {
       });
 
       toast({
-        title: 'Entreprise créée et invitation envoyée !',
+        title: '✅ Invitation envoyée avec succès',
         description: `L'entreprise "${request.entreprise}" a été créée et une invitation a été envoyée à ${request.email}`,
+        duration: 5000,
       });
     } catch (error: any) {
       console.error('Error creating company and sending invitation:', error);
+      
+      const errorMessage = error?.message || error?.error || 'Impossible d\'envoyer l\'invitation. Veuillez réessayer.';
+      
       toast({
-        title: 'Erreur',
+        title: '❌ Erreur',
+        description: errorMessage,
+        variant: 'destructive',
+        duration: 5000,
         description: error.message || 'Impossible de créer l\'entreprise et d\'envoyer l\'invitation',
         variant: 'destructive',
       });

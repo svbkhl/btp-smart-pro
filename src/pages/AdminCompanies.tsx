@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { useAllCompanies, useUpdateCompany, useCreateCompany, Company } from "@/hooks/useCompany";
+import { useAllCompanies, useUpdateCompany, useCreateCompany, useDeleteCompany, Company } from "@/hooks/useCompany";
 import { ALL_FEATURES, SUPPORT_LEVELS } from "@/utils/companyFeatures";
-import { Loader2, Building2, Save, Plus, Edit, Mail } from "lucide-react";
+import { Loader2, Building2, Save, Plus, Edit, Mail, Trash2, AlertTriangle } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +30,13 @@ const AdminCompanies = () => {
   const { data: companies = [], isLoading, error } = useAllCompanies();
   const updateCompany = useUpdateCompany();
   const createCompany = useCreateCompany();
+  const deleteCompany = useDeleteCompany();
   const { toast } = useToast();
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newCompanyData, setNewCompanyData] = useState({
     name: "",
     plan: "custom" as Company["plan"],
@@ -104,6 +109,43 @@ const AdminCompanies = () => {
       [featureKey]: !currentFeatures[featureKey],
     };
     handleSaveCompany(company, { features: newFeatures });
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!companyToDelete) return;
+
+    // Vérifier que le texte de confirmation correspond
+    if (deleteConfirmationText !== companyToDelete.name) {
+      toast({
+        title: "Erreur de confirmation",
+        description: "Le nom de l'entreprise ne correspond pas. Veuillez réessayer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await deleteCompany.mutateAsync(companyToDelete.id);
+      toast({
+        title: "Entreprise supprimée",
+        description: `L'entreprise "${companyToDelete.name}" a été supprimée avec succès.`,
+      });
+      setIsDeleteDialogOpen(false);
+      setCompanyToDelete(null);
+      setDeleteConfirmationText("");
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer l'entreprise",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openDeleteDialog = (company: Company) => {
+    setCompanyToDelete(company);
+    setDeleteConfirmationText("");
+    setIsDeleteDialogOpen(true);
   };
 
   if (isLoading) {
@@ -385,6 +427,80 @@ const AdminCompanies = () => {
         </Dialog>
       </div>
 
+      {/* Dialog de suppression avec double confirmation */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Supprimer l'entreprise
+            </DialogTitle>
+            <DialogDescription>
+              Cette action est irréversible. Toutes les données associées à cette entreprise seront supprimées.
+            </DialogDescription>
+          </DialogHeader>
+
+          {companyToDelete && (
+            <div className="space-y-4">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Attention !</AlertTitle>
+                <AlertDescription>
+                  Vous êtes sur le point de supprimer définitivement l'entreprise <strong>{companyToDelete.name}</strong>.
+                  Cette action ne peut pas être annulée.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="delete-confirmation">
+                  Pour confirmer, tapez le nom de l'entreprise : <strong>{companyToDelete.name}</strong>
+                </Label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder={companyToDelete.name}
+                  className="rounded-xl"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDeleteDialogOpen(false);
+                    setCompanyToDelete(null);
+                    setDeleteConfirmationText("");
+                  }}
+                  disabled={deleteCompany.isPending}
+                  className="rounded-xl"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteCompany}
+                  disabled={deleteCompany.isPending || deleteConfirmationText !== companyToDelete.name}
+                  className="gap-2 rounded-xl"
+                >
+                  {deleteCompany.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Suppression...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Supprimer définitivement
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 gap-4">
         {companiesList.length > 0 ? (
           companiesList.map((company) => (
@@ -427,6 +543,14 @@ const AdminCompanies = () => {
                       className="rounded-xl"
                     >
                       <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => openDeleteDialog(company)}
+                      className="rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

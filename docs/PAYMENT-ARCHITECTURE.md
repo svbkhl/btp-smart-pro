@@ -134,3 +134,9 @@ Chaque adapter doit être testable indépendamment :
 - Tests d'intégration avec les APIs mockées
 - Tests end-to-end avec les vrais providers (en staging)
 
+
+
+
+
+
+

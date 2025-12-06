@@ -94,3 +94,9 @@ Avant de déployer, vérifie que tu as bien ces variables :
 
 **🎯 Résumé** : Dans le champ, mets `main` (pas l'URL GitHub), mais vérifie d'abord que tes variables d'environnement sont bien configurées !
 
+
+
+
+
+
+

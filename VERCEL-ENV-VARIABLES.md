@@ -198,3 +198,9 @@ Pour que l'application fonctionne, tu dois **au minimum** ajouter :
 
 Tu peux d'abord déployer avec **juste les 3 variables Supabase**, puis ajouter les autres progressivement selon tes besoins.
 
+
+
+
+
+
+

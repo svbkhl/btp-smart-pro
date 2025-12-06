@@ -25,6 +25,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useCompany } from "@/hooks/useCompany";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const RHEmployees = () => {
   const { user } = useAuth();

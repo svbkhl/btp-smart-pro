@@ -275,3 +275,9 @@ export class StancerAdapter implements IPaymentProvider {
   }
 }
 
+
+
+
+
+
+

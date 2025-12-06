@@ -85,3 +85,9 @@ export interface IPaymentProvider {
   isConfigured(): boolean;
 }
 
+
+
+
+
+
+

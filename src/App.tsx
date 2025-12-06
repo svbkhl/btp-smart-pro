@@ -16,6 +16,8 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentError from './pages/PaymentError';
 import PaymentFinal from './pages/PaymentFinal';
 import SignatureQuote from './pages/SignatureQuote';
+import Signature from './pages/Signature';
+import SignaturePage from './pages/SignaturePage';
 
 // Pages protégées
 import Dashboard from './pages/Dashboard';
@@ -28,6 +30,7 @@ import Calendar from './pages/Calendar';
 import MyPlanning from './pages/MyPlanning';
 import EmployeesPlanning from './pages/EmployeesPlanning';
 import Mailbox from './pages/Mailbox';
+import Messaging from './pages/Messaging';
 import AI from './pages/AI';
 import Settings from './pages/Settings';
 import CompleteProfile from './pages/CompleteProfile';
@@ -60,7 +63,9 @@ function App() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/demo" element={<Demo />} />
+        <Route path="/sign/:quoteId" element={<SignaturePage />} />
         <Route path="/signature/:quoteId" element={<PublicSignature />} />
+        <Route path="/signature/:id" element={<Signature />} />
         <Route path="/candidature/:id" element={<PublicCandidature />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/payment/error" element={<PaymentError />} />
@@ -153,6 +158,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Mailbox />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messaging"
+          element={
+            <ProtectedRoute>
+              <Messaging />
             </ProtectedRoute>
           }
         />

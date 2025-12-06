@@ -60,3 +60,9 @@ Ensuite, quand Git te demande ton mot de passe, utilise le **token** à la place
 
 Après avoir push, exécute le script SQL `supabase/INSTALL-COMPLETE-SYSTEM.sql` dans Supabase SQL Editor pour créer toutes les tables !
 
+
+
+
+
+
+

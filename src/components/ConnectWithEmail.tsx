@@ -261,11 +261,42 @@ export const ConnectWithEmail = () => {
     }
   };
 
+  const handleEmailTypeChange = async (value: "gmail" | "outlook" | "smtp") => {
+    // Si un compte est déjà connecté et qu'on change de provider, déconnecter l'utilisateur
+    if (connected && value !== emailType) {
+      const confirmed = window.confirm(
+        "Changer de type de compte email nécessite une déconnexion. Voulez-vous continuer ?"
+      );
+      
+      if (!confirmed) {
+        return; // Annuler le changement
+      }
+      
+      // Déconnecter l'utilisateur de l'application
+      await supabase.auth.signOut();
+      
+      toast({
+        title: "Déconnexion",
+        description: "Vous avez été déconnecté. Veuillez vous reconnecter pour continuer.",
+      });
+      
+      // Rediriger vers la page de connexion après un court délai
+      setTimeout(() => {
+        window.location.href = "/auth";
+      }, 1000);
+      
+      return;
+    }
+    
+    // Sinon, simplement changer le type
+    setEmailType(value);
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Type de compte email</Label>
-        <Select value={emailType} onValueChange={(value: any) => setEmailType(value)}>
+        <Select value={emailType} onValueChange={handleEmailTypeChange}>
           <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
             <SelectValue />
           </SelectTrigger>

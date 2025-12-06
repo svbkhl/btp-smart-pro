@@ -341,3 +341,9 @@ COMMENT ON FUNCTION get_support_level(UUID) IS 'Retourne le niveau de support d'
 
 
 
+
+
+
+
+
+

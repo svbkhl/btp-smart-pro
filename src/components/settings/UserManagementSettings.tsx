@@ -60,7 +60,7 @@ export const UserManagementSettings = () => {
           <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
             <h3 className="font-semibold mb-2">Rôles et permissions</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Configurez les rôles (dirigeant, salarié, administrateur) et leurs permissions
+              Configurez les rôles (admin, member) et leurs permissions
             </p>
             <p className="text-xs text-muted-foreground">
               Fonctionnalité en cours de développement
@@ -71,6 +71,7 @@ export const UserManagementSettings = () => {
     </motion.div>
   );
 };
+
 
 
 

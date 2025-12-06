@@ -36,37 +36,51 @@ export interface CompanyUser {
 }
 
 /**
- * Récupère la company de l'utilisateur connecté
+ * Récupère toutes les companies de l'utilisateur connecté
  */
-export const useCompany = () => {
+export const useCompanies = () => {
   const { user } = useAuth();
 
-  return useQuery<Company | null, Error>({
-    queryKey: ["company", user?.id],
+  return useQuery<Company[], Error>({
+    queryKey: ["companies", user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user) return [];
 
-      // Récupérer la company_id de l'utilisateur
-      const { data: companyUser, error: companyUserError } = await supabase
+      // Récupérer toutes les companies de l'utilisateur
+      const { data: companyUsers, error: companyUserError } = await supabase
         .from("company_users")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .single();
+        .select("company_id, role")
+        .eq("user_id", user.id);
 
-      if (companyUserError || !companyUser) {
-        console.warn("⚠️ User has no company assigned");
-        return null;
+      // Gérer le cas où la table n'existe pas ou erreur RLS
+      if (companyUserError) {
+        if (
+          companyUserError.code === "42P01" ||
+          companyUserError.message?.includes("does not exist") ||
+          companyUserError.message?.includes("relation") ||
+          companyUserError.code === "42501"
+        ) {
+          console.warn("⚠️ Table company_users n'existe pas ou erreur RLS. Exécutez COMPLETE-COMPANIES-SYSTEM-REBUILD.sql");
+          return [];
+        }
+        console.warn("⚠️ Erreur lors de la récupération des companies:", companyUserError);
+        return [];
       }
 
-      // Récupérer les détails de la company
-      const { data: company, error: companyError } = await supabase
+      if (!companyUsers || companyUsers.length === 0) {
+        // L'utilisateur n'a pas de company assignée, ce n'est pas une erreur
+        return [];
+      }
+
+      // Récupérer les détails de toutes les companies
+      const companyIds = companyUsers.map(cu => cu.company_id);
+      const { data: companies, error: companyError } = await supabase
         .from("companies")
         .select("*")
-        .eq("id", companyUser.company_id)
-        .single();
+        .in("id", companyIds);
 
       if (companyError) {
-        // Si la table n'existe pas, retourner null gracieusement
+        // Si la table n'existe pas, retourner un tableau vide gracieusement
         if (
           companyError.code === "42P01" ||
           companyError.message?.includes("does not exist") ||
@@ -74,16 +88,24 @@ export const useCompany = () => {
           companyError.code === "PGRST116"
         ) {
           console.warn("⚠️ Table companies n'existe pas encore");
-          return null;
+          return [];
         }
-        console.error("❌ Error fetching company:", companyError);
+        console.error("❌ Error fetching companies:", companyError);
         throw companyError;
       }
 
-      return company as Company;
+      return (companies || []) as Company[];
     },
     enabled: !!user,
   });
+};
+
+/**
+ * Récupère la première company de l'utilisateur connecté (pour compatibilité)
+ */
+export const useCompany = () => {
+  const { data: companies } = useCompanies();
+  return { data: companies && companies.length > 0 ? companies[0] : null };
 };
 
 /**
@@ -219,10 +241,14 @@ export const useCreateCompany = () => {
         status: "active",
       });
 
+      // Récupérer l'utilisateur actuel pour définir owner_id
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase
         .from("companies")
         .insert({
           name: companyData.name,
+          owner_id: currentUser?.id || null,
           plan: companyData.plan || "custom",
           features: companyData.features || {},
           settings: companyData.settings || {},
@@ -237,9 +263,10 @@ export const useCreateCompany = () => {
         if (
           error.code === "42P01" ||
           error.message?.includes("does not exist") ||
-          error.message?.includes("relation")
+          error.message?.includes("relation") ||
+          error.message?.includes("La table companies n'existe pas")
         ) {
-          throw new Error("La table companies n'existe pas encore. Exécutez le script CREATE-COMPANIES-SYSTEM.sql dans Supabase.");
+          throw new Error("La table companies n'existe pas encore. Veuillez exécuter le script FIX-ALL-TABLES-URGENT.sql dans Supabase Dashboard → SQL Editor.");
         }
         // Vérifier si c'est une erreur RLS
         if (error.code === "42501" || error.message?.includes("permission denied") || error.message?.includes("new row violates")) {
@@ -255,6 +282,46 @@ export const useCreateCompany = () => {
       return data as Company;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all_companies"] });
+    },
+  });
+};
+
+/**
+ * Supprime une company (admin seulement)
+ */
+export const useDeleteCompany = () => {
+  const queryClient = useQueryClient();
+  const { user, isAdmin } = useAuth();
+
+  return useMutation({
+    mutationFn: async (companyId: string) => {
+      if (!user || !isAdmin) {
+        throw new Error("Unauthorized");
+      }
+
+      const { error } = await supabase
+        .from("companies")
+        .delete()
+        .eq("id", companyId);
+
+      if (error) {
+        // Vérifier si la table n'existe pas
+        if (
+          error.code === "42P01" ||
+          error.message?.includes("does not exist") ||
+          error.message?.includes("relation")
+        ) {
+          throw new Error("La table companies n'existe pas encore. Exécutez le script CREATE-COMPANIES-SYSTEM.sql dans Supabase.");
+        }
+        console.error("❌ Error deleting company:", error);
+        throw error;
+      }
+
+      return companyId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company"] });
       queryClient.invalidateQueries({ queryKey: ["all_companies"] });
     },
   });

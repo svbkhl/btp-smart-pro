@@ -3,7 +3,7 @@ import { PageLayout } from "@/components/layout/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useInvoices } from "@/hooks/useInvoices";
-import { usePayments } from "@/hooks/usePayments";
+import { usePaymentsQuery } from "@/hooks/usePaymentsQuery";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { KPIBlock } from "@/components/ui/KPIBlock";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ const Facturation = () => {
   const navigate = useNavigate();
   const { data: quotes = [], isLoading: quotesLoading } = useQuotes();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
-  const { data: payments = [], isLoading: paymentsLoading } = usePayments();
+  const { data: payments = [], isLoading: paymentsLoading } = usePaymentsQuery();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedQuote, setSelectedQuote] = useState<any>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);

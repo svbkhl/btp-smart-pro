@@ -7,7 +7,7 @@ import { QuotesTable } from "@/components/billing/QuotesTable";
 import { InvoicesTable } from "@/components/billing/InvoicesTable";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useInvoices } from "@/hooks/useInvoices";
-import { usePayments } from "@/hooks/usePayments";
+import { usePaymentsQuery } from "@/hooks/usePaymentsQuery";
 import { 
   FileText, 
   Receipt, 
@@ -32,7 +32,7 @@ export const BillingOverview = ({
 }: BillingOverviewProps) => {
   const { data: quotes = [], isLoading: quotesLoading } = useQuotes();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
-  const { data: payments = [], isLoading: paymentsLoading } = usePayments();
+  const { data: payments = [], isLoading: paymentsLoading } = usePaymentsQuery();
 
   // Calculer les statistiques
   const stats = useMemo(() => {

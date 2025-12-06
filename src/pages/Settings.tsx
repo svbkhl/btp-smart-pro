@@ -14,9 +14,12 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play } from "lucide-react";
+import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2 } from "lucide-react";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
+import { UserManagementSettings } from "@/components/settings/UserManagementSettings";
+import { RolesAndPermissionsSettings } from "@/components/settings/RolesAndPermissionsSettings";
+import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 
@@ -30,7 +33,7 @@ const Settings = () => {
   const defaultTab = tabFromUrl || "company";
   
   // Compter le nombre d'onglets (ajuster selon si admin)
-  const isAdministrator = userRole === 'administrateur';
+  const isAdministrator = userRole === 'admin' || isAdmin;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -53,7 +56,7 @@ const Settings = () => {
         <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className={`grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto ${
             isAdministrator 
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-7" 
+              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-10" 
               : isAdmin
               ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
               : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
@@ -62,7 +65,7 @@ const Settings = () => {
               <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Entreprise</span>
             </TabsTrigger>
-            {isAdmin && (
+            {(isAdmin || isAdministrator) && (
               <>
                 <TabsTrigger value="companies" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -71,6 +74,18 @@ const Settings = () => {
                 <TabsTrigger value="contact-requests" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Demandes de contact</span>
+                </TabsTrigger>
+                <TabsTrigger value="users" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Utilisateurs</span>
+                </TabsTrigger>
+                <TabsTrigger value="roles" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Rôles</span>
+                </TabsTrigger>
+                <TabsTrigger value="admin-company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <SettingsIcon2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Config Entreprises</span>
                 </TabsTrigger>
               </>
             )}
@@ -102,13 +117,22 @@ const Settings = () => {
             <CompanySettings />
           </TabsContent>
 
-          {isAdmin && (
+          {(isAdmin || isAdministrator) && (
             <>
               <TabsContent value="companies" className="mt-0">
                 <AdminCompanies />
               </TabsContent>
               <TabsContent value="contact-requests" className="mt-0">
                 <AdminContactRequests />
+              </TabsContent>
+              <TabsContent value="users" className="mt-0">
+                <UserManagementSettings />
+              </TabsContent>
+              <TabsContent value="roles" className="mt-0">
+                <RolesAndPermissionsSettings />
+              </TabsContent>
+              <TabsContent value="admin-company" className="mt-0">
+                <AdminCompanySettings />
               </TabsContent>
             </>
           )}

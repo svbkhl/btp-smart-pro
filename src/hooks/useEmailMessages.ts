@@ -18,36 +18,95 @@ export interface EmailMessage {
   invoice_id: string | null;
   quote_id: string | null;
   project_id: string | null;
+  document_id?: string | null;
+  document_type?: "quote" | "invoice" | null;
 }
 
-export const useEmailMessages = () => {
+interface UseEmailMessagesOptions {
+  limit?: number;
+  offset?: number;
+  orderBy?: "sent_at" | "created_at";
+  orderDirection?: "asc" | "desc";
+}
+
+/**
+ * Hook pour récupérer les emails envoyés avec pagination et tri
+ */
+export const useEmailMessages = (options: UseEmailMessagesOptions = {}) => {
   const { user } = useAuth();
+  const {
+    limit = 50,
+    offset = 0,
+    orderBy = "sent_at",
+    orderDirection = "desc",
+  } = options;
 
   return useQuery({
-    queryKey: ["email_messages", user?.id],
+    queryKey: ["email_messages", user?.id, limit, offset, orderBy, orderDirection],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("email_messages")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order(orderBy || "sent_at", { ascending: orderDirection === "asc" })
+        .range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
 
       if (error) {
         // Si la table n'existe pas, retourner un tableau vide
         if (error.code === "PGRST116" || error.message?.includes("does not exist")) {
           console.warn("⚠️ Table email_messages n'existe pas encore");
-          return [];
+          return { data: [], count: 0 };
         }
         throw error;
       }
 
-      return (data || []) as EmailMessage[];
+      return {
+        data: (data || []) as EmailMessage[],
+        count: count || 0,
+      };
     },
     enabled: !!user,
   });
 };
+
+/**
+ * Hook pour récupérer un email spécifique par ID
+ */
+export const useEmailMessageById = (id: string | null) => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["email_message", id, user?.id],
+    queryFn: async () => {
+      if (!user || !id) throw new Error("User not authenticated or ID missing");
+
+      const { data, error } = await supabase
+        .from("email_messages")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        if (error.code === "PGRST116" || error.message?.includes("does not exist")) {
+          return null;
+        }
+        throw error;
+      }
+
+      return data as EmailMessage | null;
+    },
+    enabled: !!user && !!id,
+  });
+};
+
+
+
+
 
 
 

@@ -14,7 +14,7 @@ export const DemoModeSettings = () => {
   const { toast } = useToast();
 
   // Seuls les administrateurs peuvent accéder à cette section
-  if (userRole !== 'administrateur') {
+  if (userRole !== 'admin') {
     return null;
   }
 
@@ -73,6 +73,7 @@ export const DemoModeSettings = () => {
     </div>
   );
 };
+
 
 
 

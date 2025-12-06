@@ -23,7 +23,7 @@ const CompleteProfile = () => {
   const [loading, setLoading] = useState(false);
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
-  const [statut, setStatut] = useState<"dirigeant" | "salarie" | "administrateur">("dirigeant");
+  const [statut, setStatut] = useState<"admin" | "member">("member");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,9 +94,8 @@ const CompleteProfile = () => {
                   <SelectValue placeholder="Sélectionnez un statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="dirigeant">Dirigeant</SelectItem>
-                  <SelectItem value="salarie">Salarié</SelectItem>
-                  <SelectItem value="administrateur">Administrateur</SelectItem>
+                  <SelectItem value="member">Membre</SelectItem>
+                  <SelectItem value="admin">Administrateur</SelectItem>
                 </SelectContent>
               </Select>
             </div>

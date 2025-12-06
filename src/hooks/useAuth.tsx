@@ -7,7 +7,7 @@ interface UseAuthReturn {
   loading: boolean;
   isAdmin: boolean;
   isEmployee: boolean;
-  userRole: 'administrateur' | 'dirigeant' | 'salarie' | null;
+  userRole: 'admin' | 'member' | null;
 }
 
 export const useAuth = (): UseAuthReturn => {
@@ -15,7 +15,7 @@ export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
-  const [userRole, setUserRole] = useState<'administrateur' | 'dirigeant' | 'salarie' | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
 
   useEffect(() => {
     // Récupérer la session initiale
@@ -50,12 +50,12 @@ export const useAuth = (): UseAuthReturn => {
 
   const checkAdminStatus = async (currentUser: User) => {
     try {
-      // Vérifier dans les métadonnées de l'utilisateur
+      // Vérifier dans les métadonnées de l'utilisateur (fallback)
       const metadata = currentUser.user_metadata || {};
       const statut = metadata.statut as string | undefined;
       const role = metadata.role as string | undefined;
       
-      // Vérifier dans la table user_roles si elle existe
+      // Vérifier dans la table user_roles
       try {
         const { data, error } = await supabase
           .from('user_roles')
@@ -63,61 +63,97 @@ export const useAuth = (): UseAuthReturn => {
           .eq('user_id', currentUser.id)
           .single();
 
-        if (!error && data) {
-          const roleFromDb = data.role as string | undefined;
-          const finalRole = roleFromDb || role || statut || 'salarie';
-          
-          // Déterminer le rôle final
-          let determinedRole: 'administrateur' | 'dirigeant' | 'salarie' = 'salarie';
-          if (finalRole === 'administrateur' || finalRole === 'admin') {
-            determinedRole = 'administrateur';
-          } else if (finalRole === 'dirigeant') {
-            determinedRole = 'dirigeant';
-          } else {
-            determinedRole = 'salarie';
+        // Gérer les différents types d'erreurs
+        if (error) {
+          // Erreur 406 Not Acceptable - table non exposée ou permissions manquantes
+          if (error.code === "PGRST301" || error.message?.includes("Not Acceptable") || error.code === "406") {
+            console.warn("⚠️ Table user_roles non accessible via API. Vérifiez les permissions RLS et l'exposition de la table.");
+          // Utiliser les métadonnées comme fallback
+          const finalRole = role || statut || 'member';
+          const determinedRole = getRoleFromString(finalRole);
+          setUserRole(determinedRole);
+          setIsAdmin(determinedRole === 'admin');
+          setIsEmployee(determinedRole === 'member');
+          return;
           }
           
-          setUserRole(determinedRole);
-          setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
-          setIsEmployee(determinedRole === 'salarie');
-        } else {
-          // Si pas de rôle dans la table, utiliser les métadonnées
+          // Erreur 42P01 - table n'existe pas
+          if (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("relation")) {
+            console.warn("⚠️ Table user_roles n'existe pas encore. Utilisation des metadata utilisateur.");
+            const finalRole = role || statut || 'member';
+            const determinedRole = getRoleFromString(finalRole);
+            setUserRole(determinedRole);
+            setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
+            setIsEmployee(determinedRole === 'salarie');
+            return;
+          }
+          
+          // Erreur PGRST116 - aucune ligne trouvée (utilisateur n'a pas de rôle)
+          if (error.code === "PGRST116") {
+            // Utilisateur n'a pas de rôle dans la table, utiliser les métadonnées
+            const finalRole = role || statut || 'member';
+            const determinedRole = getRoleFromString(finalRole);
+            setUserRole(determinedRole);
+            setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
+            setIsEmployee(determinedRole === 'salarie');
+            return;
+          }
+          
+          // Autre erreur
+          console.warn("⚠️ Erreur lors de la récupération du rôle:", error);
           const finalRole = role || statut || 'salarie';
-          let determinedRole: 'administrateur' | 'dirigeant' | 'salarie' = 'salarie';
-          if (finalRole === 'administrateur' || finalRole === 'admin') {
-            determinedRole = 'administrateur';
-          } else if (finalRole === 'dirigeant') {
-            determinedRole = 'dirigeant';
-          } else {
-            determinedRole = 'salarie';
-          }
-          
+          const determinedRole = getRoleFromString(finalRole);
           setUserRole(determinedRole);
           setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
           setIsEmployee(determinedRole === 'salarie');
+          return;
+        }
+
+        // Succès - rôle trouvé dans la table
+        if (data && data.role) {
+          const roleFromDb = data.role as string;
+          const determinedRole = getRoleFromEnum(roleFromDb);
+          setUserRole(determinedRole);
+          setIsAdmin(determinedRole === 'admin');
+          setIsEmployee(determinedRole === 'member');
+          return;
         }
       } catch (err) {
-        // Si la table n'existe pas, utiliser les métadonnées
-        const finalRole = role || statut || 'salarie';
-        let determinedRole: 'administrateur' | 'dirigeant' | 'salarie' = 'salarie';
-        if (finalRole === 'administrateur' || finalRole === 'admin') {
-          determinedRole = 'administrateur';
-        } else if (finalRole === 'dirigeant') {
-          determinedRole = 'dirigeant';
-        } else {
-          determinedRole = 'salarie';
-        }
-        
-        setUserRole(determinedRole);
-        setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
-        setIsEmployee(determinedRole === 'salarie');
+        // Erreur inattendue
+        console.warn("⚠️ Erreur lors de la vérification du rôle:", err);
       }
+      
+      // Fallback : utiliser les métadonnées
+      const finalRole = role || statut || 'member';
+      const determinedRole = getRoleFromString(finalRole);
+      setUserRole(determinedRole);
+      setIsAdmin(determinedRole === 'admin');
+      setIsEmployee(determinedRole === 'member');
     } catch (err) {
       console.warn('Erreur lors de la vérification du statut:', err);
       setIsAdmin(false);
       setIsEmployee(false);
       setUserRole(null);
     }
+  };
+
+  // Fonction helper pour convertir une string en rôle
+  const getRoleFromString = (roleStr: string | undefined): 'admin' | 'member' => {
+    if (!roleStr) return 'member';
+    const roleLower = roleStr.toLowerCase();
+    if (roleLower === 'admin' || roleLower === 'administrateur') {
+      return 'admin';
+    }
+    return 'member';
+  };
+
+  // Fonction helper pour convertir un enum app_role en rôle
+  const getRoleFromEnum = (roleEnum: string): 'admin' | 'member' => {
+    const roleLower = roleEnum.toLowerCase();
+    if (roleLower === 'admin') {
+      return 'admin';
+    }
+    return 'member';
   };
 
   return { user, loading, isAdmin, isEmployee, userRole };

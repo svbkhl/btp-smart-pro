@@ -131,3 +131,9 @@ COMMENT ON COLUMN public.contact_requests.status IS 'Statut: pending, contacted,
 COMMENT ON COLUMN public.contact_requests.trial_requested IS 'Si true, le visiteur a demandé un essai gratuit de 2 semaines';
 COMMENT ON FUNCTION create_contact_request IS 'Fonction pour créer une demande de contact sans authentification';
 
+
+
+
+
+
+

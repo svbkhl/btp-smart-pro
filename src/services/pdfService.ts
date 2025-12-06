@@ -65,22 +65,22 @@ function cleanText(text: string | undefined): string {
  * Formate un montant en euros pour le PDF (format professionnel sans espaces ni caractères spéciaux)
  */
 function formatCurrency(amount: number | undefined): string {
-  if (!amount && amount !== 0) return '0,00€';
+  if (!amount && amount !== 0) return '0,00 €';
   // S'assurer que c'est un nombre valide
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(numAmount)) return '0,00€';
+  if (isNaN(numAmount)) return '0,00 €';
   
-  // Formater manuellement pour un format professionnel : 1234,56€ (sans espaces)
+  // Formater manuellement pour un format professionnel : 1234,56 € (sans slash)
   const fixed = numAmount.toFixed(2);
   const parts = fixed.split('.');
   const integerPart = parts[0];
   const decimalPart = parts[1] || '00';
   
   // Ajouter les séparateurs de milliers (espaces) mais seulement pour les grands nombres
-  // Format français : 1 234,56€ (avec espace pour les milliers, virgule pour les décimales)
+  // Format français : 1 234,56 € (avec espace pour les milliers, virgule pour les décimales, pas de slash)
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   
-  return `${formattedInteger},${decimalPart}€`;
+  return `${formattedInteger},${decimalPart} €`;
 }
 
 /**
@@ -326,7 +326,25 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
 
         // Calculer la hauteur nécessaire pour cette ligne
         const descLines = doc.splitTextToSize(step.description || step.step || '', 100) as string[];
-        const lineHeight = descLines.length * 4 + 4;
+        const lineHeight = Math.max(6, descLines.length * 4 + 4);
+
+        // Vérifier si on dépasse la page avant d'ajouter la ligne
+        if (yPosition + lineHeight > pageHeight - margin - 30) {
+          doc.addPage();
+          yPosition = margin;
+          // Réafficher l'en-tête du tableau si nécessaire
+          doc.setFillColor(...primaryColor);
+          doc.rect(margin, yPosition, contentWidth, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Étape', margin + 2, yPosition + 5.5);
+          doc.text('Description', margin + 40, yPosition + 5.5);
+          doc.text('Montant HT', rightX, yPosition + 5.5, { align: 'right' });
+          yPosition += 8;
+          doc.setTextColor(...textColor);
+          doc.setFont('helvetica', 'normal');
+        }
 
         // Alternance de couleurs
         if (index % 2 === 0) {
@@ -349,6 +367,12 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
         doc.text(formatCurrency(cost), rightX, yPosition + 4, { align: 'right' });
         yPosition += lineHeight;
       });
+
+      // Vérifier si on a assez de place pour les totaux
+      if (yPosition > pageHeight - margin - 50) {
+        doc.addPage();
+        yPosition = margin;
+      }
 
       // Total HT
       yPosition += 2;
@@ -673,7 +697,7 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
         const descLines = doc.splitTextToSize(cleanText(step.description), 100);
         doc.text(descLines[0], margin + 10, yPosition);
         doc.text(
-          step.cost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }),
+          formatCurrency(step.cost),
           pageWidth - margin - 2,
           yPosition,
           { align: 'right' }
@@ -712,14 +736,28 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
       // Lignes du tableau
       doc.setFont('helvetica', 'normal');
       result.materials.forEach((material, index) => {
-        if (yPosition > pageHeight - 30) {
+        const lineHeight = 6;
+        
+        // Vérifier si on dépasse la page avant d'ajouter la ligne
+        if (yPosition + lineHeight > pageHeight - margin - 30) {
           doc.addPage();
           yPosition = margin + 8;
+          // Réafficher l'en-tête du tableau
+          doc.setFillColor(...lightGray);
+          doc.rect(margin, yPosition - 5, contentWidth, 8, 'F');
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Matériau', margin + 2, yPosition);
+          doc.text('Qté', margin + 70, yPosition);
+          doc.text('Prix unit.', margin + 85, yPosition);
+          doc.text('Total', pageWidth - margin - 20, yPosition, { align: 'right' });
+          yPosition += 8;
+          doc.setFont('helvetica', 'normal');
         }
 
         if (index % 2 === 0) {
           doc.setFillColor(...lightGray);
-          doc.rect(margin, yPosition - 4, contentWidth, 6, 'F');
+          doc.rect(margin, yPosition - 4, contentWidth, lineHeight, 'F');
         }
 
         doc.setFontSize(9);
@@ -736,7 +774,7 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
           yPosition,
           { align: 'right' }
         );
-        yPosition += 6;
+        yPosition += lineHeight;
       });
 
       yPosition += 5;
@@ -753,12 +791,10 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
     const totalCost = result.estimatedCost || 0;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(
-      `Total TTC: ${formatCurrency(totalCost)}`,
-      pageWidth - margin - 2,
-      yPosition,
-      { align: 'right' }
-    );
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total TTC:', pageWidth - margin - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(totalCost), pageWidth - margin - 2, yPosition, { align: 'right' });
     yPosition += 10;
 
     // ============================================
