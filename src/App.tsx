@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -9,15 +9,18 @@ import { useAuth } from './hooks/useAuth';
 // Pages publiques
 import Index from './pages/Index';
 import Auth from './pages/Auth';
+import AuthCallback from './pages/AuthCallback';
 import Demo from './pages/Demo';
 import PublicSignature from './pages/PublicSignature';
 import PublicCandidature from './pages/PublicCandidature';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentError from './pages/PaymentError';
 import PaymentFinal from './pages/PaymentFinal';
+import PaymentPage from './pages/PaymentPage';
 import SignatureQuote from './pages/SignatureQuote';
 import Signature from './pages/Signature';
 import SignaturePage from './pages/SignaturePage';
+import QuotePage from './pages/QuotePage';
 
 // Pages protégées
 import Dashboard from './pages/Dashboard';
@@ -50,26 +53,32 @@ import NotFound from './pages/NotFound';
 
 function App() {
   const { user } = useAuth();
+  const location = useLocation();
   
   return (
     <ErrorBoundary>
       {/* Guard qui désactive automatiquement le mode démo si l'utilisateur se connecte */}
       <DemoModeGuard />
-      {/* Widget Agent IA flottant - visible uniquement si connecté */}
+      {/* Widget Agent IA flottant - visible uniquement si connecté (le composant gère lui-même l'affichage sur 404) */}
       {user && <FloatingAIAssistant />}
       <Routes>
         {/* Routes publiques */}
         <Route path="/" element={<Index />} />
+        {/* Route callback DOIT être AVANT /auth pour éviter les conflits de matching */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/demo" element={<Demo />} />
         <Route path="/sign/:quoteId" element={<SignaturePage />} />
+        <Route path="/quote/:id" element={<QuotePage />} />
         <Route path="/signature/:quoteId" element={<PublicSignature />} />
         <Route path="/signature/:id" element={<Signature />} />
         <Route path="/candidature/:id" element={<PublicCandidature />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/payment/error" element={<PaymentError />} />
         <Route path="/payment/final" element={<PaymentFinal />} />
+        <Route path="/payment/quote/:id" element={<PaymentPage />} />
+        <Route path="/payment/invoice/:id" element={<PaymentPage />} />
         <Route path="/signature-quote/:id" element={<SignatureQuote />} />
 
         {/* Routes protégées */}
