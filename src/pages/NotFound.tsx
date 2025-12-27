@@ -1,8 +1,10 @@
-import { Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, AlertCircle } from "lucide-react";
 
 const NotFound = () => {
+  const location = useLocation();
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="text-center space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8">
@@ -17,6 +19,9 @@ const NotFound = () => {
           <p className="text-muted-foreground max-w-md mx-auto">
             La page que vous recherchez n'existe pas ou a été déplacée.
           </p>
+          <code className="block mt-4 text-sm text-muted-foreground bg-muted px-3 py-2 rounded">
+            {location.pathname}
+          </code>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild>

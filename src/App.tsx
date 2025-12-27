@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -53,7 +53,6 @@ import NotFound from './pages/NotFound';
 
 function App() {
   const { user } = useAuth();
-  const location = useLocation();
   
   return (
     <ErrorBoundary>
