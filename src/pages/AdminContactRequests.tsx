@@ -172,8 +172,16 @@ const AdminContactRequests = () => {
         throw new Error(errorMessage);
       }
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Impossible d\'envoyer l\'invitation');
+      // Si l'utilisateur existe déjà (success: false), afficher un message informatif
+      if (data?.success === false && data?.message) {
+        toast({
+          title: 'ℹ️ Utilisateur existant',
+          description: data.message,
+          variant: 'default',
+        });
+        // On continue quand même pour mettre à jour le statut
+      } else if (!data?.success) {
+        throw new Error(data?.message || data?.error || 'Impossible d\'envoyer l\'invitation');
       }
 
       // Mettre à jour le statut de la demande
