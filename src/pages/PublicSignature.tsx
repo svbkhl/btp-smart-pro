@@ -16,6 +16,7 @@ import { PaymentButton } from "@/components/invoices/PaymentButton";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { downloadInvoicePDF } from "@/services/invoicePdfService";
 import { trackSigned } from "@/services/statusTrackingService";
+import { extractUUID } from "@/utils/uuidExtractor";
 
 const PublicSignature = () => {
   const { token } = useParams<{ token: string }>();
@@ -58,29 +59,52 @@ const PublicSignature = () => {
         .single();
 
       if (sessionError || !sessionData) {
-        throw new Error("Session de signature introuvable ou expirée");
+        console.error("[PublicSignature] Session not found:", sessionError);
+        toast({
+          title: "Session invalide",
+          description: "Session de signature introuvable ou expirée",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
       }
 
       // Vérifier l'expiration
       if (new Date(sessionData.expires_at) < new Date()) {
-        throw new Error("Cette session de signature a expiré");
+        console.error("[PublicSignature] Session expired:", {
+          expiresAt: sessionData.expires_at,
+          now: new Date().toISOString()
+        });
+        toast({
+          title: "Session expirée",
+          description: "Cette session de signature a expiré. Veuillez demander un nouveau lien.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
       }
 
       setSession(sessionData);
 
       // Charger la facture ou le devis associé
       if (sessionData.invoice_id) {
+        // Extraire l'UUID valide si nécessaire (par sécurité)
+        const validInvoiceId = extractUUID(sessionData.invoice_id) || sessionData.invoice_id;
+        
         const { data: invoiceData } = await supabase
           .from("invoices")
           .select("*")
-          .eq("id", sessionData.invoice_id)
+          .eq("id", validInvoiceId) // Utiliser l'UUID extrait ou l'ID original
           .single();
         setInvoice(invoiceData);
       } else if (sessionData.quote_id) {
+        // Extraire l'UUID valide si nécessaire (par sécurité)
+        const validQuoteId = extractUUID(sessionData.quote_id) || sessionData.quote_id;
+        
         const { data: quoteData } = await supabase
           .from("ai_quotes")
           .select("*")
-          .eq("id", sessionData.quote_id)
+          .eq("id", validQuoteId) // Utiliser l'UUID extrait ou l'ID original
           .single();
         setQuote(quoteData);
       }
@@ -164,6 +188,9 @@ const PublicSignature = () => {
 
       // Mettre à jour la facture ou le devis
       if (invoice) {
+        // Extraire l'UUID valide si nécessaire
+        const validInvoiceId = extractUUID(invoice.id) || invoice.id;
+        
         await supabase
           .from("invoices")
           .update({
@@ -172,11 +199,14 @@ const PublicSignature = () => {
             signed_at: new Date().toISOString(),
             status: "signed",
           })
-          .eq("id", invoice.id);
+          .eq("id", validInvoiceId); // Utiliser l'UUID extrait
         
         // Tracker la signature
-        await trackSigned("invoice", invoice.id, signerName.trim(), signatureData);
+        await trackSigned("invoice", validInvoiceId, signerName.trim(), signatureData);
       } else if (quote) {
+        // Extraire l'UUID valide si nécessaire
+        const validQuoteId = extractUUID(quote.id) || quote.id;
+        
         await supabase
           .from("ai_quotes")
           .update({
@@ -185,10 +215,10 @@ const PublicSignature = () => {
             signed_at: new Date().toISOString(),
             status: "accepted",
           })
-          .eq("id", quote.id);
+          .eq("id", validQuoteId); // Utiliser l'UUID extrait
         
         // Tracker la signature
-        await trackSigned("quote", quote.id, signerName.trim(), signatureData);
+        await trackSigned("quote", validQuoteId, signerName.trim(), signatureData);
       }
 
       setSigned(true);
