@@ -205,11 +205,9 @@ const AdminContactRequests = () => {
       
       toast({
         title: '❌ Erreur',
-        description: errorMessage,
+        description: error.message || errorMessage || 'Impossible de créer l\'entreprise et d\'envoyer l\'invitation',
         variant: 'destructive',
         duration: 5000,
-        description: error.message || 'Impossible de créer l\'entreprise et d\'envoyer l\'invitation',
-        variant: 'destructive',
       });
     } finally {
       setCreatingCompany(false);
