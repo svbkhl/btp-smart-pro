@@ -70,15 +70,16 @@ function App() {
         <Route path="/demo" element={<Demo />} />
         <Route path="/sign/:quoteId" element={<SignaturePage />} />
         <Route path="/quote/:id" element={<QuotePage />} />
-        <Route path="/signature/:quoteId" element={<PublicSignature />} />
-        <Route path="/signature/:id" element={<Signature />} />
+        {/* Routes signature avec chemins distincts pour éviter les conflits */}
+        <Route path="/signature/public/:token" element={<PublicSignature />} />
+        <Route path="/signature/document/:id" element={<Signature />} />
+        <Route path="/signature-quote/:id" element={<SignatureQuote />} />
         <Route path="/candidature/:id" element={<PublicCandidature />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/payment/error" element={<PaymentError />} />
         <Route path="/payment/final" element={<PaymentFinal />} />
         <Route path="/payment/quote/:id" element={<PaymentPage />} />
         <Route path="/payment/invoice/:id" element={<PaymentPage />} />
-        <Route path="/signature-quote/:id" element={<SignatureQuote />} />
 
         {/* Routes protégées */}
         <Route
