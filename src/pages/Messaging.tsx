@@ -1,122 +1,342 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Mail,
-  Search,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  FileText,
-  Receipt,
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Mail, 
+  Search, 
+  Send, 
+  Inbox, 
+  Archive, 
+  Trash2, 
+  Star, 
+  StarOff,
+  Reply,
+  ReplyAll,
+  Forward,
+  Paperclip,
   Calendar,
   User,
-  ExternalLink,
+  Settings,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useEmailMessages, useEmailMessageById, EmailMessage } from "@/hooks/useEmailMessages";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEmailMessages, EmailMessage } from "@/hooks/useEmailMessages";
+import { useInboxEmails, InboxEmail } from "@/hooks/useInboxEmails";
+import { sendEmail } from "@/services/emailService";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
+
+interface Email {
+  id: string;
+  from: string;
+  fromName: string;
+  subject: string;
+  preview: string;
+  date: string;
+  isRead: boolean;
+  isStarred: boolean;
+  folder: "inbox" | "sent" | "drafts" | "archived" | "trash";
+  attachments?: number;
+}
+
+const FAKE_EMAILS: Email[] = [
+  {
+    id: "email-1",
+    from: "client@example.com",
+    fromName: "M. Martin",
+    subject: "Demande de devis pour rénovation",
+    preview: "Bonjour, je souhaiterais obtenir un devis pour la rénovation de ma toiture...",
+    date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    isRead: false,
+    isStarred: false,
+    folder: "inbox",
+    attachments: 2,
+  },
+  {
+    id: "email-2",
+    from: "fournisseur@example.com",
+    fromName: "Fournisseur Matériaux",
+    subject: "Devis matériaux - Projet #1234",
+    preview: "Veuillez trouver ci-joint notre devis pour les matériaux demandés...",
+    date: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    isRead: true,
+    isStarred: true,
+    folder: "inbox",
+    attachments: 1,
+  },
+  {
+    id: "email-3",
+    from: "rh@example.com",
+    fromName: "RH Entreprise",
+    subject: "Candidature reçue",
+    preview: "Une nouvelle candidature a été reçue pour le poste de maçon...",
+    date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    isRead: true,
+    isStarred: false,
+    folder: "inbox",
+  },
+];
 
 const Messaging = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: settings } = useUserSettings();
+  const queryClient = useQueryClient();
+  const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
+  const [emails, setEmails] = useState<Email[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<Email["folder"]>("inbox");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const limit = 20;
-
-  const { data: emailsData, isLoading, error } = useEmailMessages({
-    limit,
-    offset: page * limit,
-    orderBy: "sent_at",
-    orderDirection: "desc",
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [composeData, setComposeData] = useState({
+    to: "",
+    subject: "",
+    body: "",
   });
 
-  const { data: selectedEmail } = useEmailMessageById(selectedEmailId);
+  // Vérifier si un compte email est configuré
+  const { data: emailConfig, isLoading: emailConfigLoading } = useQuery({
+    queryKey: ["user_email_settings", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
 
-  const emails = emailsData?.data || [];
-  const totalCount = emailsData?.count || 0;
-  const totalPages = Math.ceil(totalCount / limit);
+      const { data, error } = await supabase
+        .from("user_email_settings" as any)
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        if (error.code === "PGRST116") {
+          // Pas de configuration email
+          return null;
+        }
+        console.error("Erreur chargement email config:", error);
+        return null;
+      }
+
+      return data as any;
+    },
+    enabled: !!user,
+    refetchInterval: 5000, // Vérifier toutes les 5 secondes pour détecter les changements
+  });
+
+  const hasEmailConfig = !!emailConfig && ((emailConfig as any).smtp_host || (emailConfig as any).provider);
+
+  // Charger l'historique des emails envoyés
+  const { data: emailMessagesData, isLoading: messagesLoading } = useEmailMessages();
+  
+  // Charger les emails entrants selon le dossier sélectionné
+  const { data: inboxEmailsData, isLoading: inboxLoading } = useInboxEmails({
+    folder: selectedFolder === "inbox" ? "inbox" : selectedFolder,
+  });
+
+  // Charger les emails envoyés et entrants
+  useEffect(() => {
+    if (fakeDataEnabled) {
+      setEmails(FAKE_EMAILS);
+    } else {
+      const allEmails: Email[] = [];
+      
+      // Charger les emails envoyés depuis email_messages (pour le dossier "sent")
+      if (selectedFolder === "sent" && emailMessagesData?.data && emailMessagesData.data.length > 0) {
+        const sentEmails: Email[] = emailMessagesData.data
+          .filter((msg) => msg.status === "sent")
+          .map((msg: EmailMessage) => ({
+            id: msg.id,
+            from: (emailConfig as any)?.from_email || (emailConfig as any)?.smtp_user || user?.email || "noreply@btpsmartpro.com",
+            fromName: (emailConfig as any)?.from_name || settings?.signature_name || "BTP Smart Pro",
+            subject: msg.subject || "Sans objet",
+            preview: msg.body_text || msg.body_html?.replace(/<[^>]*>/g, "").substring(0, 100) || "",
+            date: msg.sent_at || msg.created_at,
+            isRead: true,
+            isStarred: false,
+            folder: "sent" as const,
+          }));
+        allEmails.push(...sentEmails);
+      }
+
+      // Charger les emails entrants depuis inbox_emails (pour les autres dossiers)
+      if (selectedFolder !== "sent" && inboxEmailsData?.data && inboxEmailsData.data.length > 0) {
+        const inboxEmails: Email[] = inboxEmailsData.data.map((msg: InboxEmail) => ({
+          id: msg.id,
+          from: msg.from_email,
+          fromName: msg.from_name || msg.from_email.split("@")[0],
+          subject: msg.subject || "Sans objet",
+          preview: msg.body_text || msg.body_html?.replace(/<[^>]*>/g, "").substring(0, 100) || "",
+          date: msg.received_at,
+          isRead: msg.is_read,
+          isStarred: msg.is_starred,
+          folder: msg.folder,
+          attachments: msg.attachments?.length || 0,
+        }));
+        allEmails.push(...inboxEmails);
+      }
+      
+      setEmails(allEmails);
+    }
+  }, [
+    fakeDataEnabled, 
+    selectedFolder,
+    emailMessagesData?.data, 
+    inboxEmailsData?.data,
+    emailConfig, 
+    settings?.signature_name, 
+    user?.email
+  ]);
 
   const filteredEmails = emails.filter((email) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      email.recipient_email?.toLowerCase().includes(searchLower) ||
-      email.subject?.toLowerCase().includes(searchLower) ||
-      email.body_text?.toLowerCase().includes(searchLower)
-    );
+    const matchesFolder = email.folder === selectedFolder;
+    const matchesSearch =
+      email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      email.fromName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      email.preview.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFolder && matchesSearch;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "sent":
-        return (
-          <Badge variant="default" className="bg-green-500">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            Envoyé
-          </Badge>
-        );
-      case "failed":
-        return (
-          <Badge variant="destructive">
-            <XCircle className="w-3 h-3 mr-1" />
-            Erreur
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge variant="secondary">
-            <Clock className="w-3 h-3 mr-1" />
-            En attente
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  const unreadCount = emails.filter((e) => !e.isRead && e.folder === "inbox").length;
+
+  const handleMarkAsRead = (id: string) => {
+    setEmails(emails.map((e) => (e.id === id ? { ...e, isRead: true } : e)));
+    if (selectedEmail?.id === id) {
+      setSelectedEmail({ ...selectedEmail, isRead: true });
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "quote":
-        return <FileText className="w-4 h-4" />;
-      case "invoice":
-        return <Receipt className="w-4 h-4" />;
-      default:
-        return <Mail className="w-4 h-4" />;
+  const handleToggleStar = (id: string) => {
+    setEmails(emails.map((e) => (e.id === id ? { ...e, isStarred: !e.isStarred } : e)));
+    if (selectedEmail?.id === id) {
+      setSelectedEmail({ ...selectedEmail, isStarred: !selectedEmail.isStarred });
     }
   };
 
-  const formatEmailDate = (dateString: string | null) => {
-    if (!dateString) return "Date inconnue";
+  const handleSendReply = () => {
+    if (!replyText.trim()) {
+      toast({
+        title: "Message vide",
+        description: "Veuillez saisir un message",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Message envoyé",
+      description: "Votre réponse a été envoyée avec succès",
+    });
+    setReplyText("");
+  };
+
+  const handleSendCompose = async () => {
+    if (!composeData.to || !composeData.subject || !composeData.body) {
+      toast({
+        title: "Champs manquants",
+        description: "Veuillez remplir tous les champs",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
     try {
-      const date = new Date(dateString);
-      return format(date, "dd MMM yyyy à HH:mm", { locale: fr });
-    } catch {
-      return dateString;
+      console.log("📧 Envoi d'un email...", { to: composeData.to, subject: composeData.subject });
+      
+      // Convertir le texte en HTML simple
+      const htmlBody = composeData.body.replace(/\n/g, "<br>");
+      
+      await sendEmail({
+        to: composeData.to,
+        subject: composeData.subject,
+        html: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${htmlBody}</div>`,
+        text: composeData.body,
+        type: "notification",
+      });
+
+      console.log("✅ Email envoyé avec succès");
+      
+      toast({
+        title: "Email envoyé",
+        description: "Votre email a été envoyé avec succès",
+      });
+      
+      setIsComposing(false);
+      setComposeData({ to: "", subject: "", body: "" });
+      
+      // Rafraîchir la liste des emails en invalidant la query
+      queryClient.invalidateQueries({ queryKey: ["email_messages"] });
+    } catch (error: any) {
+      console.error("❌ Erreur lors de l'envoi de l'email:", error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'envoyer l'email. Vérifiez votre configuration email.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
-  if (error) {
+  // Afficher l'interface de configuration si pas de compte email configuré
+  if (!emailConfigLoading && !hasEmailConfig) {
     return (
       <PageLayout>
-        <div className="p-6">
-          <GlassCard className="p-12 text-center">
-            <XCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
-            <h3 className="text-xl font-semibold mb-2">Erreur</h3>
+        <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+              Messagerie
+            </h1>
             <p className="text-muted-foreground">
-              {error instanceof Error ? error.message : "Impossible de charger les emails"}
+              Configurez votre compte email pour commencer
             </p>
+          </div>
+
+          <GlassCard className="p-12 text-center space-y-6">
+            <Mail className="w-20 h-20 mx-auto mb-4 text-primary" />
+            <div className="space-y-2">
+              <h3 className="text-2xl font-semibold">Configuration requise</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Pour utiliser la messagerie, vous devez d'abord configurer un compte email dans les paramètres.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/settings?tab=email">
+                <Button size="lg" className="gap-2 rounded-xl">
+                  <Settings className="w-5 h-5" />
+                  Configurer un compte email
+                </Button>
+              </Link>
+            </div>
+            <div className="pt-6 border-t border-border/50">
+              <p className="text-sm text-muted-foreground mb-3">
+                💡 <strong>Astuce :</strong> Vous pouvez connecter :
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                  <p className="font-semibold mb-1">📧 Gmail</p>
+                  <p className="text-xs text-muted-foreground">Connexion OAuth sécurisée</p>
+                </div>
+                <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                  <p className="font-semibold mb-1">📧 Outlook</p>
+                  <p className="text-xs text-muted-foreground">Connexion OAuth Microsoft</p>
+                </div>
+                <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                  <p className="font-semibold mb-1">⚙️ SMTP</p>
+                  <p className="text-xs text-muted-foreground">Email professionnel</p>
+                </div>
+              </div>
+            </div>
           </GlassCard>
         </div>
       </PageLayout>
@@ -125,239 +345,323 @@ const Messaging = () => {
 
   return (
     <PageLayout>
-      <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
-        {/* En-tête */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1 sm:space-y-2">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
-              Emails envoyés
+      <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+              Messagerie
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Consultez l'historique de tous vos emails envoyés
+            <p className="text-muted-foreground">
+              Gérez vos emails et communications
+              {fakeDataEnabled && (
+                <Badge variant="secondary" className="ml-2">Mode Démo</Badge>
+              )}
             </p>
           </div>
+          <Button onClick={() => setIsComposing(true)} className="gap-2 rounded-xl">
+            <Send className="w-4 h-4" />
+            Nouveau message
+          </Button>
         </div>
 
-        {/* Recherche */}
-        <GlassCard className="p-4 sm:p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher par destinataire, sujet ou contenu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 sm:pl-12 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
-            />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar - Dossiers */}
+          <div className="lg:col-span-1">
+            <GlassCard className="p-6 space-y-2">
+              <Button
+                variant={selectedFolder === "inbox" ? "default" : "ghost"}
+                className="w-full justify-start gap-2 rounded-xl"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedFolder("inbox");
+                  setSelectedEmail(null); // Réinitialiser la sélection
+                }}
+              >
+                <Inbox className="w-4 h-4" />
+                Boîte de réception
+                {unreadCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </Button>
+              <Button
+                variant={selectedFolder === "sent" ? "default" : "ghost"}
+                className="w-full justify-start gap-2 rounded-xl"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedFolder("sent");
+                  setSelectedEmail(null); // Réinitialiser la sélection
+                }}
+              >
+                <Send className="w-4 h-4" />
+                Envoyés
+              </Button>
+              <Button
+                variant={selectedFolder === "drafts" ? "default" : "ghost"}
+                className="w-full justify-start gap-2 rounded-xl"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedFolder("drafts");
+                  setSelectedEmail(null); // Réinitialiser la sélection
+                }}
+              >
+                <Mail className="w-4 h-4" />
+                Brouillons
+              </Button>
+              <Button
+                variant={selectedFolder === "archived" ? "default" : "ghost"}
+                className="w-full justify-start gap-2 rounded-xl"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedFolder("archived");
+                  setSelectedEmail(null); // Réinitialiser la sélection
+                }}
+              >
+                <Archive className="w-4 h-4" />
+                Archivés
+              </Button>
+              <Button
+                variant={selectedFolder === "trash" ? "default" : "ghost"}
+                className="w-full justify-start gap-2 rounded-xl"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedFolder("trash");
+                  setSelectedEmail(null); // Réinitialiser la sélection
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+                Corbeille
+              </Button>
+            </GlassCard>
           </div>
-        </GlassCard>
 
-        {/* Liste des emails */}
-        {isLoading ? (
-          <GlassCard className="p-12">
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Chargement des emails...
-              </p>
-            </div>
-          </GlassCard>
-        ) : filteredEmails.length === 0 ? (
-          <GlassCard className="p-12">
-            <div className="text-center py-8">
-              <Mail className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg sm:text-xl font-semibold mb-2">
-                {searchQuery ? "Aucun email trouvé" : "Aucun email envoyé"}
-              </h3>
-              <p className="text-sm sm:text-base text-muted-foreground mb-4">
-                {searchQuery
-                  ? "Aucun email ne correspond à votre recherche."
-                  : "Les emails que vous envoyez apparaîtront ici."}
-              </p>
-            </div>
-          </GlassCard>
-        ) : (
-          <>
-            <GlassCard className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold">
-                    {totalCount} email{totalCount > 1 ? "s" : ""} envoyé{totalCount > 1 ? "s" : ""}
-                  </h2>
-                </div>
-                <div className="space-y-2">
-                  {filteredEmails.map((email) => (
-                    <div
-                      key={email.id}
-                      className="p-4 rounded-lg border border-border/50 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-800/70 transition-colors cursor-pointer"
-                      onClick={() => setSelectedEmailId(email.id)}
+          {/* Liste des emails */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Recherche */}
+            <GlassCard className="p-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </GlassCard>
+
+            {/* Liste */}
+            <div className="space-y-2">
+              {filteredEmails.length === 0 ? (
+                <GlassCard className="p-6 text-center">
+                  <Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">Aucun email</p>
+                </GlassCard>
+              ) : (
+                filteredEmails.map((email) => (
+                  <div
+                    key={email.id}
+                    onClick={() => {
+                      setSelectedEmail(email);
+                      handleMarkAsRead(email.id);
+                    }}
+                  >
+                    <GlassCard
+                      className={`p-4 cursor-pointer hover:shadow-lg transition-shadow ${
+                        selectedEmail?.id === email.id ? "ring-2 ring-primary" : ""
+                      } ${!email.isRead ? "bg-primary/5" : ""}`}
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            {getTypeIcon(email.email_type)}
-                            <span className="font-semibold text-sm sm:text-base truncate">
-                              {email.subject || "Sans objet"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-xs sm:text-sm text-muted-foreground mb-2">
-                            <div className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              <span className="truncate">{email.recipient_email}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>{formatEmailDate(email.sent_at || email.created_at)}</span>
-                            </div>
-                          </div>
-                          {email.body_text && (
-                            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                              {email.body_text.substring(0, 150)}
-                              {email.body_text.length > 150 ? "..." : ""}
-                            </p>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-sm truncate">
+                            {email.fromName}
+                          </span>
+                          {email.isStarred && (
+                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          )}
+                          {!email.isRead && (
+                            <div className="w-2 h-2 bg-primary rounded-full" />
                           )}
                         </div>
-                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                          {getStatusBadge(email.status)}
-                          {email.quote_id && (
-                            <Badge variant="outline" className="text-xs">
-                              <FileText className="w-3 h-3 mr-1" />
-                              Devis
-                            </Badge>
-                          )}
-                          {email.invoice_id && (
-                            <Badge variant="outline" className="text-xs">
-                              <Receipt className="w-3 h-3 mr-1" />
-                              Facture
-                            </Badge>
+                        <p className="text-sm font-medium truncate mb-1">
+                          {email.subject}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {email.preview}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span>
+                            {format(new Date(email.date), "d MMM", { locale: fr })}
+                          </span>
+                          {email.attachments && (
+                            <span className="flex items-center gap-1">
+                              <Paperclip className="w-3 h-3" />
+                              {email.attachments}
+                            </span>
                           )}
                         </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleStar(email.id);
+                        }}
+                      >
+                        {email.isStarred ? (
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        ) : (
+                          <StarOff className="w-4 h-4" />
+                        )}
+                      </Button>
                     </div>
-                  ))}
-                </div>
+                    </GlassCard>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                    <p className="text-sm text-muted-foreground">
-                      Page {page + 1} sur {totalPages}
-                    </p>
+          {/* Détail de l'email */}
+          <div className="lg:col-span-2">
+            {selectedEmail ? (
+              <GlassCard className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold mb-2">{selectedEmail.subject}</h2>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <User className="w-4 h-4" />
+                        <span>{selectedEmail.fromName}</span>
+                        <span>&lt;{selectedEmail.from}&gt;</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                        <Calendar className="w-4 h-4" />
+                        <span>
+                          {format(new Date(selectedEmail.date), "d MMMM yyyy à HH:mm", {
+                            locale: fr,
+                          })}
+                        </span>
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        size="sm"
-                        onClick={() => setPage((p) => Math.max(0, p - 1))}
-                        disabled={page === 0}
+                        size="icon"
+                        onClick={() => handleToggleStar(selectedEmail.id)}
                       >
-                        Précédent
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                        disabled={page >= totalPages - 1}
-                      >
-                        Suivant
+                        {selectedEmail.isStarred ? (
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        ) : (
+                          <StarOff className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   </div>
-                )}
-              </div>
-            </GlassCard>
-          </>
-        )}
-      </div>
 
-      {/* Dialog détails email */}
-      <Dialog open={!!selectedEmailId} onOpenChange={(open) => !open && setSelectedEmailId(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              Détails de l'email
-            </DialogTitle>
-            <DialogDescription>
-              {selectedEmail?.subject || "Sans objet"}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEmail ? (
-            <div className="space-y-6">
-              {/* Informations principales */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
-                <div>
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Destinataire
-                  </label>
-                  <p className="text-sm sm:text-base font-semibold break-all">
-                    {selectedEmail.recipient_email}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Date d'envoi
-                  </label>
-                  <p className="text-sm sm:text-base">
-                    {formatEmailDate(selectedEmail.sent_at || selectedEmail.created_at)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Statut
-                  </label>
-                  <div className="mt-1">{getStatusBadge(selectedEmail.status)}</div>
-                </div>
-                <div>
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Type
-                  </label>
-                  <p className="text-sm sm:text-base capitalize">{selectedEmail.email_type}</p>
-                </div>
-              </div>
+                  <div className="border-t pt-4">
+                    <p className="whitespace-pre-line text-sm">{selectedEmail.preview}</p>
+                  </div>
 
-              {/* Contenu */}
-              {selectedEmail.body_html ? (
-                <div className="space-y-2">
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Contenu HTML
-                  </label>
-                  <div
-                    className="p-4 bg-muted/30 rounded-lg border border-border/50 prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }}
-                  />
-                </div>
-              ) : selectedEmail.body_text ? (
-                <div className="space-y-2">
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Contenu
-                  </label>
-                  <div className="p-4 bg-muted/30 rounded-lg border border-border/50 whitespace-pre-wrap">
-                    {selectedEmail.body_text}
+                  <div className="border-t pt-4 space-y-3">
+                    <Textarea
+                      placeholder="Répondre à ce message..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      rows={4}
+                    />
+                    <div className="flex gap-2">
+                      <Button onClick={handleSendReply} className="gap-2">
+                        <Reply className="w-4 h-4" />
+                        Répondre
+                      </Button>
+                      <Button variant="outline" className="gap-2">
+                        <ReplyAll className="w-4 h-4" />
+                        Répondre à tous
+                      </Button>
+                      <Button variant="outline" className="gap-2">
+                        <Forward className="w-4 h-4" />
+                        Transférer
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              </GlassCard>
+            ) : (
+              <GlassCard className="p-12 text-center">
+                <Mail className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold mb-2">Sélectionnez un email</h3>
+                <p className="text-muted-foreground">
+                  Cliquez sur un email dans la liste pour le lire
+                </p>
+              </GlassCard>
+            )}
+          </div>
+        </div>
 
-              {/* Erreur si échec */}
-              {selectedEmail.status === "failed" && selectedEmail.error_message && (
-                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <label className="text-xs sm:text-sm font-medium text-destructive">
-                    Message d'erreur
-                  </label>
-                  <p className="text-sm text-destructive mt-1">{selectedEmail.error_message}</p>
+        {/* Dialog de composition */}
+        {isComposing && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <GlassCard className="p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-auto">
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Nouveau message</h2>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="À"
+                    value={composeData.to}
+                    onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Objet"
+                    value={composeData.subject}
+                    onChange={(e) =>
+                      setComposeData({ ...composeData, subject: e.target.value })
+                    }
+                  />
+                  <Textarea
+                    placeholder="Message..."
+                    value={composeData.body}
+                    onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
+                    rows={10}
+                  />
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+                <div className="flex gap-2 justify-end">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsComposing(false)}
+                    disabled={isSending}
+                  >
+                    Annuler
+                  </Button>
+                  <Button 
+                    onClick={handleSendCompose} 
+                    className="gap-2"
+                    disabled={isSending || !composeData.to || !composeData.subject || !composeData.body}
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Envoi...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Envoyer
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        )}
+      </div>
     </PageLayout>
   );
 };
 
 export default Messaging;
-
-
-

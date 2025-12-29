@@ -129,3 +129,10 @@ Après avoir configuré Resend ou Mailgun :
 
 
 
+
+
+
+
+
+
+

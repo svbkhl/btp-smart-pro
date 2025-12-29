@@ -9,9 +9,10 @@ import { signQuote } from "@/services/aiService";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, FileSignature, X, CheckCircle2, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { extractUUID } from "@/utils/uuidExtractor";
 
 const SignatureQuote = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: rawId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -22,18 +23,35 @@ const SignatureQuote = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
+  // Extraire l'UUID valide (l'ID peut contenir un suffixe de sécurité)
+  const id = rawId ? extractUUID(rawId) : null;
+
   useEffect(() => {
-    if (id) {
+    if (rawId) {
+      if (!id) {
+        toast({
+          title: "Erreur",
+          description: "Format d'ID invalide",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
       loadQuote();
     }
-  }, [id]);
+  }, [rawId, id, toast]);
 
   const loadQuote = async () => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: quoteData, error } = await supabase
         .from("ai_quotes")
         .select("*")
-        .eq("id", id)
+        .eq("id", id) // Utiliser l'UUID extrait
         .single();
 
       if (error) throw error;

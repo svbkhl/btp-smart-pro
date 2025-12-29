@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { extractUUID } from "@/utils/uuidExtractor";
 
 export interface StatusEvent {
   id: string;
@@ -39,12 +40,19 @@ export const trackEmailSent = async (
     updateData.email_sent_at = new Date().toISOString();
   }
 
+  // Extraire l'UUID valide si documentId contient un suffixe
+  const validDocumentId = extractUUID(documentId);
+  if (!validDocumentId) {
+    console.error("❌ [statusTrackingService] Format d'ID invalide:", documentId);
+    return;
+  }
+
   try {
     if (documentType === "quote") {
       const { error } = await supabase
         .from("ai_quotes")
         .update(updateData)
-        .eq("id", documentId)
+        .eq("id", validDocumentId)
         .eq("user_id", session.user.id);
       
       if (error) {
@@ -53,7 +61,7 @@ export const trackEmailSent = async (
         const { error: retryError } = await supabase
           .from("ai_quotes")
           .update({ status: "sent" })
-          .eq("id", documentId)
+          .eq("id", validDocumentId)
           .eq("user_id", session.user.id);
         
         if (retryError) {
@@ -64,7 +72,7 @@ export const trackEmailSent = async (
       const { error } = await supabase
         .from("invoices")
         .update(updateData)
-        .eq("id", documentId)
+        .eq("id", validDocumentId)
         .eq("user_id", session.user.id);
       
       if (error) {
@@ -73,7 +81,7 @@ export const trackEmailSent = async (
         const { error: retryError } = await supabase
           .from("invoices")
           .update({ status: "sent" })
-          .eq("id", documentId)
+          .eq("id", validDocumentId)
           .eq("user_id", session.user.id);
         
         if (retryError) {
@@ -100,6 +108,10 @@ export const trackEmailSent = async (
       return;
     }
 
+    // Déterminer le type d'email basé sur le contexte
+    // Par défaut, si c'est un devis, c'est "quote_sent", si c'est une facture, c'est "signature_request"
+    const emailType = documentType === "quote" ? "quote_sent" : "signature_request";
+
     // Insérer l'enregistrement
     const insertData: any = {
       user_id: session.user.id,
@@ -107,6 +119,7 @@ export const trackEmailSent = async (
       subject: emailSubject || `${documentType === "quote" ? "Devis" : "Facture"}`,
       document_type: documentType,
       document_id: documentId,
+      email_type: emailType, // Toujours défini
       status: "sent",
       sent_at: new Date().toISOString(),
     };
@@ -122,6 +135,7 @@ export const trackEmailSent = async (
           recipient_email: recipientEmail,
           subject: emailSubject || `${documentType === "quote" ? "Devis" : "Facture"}`,
           document_type: documentType,
+          email_type: emailType, // Toujours défini même dans le retry
           status: "sent",
           sent_at: new Date().toISOString(),
         });
@@ -162,15 +176,21 @@ export const trackEmailViewed = async (
 
     if (session) {
       if (documentType === "quote" && session.quote_id) {
-        await supabase
-          .from("ai_quotes")
-          .update(updateData)
-          .eq("id", session.quote_id);
+        const validQuoteId = extractUUID(session.quote_id);
+        if (validQuoteId) {
+          await supabase
+            .from("ai_quotes")
+            .update(updateData)
+            .eq("id", validQuoteId);
+        }
       } else if (documentType === "invoice" && session.invoice_id) {
-        await supabase
-          .from("invoices")
-          .update(updateData)
-          .eq("id", session.invoice_id);
+        const validInvoiceId = extractUUID(session.invoice_id);
+        if (validInvoiceId) {
+          await supabase
+            .from("invoices")
+            .update(updateData)
+            .eq("id", validInvoiceId);
+        }
       }
     }
   } else {
@@ -178,17 +198,24 @@ export const trackEmailViewed = async (
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
 
+    // Extraire l'UUID valide si documentId contient un suffixe
+    const validDocumentId = extractUUID(documentId);
+    if (!validDocumentId) {
+      console.error("❌ [statusTrackingService] Format d'ID invalide:", documentId);
+      return;
+    }
+
     if (documentType === "quote") {
       await supabase
         .from("ai_quotes")
         .update(updateData)
-        .eq("id", documentId)
+        .eq("id", validDocumentId)
         .eq("user_id", session.user.id);
     } else {
       await supabase
         .from("invoices")
         .update(updateData)
-        .eq("id", documentId)
+        .eq("id", validDocumentId)
         .eq("user_id", session.user.id);
     }
   }
@@ -210,16 +237,23 @@ export const trackSigned = async (
     signature_data: signatureData,
   };
 
+  // Extraire l'UUID valide si documentId contient un suffixe
+  const validDocumentId = extractUUID(documentId);
+  if (!validDocumentId) {
+    console.error("❌ [statusTrackingService] Format d'ID invalide:", documentId);
+    return;
+  }
+
   if (documentType === "quote") {
     await supabase
       .from("ai_quotes")
       .update(updateData)
-      .eq("id", documentId);
+      .eq("id", validDocumentId);
   } else {
     await supabase
       .from("invoices")
       .update(updateData)
-      .eq("id", documentId);
+      .eq("id", validDocumentId);
   }
 };
 
@@ -238,17 +272,24 @@ export const trackPaid = async (
     payment_status: "paid",
   };
 
+  // Extraire l'UUID valide si documentId contient un suffixe
+  const validDocumentId = extractUUID(documentId);
+  if (!validDocumentId) {
+    console.error("❌ [statusTrackingService] Format d'ID invalide:", documentId);
+    return;
+  }
+
   if (documentType === "quote") {
     // Pour un devis, on peut créer une facture automatiquement
     await supabase
       .from("ai_quotes")
       .update({ ...updateData, status: "accepted" })
-      .eq("id", documentId);
+      .eq("id", validDocumentId);
   } else {
     await supabase
       .from("invoices")
       .update(updateData)
-      .eq("id", documentId);
+      .eq("id", validDocumentId);
   }
 
   // Mettre à jour le paiement si paymentId fourni
@@ -276,13 +317,20 @@ export const getStatusHistory = async (
 
   const events: StatusEvent[] = [];
 
+  // Extraire l'UUID valide si documentId contient un suffixe
+  const validDocumentId = extractUUID(documentId);
+  if (!validDocumentId) {
+    console.error("❌ [statusTrackingService] Format d'ID invalide:", documentId);
+    return [];
+  }
+
   // Récupérer le document
   let document: any = null;
   if (documentType === "quote") {
     const { data } = await supabase
       .from("ai_quotes")
       .select("*")
-      .eq("id", documentId)
+      .eq("id", validDocumentId)
       .eq("user_id", session.user.id)
       .single();
     document = data;
@@ -290,7 +338,7 @@ export const getStatusHistory = async (
     const { data } = await supabase
       .from("invoices")
       .select("*")
-      .eq("id", documentId)
+      .eq("id", validDocumentId)
       .eq("user_id", session.user.id)
       .single();
     document = data;

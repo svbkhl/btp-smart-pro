@@ -52,6 +52,71 @@ const Auth = () => {
       }
     };
 
+    // Gérer explicitement les callbacks Supabase Auth (invitation, magic link, etc.)
+    const handleAuthCallback = async () => {
+      // Vérifier si on est sur la route /auth/callback avec des paramètres
+      const isCallbackRoute = window.location.pathname === '/auth/callback';
+      const hasAuthParams = urlParams.has('code') || urlParams.has('token') || urlParams.has('access_token') || urlParams.has('error');
+      
+      if (isCallbackRoute && hasAuthParams) {
+        setLoading(true);
+        console.log('[Auth] Processing callback with params:', {
+          code: urlParams.has('code'),
+          token: urlParams.has('token'),
+          access_token: urlParams.has('access_token'),
+          error: urlParams.get('error'),
+          error_description: urlParams.get('error_description')
+        });
+
+        // Vérifier s'il y a une erreur dans l'URL
+        if (urlParams.has('error')) {
+          const errorMsg = urlParams.get('error_description') || urlParams.get('error') || 'Erreur lors de la connexion';
+          setError(errorMsg);
+          toast({
+            title: "Erreur de connexion",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          setLoading(false);
+          // Nettoyer l'URL
+          navigate('/auth', { replace: true });
+          return;
+        }
+
+        // Essayer de récupérer la session (Supabase devrait automatiquement traiter les paramètres)
+        try {
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('[Auth] Error getting session:', sessionError);
+            setError(sessionError.message || 'Erreur lors de la récupération de la session');
+            setLoading(false);
+            navigate('/auth', { replace: true });
+            return;
+          }
+
+          if (session?.user) {
+            console.log('[Auth] Session created successfully, redirecting...');
+            handlePostAuthNavigation(session.user);
+            // Nettoyer l'URL après redirection
+            navigate(window.location.pathname, { replace: true });
+          } else {
+            // Pas de session immédiate, attendre onAuthStateChange
+            console.log('[Auth] No immediate session, waiting for auth state change...');
+            setLoading(true);
+          }
+        } catch (callbackError: any) {
+          console.error('[Auth] Exception handling callback:', callbackError);
+          setError(callbackError?.message || 'Erreur lors du traitement du callback');
+          setLoading(false);
+          navigate('/auth', { replace: true });
+        }
+      }
+    };
+
+    // Exécuter le handler de callback si nécessaire
+    handleAuthCallback();
+
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -61,10 +126,22 @@ const Auth = () => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Auth state changed:', { event, hasSession: !!session, hasUser: !!session?.user });
+      
       if (event === "PASSWORD_RECOVERY") {
         setIsResetDialogOpen(true);
         setLoading(false);
         return;
+      }
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (session?.user) {
+          handlePostAuthNavigation(session.user);
+          // Nettoyer l'URL si on est sur /auth/callback
+          if (window.location.pathname === '/auth/callback') {
+            navigate(window.location.pathname, { replace: true });
+          }
+        }
       }
 
       if (session?.user) {
@@ -73,7 +150,7 @@ const Auth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, toast]);
 
 
   const handleSignIn = async (e: React.FormEvent) => {

@@ -12,14 +12,34 @@ export const ConnectWithStripe = () => {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
 
-  // Vérifier si Stripe est connecté (à implémenter avec une table ou user_settings)
-  // Pour l'instant, on simule avec localStorage
+  // Vérifier si Stripe est connecté en récupérant les données de Supabase
   useEffect(() => {
-    const connected = localStorage.getItem("stripe_connected") === "true";
-    const accountId = localStorage.getItem("stripe_account_id");
-    setStripeConnected(connected);
-    setStripeAccountId(accountId);
-  }, []);
+    const checkStripeConnection = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('stripe_account_id, stripe_connected')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error checking Stripe connection:', error);
+          return;
+        }
+
+        if (data?.stripe_account_id && data?.stripe_connected) {
+          setStripeConnected(true);
+          setStripeAccountId(data.stripe_account_id);
+        }
+      } catch (error) {
+        console.error('Error checking Stripe connection:', error);
+      }
+    };
+
+    checkStripeConnection();
+  }, [user]);
 
   const handleConnect = async () => {
     if (!user) {
@@ -33,46 +53,64 @@ export const ConnectWithStripe = () => {
 
     setLoading(true);
     try {
-      // TODO: Implémenter la connexion Stripe Connect
-      // Pour l'instant, on simule
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      console.log('🔗 Creating Stripe Connect link...');
       
-      // Simuler la connexion
-      const mockAccountId = `acct_${Math.random().toString(36).substring(7)}`;
-      localStorage.setItem("stripe_connected", "true");
-      localStorage.setItem("stripe_account_id", mockAccountId);
-      setStripeConnected(true);
-      setStripeAccountId(mockAccountId);
-
-      toast({
-        title: "Stripe connecté",
-        description: "Votre compte Stripe a été connecté avec succès.",
+      // Appeler l'Edge Function pour créer le lien Stripe Connect
+      const { data, error } = await supabase.functions.invoke('stripe-create-account-link', {
+        body: { user_id: user.id },
       });
+
+      if (error) {
+        console.error('❌ Error creating Stripe link:', error);
+        throw error;
+      }
+
+      if (!data?.url) {
+        throw new Error('No URL returned from Stripe');
+      }
+
+      console.log('✅ Stripe link created, redirecting...');
+
+      // Rediriger vers Stripe pour l'onboarding
+      window.location.href = data.url;
+
     } catch (error: any) {
+      console.error('❌ Error connecting Stripe:', error);
       toast({
         title: "Erreur",
-        description: error.message || "Impossible de connecter Stripe",
+        description: error.message || "Impossible de créer le lien Stripe Connect",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
+    // Note: on ne met pas setLoading(false) ici car on redirige vers Stripe
   };
 
   const handleDisconnect = async () => {
+    if (!user) return;
+
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      localStorage.removeItem("stripe_connected");
-      localStorage.removeItem("stripe_account_id");
+      // Mettre à jour la base de données pour marquer la déconnexion
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          stripe_connected: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
       setStripeConnected(false);
       setStripeAccountId(null);
 
       toast({
         title: "Stripe déconnecté",
-        description: "Votre compte Stripe a été déconnecté.",
+        description: "Votre compte Stripe a été déconnecté. Vous pouvez le reconnecter à tout moment.",
       });
     } catch (error: any) {
+      console.error('Error disconnecting Stripe:', error);
       toast({
         title: "Erreur",
         description: error.message || "Impossible de déconnecter Stripe",

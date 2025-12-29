@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { extractUUID } from '@/utils/uuidExtractor';
 
 /**
  * Service pour archiver/désarchiver des éléments
@@ -43,10 +44,16 @@ export async function unarchiveProject(projectId: string): Promise<void> {
  */
 export async function archiveQuote(quoteId: string): Promise<void> {
   try {
+    // Extraire l'UUID valide si l'ID contient un suffixe
+    const validUuid = extractUUID(quoteId);
+    if (!validUuid) {
+      throw new Error("Format d'ID de devis invalide");
+    }
+
     const { error } = await supabase
       .from('ai_quotes')
       .update({ archived: true, archived_at: new Date().toISOString() })
-      .eq('id', quoteId);
+      .eq('id', validUuid); // Utiliser l'UUID extrait
 
     if (error) throw error;
   } catch (error) {
@@ -60,10 +67,16 @@ export async function archiveQuote(quoteId: string): Promise<void> {
  */
 export async function unarchiveQuote(quoteId: string): Promise<void> {
   try {
+    // Extraire l'UUID valide si l'ID contient un suffixe
+    const validUuid = extractUUID(quoteId);
+    if (!validUuid) {
+      throw new Error("Format d'ID de devis invalide");
+    }
+
     const { error } = await supabase
       .from('ai_quotes')
       .update({ archived: false, archived_at: null })
-      .eq('id', quoteId);
+      .eq('id', validUuid); // Utiliser l'UUID extrait
 
     if (error) throw error;
   } catch (error) {
@@ -139,6 +152,8 @@ export async function unarchiveClient(clientId: string): Promise<void> {
     throw error;
   }
 }
+
+
 
 
 

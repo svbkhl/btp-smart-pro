@@ -6,6 +6,7 @@ import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_QUOTES } from "@/fakeData/quotes";
 import { generateQuoteNumber } from "@/utils/documentNumbering";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { extractUUID } from "@/utils/uuidExtractor";
 
 export interface Quote {
   id: string;
@@ -73,7 +74,24 @@ export const useQuotes = () => {
             .order("created_at", { ascending: false });
 
           if (error) throw error;
-          return (data || []) as Quote[];
+          
+          // ⚠️ SÉCURITÉ : S'assurer que tous les IDs sont des UUID purs (sans suffixe)
+          // Si un ID contient un suffixe, l'extraire
+          const cleanedData = (data || []).map((quote: any) => {
+            if (quote.id && quote.id.length > 36) {
+              const validId = extractUUID(quote.id);
+              if (validId && validId !== quote.id) {
+                console.warn("⚠️ [useQuotes] Quote avec ID contenant suffixe détecté:", { 
+                  originalId: quote.id, 
+                  cleanedId: validId 
+                });
+                return { ...quote, id: validId };
+              }
+            }
+            return quote;
+          });
+          
+          return cleanedData as Quote[];
         },
         [],
         "useQuotes"
@@ -88,6 +106,7 @@ export const useQuotes = () => {
 };
 
 // Hook pour récupérer un devis par ID
+// L'ID peut contenir un suffixe de sécurité (ex: "uuid-suffix")
 export const useQuote = (id: string | undefined) => {
   const { user } = useAuth();
 
@@ -98,10 +117,25 @@ export const useQuote = (id: string | undefined) => {
         async () => {
           if (!user || !id) throw new Error("User not authenticated or no ID provided");
 
+          // Extraire l'UUID valide (peut contenir un suffixe)
+          const validUuid = extractUUID(id);
+          if (!validUuid) {
+            console.error("❌ [useQuote] Impossible d'extraire l'UUID de:", id);
+            throw new Error("Invalid quote ID format");
+          }
+
+          // ⚠️ LOG si l'ID original contenait un suffixe
+          if (id !== validUuid) {
+            console.warn("⚠️ [useQuote] ID avec suffixe détecté, utilisation de l'UUID extrait:", { 
+              originalId: id, 
+              extractedUuid: validUuid 
+            });
+          }
+
           const { data, error } = await supabase
             .from("ai_quotes")
             .select("*")
-            .eq("id", id)
+            .eq("id", validUuid) // Utiliser l'UUID extrait, pas l'ID complet
             .eq("user_id", user.id)
             .single();
 
@@ -170,10 +204,14 @@ export const useCreateQuote = () => {
             });
             
             // Mettre à jour le statut
-            await supabase
-              .from("ai_quotes")
-              .update({ status: "sent", sent_at: new Date().toISOString() })
-              .eq("id", quote.id);
+            // Extraire l'UUID valide au cas où quote.id contiendrait un suffixe
+            const validQuoteId = extractUUID(quote.id);
+            if (validQuoteId) {
+              await supabase
+                .from("ai_quotes")
+                .update({ status: "sent", sent_at: new Date().toISOString() })
+                .eq("id", validQuoteId);
+            }
 
             toast({
               title: "Devis créé et envoyé",
@@ -221,10 +259,16 @@ export const useUpdateQuote = () => {
     mutationFn: async ({ id, ...quoteData }: UpdateQuoteData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Extraire l'UUID valide si l'ID contient un suffixe
+      const validUuid = extractUUID(id);
+      if (!validUuid) {
+        throw new Error("Invalid quote ID format");
+      }
+
       const { data, error } = await supabase
         .from("ai_quotes")
         .update(quoteData)
-        .eq("id", id)
+        .eq("id", validUuid) // Utiliser l'UUID extrait
         .eq("user_id", user.id)
         .select()
         .single();
@@ -260,10 +304,16 @@ export const useDeleteQuote = () => {
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Extraire l'UUID valide si l'ID contient un suffixe
+      const validUuid = extractUUID(id);
+      if (!validUuid) {
+        throw new Error("Invalid quote ID format");
+      }
+
       const { error } = await supabase
         .from("ai_quotes")
         .delete()
-        .eq("id", id)
+        .eq("id", validUuid) // Utiliser l'UUID extrait
         .eq("user_id", user.id);
 
       if (error) throw error;

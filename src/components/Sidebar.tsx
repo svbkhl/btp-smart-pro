@@ -97,8 +97,8 @@ const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null 
   },
   {
     items: [
-      // 9️⃣ Messagerie
-      { icon: Mail, label: "Emails envoyés", path: "/messaging", feature: "messagerie" },
+      // 9️⃣ Messagerie (toujours visible)
+      { icon: Mail, label: "Messagerie", path: "/messaging", feature: null },
     ],
   },
 ];

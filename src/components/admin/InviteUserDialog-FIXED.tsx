@@ -51,6 +51,7 @@ export const InviteUserDialog = ({
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'owner' | 'admin' | 'member'>(defaultRole);
+  const [success, setSuccess] = useState(false);
 
   // Vérifier que companyId est chargé avant de permettre l'ouverture du dialog
   const isCompanyIdReady = companyId && companyId.trim() !== '';
@@ -154,9 +155,23 @@ export const InviteUserDialog = ({
         throw new Error('Aucune réponse de la fonction');
       }
 
+      // Si l'utilisateur existe déjà (success: false avec message), afficher un message informatif
+      if (data?.success === false && data?.message) {
+        console.log('ℹ️ [InviteUserDialog] User already exists:', data);
+        toast({
+          title: 'Utilisateur existant',
+          description: data.message,
+          variant: 'default',
+        });
+        setEmail('');
+        setOpen(false);
+        onSuccess?.();
+        return;
+      }
+
       if (!data.success) {
         // Construire un message d'erreur détaillé
-        let errorMsg = 'La fonction n\'a pas retourné de succès';
+        let errorMsg = data?.message || 'La fonction n\'a pas retourné de succès';
         
         if (data.error) {
           errorMsg = data.error;
@@ -176,14 +191,19 @@ export const InviteUserDialog = ({
 
       console.log('✅ [InviteUserDialog] Invitation sent successfully:', data);
 
+      setSuccess(true);
       toast({
-        title: 'Invitation envoyée',
-        description: `Une invitation a été envoyée à ${email}`,
+        title: 'Invitation envoyée avec succès !',
+        description: data?.message || `Une invitation a été envoyée à ${email}`,
       });
 
-      setEmail('');
-      setOpen(false);
-      onSuccess?.();
+      // Réinitialiser après 2 secondes pour permettre de voir le message
+      setTimeout(() => {
+        setEmail('');
+        setSuccess(false);
+        setOpen(false);
+        onSuccess?.();
+      }, 2000);
     } catch (error: any) {
       console.error('❌ [InviteUserDialog] Error sending invitation:', error);
       
@@ -268,11 +288,20 @@ export const InviteUserDialog = ({
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading} className="gap-2 rounded-xl">
+            <Button 
+              type="submit" 
+              disabled={loading || success} 
+              className={`gap-2 rounded-xl ${success ? 'bg-green-600 hover:bg-green-700' : ''}`}
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Envoi...
+                </>
+              ) : success ? (
+                <>
+                  <Mail className="h-4 w-4" />
+                  Invitation envoyée avec succès !
                 </>
               ) : (
                 <>
@@ -287,6 +316,8 @@ export const InviteUserDialog = ({
     </Dialog>
   );
 };
+
+
 
 
 

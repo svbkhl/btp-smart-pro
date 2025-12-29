@@ -154,3 +154,12 @@ verify_jwt = false
 
 [functions.generate-stats]
 verify_jwt = false
+
+[functions.send-invitation]
+verify_jwt = false
+
+[functions.create-public-payment-session]
+verify_jwt = false
+
+[functions.get-public-document]
+verify_jwt = false

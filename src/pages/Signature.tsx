@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle2, FileText, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { extractUUID } from "@/utils/uuidExtractor";
 
 export default function SignaturePage() {
   const { id } = useParams<{ id: string }>();
@@ -30,20 +31,26 @@ export default function SignaturePage() {
 
     const loadDocument = async () => {
       if (signature.quote_id) {
+        // Extraire l'UUID valide si nécessaire (signature.quote_id vient de la DB donc devrait être valide, mais on vérifie quand même)
+        const validQuoteId = extractUUID(signature.quote_id) || signature.quote_id;
+        
         const { data, error } = await supabase
           .from("ai_quotes")
           .select("*")
-          .eq("id", signature.quote_id)
+          .eq("id", validQuoteId) // Utiliser l'UUID extrait ou l'ID original
           .single();
 
         if (!error && data) {
           setQuote(data);
         }
       } else if (signature.invoice_id) {
+        // Extraire l'UUID valide si nécessaire
+        const validInvoiceId = extractUUID(signature.invoice_id) || signature.invoice_id;
+        
         const { data, error } = await supabase
           .from("invoices")
           .select("*")
-          .eq("id", signature.invoice_id)
+          .eq("id", validInvoiceId) // Utiliser l'UUID extrait ou l'ID original
           .single();
 
         if (!error && data) {

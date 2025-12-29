@@ -16,6 +16,20 @@ export const FloatingAIAssistant = () => {
   const { toast } = useToast();
   const location = useLocation();
   const queryClient = useQueryClient();
+  
+  // Ne pas afficher le bouton sur les pages d'erreur (404, etc.)
+  // Vérifier si on est sur une route qui n'existe pas (détectée par React Router)
+  // Les routes invalides sont généralement celles qui ne correspondent à aucune route définie
+  // On peut détecter cela en vérifiant si le pathname ne correspond à aucune route connue
+  // Pour simplifier, on cache le bouton si le pathname contient des segments suspects
+  const isErrorPage = location.pathname.includes('/404') || 
+                      location.pathname.includes('/error') ||
+                      location.pathname.includes('/not-found');
+  
+  // Si c'est une page d'erreur, ne pas afficher le bouton
+  if (isErrorPage) {
+    return null;
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [message, setMessage] = useState("");

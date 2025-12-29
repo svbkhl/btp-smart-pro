@@ -25,3 +25,10 @@ COMMENT ON COLUMN public.user_settings.auto_send_email IS 'Active l''envoi autom
 
 
 
+
+
+
+
+
+
+

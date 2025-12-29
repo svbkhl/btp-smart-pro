@@ -281,3 +281,10 @@ export class SumUpAdapter implements IPaymentProvider {
 
 
 
+
+
+
+
+
+
+

@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import { Loader2, Mail, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,12 +45,12 @@ export const InviteUserDialog = ({
   trigger,
   onSuccess,
 }: InviteUserDialogProps) => {
-  const { toast } = useToast();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'owner' | 'admin' | 'member'>(defaultRole);
+  const [success, setSuccess] = useState(false);
 
   // Vérifier que companyId est chargé avant de permettre l'ouverture du dialog
   const isCompanyIdReady = companyId && companyId.trim() !== '';
@@ -71,12 +71,38 @@ export const InviteUserDialog = ({
     setLoading(true);
 
     try {
-      // Appeler UNIQUEMENT l'Edge Function avec l'email
-      const { data, error } = await supabase.functions.invoke('send-invitation', {
-        body: { email: email.trim().toLowerCase() },
+      // Vérifier que l'utilisateur est connecté
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session) {
+        toast({
+          title: 'Erreur',
+          description: 'Vous devez être connecté pour envoyer une invitation',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const emailToSend = email.trim().toLowerCase();
+      // Envoyer email + rôle + companyId
+      const requestBody = { 
+        email: emailToSend,
+        role: role,
+        companyId: companyId
+      };
+      
+      console.log("📤 Sending invitation request - Body:", JSON.stringify(requestBody));
+      console.log("🔐 User session:", session.session?.user?.email);
+
+      // Utiliser supabase.functions.invoke qui gère automatiquement l'authentification
+      // et envoie correctement le body JSON
+      const { data, error } = await supabase.functions.invoke("send-invitation", {
+        body: requestBody, // { email: "..." } - supabase le sérialise automatiquement
       });
 
+      console.log("📥 Response received:", { data, error });
+
       if (error) {
+        console.error("❌ Supabase function error:", error);
         // Extraire le message d'erreur
         let errorMessage = error.message || 'Impossible d\'envoyer l\'invitation';
         
@@ -86,45 +112,85 @@ export const InviteUserDialog = ({
             const errorBody = typeof error.context.body === 'string' 
               ? JSON.parse(error.context.body) 
               : error.context.body;
-            if (errorBody.error) {
+            console.log("📋 Error body:", errorBody);
+            if (errorBody?.error) {
               errorMessage = errorBody.error;
             }
+            if (errorBody?.details) {
+              errorMessage += ` - ${errorBody.details}`;
+            }
           } catch (e) {
-            // Ignorer l'erreur de parsing
+            console.error("❌ Error parsing error body:", e);
           }
         }
         
-        throw new Error(errorMessage);
+        toast({
+          title: 'Erreur',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        return;
       }
 
-      // Vérifier la réponse
-      if (data?.success === true || data?.error) {
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        
-        // Succès
+      // Vérifier le format de réponse
+      // Format attendu : { success: boolean, message: string, ... }
+      
+      // Si l'utilisateur existe déjà (success: false avec message approprié)
+      if (data?.success === false && data?.message) {
         toast({
-          title: '✅ Invitation envoyée avec succès',
-          description: `Une invitation a été envoyée à ${email}`,
-          duration: 5000,
+          title: 'Utilisateur existant',
+          description: data.message,
+          variant: 'default', // Pas destructif, juste informatif
         });
-
         setEmail('');
         setOpen(false);
-        onSuccess?.();
-      } else {
-        throw new Error('Réponse inattendue de la fonction');
+        onSuccess?.(); // On considère que c'est un succès (l'utilisateur existe déjà)
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ Error sending invitation:', error);
-      
-      // Toast d'erreur avec le message exact
+
+      // Succès - invitation envoyée
+      if (data?.success === true) {
+        setSuccess(true);
+        toast({
+          title: 'Invitation envoyée avec succès !',
+          description: data?.message || `Une invitation a été envoyée à ${emailToSend}`,
+        });
+        
+        // Réinitialiser après 2 secondes pour permettre de voir le message
+        setTimeout(() => {
+          setEmail('');
+          setSuccess(false);
+          setOpen(false);
+          onSuccess?.();
+        }, 2000);
+        return;
+      }
+
+      // Vérifier si data contient une erreur (ancien format)
+      if (data?.error) {
+        console.error("❌ Function returned error:", data.error);
+        toast({
+          title: 'Erreur',
+          description: data.error + (data.details ? ` - ${data.details}` : ''),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Réponse inattendue
+      console.warn("⚠️ Unexpected response format:", data);
       toast({
-        title: '❌ Erreur',
-        description: error.message || 'Impossible d\'envoyer l\'invitation. Veuillez réessayer.',
+        title: 'Réponse inattendue',
+        description: 'Le serveur a retourné une réponse inattendue. Veuillez réessayer.',
         variant: 'destructive',
-        duration: 5000,
+      });
+
+    } catch (e: any) {
+      console.error('❌ Error sending invitation:', e);
+      toast({
+        title: 'Erreur',
+        description: e.message || 'Erreur inconnue',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -193,11 +259,20 @@ export const InviteUserDialog = ({
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading} className="gap-2 rounded-xl">
+            <Button 
+              type="submit" 
+              disabled={loading || success} 
+              className={`gap-2 rounded-xl ${success ? 'bg-green-600 hover:bg-green-700' : ''}`}
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Envoi...
+                </>
+              ) : success ? (
+                <>
+                  <Mail className="h-4 w-4" />
+                  Invitation envoyée avec succès !
                 </>
               ) : (
                 <>

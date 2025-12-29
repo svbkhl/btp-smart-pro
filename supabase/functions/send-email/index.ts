@@ -175,9 +175,19 @@ serve(async (req) => {
     // Générer le lien de signature si quote_id est fourni
     let signatureUrl: string | null = null;
     if (quote_id) {
-      const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("VITE_APP_URL") || "https://btpsmartpro.com";
+      // Récupérer l'URL de base depuis les variables d'environnement ou user_settings
+      let APP_URL = Deno.env.get("APP_URL") || 
+                    Deno.env.get("VITE_APP_URL") || 
+                    Deno.env.get("PUBLIC_URL") ||
+                    Deno.env.get("PRODUCTION_URL") ||
+                    "https://btpsmartpro.com";
+      
+      // Nettoyer l'URL (enlever le slash final)
+      APP_URL = APP_URL.replace(/\/$/, "");
+      
       signatureUrl = `${APP_URL}/sign/${quote_id}`;
       console.log("📝 [send-email] Lien de signature généré:", signatureUrl);
+      console.log("📝 [send-email] quote_id utilisé:", quote_id);
     }
 
     // Préparer le contenu HTML avec signature et lien de signature
@@ -427,13 +437,30 @@ serve(async (req) => {
       const document_id = quote_id || invoice_id || null;
       const document_type = quote_id ? "quote" : invoice_id ? "invoice" : null;
 
+      // Déterminer le type d'email basé sur le contexte
+      // Si un lien de signature a été ajouté, c'est une demande de signature
+      const hasSignatureLink = !!(signatureUrl && quote_id);
+      let emailType: string;
+      
+      if (hasSignatureLink) {
+        emailType = "signature_request";
+      } else if (quote_id) {
+        emailType = "quote_sent";
+      } else if (invoice_id) {
+        emailType = "signature_request"; // Les factures sont généralement pour signature
+      } else if (type && ["quote_sent", "signature_request", "reminder", "generic"].includes(type)) {
+        emailType = type;
+      } else {
+        emailType = "generic"; // Par défaut si aucun contexte
+      }
+
       const insertData: any = {
         user_id: user.id,
         recipient_email: to,
         subject,
         body_html: htmlWithSignature || null,
         body_text: textWithSignature || text || null,
-        email_type: type,
+        email_type: emailType, // Toujours défini, jamais null
         status: "sent",
         external_id: emailId,
         sent_at: new Date().toISOString(),
@@ -458,6 +485,7 @@ serve(async (req) => {
         if (insertError.message?.includes("document_id")) {
           console.warn("⚠️ Colonne document_id manquante, insertion sans cette colonne");
           const { document_id: _, document_type: __, ...dataWithoutDocId } = insertData;
+          // email_type est déjà présent dans insertData, donc il sera conservé dans dataWithoutDocId
           await supabaseClient.from("email_messages").insert(dataWithoutDocId);
         } else {
           throw insertError;

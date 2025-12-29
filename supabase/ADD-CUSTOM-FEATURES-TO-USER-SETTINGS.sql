@@ -98,3 +98,10 @@ COMMENT ON COLUMN public.user_settings.custom_status IS 'Statut personnalisé (a
 
 
 
+
+
+
+
+
+
+

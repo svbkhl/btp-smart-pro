@@ -96,3 +96,10 @@ Après avoir configuré votre rôle admin, vérifiez que tout fonctionne :
 
 
 
+
+
+
+
+
+
+

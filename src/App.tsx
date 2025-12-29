@@ -49,6 +49,7 @@ import RHTaches from './pages/RHTaches';
 import AdminEmployees from './pages/AdminEmployees';
 import AdminCompanies from './pages/AdminCompanies';
 import AcceptInvitation from './pages/AcceptInvitation';
+import StripeCallback from './pages/StripeCallback';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
+        <Route path="/stripe-callback" element={<StripeCallback />} />
         <Route path="/demo" element={<Demo />} />
         <Route path="/sign/:quoteId" element={<SignaturePage />} />
         <Route path="/quote/:id" element={<QuotePage />} />

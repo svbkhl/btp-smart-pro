@@ -5,7 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ThemeProvider } from './components/ThemeProvider';
 import { SidebarProvider } from './contexts/SidebarContext';
+import { initEnv } from './lib/env';
 import './index.css';
+
+// Valider les variables d'environnement au démarrage
+initEnv();
 
 const queryClient = new QueryClient({
   defaultOptions: {

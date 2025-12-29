@@ -12,9 +12,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle2, FileText, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { extractUUID } from "@/utils/uuidExtractor";
 
 export default function SignaturePage() {
-  const { quoteId } = useParams<{ quoteId: string }>();
+  const { quoteId: rawQuoteId } = useParams<{ quoteId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -22,43 +23,71 @@ export default function SignaturePage() {
   const [quote, setQuote] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Charger le devis
+  // Extraire l'UUID du paramètre d'URL (peut contenir un suffixe de sécurité)
+  const quoteId = rawQuoteId ? extractUUID(rawQuoteId) : null;
+
+  // Charger le devis via Edge Function publique
   useEffect(() => {
-    if (!quoteId) {
+    if (!rawQuoteId) {
       setError("ID du devis manquant");
+      setLoading(false);
+      return;
+    }
+
+    if (!quoteId) {
+      console.error("❌ Impossible d'extraire l'UUID de:", rawQuoteId);
+      setError("Format d'ID invalide");
       setLoading(false);
       return;
     }
 
     const loadQuote = async () => {
       try {
-        const { data, error: quoteError } = await supabase
-          .from("ai_quotes")
-          .select("*")
-          .eq("id", quoteId)
-          .single();
+        // Utiliser l'Edge Function get-public-document pour récupérer le devis
+        // Cela permet d'accéder au devis sans authentification (pour les clients)
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+        const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-        if (quoteError) {
-          console.error("❌ Erreur chargement devis:", quoteError);
+        console.log("🔍 [SignaturePage] Chargement du devis:", { rawQuoteId, extractedUUID: quoteId });
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/get-public-document`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            quote_id: quoteId, // Utiliser l'UUID extrait, pas l'ID complet
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+          console.error("❌ Erreur chargement devis:", errorData);
+          setError(errorData.error || "Devis introuvable");
+          setLoading(false);
+          return;
+        }
+
+        const result = await response.json();
+
+        if (!result.document) {
           setError("Devis introuvable");
           setLoading(false);
           return;
         }
 
-        if (!data) {
-          setError("Devis introuvable");
-          setLoading(false);
-          return;
-        }
+        // Le document retourné contient maintenant toutes les données nécessaires
+        const quoteData = result.document;
 
         // Vérifier si déjà signé
-        if (data.signed && data.signed_at) {
-          setQuote(data);
+        if (quoteData.signed && quoteData.signed_at) {
+          setQuote(quoteData);
           setLoading(false);
           return;
         }
 
-        setQuote(data);
+        setQuote(quoteData);
         setLoading(false);
       } catch (err: any) {
         console.error("❌ Erreur:", err);
@@ -68,26 +97,39 @@ export default function SignaturePage() {
     };
 
     loadQuote();
-  }, [quoteId]);
+  }, [rawQuoteId, quoteId]);
 
   const handleSign = async () => {
     if (!quoteId || !quote) return;
 
     setSigning(true);
     try {
-      // Mettre à jour le devis
-      const { error: updateError } = await supabase
-        .from("ai_quotes")
-        .update({
-          signed: true,
-          signed_at: new Date().toISOString(),
-          status: "signed",
-        })
-        .eq("id", quoteId);
+      // Utiliser l'Edge Function sign-quote pour signer le devis sans authentification
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      if (updateError) {
-        console.error("❌ Erreur signature:", updateError);
-        throw new Error(`Impossible de signer le devis: ${updateError.message}`);
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/sign-quote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          quote_id: quoteId, // Utiliser l'UUID extrait
+          signer_name: quote.client_name || "Client",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+        console.error("❌ Erreur signature:", errorData);
+        throw new Error(errorData.error || "Impossible de signer le devis");
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Impossible de signer le devis");
       }
 
       console.log("✅ Devis signé avec succès:", quoteId);
@@ -98,14 +140,25 @@ export default function SignaturePage() {
       });
 
       // Recharger le devis pour afficher le statut mis à jour
-      const { data: updatedQuote } = await supabase
-        .from("ai_quotes")
-        .select("*")
-        .eq("id", quoteId)
-        .single();
+      // quoteId est déjà l'UUID extrait
+      if (quoteId) {
+        const reloadResponse = await fetch(`${SUPABASE_URL}/functions/v1/get-public-document`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            quote_id: quoteId,
+          }),
+        });
 
-      if (updatedQuote) {
-        setQuote(updatedQuote);
+        if (reloadResponse.ok) {
+          const reloadResult = await reloadResponse.json();
+          if (reloadResult.document) {
+            setQuote(reloadResult.document);
+          }
+        }
       }
 
       // Rediriger après 2 secondes
@@ -205,7 +258,7 @@ export default function SignaturePage() {
               Signature du devis
             </CardTitle>
             <CardDescription>
-              Devis {quote.quote_number || quoteId}
+              Devis {quote.quote_number || quoteId || rawQuoteId}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -266,6 +319,8 @@ export default function SignaturePage() {
     </div>
   );
 }
+
+
 
 
 

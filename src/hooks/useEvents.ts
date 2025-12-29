@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_EVENTS } from "@/fakeData/calendar";
 import { MOCK_EVENTS } from "@/utils/mockData"; // Pour compatibilité
+import { useAuth } from "./useAuth";
 
 export interface Event {
   id: string;
@@ -186,11 +187,9 @@ export const useTodayEvents = () => {
             })
           );
 
-          return eventsWithProjects;
-
           // Retourner les vraies données (même si vide)
           // queryWithTimeout gère le fallback automatiquement
-          return events;
+          return eventsWithProjects;
         },
         FAKE_EVENTS.filter(e => {
           const today = new Date();
@@ -214,38 +213,103 @@ export const useTodayEvents = () => {
 // Créer un événement
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
-      // Nettoyer les données pour éviter les valeurs undefined
-      const cleanData: any = {
+      // Vérifier que l'utilisateur est connecté
+      if (!user) {
+        throw new Error("Vous devez être connecté pour créer un événement");
+      }
+
+      // Récupérer l'ID utilisateur de manière sécurisée
+      const { data: userData } = await supabase.auth.getUser();
+      const user_id = userData?.user?.id;
+
+      if (!user_id) {
+        throw new Error("Impossible de récupérer l'ID utilisateur");
+      }
+
+      // Vérifier que start_date est présent et valide
+      if (!data.start_date || typeof data.start_date !== 'string') {
+        throw new Error('start_date is required and must be a valid ISO string');
+      }
+
+      // Construire l'objet d'insertion - NE JAMAIS inclure 'id' ou utiliser .eq() sur un insert
+      const insertData: any = {
+        user_id: user_id, // ✅ OBLIGATOIRE : Inclure le user_id
+        title: data.title,
+        start_date: data.start_date,
         all_day: data.all_day ?? false,
         type: data.type ?? "meeting",
         color: data.color ?? "#3b82f6",
       };
 
-      // Ajouter uniquement les champs définis
-      if (data.project_id) cleanData.project_id = data.project_id;
-      if (data.title) cleanData.title = data.title;
-      if (data.description) cleanData.description = data.description;
-      if (data.start_date) cleanData.start_date = data.start_date;
-      if (data.end_date) cleanData.end_date = data.end_date;
-      if (data.location) cleanData.location = data.location;
-      if (data.reminder_minutes !== undefined) cleanData.reminder_minutes = data.reminder_minutes;
-      if (data.reminder_recurring !== undefined) cleanData.reminder_recurring = data.reminder_recurring;
+      // Ajouter uniquement les champs optionnels s'ils sont définis
+      if (data.description) insertData.description = data.description;
+      if (data.end_date) insertData.end_date = data.end_date;
+      if (data.location) insertData.location = data.location;
+      
+      // ⚠️ IMPORTANT : Valider project_id pour éviter les UUID invalides
+      // Ne jamais accepter "events", "none", "", ou toute autre chaîne non-UUID
+      if (data.project_id && 
+          data.project_id.trim() !== "" &&
+          data.project_id !== "none" && 
+          data.project_id !== "events" &&
+          data.project_id !== "null" &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.project_id)) {
+        insertData.project_id = data.project_id;
+      } else if (data.project_id) {
+        // Log si project_id est fourni mais n'est pas un UUID valide
+        console.warn("⚠️ [useCreateEvent] project_id invalide ignoré:", data.project_id);
+      }
+      // Si project_id est invalide, ne pas l'inclure (sera NULL dans la DB)
+      
+      if (data.reminder_minutes !== undefined) insertData.reminder_minutes = data.reminder_minutes;
+      if (data.reminder_recurring !== undefined) insertData.reminder_recurring = data.reminder_recurring;
 
-      // Vérifier que start_date est présent et valide
-      if (!cleanData.start_date || typeof cleanData.start_date !== 'string') {
-        throw new Error('start_date is required and must be a valid ISO string');
+      // ⚠️ Vérification finale AVANT l'insertion : S'assurer qu'aucun champ UUID ne contient "events"
+      // Vérifier tous les champs qui pourraient être des UUID
+      const uuidFields = ['user_id', 'project_id'];
+      for (const field of uuidFields) {
+        if (insertData[field] === "events" || insertData[field] === "none" || insertData[field] === "") {
+          console.error(`❌ [useCreateEvent] ERREUR : Valeur invalide '${insertData[field]}' détectée dans ${field}!`, {
+            field,
+            value: insertData[field],
+            allFields: insertData,
+          });
+          // Supprimer le champ invalide au lieu de throw pour éviter de bloquer
+          delete insertData[field];
+        }
       }
 
+      // Log pour déboguer - Vérifier tous les champs UUID
+      console.log("🔍 [useCreateEvent] Insertion événement:", {
+        user_id: insertData.user_id,
+        project_id: insertData.project_id,
+        title: insertData.title,
+        start_date: insertData.start_date,
+        auth_uid: user_id,
+        allFields: insertData, // ✅ Afficher tous les champs pour déboguer
+      });
+
+      // ⚠️ IMPORTANT : Insertion simple sans aucun filtre .eq()
+      // Ne jamais utiliser .eq("id", ...) ou tout autre filtre lors d'un insert
       const { data: event, error } = await supabase
         .from("events")
-        .insert(cleanData)
-        .select()
-        .single();
+        .insert([insertData]) // ✅ Utiliser un tableau
+        .select("*") // ✅ Sélectionner toutes les colonnes retournées
+        .single(); // ✅ Retourner un seul objet
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ [useCreateEvent] Erreur insertion:", error);
+        console.error("Code:", error.code);
+        console.error("Message:", error.message);
+        console.error("Details:", error.details);
+        throw error;
+      }
+      
+      console.log("✅ [useCreateEvent] Événement créé:", event);
       return event as Event;
     },
     onSuccess: () => {

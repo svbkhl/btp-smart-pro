@@ -82,3 +82,10 @@ FROM public.companies;
 
 
 
+
+
+
+
+
+
+

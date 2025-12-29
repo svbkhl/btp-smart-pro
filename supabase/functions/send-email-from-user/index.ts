@@ -507,13 +507,17 @@ serve(async (req) => {
           .eq("user_id", user.id);
 
         // Logger l'email
+        // Déterminer le type d'email : si le devis contient un lien de signature, c'est "signature_request", sinon "quote_sent"
+        const hasSignatureLink = emailHtml?.includes("/sign/") || emailText?.includes("/sign/");
+        const emailType = hasSignatureLink ? "signature_request" : "quote_sent";
+        
         await supabaseClient.from("email_messages").insert({
           user_id: user.id,
           recipient_email: clientEmail,
           subject: `Devis ${quoteNumber} - ${clientName}`,
           body_html: emailHtml,
           body_text: emailText,
-          email_type: "quote",
+          email_type: emailType, // Utiliser le type déterminé
           status: "sent",
           external_id: result.email_id,
           sent_at: new Date().toISOString(),
@@ -538,13 +542,17 @@ serve(async (req) => {
       console.error("❌ [send-email-from-user] Erreur envoi email:", error);
 
       // Logger l'erreur
+      // Déterminer le type d'email même en cas d'erreur
+      const hasSignatureLink = emailHtml?.includes("/sign/") || emailText?.includes("/sign/");
+      const emailType = hasSignatureLink ? "signature_request" : "quote_sent";
+      
       await supabaseClient.from("email_messages").insert({
         user_id: user.id,
         recipient_email: clientEmail,
         subject: `Devis ${quoteNumber} - ${clientName}`,
         body_html: emailHtml,
         body_text: emailText,
-        email_type: "quote",
+        email_type: emailType, // Utiliser le type déterminé
         status: "failed",
         error_message: error.message,
         quote_id: quoteId,

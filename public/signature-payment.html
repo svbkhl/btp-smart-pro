@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature et Paiement - Devis</title>
+    <link rel="stylesheet" href="/signature-payment.css">
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête -->
+        <header class="header">
+            <h1>📄 Signature et Paiement</h1>
+            <p class="subtitle">Veuillez signer le devis ci-dessous pour procéder au paiement</p>
+        </header>
+
+        <!-- Section Devis -->
+        <section id="quote-section" class="quote-section">
+            <div class="card">
+                <h2>Détails du Devis</h2>
+                <div class="quote-info">
+                    <div class="info-row">
+                        <span class="label">Numéro de devis :</span>
+                        <span id="quote-number" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Client :</span>
+                        <span id="quote-client" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Date :</span>
+                        <span id="quote-date" class="value">-</span>
+                    </div>
+                    <div class="info-row highlight">
+                        <span class="label">Montant total :</span>
+                        <span id="quote-amount" class="value amount">-</span>
+                    </div>
+                    <div id="quote-details" class="quote-details">
+                        <h3>Détails</h3>
+                        <p id="quote-description">-</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section Signature -->
+        <section id="signature-section" class="signature-section">
+            <div class="card">
+                <h2>Signature Électronique</h2>
+                <form id="signature-form">
+                    <div class="form-group">
+                        <label for="signer-name">Nom complet *</label>
+                        <input 
+                            type="text" 
+                            id="signer-name" 
+                            name="signer-name" 
+                            placeholder="Votre nom complet"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="signature-canvas">Signature *</label>
+                        <div class="canvas-container">
+                            <canvas id="signature-canvas" width="600" height="200"></canvas>
+                            <div class="canvas-controls">
+                                <button type="button" id="clear-signature" class="btn-secondary">
+                                    Effacer
+                                </button>
+                            </div>
+                        </div>
+                        <p class="hint">Signez avec votre souris ou votre doigt</p>
+                    </div>
+
+                    <button type="submit" id="submit-signature" class="btn-primary">
+                        <span id="submit-text">Signer le devis</span>
+                        <span id="submit-loading" class="loading" style="display: none;">
+                            ⏳ Signature en cours...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Section Paiement (cachée jusqu'à la signature) -->
+        <section id="payment-section" class="payment-section" style="display: none;">
+            <div class="card">
+                <h2>✅ Devis signé avec succès</h2>
+                <div class="success-message">
+                    <p>Merci d'avoir signé le devis. Vous pouvez maintenant procéder au paiement.</p>
+                </div>
+
+                <div class="payment-summary">
+                    <div class="summary-row">
+                        <span class="label">Montant à payer :</span>
+                        <span id="payment-amount" class="value amount">-</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="label">Devise :</span>
+                        <span id="payment-currency" class="value">EUR</span>
+                    </div>
+                </div>
+
+                <button id="pay-button" class="btn-payment">
+                    <span>💳 Payer maintenant</span>
+                </button>
+
+                <p class="security-note">
+                    🔒 Paiement sécurisé via Stripe. Vos données sont protégées.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section Confirmation (cachée) -->
+        <section id="confirmation-section" class="confirmation-section" style="display: none;">
+            <div class="card success">
+                <div class="success-icon">✅</div>
+                <h2>Paiement réussi !</h2>
+                <p>Votre paiement a été traité avec succès.</p>
+                <div id="payment-details" class="payment-details"></div>
+            </div>
+        </section>
+
+        <!-- Messages d'erreur -->
+        <div id="error-message" class="error-message" style="display: none;"></div>
+    </div>
+
+    <script src="/signature-payment.js"></script>
+</body>
+</html>
+
+
+
+
+
+

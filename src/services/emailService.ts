@@ -153,11 +153,18 @@ export const sendQuoteEmail = async (params: SendQuoteEmailParams) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
+  // Extraire l'UUID valide si l'ID contient un suffixe
+  const { extractUUID } = await import("@/utils/uuidExtractor");
+  const validQuoteId = extractUUID(params.quoteId);
+  if (!validQuoteId) {
+    throw new Error("Format d'ID de devis invalide");
+  }
+
   // Récupérer le devis
   const { data: quote, error: quoteError } = await supabase
     .from("ai_quotes")
     .select("*")
-    .eq("id", params.quoteId)
+    .eq("id", validQuoteId) // Utiliser l'UUID extrait
     .eq("user_id", session.user.id)
     .single();
 

@@ -243,3 +243,10 @@ WHERE ur.role = 'administrateur';
 
 
 
+
+
+
+
+
+
+

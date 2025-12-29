@@ -140,3 +140,10 @@ Chaque adapter doit être testable indépendamment :
 
 
 
+
+
+
+
+
+
+
