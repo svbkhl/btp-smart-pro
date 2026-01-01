@@ -76,14 +76,15 @@ serve(async (req) => {
 
     // Extraire l'UUID si quote_id contient un suffixe
     if (quote_id) {
+      console.log('📥 [get-public-document] Requête reçue:', { quote_id, invoice_id, token });
       const extractedUUID = extractUUID(quote_id);
       if (extractedUUID) {
         console.log('🔍 [get-public-document] UUID extrait:', { original: quote_id, extracted: extractedUUID });
         quote_id = extractedUUID;
       } else {
-        console.error('❌ [get-public-document] Impossible d\'extraire l\'UUID de:', quote_id);
+        console.error('❌ [get-public-document] Impossible d\'extraire l\'UUID de:', quote_id, typeof quote_id);
         return new Response(
-          JSON.stringify({ error: 'Invalid quote_id format' }),
+          JSON.stringify({ error: 'Invalid quote_id format', received: quote_id, type: typeof quote_id }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
@@ -107,6 +108,7 @@ serve(async (req) => {
 
     // Récupérer le document
     if (quote_id) {
+      console.log('🔍 [get-public-document] Recherche du devis dans ai_quotes:', quote_id);
       const { data, error } = await supabaseClient
         .from('ai_quotes')
         .select('id, quote_number, estimated_cost, client_name, client_email, created_at, status, signed, signed_at, signed_by, details, signature_data, work_type, surface, materials, image_urls')
@@ -114,15 +116,26 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        console.error('❌ Error fetching quote:', error);
+        console.error('❌ Devis non trouvé dans ai_quotes:', {
+          quote_id,
+          error: error?.message,
+          errorCode: error?.code,
+          errorDetails: error?.details
+        });
         return new Response(
-          JSON.stringify({ error: 'Quote not found', details: error?.message }),
+          JSON.stringify({ 
+            error: 'Quote not found', 
+            details: error?.message,
+            quote_id_searched: quote_id
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 404,
           }
         );
       }
+
+      console.log('✅ [get-public-document] Devis trouvé:', { id: data.id, quote_number: data.quote_number });
 
       document = data;
       documentType = 'quote';
