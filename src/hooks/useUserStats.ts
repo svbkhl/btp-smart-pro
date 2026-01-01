@@ -144,18 +144,18 @@ export const useRecalculateStats = () => {
             // Ne compter que les devis signés, acceptés ou envoyés
             if (quote.status && ['signed', 'accepted', 'sent'].includes(quote.status)) {
               let quoteAmount = 0;
-              
+
               if (quote.estimated_cost) {
-                // estimated_cost est déjà en HT, on ajoute la TVA (20%)
-                quoteAmount = Number(quote.estimated_cost) * 1.20;
+                // estimated_cost est maintenant stocké en TTC
+                quoteAmount = Number(quote.estimated_cost);
               } else if (quote.details) {
                 // Essayer d'extraire depuis details
-                const details = typeof quote.details === 'string' 
-                  ? JSON.parse(quote.details) 
+                const details = typeof quote.details === 'string'
+                  ? JSON.parse(quote.details)
                   : quote.details;
                 if (details?.estimatedCost) {
-                  // estimatedCost est en HT, on ajoute la TVA (20%)
-                  quoteAmount = Number(details.estimatedCost) * 1.20;
+                  // estimatedCost est maintenant en TTC
+                  quoteAmount = Number(details.estimatedCost);
                 }
               }
               
