@@ -92,18 +92,15 @@ export const SimpleQuoteForm = () => {
         throw new Error("Les valeurs numériques ne sont pas valides");
       }
 
-      // Le prix saisi est TTC, calculer le HT
-      const prixHT = Math.round((prixTTC / 1.2) * 100) / 100;
-      
       console.log('Prix saisi (TTC):', prixTTC);
-      console.log('Prix HT calculé:', prixHT);
       
       // Générer le devis simple
+      // Le prix est envoyé tel quel (TTC), le service le traitera comme TTC
       const result = await generateSimpleQuote(
         {
           prestation: prestation.trim(),
           surface: surfaceNum,
-          prix: prixHT, // Envoyer le HT au service
+          prix: prixTTC, // Envoyer le TTC directement
           clientId: clientId,
         },
         companyInfo,

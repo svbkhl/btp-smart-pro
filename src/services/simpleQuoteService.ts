@@ -58,24 +58,24 @@ export async function generateSimpleQuote(
     throw new Error("Les montants ne sont pas valides");
   }
   
-  // Le prix saisi est considéré comme HT
-  const totalHT = Math.round(prixSaisi * 100) / 100;
+  // Le prix saisi est considéré comme TTC
+  const totalTTC = Math.round(prixSaisi * 100) / 100;
   const tvaRate = 0.20; // 20% par défaut
-  const tva = Math.round(totalHT * tvaRate * 100) / 100;
-  const totalTTC = Math.round((totalHT + tva) * 100) / 100;
+  const totalHT = Math.round((totalTTC / 1.2) * 100) / 100;
+  const tva = Math.round((totalTTC - totalHT) * 100) / 100;
 
   // Construire la description avec la phrase standard
   const description = `${data.prestation}\n\n${STANDARD_PHRASE}`;
 
   // Créer les détails du devis
   const details = {
-    estimatedCost: totalHT,
+    estimatedCost: totalTTC, // Stocker le TTC
     description: description,
     workSteps: [
       {
         step: data.prestation,
         description: `${data.prestation} - Surface: ${data.surface} m²\n\n${STANDARD_PHRASE}`,
-        cost: totalHT,
+        cost: totalTTC, // Stocker le TTC
       },
     ],
     materials: [],
@@ -89,7 +89,7 @@ export async function generateSimpleQuote(
       client_name: clientInfo.name,
       quote_number: quoteNumber,
       status: "draft",
-      estimated_cost: totalHT,
+      estimated_cost: totalTTC, // Stocker le TTC au lieu du HT
       details: details,
     })
     .select()
