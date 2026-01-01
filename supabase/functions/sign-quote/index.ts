@@ -65,11 +65,52 @@ serve(async (req) => {
 
     // Parser le body
     const body = await req.json();
-    let { quote_id, signer_name, signature_data } = body;
+    let { quote_id, token, signer_name, signature_data, user_agent, signed_at } = body;
+
+    console.log('📥 [sign-quote] Requête reçue:', { quote_id, token, has_signature: !!signature_data });
+
+    // Si un token est fourni, récupérer quote_id depuis signature_sessions
+    if (token && !quote_id) {
+      console.log('🔍 [sign-quote] Recherche via token:', token);
+      const { data: session, error: sessionError } = await supabaseClient
+        .from('signature_sessions')
+        .select('quote_id, invoice_id, status, expires_at')
+        .eq('token', token)
+        .maybeSingle();
+
+      if (sessionError || !session) {
+        console.error('❌ Session non trouvée pour token:', token);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid or expired signature token',
+            token_provided: token
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
+
+      // Vérifier l'expiration
+      if (new Date(session.expires_at) < new Date()) {
+        console.error('❌ Token expiré:', token);
+        return new Response(
+          JSON.stringify({ error: 'Signature token expired' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 410,
+          }
+        );
+      }
+
+      console.log('✅ Session trouvée:', session);
+      quote_id = session.quote_id;
+    }
 
     if (!quote_id) {
       return new Response(
-        JSON.stringify({ error: 'quote_id is required' }),
+        JSON.stringify({ error: 'quote_id or token is required' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -95,23 +136,43 @@ serve(async (req) => {
       quote_id = extractedUUID;
     }
 
-    // Vérifier que le devis existe
-    const { data: quote, error: quoteError } = await supabaseClient
+    // Vérifier que le devis existe (essayer ai_quotes puis quotes)
+    let { data: quote, error: quoteError } = await supabaseClient
       .from('ai_quotes')
       .select('id, signed, signed_at, status')
       .eq('id', quote_id)
-      .single();
+      .maybeSingle();
+
+    let tableName = 'ai_quotes';
+
+    // Si pas trouvé dans ai_quotes, essayer dans quotes
+    if (quoteError || !quote) {
+      console.log('🔍 [sign-quote] Pas trouvé dans ai_quotes, essai dans quotes');
+      const quotesResult = await supabaseClient
+        .from('quotes')
+        .select('id, signed, signed_at, status')
+        .eq('id', quote_id)
+        .maybeSingle();
+
+      if (quotesResult.data) {
+        quote = quotesResult.data;
+        tableName = 'quotes';
+        quoteError = null;
+      }
+    }
 
     if (quoteError || !quote) {
       console.error('❌ Error fetching quote:', quoteError);
       return new Response(
-        JSON.stringify({ error: 'Quote not found', details: quoteError?.message }),
+        JSON.stringify({ error: 'Quote not found in any table', details: quoteError?.message }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 404,
         }
       );
     }
+
+    console.log('✅ Devis trouvé dans:', tableName);
 
     // Vérifier si déjà signé
     if (quote.signed && quote.signed_at) {
@@ -128,16 +189,19 @@ serve(async (req) => {
     }
 
     // Mettre à jour le devis avec la signature
+    const signatureMetadata = {
+      signed: true,
+      signed_at: signed_at || new Date().toISOString(),
+      signed_by: signer_name || null,
+      signature_data: signature_data || null,
+      signature_user_agent: user_agent || null,
+      status: 'signed',
+      updated_at: new Date().toISOString(),
+    };
+
     const { data: updatedQuote, error: updateError } = await supabaseClient
-      .from('ai_quotes')
-      .update({
-        signed: true,
-        signed_at: new Date().toISOString(),
-        signed_by: signer_name || null,
-        signature_data: signature_data || null,
-        status: 'signed',
-        updated_at: new Date().toISOString(),
-      })
+      .from(tableName)
+      .update(signatureMetadata)
       .eq('id', quote_id)
       .select()
       .single();
@@ -153,7 +217,18 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ Quote signed successfully:', quote_id);
+    // Mettre à jour la session si un token était fourni
+    if (token) {
+      await supabaseClient
+        .from('signature_sessions')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('token', token);
+    }
+
+    console.log('✅ Quote signed successfully:', quote_id, 'in table:', tableName);
 
     return new Response(
       JSON.stringify({

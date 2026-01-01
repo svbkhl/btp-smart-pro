@@ -13,6 +13,7 @@ import { Loader2, CheckCircle2, FileText, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { extractUUID } from "@/utils/uuidExtractor";
+import SignatureCanvas from "@/components/signature/SignatureCanvas";
 
 export default function SignaturePage() {
   const { quoteId: rawQuoteId } = useParams<{ quoteId: string }>();
@@ -22,6 +23,8 @@ export default function SignaturePage() {
   const [signing, setSigning] = useState(false);
   const [quote, setQuote] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
 
   // Déterminer si rawQuoteId est un token (avec suffixe) ou un UUID pur
   const hasToken = rawQuoteId && rawQuoteId.length > 36; // Un token a plus de 36 caractères
@@ -113,14 +116,36 @@ export default function SignaturePage() {
     loadQuote();
   }, [rawQuoteId, quoteId]);
 
-  const handleSign = async () => {
-    if (!quoteId || !quote) return;
+  const handleSignatureComplete = (signature: string) => {
+    setSignatureData(signature);
+    setShowSignatureCanvas(false);
+    handleSign(signature);
+  };
+
+  const handleSign = async (signature?: string) => {
+    // Si pas de signature fournie, afficher le canvas
+    if (!signature) {
+      setShowSignatureCanvas(true);
+      return;
+    }
+
+    if (!quote) return;
 
     setSigning(true);
     try {
       // Utiliser l'Edge Function sign-quote pour signer le devis sans authentification
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      // Récupérer des métadonnées pour la signature
+      const userAgent = navigator.userAgent;
+      const timestamp = new Date().toISOString();
+
+      console.log("📝 [SignaturePage] Envoi de la signature:", {
+        hasToken,
+        token: hasToken ? rawQuoteId : undefined,
+        quote_id: !hasToken ? quoteId : undefined,
+      });
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/sign-quote`, {
         method: "POST",
@@ -129,8 +154,12 @@ export default function SignaturePage() {
           "apikey": SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          quote_id: quoteId, // Utiliser l'UUID extrait
+          token: hasToken ? rawQuoteId : undefined,
+          quote_id: !hasToken ? quoteId : undefined,
+          signature_data: signature,
           signer_name: quote.client_name || "Client",
+          user_agent: userAgent,
+          signed_at: timestamp,
         }),
       });
 
@@ -146,46 +175,47 @@ export default function SignaturePage() {
         throw new Error(result.error || "Impossible de signer le devis");
       }
 
-      console.log("✅ Devis signé avec succès:", quoteId);
+      console.log("✅ Devis signé avec succès");
 
       toast({
-        title: "Document signé !",
-        description: "Le devis a été signé avec succès.",
+        title: "✅ Document signé !",
+        description: "Votre signature a été enregistrée avec succès. Vous allez être redirigé...",
+        duration: 3000,
       });
 
       // Recharger le devis pour afficher le statut mis à jour
-      // quoteId est déjà l'UUID extrait
-      if (quoteId) {
-        const reloadResponse = await fetch(`${SUPABASE_URL}/functions/v1/get-public-document`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            quote_id: quoteId,
-          }),
-        });
+      const requestBody = hasToken
+        ? { token: rawQuoteId }
+        : { quote_id: quoteId };
 
-        if (reloadResponse.ok) {
-          const reloadResult = await reloadResponse.json();
-          if (reloadResult.document) {
-            setQuote(reloadResult.document);
-          }
+      const reloadResponse = await fetch(`${SUPABASE_URL}/functions/v1/get-public-document`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (reloadResponse.ok) {
+        const reloadResult = await reloadResponse.json();
+        if (reloadResult.document) {
+          setQuote(reloadResult.document);
         }
       }
 
-      // Rediriger après 2 secondes
+      // Rediriger après 3 secondes
       setTimeout(() => {
         navigate("/");
-      }, 2000);
+      }, 3000);
     } catch (error: any) {
       console.error("Erreur lors de la signature:", error);
       toast({
-        title: "Erreur",
+        title: "❌ Erreur",
         description: error.message || "Impossible de signer le document",
         variant: "destructive",
       });
+      setShowSignatureCanvas(false);
     } finally {
       setSigning(false);
     }
@@ -307,26 +337,28 @@ export default function SignaturePage() {
               </AlertDescription>
             </Alert>
 
-            <div className="flex gap-4">
-              <Button
-                onClick={handleSign}
+            {!showSignatureCanvas && !signing ? (
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => handleSign()}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  size="lg"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Signer le devis
+                </Button>
+              </div>
+            ) : signing ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Enregistrement de votre signature...</p>
+              </div>
+            ) : (
+              <SignatureCanvas
+                onSignatureComplete={handleSignatureComplete}
                 disabled={signing}
-                className="flex-1"
-                size="lg"
-              >
-                {signing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signature en cours...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Signer le devis
-                  </>
-                )}
-              </Button>
-            </div>
+              />
+            )}
           </CardContent>
         </Card>
       </div>
