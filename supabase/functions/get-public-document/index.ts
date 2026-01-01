@@ -93,9 +93,49 @@ serve(async (req) => {
       }
     }
 
+    // Si un token est fourni, récupérer quote_id ou invoice_id depuis signature_sessions
+    if (token && !quote_id && !invoice_id) {
+      console.log('🔍 [get-public-document] Recherche via token:', token);
+      const { data: session, error: sessionError } = await supabaseClient
+        .from('signature_sessions')
+        .select('quote_id, invoice_id, status, expires_at')
+        .eq('token', token)
+        .single();
+
+      if (sessionError || !session) {
+        console.error('❌ Session non trouvée pour token:', token);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid or expired signature token',
+            token_provided: token
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
+
+      // Vérifier l'expiration
+      if (new Date(session.expires_at) < new Date()) {
+        console.error('❌ Token expiré:', token);
+        return new Response(
+          JSON.stringify({ error: 'Signature token expired' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 410,
+          }
+        );
+      }
+
+      console.log('✅ Session trouvée:', session);
+      quote_id = session.quote_id;
+      invoice_id = session.invoice_id;
+    }
+
     if (!quote_id && !invoice_id) {
       return new Response(
-        JSON.stringify({ error: 'quote_id or invoice_id is required' }),
+        JSON.stringify({ error: 'quote_id, invoice_id or token is required' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
