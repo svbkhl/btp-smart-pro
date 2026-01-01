@@ -115,7 +115,7 @@ serve(async (req) => {
       console.log('🔍 Tentative 1: Table ai_quotes');
       let { data, error } = await supabaseClient
         .from('ai_quotes')
-        .select('id, quote_number, estimated_cost, client_name, client_email, created_at, status, signed, signed_at, signed_by, details, signature_data, work_type, surface, materials, image_urls')
+        .select('id, quote_number, estimated_cost, client_name, created_at, status, signed, signed_at, signed_by, details, signature_data, work_type, surface, materials, image_urls')
         .eq('id', quote_id)
         .single();
 
