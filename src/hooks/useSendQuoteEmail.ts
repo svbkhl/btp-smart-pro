@@ -63,10 +63,12 @@ export function useSendQuoteEmail() {
       queryClient.invalidateQueries({ queryKey: ["email-messages"] });
       queryClient.invalidateQueries({ queryKey: ["user-email-configured"] });
 
-      // Afficher un toast de succès
+      // Afficher un toast de succès détaillé
+      const pdfInfo = variables.includePDF ? " (PDF inclus)" : "";
       toast({
-        title: "Email envoyé !",
-        description: `Le devis ${variables.quoteNumber} a été envoyé à ${variables.clientName} avec succès.`,
+        title: "✅ Email envoyé avec succès",
+        description: `Le devis ${variables.quoteNumber} a été envoyé à ${variables.clientName} (${variables.clientEmail})${pdfInfo}`,
+        duration: 5000,
       });
     },
 
