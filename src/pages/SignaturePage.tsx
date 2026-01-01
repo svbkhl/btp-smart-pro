@@ -23,20 +23,14 @@ export default function SignaturePage() {
   const [quote, setQuote] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Extraire l'UUID du paramètre d'URL (peut contenir un suffixe de sécurité)
-  const quoteId = rawQuoteId ? extractUUID(rawQuoteId) : null;
+  // Déterminer si rawQuoteId est un token (avec suffixe) ou un UUID pur
+  const hasToken = rawQuoteId && rawQuoteId.length > 36; // Un token a plus de 36 caractères
+  const quoteId = rawQuoteId && !hasToken ? extractUUID(rawQuoteId) : null;
 
   // Charger le devis via Edge Function publique
   useEffect(() => {
     if (!rawQuoteId) {
       setError("ID du devis manquant");
-      setLoading(false);
-      return;
-    }
-
-    if (!quoteId) {
-      console.error("❌ Impossible d'extraire l'UUID de:", rawQuoteId);
-      setError("Format d'ID invalide");
       setLoading(false);
       return;
     }
@@ -50,9 +44,16 @@ export default function SignaturePage() {
 
         console.log("🔍 [SignaturePage] Chargement du devis:", 
           "rawQuoteId:", rawQuoteId,
+          "hasToken:", hasToken,
           "extractedUUID:", quoteId,
           "url:", `${SUPABASE_URL}/functions/v1/get-public-document`
         );
+
+        // Si rawQuoteId contient un suffixe, c'est un token de session
+        // Sinon, c'est un quote_id direct
+        const requestBody = hasToken
+          ? { token: rawQuoteId } // Envoyer comme token si c'est une session
+          : { quote_id: quoteId }; // Envoyer comme quote_id si c'est un UUID pur
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/get-public-document`, {
           method: "POST",
@@ -60,9 +61,7 @@ export default function SignaturePage() {
             "Content-Type": "application/json",
             "apikey": SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({
-            quote_id: quoteId, // Utiliser l'UUID extrait, pas l'ID complet
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         console.log("📡 [SignaturePage] Réponse Edge Function:", 
