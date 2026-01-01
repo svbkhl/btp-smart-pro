@@ -48,11 +48,11 @@ export default function SignaturePage() {
         const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
         const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-        console.log("🔍 [SignaturePage] Chargement du devis:", { 
-          rawQuoteId, 
-          extractedUUID: quoteId,
-          url: `${SUPABASE_URL}/functions/v1/get-public-document`
-        });
+        console.log("🔍 [SignaturePage] Chargement du devis:", 
+          "rawQuoteId:", rawQuoteId,
+          "extractedUUID:", quoteId,
+          "url:", `${SUPABASE_URL}/functions/v1/get-public-document`
+        );
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/get-public-document`, {
           method: "POST",
@@ -65,20 +65,20 @@ export default function SignaturePage() {
           }),
         });
 
-        console.log("📡 [SignaturePage] Réponse Edge Function:", {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok
-        });
+        console.log("📡 [SignaturePage] Réponse Edge Function:", 
+          "status:", response.status,
+          "statusText:", response.statusText,
+          "ok:", response.ok
+        );
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
-          console.error("❌ Erreur chargement devis:", {
-            status: response.status,
-            errorData,
-            quoteIdSent: quoteId,
-            rawQuoteId
-          });
+          console.error("❌ Erreur chargement devis:", 
+            "status:", response.status,
+            "errorData:", JSON.stringify(errorData),
+            "quoteIdSent:", quoteId,
+            "rawQuoteId:", rawQuoteId
+          );
           setError(errorData.error || `Devis introuvable (Erreur ${response.status})`);
           setLoading(false);
           return;

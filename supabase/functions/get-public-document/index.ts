@@ -108,25 +108,47 @@ serve(async (req) => {
 
     // Récupérer le document
     if (quote_id) {
-      console.log('🔍 [get-public-document] Recherche du devis dans ai_quotes:', quote_id);
-      const { data, error } = await supabaseClient
+      console.log('🔍 [get-public-document] Recherche du devis:', quote_id);
+      console.log('🔍 Type de quote_id:', typeof quote_id, 'Longueur:', quote_id?.length);
+      
+      // Essayer d'abord dans ai_quotes
+      console.log('🔍 Tentative 1: Table ai_quotes');
+      let { data, error } = await supabaseClient
         .from('ai_quotes')
         .select('id, quote_number, estimated_cost, client_name, client_email, created_at, status, signed, signed_at, signed_by, details, signature_data, work_type, surface, materials, image_urls')
         .eq('id', quote_id)
         .single();
 
+      // Si pas trouvé dans ai_quotes, essayer dans quotes
       if (error || !data) {
-        console.error('❌ Devis non trouvé dans ai_quotes:', {
+        console.log('⚠️ Non trouvé dans ai_quotes, tentative 2: Table quotes');
+        const quotesResult = await supabaseClient
+          .from('quotes')
+          .select('*')
+          .eq('id', quote_id)
+          .single();
+        
+        if (quotesResult.data) {
+          console.log('✅ Devis trouvé dans quotes!');
+          data = quotesResult.data;
+          error = null;
+        }
+      }
+
+      if (error || !data) {
+        console.error('❌ Devis non trouvé dans aucune table:', {
           quote_id,
+          quote_id_type: typeof quote_id,
           error: error?.message,
           errorCode: error?.code,
           errorDetails: error?.details
         });
         return new Response(
           JSON.stringify({ 
-            error: 'Quote not found', 
+            error: 'Quote not found in any table', 
             details: error?.message,
-            quote_id_searched: quote_id
+            quote_id_searched: quote_id,
+            tables_searched: ['ai_quotes', 'quotes']
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
