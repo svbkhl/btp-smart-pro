@@ -222,8 +222,11 @@ export const SendToClientModal = ({
         duration: 5000,
       });
 
-      onSent?.();
-      onOpenChange(false);
+      // Attendre un peu avant de fermer le modal pour que le toast soit visible
+      setTimeout(() => {
+        onSent?.();
+        onOpenChange(false);
+      }, 500);
     } catch (error: any) {
       console.error("Error sending email:", error);
       
