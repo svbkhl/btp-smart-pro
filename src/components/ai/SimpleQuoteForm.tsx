@@ -356,16 +356,16 @@ export const SimpleQuoteForm = () => {
           {prix && surface && (
             <GlassCard className="p-4 bg-primary/5 dark:bg-primary/10 border-primary/20">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Total HT :</span>
+                <span className="text-sm font-medium">Total TTC :</span>
                 <span className="text-lg font-bold">
-                  {(parseFloat(prix) / 1.2).toLocaleString("fr-FR", {
+                  {parseFloat(prix).toLocaleString("fr-FR", {
                     style: "currency",
                     currency: "EUR",
                   })}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-muted-foreground">TVA (20%) :</span>
+                <span className="text-sm text-muted-foreground">dont TVA (20%) :</span>
                 <span className="text-sm font-medium">
                   {(parseFloat(prix) - parseFloat(prix) / 1.2).toLocaleString("fr-FR", {
                     style: "currency",
@@ -373,10 +373,10 @@ export const SimpleQuoteForm = () => {
                   })}
                 </span>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                <span className="text-sm font-semibold">Total :</span>
-                <span className="text-xl font-bold text-primary">
-                  {parseFloat(prix).toLocaleString("fr-FR", {
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-sm text-muted-foreground">Total HT :</span>
+                <span className="text-sm font-medium">
+                  {(parseFloat(prix) / 1.2).toLocaleString("fr-FR", {
                     style: "currency",
                     currency: "EUR",
                   })}
