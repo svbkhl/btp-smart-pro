@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings as SettingsIcon } from "lucide-react";
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { StripeSettings } from "@/components/settings/StripeSettings";
-import { PaymentProviderSettings } from "@/components/settings/PaymentProviderSettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -144,7 +143,7 @@ const Settings = () => {
           )}
 
           <TabsContent value="stripe" className="mt-0">
-            <PaymentProviderSettings />
+            <StripeSettings />
           </TabsContent>
 
           <TabsContent value="email" className="mt-0">
