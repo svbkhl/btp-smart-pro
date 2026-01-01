@@ -113,11 +113,18 @@ serve(async (req) => {
       
       // Essayer d'abord dans ai_quotes
       console.log('🔍 Tentative 1: Table ai_quotes');
-      let { data, error } = await supabaseClient
+      let { data, error, count } = await supabaseClient
         .from('ai_quotes')
-        .select('*')  // Sélectionner toutes les colonnes disponibles
+        .select('*', { count: 'exact' })
         .eq('id', quote_id)
-        .single();
+        .maybeSingle();  // maybeSingle() au lieu de single() pour gérer 0 résultat
+
+      console.log('📊 Résultat ai_quotes:', { 
+        found: !!data, 
+        error: error?.message,
+        errorCode: error?.code,
+        count 
+      });
 
       // Si pas trouvé dans ai_quotes, essayer dans quotes
       if (error || !data) {
@@ -126,7 +133,12 @@ serve(async (req) => {
           .from('quotes')
           .select('*')
           .eq('id', quote_id)
-          .single();
+          .maybeSingle();  // maybeSingle() ici aussi
+        
+        console.log('📊 Résultat quotes:', { 
+          found: !!quotesResult.data,
+          error: quotesResult.error?.message 
+        });
         
         if (quotesResult.data) {
           console.log('✅ Devis trouvé dans quotes!');
