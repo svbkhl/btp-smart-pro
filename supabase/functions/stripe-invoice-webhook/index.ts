@@ -196,6 +196,67 @@ async function handleCheckoutSessionCompleted(
 
   console.log('✅ Paiement mis à jour:', payment.id);
 
+  // =====================================================
+  // GÉRER LES ÉCHÉANCES (PAIEMENT EN PLUSIEURS FOIS)
+  // =====================================================
+  
+  if (payment.schedule_id) {
+    console.log('📅 Paiement lié à une échéance:', payment.schedule_id);
+    
+    // Mettre à jour l'échéance
+    const { error: updateScheduleError } = await supabaseClient
+      .from('payment_schedules')
+      .update({
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+        stripe_payment_intent_id: session.payment_intent,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', payment.schedule_id);
+
+    if (updateScheduleError) {
+      console.error('❌ Erreur mise à jour échéance:', updateScheduleError);
+    } else {
+      console.log('✅ Échéance marquée comme payée');
+      
+      // Récupérer l'échéance pour savoir le numéro
+      const { data: schedule } = await supabaseClient
+        .from('payment_schedules')
+        .select('*')
+        .eq('id', payment.schedule_id)
+        .single();
+
+      if (schedule) {
+        // Vérifier s'il y a une échéance suivante
+        const nextInstallmentNumber = schedule.installment_number + 1;
+        
+        if (nextInstallmentNumber <= schedule.total_installments) {
+          console.log(`📧 Envoi du lien pour l'échéance ${nextInstallmentNumber}/${schedule.total_installments}`);
+          
+          // Récupérer l'échéance suivante
+          const { data: nextSchedule } = await supabaseClient
+            .from('payment_schedules')
+            .select('*')
+            .eq('invoice_id', payment.invoice_id)
+            .eq('installment_number', nextInstallmentNumber)
+            .single();
+
+          if (nextSchedule) {
+            // TODO: Créer automatiquement le lien de paiement pour l'échéance suivante
+            // et l'envoyer par email au client
+            console.log('💡 Échéance suivante trouvée:', nextSchedule.id);
+            console.log('📧 TODO: Envoyer email avec lien de paiement échéance', nextInstallmentNumber);
+            
+            // Pour l'instant, on log juste. L'email sera implémenté séparément.
+            // L'admin pourra aussi manuellement envoyer le lien depuis l'interface.
+          }
+        } else {
+          console.log('🎉 Toutes les échéances sont payées !');
+        }
+      }
+    }
+  }
+
   // Mettre à jour la facture
   if (payment.invoice_id) {
     const { data: invoice, error: invoiceError } = await supabaseClient

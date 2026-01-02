@@ -63,8 +63,9 @@ export default function SendPaymentLinkButton({
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [paymentType, setPaymentType] = useState<"total" | "deposit">("total");
+  const [paymentType, setPaymentType] = useState<"total" | "deposit" | "installments">("total");
   const [depositAmount, setDepositAmount] = useState<string>("");
+  const [installmentsCount, setInstallmentsCount] = useState<string>("2");
 
   const remainingAmount = totalAmount - amountPaid;
 
@@ -117,19 +118,47 @@ export default function SendPaymentLinkButton({
       }
     }
 
+    if (paymentType === "installments") {
+      const count = parseInt(installmentsCount);
+      if (isNaN(count) || count < 2) {
+        toast({
+          title: "❌ Nombre d'échéances invalide",
+          description: "Le nombre d'échéances doit être au minimum 2.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (count > 12) {
+        toast({
+          title: "❌ Nombre d'échéances trop élevé",
+          description: "Le nombre d'échéances ne peut pas dépasser 12.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      // Construire le body selon le type de paiement
+      const requestBody: any = {
+        quote_id: quoteId,
+        invoice_id: invoiceId,
+        payment_type: paymentType,
+        client_email: clientEmail,
+        client_name: clientName,
+      };
+
+      if (paymentType === "deposit") {
+        requestBody.amount = parseFloat(depositAmount);
+      } else if (paymentType === "installments") {
+        requestBody.installments_count = parseInt(installmentsCount);
+      }
+
       // Appeler l'Edge Function pour créer le lien de paiement
-      const { data, error } = await supabase.functions.invoke("create-payment-link", {
-        body: {
-          quote_id: quoteId,
-          invoice_id: invoiceId,
-          payment_type: paymentType,
-          amount: paymentType === "deposit" ? parseFloat(depositAmount) : remainingAmount,
-          client_email: clientEmail,
-          client_name: clientName,
-        },
+      const { data, error } = await supabase.functions.invoke("create-payment-link-v2", {
+        body: requestBody,
       });
 
       if (error) {
@@ -159,9 +188,15 @@ export default function SendPaymentLinkButton({
       // TODO: Envoyer l'email automatiquement au client avec le lien
       // Pour l'instant, l'admin peut copier/coller le lien
 
+      let successMessage = `Un lien de paiement de ${data.amount.toFixed(2)}€ a été généré pour ${clientEmail}.`;
+      
+      if (paymentType === "installments" && data.total_installments) {
+        successMessage = `Plan de paiement en ${data.total_installments}x créé. Lien pour l'échéance 1/${data.total_installments} (${data.amount.toFixed(2)}€) généré.`;
+      }
+
       toast({
         title: "✅ Lien de paiement créé !",
-        description: `Un lien de paiement de ${data.amount.toFixed(2)}€ a été généré pour ${clientEmail}.`,
+        description: successMessage,
         duration: 5000,
       });
 
@@ -229,6 +264,7 @@ export default function SendPaymentLinkButton({
                   Paiement total ({remainingAmount.toFixed(2)} €)
                 </SelectItem>
                 <SelectItem value="deposit">Acompte (montant personnalisé)</SelectItem>
+                <SelectItem value="installments">Paiement en plusieurs fois</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -249,6 +285,29 @@ export default function SendPaymentLinkButton({
               />
               <p className="text-xs text-muted-foreground">
                 Maximum : {remainingAmount.toFixed(2)} €
+              </p>
+            </div>
+          )}
+
+          {/* Nombre d'échéances */}
+          {paymentType === "installments" && (
+            <div className="space-y-2">
+              <Label htmlFor="installments-count">Nombre d'échéances</Label>
+              <Select value={installmentsCount} onValueChange={setInstallmentsCount}>
+                <SelectTrigger id="installments-count">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2 fois ({(remainingAmount / 2).toFixed(2)} € x 2)</SelectItem>
+                  <SelectItem value="3">3 fois ({(remainingAmount / 3).toFixed(2)} € x 3)</SelectItem>
+                  <SelectItem value="4">4 fois ({(remainingAmount / 4).toFixed(2)} € x 4)</SelectItem>
+                  <SelectItem value="5">5 fois ({(remainingAmount / 5).toFixed(2)} € x 5)</SelectItem>
+                  <SelectItem value="6">6 fois ({(remainingAmount / 6).toFixed(2)} € x 6)</SelectItem>
+                  <SelectItem value="12">12 fois ({(remainingAmount / 12).toFixed(2)} € x 12)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Les échéances seront espacées de 30 jours
               </p>
             </div>
           )}
