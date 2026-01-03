@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generateDevisNumber } from "@/utils/generateDevisNumber";
 import { useCreateQuote } from "@/hooks/useQuotes";
+import { calculateFromTTC } from "@/utils/priceCalculations";
 
 export interface SimpleQuoteData {
   prestation: string; // Nom de la prestation
@@ -49,7 +50,7 @@ export async function generateSimpleQuote(
   // Générer le numéro de devis
   const quoteNumber = await generateDevisNumber();
 
-  // Calculer le total HT et TTC
+  // Calculer le total HT et TTC - MODE TTC FIRST
   // S'assurer que les valeurs sont des nombres valides
   const prixSaisi = typeof data.prix === 'string' ? parseFloat(data.prix.replace(',', '.')) : data.prix;
   const surfaceSaisie = typeof data.surface === 'string' ? parseFloat(data.surface.replace(',', '.')) : data.surface;
@@ -58,11 +59,10 @@ export async function generateSimpleQuote(
     throw new Error("Les montants ne sont pas valides");
   }
   
-  // Le prix saisi est considéré comme TTC
-  const totalTTC = Math.round(prixSaisi * 100) / 100;
-  const tvaRate = 0.20; // 20% par défaut
-  const totalHT = Math.round((totalTTC / 1.2) * 100) / 100;
-  const tva = Math.round((totalTTC - totalHT) * 100) / 100;
+  // ⚠️ RÈGLE MÉTIER: Le prix saisi est TOUJOURS un prix TTC
+  // Utilisation de la fonction utilitaire pour les calculs précis
+  const prices = calculateFromTTC(prixSaisi, 20); // 20% TVA par défaut
+  const { total_ttc, total_ht, vat_amount } = prices;
 
   // Construire la description avec la phrase standard
   const description = `${data.prestation}\n\n${STANDARD_PHRASE}`;
@@ -89,7 +89,7 @@ export async function generateSimpleQuote(
       client_name: clientInfo.name,
       quote_number: quoteNumber,
       status: "draft",
-      estimated_cost: totalTTC, // Stocker le TTC au lieu du HT
+      estimated_cost: total_ttc, // ⚠️ TTC = source de vérité
       details: details,
     })
     .select()
@@ -109,7 +109,7 @@ export async function generateSimpleQuote(
     client_address: clientInfo.location,
     prestation: data.prestation,
     surface: data.surface,
-    estimated_cost: totalHT,
+    estimated_cost: total_ttc, // ⚠️ Retourner le TTC, pas le HT
     description: description,
     created_at: quote.created_at,
     status: quote.status as any,

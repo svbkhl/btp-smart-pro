@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Building2, User, Calendar, MapPin, FileText, Euro, Clock, CheckCircle2 } from "lucide-react";
 import { UserSettings } from "@/hooks/useUserSettings";
 import { Client } from "@/hooks/useClients";
+import { calculateFromTTC } from "@/utils/priceCalculations";
 
 // Formatage de date simple sans dépendance
 const formatDate = (date: Date): string => {
@@ -66,31 +67,32 @@ export const QuoteDisplay = ({
   // ID pour l'export PDF
   const displayId = quoteNumber || `quote-${Date.now()}`;
   
-  // Calculer le prix total de la même manière que dans le PDF
-  let estimatedCost = typeof result.estimatedCost === 'number' 
-    ? result.estimatedCost 
+  // ⚠️ MODE TTC FIRST - Le prix stocké est TOUJOURS un TTC
+  let priceTTC = typeof result.estimatedCost === 'number'
+    ? result.estimatedCost
     : parseFloat(result.estimatedCost || 0);
-  
-  // Si estimatedCost est 0 ou manquant, calculer depuis workSteps et materials
-  if (!estimatedCost || estimatedCost === 0) {
+
+  // Si priceTTC est 0 ou manquant, calculer depuis workSteps et materials
+  if (!priceTTC || priceTTC === 0) {
     const workStepsCost = (result.workSteps || []).reduce((sum: number, step: any) => {
       return sum + (typeof step.cost === 'number' ? step.cost : parseFloat(step.cost || 0));
     }, 0);
-    
+
     const materialsCost = (result.materials || []).reduce((sum: number, mat: any) => {
       const quantity = typeof mat.quantity === 'string' ? parseFloat(mat.quantity) : (mat.quantity || 1);
       const unitCost = typeof mat.unitCost === 'number' ? mat.unitCost : parseFloat(mat.unitCost || 0);
       return sum + (quantity * unitCost);
     }, 0);
-    
-    estimatedCost = workStepsCost + materialsCost;
+
+    priceTTC = workStepsCost + materialsCost;
   }
-  
-  // Calculer TVA (20% par défaut)
-  const tvaRate = 0.20;
-  const totalHT = estimatedCost;
-  const tva = totalHT * tvaRate;
-  const totalTTC = totalHT + tva;
+
+  // ⚠️ CALCUL CORRECT: TTC → HT et TVA
+  // Le prix saisi/stocké est TOUJOURS TTC, on calcule HT et TVA à partir du TTC
+  const prices = calculateFromTTC(priceTTC, 20);
+  const totalTTC = prices.total_ttc;  // Source de vérité
+  const totalHT = prices.total_ht;    // Calculé
+  const tva = prices.vat_amount;      // Calculé
 
   // Formater l'adresse complète de l'entreprise
   const companyAddress = [
@@ -311,17 +313,18 @@ export const QuoteDisplay = ({
             <div className="w-72">
               <table className="w-full border-collapse">
                 <tbody>
-                  <tr>
-                    <td className="border border-gray-300 p-2 text-right font-semibold text-sm">Total HT</td>
-                    <td className="border border-gray-300 p-2 text-right text-sm">
-                      {totalHT.toLocaleString('fr-FR', {
+                  {/* ⚠️ MODE TTC FIRST: TTC affiché en premier et en gras */}
+                  <tr className="bg-primary/10 font-bold text-lg">
+                    <td className="border border-gray-300 p-3 text-right font-bold">Total à payer (TTC)</td>
+                    <td className="border border-gray-300 p-3 text-right font-bold text-primary">
+                      {totalTTC.toLocaleString('fr-FR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })} €
                     </td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 p-2 text-right text-sm">TVA (20%)</td>
+                    <td className="border border-gray-300 p-2 text-right text-sm text-muted-foreground">dont TVA (20%)</td>
                     <td className="border border-gray-300 p-2 text-right text-sm">
                       {tva.toLocaleString('fr-FR', {
                         minimumFractionDigits: 2,
@@ -329,10 +332,10 @@ export const QuoteDisplay = ({
                       })} €
                     </td>
                   </tr>
-                  <tr className="bg-gray-100 font-bold">
-                    <td className="border border-gray-300 p-2 text-right text-sm">Total TTC</td>
+                  <tr>
+                    <td className="border border-gray-300 p-2 text-right text-sm text-muted-foreground">Total HT</td>
                     <td className="border border-gray-300 p-2 text-right text-sm">
-                      {totalTTC.toLocaleString('fr-FR', {
+                      {totalHT.toLocaleString('fr-FR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })} €

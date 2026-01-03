@@ -3,6 +3,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { calculateFromTTC } from "@/utils/priceCalculations";
 import {
   Select,
   SelectContent,
@@ -333,11 +334,11 @@ export const SimpleQuoteForm = () => {
             />
           </div>
 
-          {/* Prix */}
+          {/* Prix TTC */}
           <div className="space-y-2">
             <Label htmlFor="prix" className="flex items-center gap-2">
               <Euro className="w-4 h-4" />
-              Prix
+              Montant TTC
             </Label>
             <Input
               id="prix"
@@ -346,44 +347,56 @@ export const SimpleQuoteForm = () => {
               step="0.01"
               value={prix}
               onChange={(e) => setPrix(e.target.value)}
-              placeholder="Ex: 4500"
+              placeholder="Ex: 2000 (montant TTC toutes taxes comprises)"
               className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               disabled={loading}
             />
+            <p className="text-xs text-muted-foreground">
+              ⚠️ Saisissez le montant TTC (toutes taxes comprises) que vous souhaitez facturer
+            </p>
           </div>
 
-          {/* Aperçu du total */}
-          {prix && surface && (
-            <GlassCard className="p-4 bg-primary/5 dark:bg-primary/10 border-primary/20">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Total TTC :</span>
-                <span className="text-lg font-bold">
-                  {parseFloat(prix).toLocaleString("fr-FR", {
-                    style: "currency",
-                    currency: "EUR",
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-muted-foreground">dont TVA (20%) :</span>
-                <span className="text-sm font-medium">
-                  {(parseFloat(prix) - parseFloat(prix) / 1.2).toLocaleString("fr-FR", {
-                    style: "currency",
-                    currency: "EUR",
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-muted-foreground">Total HT :</span>
-                <span className="text-sm font-medium">
-                  {(parseFloat(prix) / 1.2).toLocaleString("fr-FR", {
-                    style: "currency",
-                    currency: "EUR",
-                  })}
-                </span>
-              </div>
-            </GlassCard>
-          )}
+          {/* Aperçu du total - MODE TTC FIRST */}
+          {prix && surface && (() => {
+            const prixNum = parseFloat(prix);
+            if (isNaN(prixNum) || prixNum <= 0) return null;
+            
+            const prices = calculateFromTTC(prixNum, 20);
+            
+            return (
+              <GlassCard className="p-4 bg-primary/5 dark:bg-primary/10 border-primary/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-bold">Total à payer (TTC) :</span>
+                  <span className="text-2xl font-bold text-primary">
+                    {prices.total_ttc.toLocaleString("fr-FR", {
+                      style: "currency",
+                      currency: "EUR",
+                    })}
+                  </span>
+                </div>
+                <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">dont TVA (20%) :</span>
+                    <span className="font-medium">
+                      {prices.vat_amount.toLocaleString("fr-FR", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total HT :</span>
+                    <span className="font-medium">
+                      {prices.total_ht.toLocaleString("fr-FR", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </GlassCard>
+            );
+          })()}
 
           {/* Bouton de génération */}
           <Button
