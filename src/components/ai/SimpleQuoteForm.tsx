@@ -329,7 +329,7 @@ export const SimpleQuoteForm = () => {
               value={surface}
               onChange={(e) => setSurface(e.target.value)}
               placeholder="Ex: 15"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               disabled={loading}
             />
           </div>
@@ -348,7 +348,7 @@ export const SimpleQuoteForm = () => {
               value={prix}
               onChange={(e) => setPrix(e.target.value)}
               placeholder="Ex: 2000"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
