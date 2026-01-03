@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,7 +18,6 @@ import { generateQuotePDF } from "@/services/pdfService";
 
 export default function SignaturePage() {
   const { quoteId: rawQuoteId } = useParams<{ quoteId: string }>();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
