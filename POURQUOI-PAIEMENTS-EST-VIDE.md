@@ -160,3 +160,4 @@ NORMAL ! 😊
 **Il est juste vide si tu n'as pas encore de devis signés.**
 
 **Suis le guide `GUIDE-TEST-PAIEMENTS.md` et tout apparaîtra ! 🚀**
+

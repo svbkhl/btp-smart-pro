@@ -129,3 +129,4 @@ Puis réessaye les 3 commandes de déploiement.
 ---
 
 **DÉPLOIE LES 3 FONCTIONS MAINTENANT ! 🚀**
+

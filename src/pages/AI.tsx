@@ -67,7 +67,7 @@ const AI = () => {
 
             <TabsContent value="quotes" className="mt-0">
               <Suspense fallback={<TabLoader />}>
-                <SimpleQuoteForm />
+                <AIQuotesTab />
               </Suspense>
             </TabsContent>
 

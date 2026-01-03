@@ -263,3 +263,4 @@ Si tu suis ces étapes, tu **verras forcément** la section orange avec ton devi
 ---
 
 **Besoin d'aide ? Regarde les logs browser (F12) et Supabase Edge Functions Logs !**
+

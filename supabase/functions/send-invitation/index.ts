@@ -444,7 +444,7 @@ serve(async (req) => {
 
       // Si erreur, vérifier si c'est email_exists
       const error = result.error;
-      if (error) {
+    if (error) {
         // Log détaillé de l'erreur avec sérialisation JSON
         const errorDetails = {
           message: error.message || 'No message',

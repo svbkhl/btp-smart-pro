@@ -412,3 +412,4 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
     </div>
   );
 }
+

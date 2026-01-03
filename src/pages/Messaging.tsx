@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Mail, 
-  Search, 
+import {
+  Mail,
+  Search,
   Send, 
   Inbox, 
   Archive, 
@@ -438,18 +438,18 @@ const Messaging = () => {
 
           {/* Liste des emails */}
           <div className="lg:col-span-1 space-y-4">
-            {/* Recherche */}
+        {/* Recherche */}
             <GlassCard className="p-6">
-              <div className="relative">
+          <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
+            <Input
                   placeholder="Rechercher..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
-                />
-              </div>
-            </GlassCard>
+            />
+          </div>
+        </GlassCard>
 
             {/* Liste */}
             <div className="space-y-2">
@@ -457,11 +457,11 @@ const Messaging = () => {
                 <GlassCard className="p-6 text-center">
                   <Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                   <p className="text-muted-foreground">Aucun email</p>
-                </GlassCard>
-              ) : (
+          </GlassCard>
+        ) : (
                 filteredEmails.map((email) => (
-                  <div
-                    key={email.id}
+                    <div
+                      key={email.id}
                     onClick={() => {
                       setSelectedEmail(email);
                       handleMarkAsRead(email.id);
@@ -473,11 +473,11 @@ const Messaging = () => {
                       } ${!email.isRead ? "bg-primary/5" : ""}`}
                     >
                     <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-sm truncate">
                             {email.fromName}
-                          </span>
+                            </span>
                           {email.isStarred && (
                             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                           )}
@@ -524,7 +524,7 @@ const Messaging = () => {
                 ))
               )}
             </div>
-          </div>
+                </div>
 
           {/* Détail de l'email */}
           <div className="lg:col-span-2">
@@ -600,8 +600,8 @@ const Messaging = () => {
                 </p>
               </GlassCard>
             )}
-          </div>
-        </div>
+                </div>
+              </div>
 
         {/* Dialog de composition */}
         {isComposing && (
@@ -657,9 +657,9 @@ const Messaging = () => {
                 </div>
               </div>
             </GlassCard>
-          </div>
-        )}
-      </div>
+                </div>
+              )}
+            </div>
     </PageLayout>
   );
 };
