@@ -13,7 +13,7 @@ import { Loader2, CheckCircle2, FileText, AlertCircle, Download } from "lucide-r
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { extractUUID } from "@/utils/uuidExtractor";
-import SignatureCanvas from "@/components/signature/SignatureCanvas";
+import SignatureWithOTP from "@/components/signature/SignatureWithOTP";
 import { generateQuotePDF } from "@/services/pdfService";
 
 export default function SignaturePage() {
@@ -24,8 +24,6 @@ export default function SignaturePage() {
   const [signing, setSigning] = useState(false);
   const [quote, setQuote] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
-  const [signatureData, setSignatureData] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -169,19 +167,7 @@ export default function SignaturePage() {
     };
   }, [pdfUrl]);
 
-  const handleSignatureComplete = (signature: string) => {
-    setSignatureData(signature);
-    setShowSignatureCanvas(false);
-    handleSign(signature);
-  };
-
-  const handleSign = async (signature?: string) => {
-    // Si pas de signature fournie, afficher le canvas
-    if (!signature) {
-      setShowSignatureCanvas(true);
-      return;
-    }
-
+  const handleSignatureComplete = async (signatureDataOrNull: string | null, signerName: string) => {
     if (!quote) return;
 
     setSigning(true);
@@ -198,6 +184,8 @@ export default function SignaturePage() {
         hasToken,
         token: hasToken ? rawQuoteId : undefined,
         quote_id: !hasToken ? quoteId : undefined,
+        signerName,
+        hasDrawnSignature: !!signatureDataOrNull,
       });
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/sign-quote`, {
@@ -209,8 +197,8 @@ export default function SignaturePage() {
         body: JSON.stringify({
           token: hasToken ? rawQuoteId : undefined,
           quote_id: !hasToken ? quoteId : undefined,
-          signature_data: signature,
-          signer_name: quote.client_name || "Client",
+          signature_data: signatureDataOrNull,
+          signer_name: signerName,
           user_agent: userAgent,
           signed_at: timestamp,
         }),
@@ -265,7 +253,6 @@ export default function SignaturePage() {
         description: error.message || "Impossible de signer le document",
         variant: "destructive",
       });
-      setShowSignatureCanvas(false);
     } finally {
       setSigning(false);
     }
@@ -461,24 +448,17 @@ export default function SignaturePage() {
                   </AlertDescription>
                 </Alert>
 
-                {!showSignatureCanvas && !signing ? (
-                  <div className="flex gap-4">
-                    <Button
-                      onClick={() => handleSign()}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                      size="lg"
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Signer le devis
-                    </Button>
-                  </div>
-                ) : signing ? (
+                {signing ? (
                   <div className="text-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
                     <p className="text-muted-foreground">Enregistrement de votre signature...</p>
                   </div>
                 ) : (
-                  <SignatureCanvas
+                  <SignatureWithOTP
+                    quoteId={!hasToken ? quoteId : undefined}
+                    sessionToken={hasToken ? rawQuoteId : undefined}
+                    clientEmail={quote.email || quote.client_email || "client@example.com"}
+                    clientName={quote.client_name}
                     onSignatureComplete={handleSignatureComplete}
                     disabled={signing}
                   />

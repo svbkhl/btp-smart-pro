@@ -264,6 +264,22 @@ serve(async (req) => {
 
     console.log('✅ Quote signed successfully:', quote_id, 'in table:', tableName);
 
+    // ⚠️ ENVOI AUTOMATIQUE EMAIL DE CONFIRMATION (non bloquant)
+    try {
+      console.log('📧 Envoi email de confirmation...');
+      // On ne bloque pas la réponse, l'email sera envoyé en arrière-plan
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-signature-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({ quote_id: quote_id }),
+      }).catch(err => console.error('⚠️ Erreur envoi email confirmation (non bloquant):', err));
+    } catch (emailError) {
+      console.error('⚠️ Erreur envoi email confirmation (non bloquant):', emailError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
