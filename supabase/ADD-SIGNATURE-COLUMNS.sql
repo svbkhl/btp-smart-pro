@@ -228,6 +228,10 @@ COMMENT ON COLUMN public.ai_quotes.signature_user_agent IS 'User Agent du naviga
 COMMENT ON COLUMN public.ai_quotes.signature_url IS 'URL publique pour signer le devis';
 COMMENT ON COLUMN public.ai_quotes.signature_token IS 'Token de sécurité pour la signature';
 
-RAISE NOTICE '========================================';
-RAISE NOTICE '✅ COLONNES DE SIGNATURE AJOUTÉES';
-RAISE NOTICE '========================================';
+-- Message de succès
+DO $$
+BEGIN
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✅ COLONNES DE SIGNATURE AJOUTÉES';
+  RAISE NOTICE '========================================';
+END $$;

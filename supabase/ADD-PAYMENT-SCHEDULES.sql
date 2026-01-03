@@ -337,12 +337,16 @@ COMMENT ON FUNCTION public.get_next_unpaid_installment IS 'Retourne le numéro d
 COMMENT ON FUNCTION public.is_previous_installment_paid IS 'Vérifie si toutes les échéances précédentes sont payées';
 COMMENT ON FUNCTION public.generate_payment_schedule IS 'Génère un plan de paiement avec N échéances espacées de 30 jours';
 
-RAISE NOTICE '========================================';
-RAISE NOTICE '✅ SYSTÈME DE PAIEMENT EN PLUSIEURS FOIS';
-RAISE NOTICE '========================================';
-RAISE NOTICE 'Table payment_schedules créée';
-RAISE NOTICE 'Colonnes invoices/payments mises à jour';
-RAISE NOTICE 'Fonctions utilitaires créées';
-RAISE NOTICE 'Triggers automatiques configurés';
-RAISE NOTICE 'RLS activé';
-RAISE NOTICE '========================================';
+-- Message de succès
+DO $$
+BEGIN
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✅ SYSTÈME DE PAIEMENT EN PLUSIEURS FOIS';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'Table payment_schedules créée';
+  RAISE NOTICE 'Colonnes invoices/payments mises à jour';
+  RAISE NOTICE 'Fonctions utilitaires créées';
+  RAISE NOTICE 'Triggers automatiques configurés';
+  RAISE NOTICE 'RLS activé';
+  RAISE NOTICE '========================================';
+END $$;

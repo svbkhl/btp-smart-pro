@@ -360,11 +360,15 @@ CREATE TRIGGER trigger_update_invoice_on_payment
   WHEN (NEW.status = 'completed')
   EXECUTE FUNCTION public.update_invoice_remaining_amount();
 
-RAISE NOTICE '========================================';
-RAISE NOTICE '✅ SYSTÈME DE PAIEMENT STRIPE CONFIGURÉ';
-RAISE NOTICE '========================================';
-RAISE NOTICE 'Tables: invoices, payments';
-RAISE NOTICE 'Colonnes Stripe ajoutées';
-RAISE NOTICE 'RLS activé';
-RAISE NOTICE 'Trigger auto-update facture créé';
-RAISE NOTICE '========================================';
+-- Message de succès
+DO $$
+BEGIN
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✅ SYSTÈME DE PAIEMENT STRIPE CONFIGURÉ';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'Tables: invoices, payments';
+  RAISE NOTICE 'Colonnes Stripe ajoutées';
+  RAISE NOTICE 'RLS activé';
+  RAISE NOTICE 'Trigger auto-update facture créé';
+  RAISE NOTICE '========================================';
+END $$;

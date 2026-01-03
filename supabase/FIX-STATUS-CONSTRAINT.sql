@@ -76,7 +76,11 @@ END $$;
 -- 4️⃣ Commentaires pour documentation
 COMMENT ON COLUMN public.ai_quotes.status IS 'Statut du devis: draft, sent, signed (après signature), accepted, rejected, paid (après paiement), cancelled';
 
-RAISE NOTICE '========================================';
-RAISE NOTICE '✅ CONTRAINTES STATUS MISES À JOUR';
-RAISE NOTICE 'Statuts autorisés: draft, sent, signed, accepted, rejected, paid, cancelled';
-RAISE NOTICE '========================================';
+-- Message de succès
+DO $$
+BEGIN
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✅ CONTRAINTES STATUS MISES À JOUR';
+  RAISE NOTICE 'Statuts autorisés: draft, sent, signed, accepted, rejected, paid, cancelled';
+  RAISE NOTICE '========================================';
+END $$;
