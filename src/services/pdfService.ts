@@ -499,6 +499,157 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
 }
 
 /**
+ * Génère un PDF de devis et le retourne comme Blob (pour aperçu)
+ */
+export async function generateQuotePDF(params: DownloadQuotePDFParams): Promise<Blob> {
+  try {
+    console.log('[PDF Service] Génération du PDF pour aperçu');
+
+    const {
+      result,
+      companyInfo,
+      clientInfo,
+      surface,
+      workType,
+      region,
+      quoteDate,
+      quoteNumber,
+      signatureData,
+      signedBy,
+      signedAt,
+      quoteFormat,
+    } = params;
+
+    // Créer le document PDF
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    // Marges
+    const margin = 15;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const contentWidth = pageWidth - 2 * margin;
+    let yPosition = margin;
+
+    // Couleurs
+    const primaryColor = [59, 130, 246];
+    const textColor = [31, 41, 55];
+    const lightGray = [243, 244, 246];
+
+    // EN-TÊTE
+    doc.setFillColor(...primaryColor);
+    doc.rect(margin, yPosition, contentWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DEVIS', margin + 5, yPosition + 15);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    if (quoteNumber) {
+      doc.text(`N° ${quoteNumber}`, margin + 5, yPosition + 25);
+    }
+    doc.text(
+      `Date: ${quoteDate.toLocaleDateString('fr-FR')}`,
+      margin + 5,
+      yPosition + 32
+    );
+
+    yPosition += 50;
+
+    // INFORMATIONS
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Entreprise:', margin, yPosition);
+    doc.text('Client:', pageWidth - margin - 70, yPosition);
+    
+    yPosition += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.text(companyInfo.companyName || 'BTP Smart Pro', margin, yPosition);
+    doc.text(clientInfo.name, pageWidth - margin - 70, yPosition);
+    
+    if (clientInfo.email) {
+      yPosition += 5;
+      doc.text(clientInfo.email, pageWidth - margin - 70, yPosition);
+    }
+
+    yPosition += 15;
+
+    // DÉTAILS
+    if (workType || surface) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Description des travaux:', margin, yPosition);
+      yPosition += 7;
+      doc.setFont('helvetica', 'normal');
+      if (workType) doc.text(`Type: ${workType}`, margin, yPosition);
+      if (surface) {
+        yPosition += 5;
+        doc.text(`Surface: ${surface} m²`, margin, yPosition);
+      }
+      yPosition += 10;
+    }
+
+    // MONTANT AVEC TTC
+    const ttc = result.estimatedCost || 0;
+    const { total_ht, vat_amount } = calculateFromTTC(ttc, 20);
+
+    doc.setFillColor(...lightGray);
+    doc.rect(margin, yPosition, contentWidth, 30, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('MONTANT TOTAL TTC:', margin + 5, yPosition + 10);
+    doc.setFontSize(16);
+    doc.text(
+      `${ttc.toLocaleString('fr-FR')} €`,
+      pageWidth - margin - 40,
+      yPosition + 10
+    );
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`HT: ${total_ht.toLocaleString('fr-FR')} €`, margin + 5, yPosition + 20);
+    doc.text(`TVA (20%): ${vat_amount.toLocaleString('fr-FR')} €`, margin + 5, yPosition + 25);
+
+    // Signature si présente
+    if (signatureData && signedBy && signedAt) {
+      yPosition = pageHeight - 60;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Signature:', margin, yPosition);
+      yPosition += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Signé par: ${signedBy}`, margin, yPosition);
+      yPosition += 5;
+      doc.text(
+        `Le: ${new Date(signedAt).toLocaleDateString('fr-FR')}`,
+        margin,
+        yPosition
+      );
+      
+      if (signatureData.startsWith('data:image')) {
+        try {
+          doc.addImage(signatureData, 'PNG', margin, yPosition + 5, 50, 20);
+        } catch (e) {
+          console.error('Erreur ajout signature:', e);
+        }
+      }
+    }
+
+    // Retourner comme Blob
+    const pdfBlob = doc.output('blob');
+    return pdfBlob;
+  } catch (error) {
+    console.error('[PDF Service] Erreur génération PDF:', error);
+    throw new Error('Impossible de générer le PDF');
+  }
+}
+
+/**
  * Génère un PDF de devis et le retourne en base64 pour l'email
  */
 export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Promise<{
