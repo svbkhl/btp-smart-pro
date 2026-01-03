@@ -231,9 +231,9 @@ export default function SignaturePage() {
       console.log("✅ Devis signé avec succès");
 
       toast({
-        title: "✅ Document signé !",
-        description: "Votre signature a été enregistrée avec succès. Vous allez être redirigé...",
-        duration: 3000,
+        title: "✅ Signature enregistrée avec succès !",
+        description: "Merci pour votre confiance. Nous vous contacterons prochainement.",
+        duration: 5000,
       });
 
       // Recharger le devis pour afficher le statut mis à jour
@@ -257,10 +257,7 @@ export default function SignaturePage() {
         }
       }
 
-      // Rediriger après 3 secondes
-      setTimeout(() => {
-        navigate("/");
-      }, 3000);
+      // ⚠️ PAS de redirection - le client reste sur la page de confirmation
     } catch (error: any) {
       console.error("Erreur lors de la signature:", error);
       toast({
@@ -288,24 +285,36 @@ export default function SignaturePage() {
   if (error || !quote) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              {error || "Devis introuvable"}
+        <Card className="w-full max-w-md backdrop-blur-xl bg-white/90 dark:bg-gray-800/90">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="h-10 w-10 text-orange-600 dark:text-orange-400" />
+            </div>
+            <CardTitle className="text-xl text-orange-600 dark:text-orange-400">
+              Document introuvable
             </CardTitle>
-            <CardDescription>
-              {error || "Le devis demandé n'existe pas ou a été supprimé."}
+            <CardDescription className="text-base mt-2">
+              Le lien que vous avez utilisé n'est plus valide ou a expiré.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => navigate("/")}
-              variant="outline"
-              className="w-full"
-            >
-              Retour à l'accueil
-            </Button>
+          <CardContent className="space-y-4">
+            <Alert className="bg-orange-50 dark:bg-orange-900/20 border-orange-200">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
+                <p className="font-medium mb-2">Que faire ?</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>Vérifiez que vous avez bien copié le lien complet</li>
+                  <li>Contactez l'entreprise pour obtenir un nouveau lien</li>
+                  <li>Le document a peut-être déjà été signé</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+            
+            <div className="p-4 bg-muted/30 rounded-lg text-center">
+              <p className="text-sm text-muted-foreground">
+                Vous pouvez fermer cette page
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -315,14 +324,16 @@ export default function SignaturePage() {
   if (quote.signed && quote.signed_at) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-600">
-              <CheckCircle2 className="h-5 w-5" />
-              Document déjà signé
+        <Card className="w-full max-w-lg backdrop-blur-xl bg-white/90 dark:bg-gray-800/90 border-green-200">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+            </div>
+            <CardTitle className="text-2xl text-green-600 dark:text-green-400">
+              ✅ Merci pour votre signature !
             </CardTitle>
-            <CardDescription>
-              Ce devis a déjà été signé le {new Date(quote.signed_at).toLocaleDateString("fr-FR", {
+            <CardDescription className="text-base mt-2">
+              Votre devis a été signé avec succès le {new Date(quote.signed_at).toLocaleDateString("fr-FR", {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
@@ -331,14 +342,24 @@ export default function SignaturePage() {
               })}.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => navigate("/")}
-              variant="outline"
-              className="w-full"
-            >
-              Retour à l'accueil
-            </Button>
+          <CardContent className="space-y-4">
+            <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                <p className="font-medium mb-2">Prochaines étapes :</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>Nous avons bien reçu votre signature</li>
+                  <li>Vous recevrez une confirmation par email</li>
+                  <li>Notre équipe vous contactera sous 24-48h</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+            
+            <div className="p-4 bg-muted/30 rounded-lg">
+              <p className="text-sm text-center text-muted-foreground">
+                Vous pouvez fermer cette page en toute sécurité
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
