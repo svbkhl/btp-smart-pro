@@ -24,15 +24,19 @@ BEGIN
     RAISE NOTICE '⚠️ Colonne signature_ip_address existe déjà dans ai_quotes';
   END IF;
 
-  -- Ajouter ip_address à quotes si elle n'existe pas
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'quotes' AND column_name = 'signature_ip_address'
-  ) THEN
-    ALTER TABLE quotes ADD COLUMN signature_ip_address TEXT;
-    RAISE NOTICE '✅ Colonne signature_ip_address ajoutée à quotes';
+  -- Ajouter ip_address à quotes si la table existe
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'quotes') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'quotes' AND column_name = 'signature_ip_address'
+    ) THEN
+      ALTER TABLE quotes ADD COLUMN signature_ip_address TEXT;
+      RAISE NOTICE '✅ Colonne signature_ip_address ajoutée à quotes';
+    ELSE
+      RAISE NOTICE '⚠️ Colonne signature_ip_address existe déjà dans quotes';
+    END IF;
   ELSE
-    RAISE NOTICE '⚠️ Colonne signature_ip_address existe déjà dans quotes';
+    RAISE NOTICE 'ℹ️ Table quotes n''existe pas (normal si vous utilisez seulement ai_quotes)';
   END IF;
 END $$;
 
