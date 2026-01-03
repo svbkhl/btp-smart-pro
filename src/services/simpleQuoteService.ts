@@ -67,15 +67,18 @@ export async function generateSimpleQuote(
   // Construire la description avec la phrase standard
   const description = `${data.prestation}\n\n${STANDARD_PHRASE}`;
 
-  // Créer les détails du devis
+  // Créer les détails du devis - MODE TTC FIRST
   const details = {
-    estimatedCost: totalTTC, // Stocker le TTC
+    estimatedCost: total_ttc, // TTC = source de vérité
+    total_ttc: total_ttc,     // Ajouter explicitement
+    total_ht: total_ht,       // Ajouter explicitement
+    vat_amount: vat_amount,   // Ajouter explicitement
     description: description,
     workSteps: [
       {
         step: data.prestation,
         description: `${data.prestation} - Surface: ${data.surface} m²\n\n${STANDARD_PHRASE}`,
-        cost: totalTTC, // Stocker le TTC
+        cost: total_ttc, // TTC
       },
     ],
     materials: [],
