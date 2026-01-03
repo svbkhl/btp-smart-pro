@@ -46,9 +46,9 @@ export function calculateFromTTC(ttc: number, vatRate: number = 20) {
   const ht = ttc - vat;
 
   return {
-    total_ttc: round(ttc),      // Prix TTC (source de vérité)
-    total_ht: round(ht),         // Prix HT (calculé)
-    vat_amount: round(vat),      // Montant TVA (calculé)
+    total_ttc: ttc,              // ⚠️ TTC = source de vérité (JAMAIS arrondi)
+    total_ht: round(ht),         // Prix HT (calculé et arrondi)
+    vat_amount: round(vat),      // Montant TVA (calculé et arrondi)
     vat_rate: vatRate,           // Taux TVA (pour référence)
   };
 }
