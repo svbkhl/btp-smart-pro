@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Invoice } from '@/hooks/useInvoices';
 import { UserSettings } from '@/hooks/useUserSettings';
+import { calculateFromTTC } from '@/utils/priceCalculations';
 
 interface DownloadInvoicePDFParams {
   invoice: Invoice;
@@ -295,37 +296,48 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
         yPosition += 6;
       });
 
-      // Total HT
-      yPosition += 2;
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, yPosition, rightX, yPosition);
-      yPosition += 5;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
-      doc.text(formatCurrency(totalHT), rightX, yPosition, { align: 'right' });
-      yPosition += 6;
-
-      // TVA
+      // ⚠️ MODE TTC FIRST : Si amount_ttc existe, partir du TTC
+      let finalTTC, finalHT, finalVAT;
       const vat = invoice.vat_rate || 20;
-      const vatAmount = invoice.vat_amount || (totalHT * vat) / 100;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text(`TVA (${vat}%):`, rightX - 30, yPosition, { align: 'right' });
-      doc.text(formatCurrency(vatAmount), rightX, yPosition, { align: 'right' });
-      yPosition += 6;
+      
+      if (invoice.amount_ttc) {
+        // Partir du TTC (source de vérité)
+        const prices = calculateFromTTC(invoice.amount_ttc, vat);
+        finalTTC = prices.total_ttc;
+        finalHT = prices.total_ht;
+        finalVAT = prices.vat_amount;
+      } else {
+        // Ancienne logique (compatibilité)
+        finalHT = totalHT;
+        finalVAT = invoice.vat_amount || (totalHT * vat) / 100;
+        finalTTC = finalHT + finalVAT;
+      }
 
-      // Total TTC
-      const totalTTC = invoice.amount_ttc || totalHT + vatAmount;
+      // Total TTC (EN PREMIER, GROS, EN COULEUR)
+      yPosition += 2;
       doc.setDrawColor(...primaryColor);
       doc.setLineWidth(1);
       doc.line(margin, yPosition, rightX, yPosition);
       yPosition += 5;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text('Total TTC:', rightX - 30, yPosition, { align: 'right' });
+      doc.text('Total à payer (TTC):', rightX - 40, yPosition, { align: 'right' });
       doc.setTextColor(...primaryColor);
-      doc.text(formatCurrency(totalTTC), rightX, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalTTC), rightX, yPosition, { align: 'right' });
+      doc.setTextColor(...textColor);
+      yPosition += 8;
+
+      // TVA
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`dont TVA (${vat}%):`, rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalVAT), rightX, yPosition, { align: 'right' });
+      yPosition += 5;
+
+      // Total HT
+      doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalHT), rightX, yPosition, { align: 'right' });
       doc.setTextColor(...textColor);
       yPosition += 10;
     } else {

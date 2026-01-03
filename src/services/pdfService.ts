@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { calculateFromTTC } from '@/utils/priceCalculations';
 
 // Types pour les données du devis
 interface QuoteResult {
@@ -310,13 +311,14 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       doc.setFont('helvetica', 'bold');
       doc.text('Étape', margin + 2, yPosition + 5.5);
       doc.text('Description', margin + 40, yPosition + 5.5);
-      doc.text('Montant HT', rightX, yPosition + 5.5, { align: 'right' });
+      doc.text('Montant TTC', rightX, yPosition + 5.5, { align: 'right' });
       yPosition += 8;
 
       // Lignes du tableau
       doc.setTextColor(...textColor);
       doc.setFont('helvetica', 'normal');
-      let totalHT = 0;
+      // ⚠️ MODE TTC FIRST : Les montants stockés sont en TTC
+      let totalTTC = 0;
 
       result.workSteps.forEach((step, index) => {
         if (yPosition > pageHeight - 50) {
@@ -340,7 +342,7 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
           doc.setFont('helvetica', 'bold');
           doc.text('Étape', margin + 2, yPosition + 5.5);
           doc.text('Description', margin + 40, yPosition + 5.5);
-          doc.text('Montant HT', rightX, yPosition + 5.5, { align: 'right' });
+          doc.text('Montant TTC', rightX, yPosition + 5.5, { align: 'right' });
           yPosition += 8;
           doc.setTextColor(...textColor);
           doc.setFont('helvetica', 'normal');
@@ -363,7 +365,7 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
         });
         
         const cost = step.cost || 0;
-        totalHT += cost;
+        totalTTC += cost; // Accumulation en TTC
         doc.text(formatCurrency(cost), rightX, yPosition + 4, { align: 'right' });
         yPosition += lineHeight;
       });
@@ -374,37 +376,34 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
         yPosition = margin;
       }
 
-      // Total HT
+      // ⚠️ MODE TTC FIRST : Calculer HT et TVA à partir du TTC
+      const prices = calculateFromTTC(totalTTC, 20);
+      
+      // Total TTC (EN PREMIER, GROS, EN COULEUR)
       yPosition += 2;
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, yPosition, rightX, yPosition);
-      yPosition += 5;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      const totalHTRounded = Math.round(totalHT * 100) / 100;
-      doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
-      doc.text(formatCurrency(totalHTRounded), rightX, yPosition, { align: 'right' });
-      yPosition += 6;
-
-      // TVA (20%)
-      const tva = Math.round(totalHTRounded * 0.2 * 100) / 100;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text('TVA (20%):', rightX - 30, yPosition, { align: 'right' });
-      doc.text(formatCurrency(tva), rightX, yPosition, { align: 'right' });
-      yPosition += 6;
-
-      // Total TTC
-      const totalTTC = Math.round((totalHTRounded + tva) * 100) / 100;
       doc.setDrawColor(...primaryColor);
       doc.setLineWidth(1);
       doc.line(margin, yPosition, rightX, yPosition);
       yPosition += 5;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text('Total TTC:', rightX - 30, yPosition, { align: 'right' });
+      doc.text('Total à payer (TTC):', rightX - 40, yPosition, { align: 'right' });
       doc.setTextColor(...primaryColor);
-      doc.text(formatCurrency(totalTTC), rightX, yPosition, { align: 'right' });
+      doc.text(formatCurrency(prices.total_ttc), rightX, yPosition, { align: 'right' });
+      doc.setTextColor(...textColor);
+      yPosition += 8;
+
+      // TVA (20%)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('dont TVA (20%):', rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(prices.vat_amount), rightX, yPosition, { align: 'right' });
+      yPosition += 5;
+
+      // Total HT
+      doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(prices.total_ht), rightX, yPosition, { align: 'right' });
       doc.setTextColor(...textColor);
       yPosition += 10;
     } else if (result.estimatedCost) {
