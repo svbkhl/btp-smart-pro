@@ -65,9 +65,21 @@ serve(async (req) => {
 
     // Parser le body
     const body = await req.json();
-    let { quote_id, token, signer_name, signature_data, user_agent, signed_at } = body;
+    let { quote_id, token, signer_name, signature_data, user_agent, signed_at, otp_code } = body;
 
-    console.log('📥 [sign-quote] Requête reçue:', { quote_id, token, has_signature: !!signature_data });
+    // ⚠️ CAPTURER L'ADRESSE IP DU SIGNATAIRE
+    const ip_address = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                       req.headers.get('x-real-ip') || 
+                       req.headers.get('cf-connecting-ip') || // Cloudflare
+                       'unknown';
+
+    console.log('📥 [sign-quote] Requête reçue:', { 
+      quote_id, 
+      token, 
+      has_signature: !!signature_data,
+      ip_address,
+      otp_provided: !!otp_code
+    });
 
     // Si un token est fourni, récupérer quote_id depuis signature_sessions
     if (token && !quote_id) {
@@ -188,13 +200,14 @@ serve(async (req) => {
       );
     }
 
-    // Mettre à jour le devis avec la signature
+    // Mettre à jour le devis avec la signature + IP
     const signatureMetadata = {
       signed: true,
       signed_at: signed_at || new Date().toISOString(),
       signed_by: signer_name || null,
       signature_data: signature_data || null,
       signature_user_agent: user_agent || null,
+      signature_ip_address: ip_address, // ⚠️ NOUVEAU : IP du signataire
       status: 'signed',
       updated_at: new Date().toISOString(),
     };
@@ -226,6 +239,27 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
         })
         .eq('token', token);
+    }
+
+    // ⚠️ AUDIT TRAIL : Enregistrer l'événement de signature
+    try {
+      await supabaseClient
+        .from('signature_events')
+        .insert({
+          quote_id: quote_id,
+          session_token: token || null,
+          event_type: 'signed',
+          event_data: {
+            signer_name: signer_name,
+            signature_method: signature_data ? 'drawn' : 'typed',
+            otp_verified: !!otp_code,
+          },
+          ip_address: ip_address,
+          user_agent: user_agent || null,
+        });
+      console.log('✅ Événement d\'audit enregistré');
+    } catch (auditError) {
+      console.error('⚠️ Erreur enregistrement audit (non bloquant):', auditError);
     }
 
     console.log('✅ Quote signed successfully:', quote_id, 'in table:', tableName);
