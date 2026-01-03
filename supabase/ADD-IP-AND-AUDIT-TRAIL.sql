@@ -1,10 +1,6 @@
 -- ================================================================
 -- SCRIPT SQL : Ajouter IP et Audit Trail pour signature électronique
--- ================================================================
--- Ce script ajoute :
--- 1. Colonne ip_address aux tables de devis
--- 2. Table signature_events pour l'audit trail
--- 3. Table signature_otp pour les codes de vérification
+-- VERSION ULTRA-ROBUSTE - Vérifie tout avant modification
 -- ================================================================
 
 -- ================================================================
@@ -14,14 +10,18 @@
 DO $$ 
 BEGIN
   -- Ajouter ip_address à ai_quotes si elle n'existe pas
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'ai_quotes' AND column_name = 'signature_ip_address'
-  ) THEN
-    ALTER TABLE ai_quotes ADD COLUMN signature_ip_address TEXT;
-    RAISE NOTICE '✅ Colonne signature_ip_address ajoutée à ai_quotes';
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ai_quotes') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'ai_quotes' AND column_name = 'signature_ip_address'
+    ) THEN
+      ALTER TABLE ai_quotes ADD COLUMN signature_ip_address TEXT;
+      RAISE NOTICE '✅ Colonne signature_ip_address ajoutée à ai_quotes';
+    ELSE
+      RAISE NOTICE '⚠️ Colonne signature_ip_address existe déjà dans ai_quotes';
+    END IF;
   ELSE
-    RAISE NOTICE '⚠️ Colonne signature_ip_address existe déjà dans ai_quotes';
+    RAISE NOTICE '❌ Table ai_quotes n''existe pas';
   END IF;
 
   -- Ajouter ip_address à quotes si la table existe
@@ -44,21 +44,30 @@ END $$;
 -- 2. TABLE SIGNATURE_EVENTS (Audit Trail)
 -- ================================================================
 
-CREATE TABLE IF NOT EXISTS signature_events (
+DO $$
+BEGIN
+  -- Supprimer la table si elle existe déjà (pour réinitialisation propre)
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'signature_events') THEN
+    DROP TABLE signature_events CASCADE;
+    RAISE NOTICE 'ℹ️ Table signature_events existante supprimée';
+  END IF;
+END $$;
+
+CREATE TABLE signature_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quote_id UUID, -- Référence au devis (ai_quotes ou quotes)
-  session_token TEXT, -- Token de session si applicable
-  event_type TEXT NOT NULL, -- 'viewed', 'otp_sent', 'otp_verified', 'signature_drawn', 'signature_typed', 'signed', 'certificate_generated', 'pdf_downloaded'
-  event_data JSONB, -- Données supplémentaires (code OTP, nom saisi, etc.)
+  quote_id UUID,
+  session_token TEXT,
+  event_type TEXT NOT NULL,
+  event_data JSONB,
   ip_address TEXT,
   user_agent TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index pour recherche rapide
-CREATE INDEX IF NOT EXISTS idx_signature_events_quote_id ON signature_events(quote_id);
-CREATE INDEX IF NOT EXISTS idx_signature_events_session_token ON signature_events(session_token);
-CREATE INDEX IF NOT EXISTS idx_signature_events_created_at ON signature_events(created_at);
+-- Index
+CREATE INDEX idx_signature_events_quote_id ON signature_events(quote_id);
+CREATE INDEX idx_signature_events_session_token ON signature_events(session_token);
+CREATE INDEX idx_signature_events_created_at ON signature_events(created_at);
 
 DO $$ 
 BEGIN
@@ -69,24 +78,33 @@ END $$;
 -- 3. TABLE SIGNATURE_OTP (Codes de vérification)
 -- ================================================================
 
-CREATE TABLE IF NOT EXISTS signature_otp (
+DO $$
+BEGIN
+  -- Supprimer la table si elle existe déjà
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'signature_otp') THEN
+    DROP TABLE signature_otp CASCADE;
+    RAISE NOTICE 'ℹ️ Table signature_otp existante supprimée';
+  END IF;
+END $$;
+
+CREATE TABLE signature_otp (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quote_id UUID, -- Référence au devis
-  session_token TEXT, -- Token de session
-  email TEXT NOT NULL, -- Email du destinataire
-  otp_code TEXT NOT NULL, -- Code à 6 chiffres
+  quote_id UUID,
+  session_token TEXT,
+  email TEXT NOT NULL,
+  otp_code TEXT NOT NULL,
   verified BOOLEAN DEFAULT FALSE,
-  expires_at TIMESTAMPTZ NOT NULL, -- Expiration (10 minutes)
+  expires_at TIMESTAMPTZ NOT NULL,
   verified_at TIMESTAMPTZ,
   ip_address TEXT,
-  attempts INT DEFAULT 0, -- Nombre de tentatives
+  attempts INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index pour recherche rapide
-CREATE INDEX IF NOT EXISTS idx_signature_otp_session_token ON signature_otp(session_token);
-CREATE INDEX IF NOT EXISTS idx_signature_otp_email ON signature_otp(email);
-CREATE INDEX IF NOT EXISTS idx_signature_otp_expires_at ON signature_otp(expires_at);
+-- Index
+CREATE INDEX idx_signature_otp_session_token ON signature_otp(session_token);
+CREATE INDEX idx_signature_otp_email ON signature_otp(email);
+CREATE INDEX idx_signature_otp_expires_at ON signature_otp(expires_at);
 
 DO $$ 
 BEGIN
@@ -100,15 +118,21 @@ END $$;
 -- Activer RLS sur signature_events
 ALTER TABLE signature_events ENABLE ROW LEVEL SECURITY;
 
--- Policy : Lecture publique (pour Edge Functions)
-DROP POLICY IF EXISTS "Allow public read signature_events" ON signature_events;
+-- Supprimer policies existantes si elles existent
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Allow public read signature_events" ON signature_events;
+  DROP POLICY IF EXISTS "Allow public insert signature_events" ON signature_events;
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;
+
+-- Créer policies
 CREATE POLICY "Allow public read signature_events"
   ON signature_events
   FOR SELECT
   USING (true);
 
--- Policy : Insertion publique (pour Edge Functions)
-DROP POLICY IF EXISTS "Allow public insert signature_events" ON signature_events;
 CREATE POLICY "Allow public insert signature_events"
   ON signature_events
   FOR INSERT
@@ -117,22 +141,27 @@ CREATE POLICY "Allow public insert signature_events"
 -- Activer RLS sur signature_otp
 ALTER TABLE signature_otp ENABLE ROW LEVEL SECURITY;
 
--- Policy : Lecture publique (pour Edge Functions)
-DROP POLICY IF EXISTS "Allow public read signature_otp" ON signature_otp;
+-- Supprimer policies existantes
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Allow public read signature_otp" ON signature_otp;
+  DROP POLICY IF EXISTS "Allow public insert signature_otp" ON signature_otp;
+  DROP POLICY IF EXISTS "Allow public update signature_otp" ON signature_otp;
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;
+
+-- Créer policies
 CREATE POLICY "Allow public read signature_otp"
   ON signature_otp
   FOR SELECT
   USING (true);
 
--- Policy : Insertion publique (pour Edge Functions)
-DROP POLICY IF EXISTS "Allow public insert signature_otp" ON signature_otp;
 CREATE POLICY "Allow public insert signature_otp"
   ON signature_otp
   FOR INSERT
   WITH CHECK (true);
 
--- Policy : Update publique (pour marquer comme vérifié)
-DROP POLICY IF EXISTS "Allow public update signature_otp" ON signature_otp;
 CREATE POLICY "Allow public update signature_otp"
   ON signature_otp
   FOR UPDATE
@@ -144,7 +173,7 @@ BEGIN
 END $$;
 
 -- ================================================================
--- 5. FONCTION : Nettoyer les OTP expirés (optionnel)
+-- 5. FONCTION : Nettoyer les OTP expirés
 -- ================================================================
 
 CREATE OR REPLACE FUNCTION clean_expired_otp()
@@ -178,8 +207,11 @@ BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '📝 Colonnes ajoutées :';
   RAISE NOTICE '   - ai_quotes.signature_ip_address';
-  RAISE NOTICE '   - quotes.signature_ip_address';
+  RAISE NOTICE '   - quotes.signature_ip_address (si table existe)';
   RAISE NOTICE '';
   RAISE NOTICE '🔒 RLS activé sur toutes les tables';
+  RAISE NOTICE '';
+  RAISE NOTICE '⚠️ IMPORTANT : Les tables signature_events et signature_otp';
+  RAISE NOTICE '   ont été réinitialisées (données précédentes supprimées)';
   RAISE NOTICE '========================================';
 END $$;
