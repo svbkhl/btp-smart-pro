@@ -38,7 +38,10 @@ ALTER TABLE public.ai_quotes
 ADD CONSTRAINT ai_quotes_status_check 
 CHECK (status IN ('draft', 'sent', 'signed', 'accepted', 'rejected', 'paid', 'cancelled'));
 
-RAISE NOTICE '✅ Contrainte ai_quotes_status_check recréée avec signed et paid';
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Contrainte ai_quotes_status_check recréée avec signed et paid';
+END $$;
 
 -- 3️⃣ Faire la même chose pour quotes si elle existe
 DO $$
