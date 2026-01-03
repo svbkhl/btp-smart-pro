@@ -347,12 +347,12 @@ export const SimpleQuoteForm = () => {
               step="0.01"
               value={prix}
               onChange={(e) => setPrix(e.target.value)}
-              placeholder="Ex: 2000 (montant TTC toutes taxes comprises)"
+              placeholder="Ex: 2000"
               className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
-              ⚠️ Saisissez le montant TTC (toutes taxes comprises) que vous souhaitez facturer
+              💡 Le montant que vous saisissez est le prix final TTC (TVA incluse)
             </p>
           </div>
 
