@@ -385,7 +385,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        payment_link: session.url,
+        payment_url: session.url,  // ← Changé de payment_link à payment_url
+        payment_link: session.url,  // ← Gardé pour rétrocompatibilité
         session_id: session.id,
         payment_id: payment?.id,
         invoice_id: invoiceId,
