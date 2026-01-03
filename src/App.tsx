@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -54,13 +54,22 @@ import NotFound from './pages/NotFound';
 
 function App() {
   const { user } = useAuth();
+  const location = useLocation();
+  
+  // Pages publiques où l'agent IA ne doit PAS être visible
+  const isPublicPage = 
+    location.pathname.startsWith('/sign/') ||
+    location.pathname.startsWith('/signature/') ||
+    location.pathname.startsWith('/payment/') ||
+    location.pathname.startsWith('/candidature/') ||
+    location.pathname.startsWith('/quote/');
   
   return (
     <ErrorBoundary>
       {/* Guard qui désactive automatiquement le mode démo si l'utilisateur se connecte */}
       <DemoModeGuard />
-      {/* Widget Agent IA flottant - visible uniquement si connecté (le composant gère lui-même l'affichage sur 404) */}
-      {user && <FloatingAIAssistant />}
+      {/* Widget Agent IA flottant - masqué sur les pages publiques (signature, paiement) */}
+      {user && !isPublicPage && <FloatingAIAssistant />}
       <Routes>
         {/* Routes publiques */}
         <Route path="/" element={<Index />} />
