@@ -12,9 +12,10 @@ export interface Quote {
   id: string;
   user_id: string;
   client_name: string;
+  client_email?: string;
   project_id?: string;
   quote_number: string;
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "signed" | "paid";
   estimated_cost: number;
   details?: {
     estimatedCost: number;
@@ -26,6 +27,16 @@ export interface Quote {
   };
   created_at: string;
   updated_at: string;
+  sent_at?: string;
+  // Colonnes de signature électronique
+  signed?: boolean;
+  signed_at?: string;
+  signer_name?: string;
+  signature_data?: string;
+  signature_ip_address?: string;
+  // Colonnes de paiement
+  payment_status?: "pending" | "partially_paid" | "paid";
+  paid_at?: string;
 }
 
 export interface CreateQuoteData {
