@@ -51,7 +51,6 @@ import AdminEmployees from './pages/AdminEmployees';
 import AdminCompanies from './pages/AdminCompanies';
 import AcceptInvitation from './pages/AcceptInvitation';
 import StripeCallback from './pages/StripeCallback';
-import SignaturesTracking from './pages/SignaturesTracking';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -204,14 +203,6 @@ function App() {
           element={
             <ProtectedRoute>
               <QuoteDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/signatures-tracking"
-          element={
-            <ProtectedRoute>
-              <SignaturesTracking />
             </ProtectedRoute>
           }
         />

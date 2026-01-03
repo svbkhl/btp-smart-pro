@@ -40,6 +40,8 @@ import { SendToClientModal } from "@/components/billing/SendToClientModal";
 import { Quote } from "@/hooks/useQuotes";
 import { Invoice } from "@/hooks/useInvoices";
 import { motion } from "framer-motion";
+import PaymentsTab from "@/components/payments/PaymentsTab";
+import QuoteStatusBadge from "@/components/quotes/QuoteStatusBadge";
 
 const Facturation = () => {
   const navigate = useNavigate();
@@ -69,36 +71,6 @@ const Facturation = () => {
     payment.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     payment.payment_method?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const getQuoteStatusColor = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return "default";
-      case "sent":
-        return "secondary";
-      case "draft":
-        return "outline";
-      case "rejected":
-        return "destructive";
-      default:
-        return "default";
-    }
-  };
-
-  const getQuoteStatusLabel = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return "Accepté";
-      case "sent":
-        return "Envoyé";
-      case "draft":
-        return "Brouillon";
-      case "rejected":
-        return "Refusé";
-      default:
-        return status;
-    }
-  };
 
   const getInvoiceStatusColor = (status: string) => {
     switch (status) {
@@ -210,15 +182,24 @@ const Facturation = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredQuotes.map((quote) => (
-                  <GlassCard key={quote.id} className="p-6">
+                  <GlassCard 
+                    key={quote.id} 
+                    className="p-6 cursor-pointer hover:border-primary/30 transition-colors"
+                    onClick={() => navigate(`/quotes/${quote.id}`)}
+                  >
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="font-semibold text-lg">{quote.quote_number}</h3>
                         <p className="text-sm text-muted-foreground">{quote.client_name}</p>
                       </div>
-                      <Badge variant={getQuoteStatusColor(quote.status) as any}>
-                        {getQuoteStatusLabel(quote.status)}
-                      </Badge>
+                      <QuoteStatusBadge
+                        status={
+                          quote.signed ? 'signed' : 
+                          quote.sent_at ? 'sent' : 
+                          'draft'
+                        }
+                        signedAt={quote.signed_at}
+                      />
                     </div>
 
                     <div className="space-y-2 mb-4">
@@ -237,6 +218,14 @@ const Facturation = () => {
                           {format(new Date(quote.created_at), "d MMM yyyy", { locale: fr })}
                         </span>
                       </div>
+                      {quote.signed && quote.signed_at && (
+                        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="font-medium">
+                            Signé le {format(new Date(quote.signed_at), "d MMM", { locale: fr })}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <QuoteActionButtons
@@ -343,88 +332,12 @@ const Facturation = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="payments" className="mt-0 space-y-6">
-            {/* Recherche */}
-            <GlassCard className="p-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher un paiement..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </GlassCard>
-
-            {/* Liste des paiements */}
-            {paymentsLoading ? (
-              <div className="text-center py-12 text-muted-foreground">
-                Chargement...
-              </div>
-            ) : filteredPayments.length === 0 ? (
-              <GlassCard className="p-12 text-center">
-                <CreditCard className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-xl font-semibold mb-2">Aucun paiement</h3>
-                <p className="text-muted-foreground mb-4">
-                  {searchQuery ? "Aucun paiement ne correspond à votre recherche." : "Aucun paiement enregistré pour le moment."}
-                </p>
-              </GlassCard>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredPayments.map((payment) => (
-                  <GlassCard key={payment.id} className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg">
-                          {payment.reference || `Paiement #${payment.id.slice(0, 8)}`}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {payment.payment_method || "Non spécifié"}
-                        </p>
-                      </div>
-                      <Badge variant={payment.status === "paid" ? "default" : payment.status === "overdue" ? "destructive" : "secondary"}>
-                        {payment.status === "paid" ? "Payé" : payment.status === "overdue" ? "En retard" : payment.status === "cancelled" ? "Annulé" : "En attente"}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Euro className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-semibold">
-                          {payment.amount.toLocaleString("fr-FR", {
-                            style: "currency",
-                            currency: "EUR",
-                          })}
-                        </span>
-                      </div>
-                      {payment.due_date && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            Échéance: {format(new Date(payment.due_date), "d MMM yyyy", { locale: fr })}
-                          </span>
-                        </div>
-                      )}
-                      {payment.paid_date && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          <span className="text-muted-foreground">
-                            Payé le: {format(new Date(payment.paid_date), "d MMM yyyy", { locale: fr })}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {payment.notes && (
-                      <div className="mb-4 p-3 bg-white/40 dark:bg-gray-800/40 rounded-lg">
-                        <p className="text-sm text-muted-foreground">{payment.notes}</p>
-                      </div>
-                    )}
-                  </GlassCard>
-                ))}
-              </div>
-            )}
+          <TabsContent value="payments" className="mt-0">
+            <PaymentsTab
+              payments={payments}
+              quotes={quotes}
+              loading={paymentsLoading}
+            />
           </TabsContent>
         </Tabs>
 
