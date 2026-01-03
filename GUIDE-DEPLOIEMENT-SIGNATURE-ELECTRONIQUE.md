@@ -186,3 +186,4 @@ Une fois les phases 1-2-3 complètes, tu pourras :
 ---
 
 **Document en cours de mise à jour...**
+

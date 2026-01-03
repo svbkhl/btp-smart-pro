@@ -350,3 +350,4 @@ BEGIN
   RAISE NOTICE 'RLS activé';
   RAISE NOTICE '========================================';
 END $$;
+

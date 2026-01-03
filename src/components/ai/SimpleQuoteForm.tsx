@@ -20,7 +20,11 @@ import { downloadQuotePDF } from "@/services/pdfService";
 import { Loader2, Sparkles, Download, CheckCircle2, Euro, Ruler, User, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-export const SimpleQuoteForm = () => {
+interface SimpleQuoteFormProps {
+  onSuccess?: () => void;
+}
+
+export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
@@ -117,9 +121,14 @@ export const SimpleQuoteForm = () => {
       setQuote(result);
 
       toast({
-        title: "Devis généré !",
+        title: "✅ Devis généré !",
         description: "Le devis a été créé avec succès.",
       });
+
+      // Callback de succès
+      if (onSuccess) {
+        setTimeout(() => onSuccess(), 500);
+      }
     } catch (error: any) {
       console.error("Error generating quote:", error);
       toast({

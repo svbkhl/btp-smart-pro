@@ -101,3 +101,4 @@ RLS activé
 
 Le fichier `ADD-SIGNATURE-COLUMNS.sql` est déjà ouvert dans ton éditeur.  
 **Copie-le et exécute-le dans le Dashboard Supabase !**
+

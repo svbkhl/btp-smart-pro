@@ -95,3 +95,4 @@ const { data, error } = await supabase.auth.admin.inviteUserByEmail(email.trim()
 
 
 
+

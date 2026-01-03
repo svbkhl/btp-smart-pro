@@ -125,3 +125,4 @@ Tu auras :
 **🎯 PROCHAINE ACTION : Exécute les 4 scripts SQL !**
 
 https://supabase.com/dashboard/project/renmjmqlmafqjzldmsgs/sql/new
+

@@ -22,3 +22,4 @@ COMMENT ON COLUMN public.user_settings.app_base_url IS 'URL de base de l''applic
 
 
 
+

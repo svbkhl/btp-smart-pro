@@ -417,3 +417,4 @@ Tu as maintenant **UN SYSTÈME COMPLET DE FACTURATION PROFESSIONNELLE** :
 *Code : 3500 lignes*  
 
 **🎯 TOUT EST PRÊT. EXÉCUTE LA CONFIG ET TESTE !** 🚀
+

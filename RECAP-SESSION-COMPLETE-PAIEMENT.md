@@ -391,3 +391,4 @@ Tu as maintenant **un système de facturation et paiement professionnel** :
 *Commits : 17*  
 *Lignes de code : ~2000*  
 *Files : 20 fichiers créés/modifiés*
+

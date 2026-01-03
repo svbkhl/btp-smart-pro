@@ -86,3 +86,4 @@ draft → sent → signed → paid
          ↓       ↓
     rejected  cancelled
 ```
+

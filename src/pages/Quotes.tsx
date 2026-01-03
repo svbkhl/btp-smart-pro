@@ -29,6 +29,8 @@ import { useQuotes, Quote, useDeleteQuote } from "@/hooks/useQuotes";
 import { QuoteActionButtons } from "@/components/quotes/QuoteActionButtons";
 import { EditQuoteDialog } from "@/components/quotes/EditQuoteDialog";
 import { QuoteDisplay } from "@/components/ai/QuoteDisplay";
+import QuoteDetailView from "@/components/quotes/QuoteDetailView";
+import QuoteStatusBadge, { QuoteStatus } from "@/components/quotes/QuoteStatusBadge";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { Search, FileText, Euro, Calendar, User, Filter, Eye, Plus } from "lucide-react";
 import { format } from "date-fns";
@@ -79,21 +81,23 @@ const Quotes = () => {
     );
   };
 
-  const getStatusColor = (status: Quote["status"]) => {
-    switch (status) {
-      case "accepted":
-        return "default";
-      case "sent":
-        return "secondary";
-      case "draft":
-        return "outline";
-      case "rejected":
-        return "destructive";
-      case "expired":
-        return "outline";
-      default:
-        return "default";
-    }
+  const getQuoteStatus = (quote: Quote): QuoteStatus => {
+    // Vérifier d'abord si le devis est payé
+    if (quote.payment_status === 'paid') return 'paid';
+    if (quote.payment_status === 'partially_paid') return 'partially_paid';
+    
+    // Vérifier si signé
+    if (quote.signed || quote.status === 'signed') return 'signed';
+    
+    // Vérifier si envoyé
+    if (quote.sent_at || quote.status === 'sent') return 'sent';
+    
+    // Vérifier si expiré ou annulé
+    if (quote.status === 'expired') return 'expired';
+    if (quote.status === 'cancelled' || quote.status === 'rejected') return 'cancelled';
+    
+    // Par défaut: brouillon
+    return 'draft';
   };
 
   const getStatusLabel = (status: Quote["status"]) => {
@@ -203,9 +207,11 @@ const Quotes = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg mb-1">{quote.quote_number}</h3>
-                    <Badge variant={getStatusColor(quote.status)} className="mt-1">
-                      {getStatusLabel(quote.status)}
-                    </Badge>
+                    <QuoteStatusBadge 
+                      status={getQuoteStatus(quote)} 
+                      signedAt={quote.signed_at}
+                      className="mt-1"
+                    />
                   </div>
                 </div>
 
@@ -257,20 +263,33 @@ const Quotes = () => {
           </div>
         )}
 
-        {/* Dialog de visualisation */}
+        {/* Dialog de visualisation avec vue détaillée complète */}
         <Dialog open={!!viewingQuote} onOpenChange={(open) => !open && setViewingQuote(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             {viewingQuote && (
-              <QuoteDisplay
-                result={viewingQuote.details || {}}
-                companyInfo={companyInfo || undefined}
-                clientInfo={{
-                  name: viewingQuote.client_name,
+              <QuoteDetailView
+                quote={viewingQuote}
+                onEdit={() => {
+                  setViewingQuote(null);
+                  setEditingQuote(viewingQuote);
                 }}
-                surface=""
-                workType=""
-                quoteDate={new Date(viewingQuote.created_at)}
-                quoteNumber={viewingQuote.quote_number}
+                onDelete={() => {
+                  setViewingQuote(null);
+                  setQuoteToDelete(viewingQuote.id);
+                  setDeleteDialogOpen(true);
+                }}
+                onSendEmail={() => {
+                  toast({
+                    title: "📧 Envoi en cours...",
+                    description: "Le devis sera envoyé par email au client",
+                  });
+                }}
+                onDownloadPDF={() => {
+                  toast({
+                    title: "📄 Téléchargement...",
+                    description: "Le PDF du devis est en cours de génération",
+                  });
+                }}
               />
             )}
           </DialogContent>

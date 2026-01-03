@@ -227,3 +227,4 @@ Après avoir fait ces 4 étapes :
 **🎯 UNE FOIS CES 4 ÉTAPES FAITES, REVIENS ME VOIR ET JE T'AIDERAI POUR LES PHASES 2+3 !**
 
 Ou bien dis-moi "continue" et je termine les phases 2+3 maintenant ! 🚀
+

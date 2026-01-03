@@ -33,6 +33,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { QuoteActionButtons } from "@/components/quotes/QuoteActionButtons";
+import QuoteStatusBadge, { QuoteStatus } from "@/components/quotes/QuoteStatusBadge";
 import { useState } from "react";
 
 interface QuotesTableProps {
@@ -57,36 +58,23 @@ export const QuotesTable = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return "default";
-      case "sent":
-        return "secondary";
-      case "draft":
-        return "outline";
-      case "rejected":
-        return "destructive";
-      default:
-        return "default";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return "Accepté";
-      case "sent":
-        return "Envoyé";
-      case "draft":
-        return "Brouillon";
-      case "rejected":
-        return "Refusé";
-      case "expired":
-        return "Expiré";
-      default:
-        return status;
-    }
+  const getQuoteStatus = (quote: Quote): QuoteStatus => {
+    // Vérifier d'abord si le devis est payé
+    if (quote.payment_status === 'paid') return 'paid';
+    if (quote.payment_status === 'partially_paid') return 'partially_paid';
+    
+    // Vérifier si signé
+    if (quote.signed || quote.status === 'signed') return 'signed';
+    
+    // Vérifier si envoyé
+    if (quote.sent_at || quote.status === 'sent') return 'sent';
+    
+    // Vérifier si expiré ou annulé
+    if (quote.status === 'expired') return 'expired';
+    if (quote.status === 'cancelled' || quote.status === 'rejected') return 'cancelled';
+    
+    // Par défaut: brouillon
+    return 'draft';
   };
 
   const filteredQuotes = quotes.filter((quote) => {
@@ -180,9 +168,10 @@ export const QuotesTable = ({
                     })}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusColor(quote.status) as any}>
-                      {getStatusLabel(quote.status)}
-                    </Badge>
+                    <QuoteStatusBadge 
+                      status={getQuoteStatus(quote)} 
+                      signedAt={quote.signed_at}
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">

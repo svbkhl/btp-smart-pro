@@ -240,3 +240,4 @@ END $$;
 ## ⚠️ Si Ça Ne Marche Toujours Pas
 
 Envoie-moi le message d'erreur complet de la console.
+

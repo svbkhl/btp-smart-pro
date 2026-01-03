@@ -215,3 +215,4 @@ BEGIN
   RAISE NOTICE '   ont été réinitialisées (données précédentes supprimées)';
   RAISE NOTICE '========================================';
 END $$;
+

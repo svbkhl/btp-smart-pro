@@ -7,7 +7,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 
 // Lazy loading des composants lourds (chargés seulement quand l'onglet est activé)
 const AIAssistant = lazy(() => import("@/components/ai/AIAssistant").then(m => ({ default: m.AIAssistant })));
-const SimpleQuoteForm = lazy(() => import("@/components/ai/SimpleQuoteForm").then(m => ({ default: m.SimpleQuoteForm })));
+const AIQuotesTab = lazy(() => import("@/components/ai/AIQuotesTab"));
 const SimpleInvoiceForm = lazy(() => import("@/components/ai/SimpleInvoiceForm").then(m => ({ default: m.SimpleInvoiceForm })));
 
 // Composant de loading
@@ -67,7 +67,7 @@ const AI = () => {
 
             <TabsContent value="quotes" className="mt-0">
               <Suspense fallback={<TabLoader />}>
-                <SimpleQuoteForm />
+                <AIQuotesTab />
               </Suspense>
             </TabsContent>
 

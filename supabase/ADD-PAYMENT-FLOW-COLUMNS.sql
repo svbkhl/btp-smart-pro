@@ -372,3 +372,4 @@ BEGIN
   RAISE NOTICE 'Trigger auto-update facture créé';
   RAISE NOTICE '========================================';
 END $$;
+

@@ -399,3 +399,4 @@ Si tu bloques sur une étape :
 **🎯 COMMENCE PAR L'ÉTAPE 1 !**
 
 Une fois l'ÉTAPE 1 faite, envoie-moi un screenshot des messages de succès SQL ! ✅
+

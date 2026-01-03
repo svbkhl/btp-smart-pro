@@ -235,3 +235,4 @@ BEGIN
   RAISE NOTICE '✅ COLONNES DE SIGNATURE AJOUTÉES';
   RAISE NOTICE '========================================';
 END $$;
+

@@ -87,3 +87,4 @@ BEGIN
   RAISE NOTICE 'Statuts autorisés: draft, sent, signed, accepted, rejected, paid, cancelled';
   RAISE NOTICE '========================================';
 END $$;
+

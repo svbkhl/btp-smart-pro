@@ -26,6 +26,7 @@ import QuotePage from './pages/QuotePage';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Quotes from './pages/Quotes';
+import QuoteDetail from './pages/QuoteDetail';
 import Invoices from './pages/Invoices';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
@@ -50,6 +51,7 @@ import AdminEmployees from './pages/AdminEmployees';
 import AdminCompanies from './pages/AdminCompanies';
 import AcceptInvitation from './pages/AcceptInvitation';
 import StripeCallback from './pages/StripeCallback';
+import SignaturesTracking from './pages/SignaturesTracking';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -194,6 +196,22 @@ function App() {
           element={
             <ProtectedRoute>
               <AI />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quotes/:id"
+          element={
+            <ProtectedRoute>
+              <QuoteDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/signatures-tracking"
+          element={
+            <ProtectedRoute>
+              <SignaturesTracking />
             </ProtectedRoute>
           }
         />

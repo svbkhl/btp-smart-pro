@@ -204,3 +204,4 @@ Les policies dans `FIX-INVITATIONS-SYSTEM-COMPLETE.sql` sont correctes :
 
 
 
+
