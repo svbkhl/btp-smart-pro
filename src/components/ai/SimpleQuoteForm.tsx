@@ -93,6 +93,7 @@ export const SimpleQuoteForm = () => {
         throw new Error("Les valeurs numériques ne sont pas valides");
       }
 
+      console.log('Surface saisie:', surfaceNum);
       console.log('Prix saisi (TTC):', prixTTC);
       
       // Générer le devis simple
