@@ -48,6 +48,8 @@ interface EventFormProps {
 }
 
 export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormProps) => {
+  console.log("🟢 [EventForm] Render - open:", open, "event:", event?.id);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createEvent = useCreateEvent();
   const updateEvent = useUpdateEvent();
@@ -104,43 +106,17 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
   }, [event, defaultDate, open, reset]);
 
   const onSubmit = async (data: EventFormData) => {
-    console.log("Event form submitted:", data);
+    console.log("✅ [EventForm] Soumission du formulaire:", data);
     
     setIsSubmitting(true);
     try {
-      // ⚠️ Vérification de sécurité STRICTE : Détecter si "events" est présent dans les données
-      if (data.project_id === "events" || 
-          data.title === "events" || 
-          data.description === "events" ||
-          String(data.project_id || "").toLowerCase() === "events") {
-        console.error("❌ [EventForm] ERREUR : 'events' détecté dans les données du formulaire!", data);
-        alert("Erreur : Valeur invalide détectée dans le formulaire. Veuillez réessayer.");
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // ⚠️ IMPORTANT : Valider project_id pour éviter les UUID invalides
-      // Ne jamais accepter "events", "none", "", ou toute autre chaîne non-UUID
+      // Valider project_id (UUID valide ou undefined)
       let validProjectId: string | undefined = undefined;
       if (data.project_id && 
           data.project_id.trim() !== "" &&
           data.project_id !== "none" && 
-          data.project_id !== "events" &&
-          data.project_id !== "null" &&
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.project_id)) {
         validProjectId = data.project_id;
-      } else if (data.project_id && 
-                 data.project_id !== "none" && 
-                 data.project_id !== "events" && 
-                 data.project_id.trim() !== "") {
-        // Log si project_id est fourni mais n'est pas un UUID valide
-        console.warn("⚠️ [EventForm] project_id invalide ignoré:", data.project_id);
-      }
-
-      // ⚠️ Vérification finale AVANT de construire eventData
-      if (validProjectId === "events" || validProjectId === "none") {
-        console.error("❌ [EventForm] ERREUR : project_id invalide après validation!", validProjectId);
-        validProjectId = undefined; // Forcer à undefined
       }
 
       const eventData: CreateEventData = {
@@ -152,26 +128,24 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
         location: data.location || undefined,
         type: data.type || "meeting",
         color: data.color || "#3b82f6",
-        project_id: validProjectId, // ✅ Utiliser uniquement un UUID valide ou undefined
+        project_id: validProjectId,
       };
       
-      // ⚠️ Vérification finale AVANT l'envoi
-      if (eventData.project_id === "events" || eventData.project_id === "none") {
-        console.error("❌ [EventForm] ERREUR CRITIQUE : project_id invalide dans eventData!", eventData);
-        delete eventData.project_id; // Supprimer le champ invalide
-      }
-      
-      console.log("📝 [EventForm] Données validées avant envoi:", eventData);
+      console.log("📝 [EventForm] Données à envoyer:", eventData);
 
       if (event) {
         await updateEvent.mutateAsync({ id: event.id, ...eventData });
+        console.log("✅ [EventForm] Événement mis à jour");
       } else {
         await createEvent.mutateAsync(eventData);
+        console.log("✅ [EventForm] Événement créé");
       }
+      
+      // Fermer le modal et réinitialiser
       onOpenChange(false);
       reset();
     } catch (error: any) {
-      console.error("Error saving event:", error);
+      console.error("❌ [EventForm] Erreur:", error);
       alert(`Erreur: ${error.message || "Impossible de sauvegarder l'événement"}`);
     } finally {
       setIsSubmitting(false);

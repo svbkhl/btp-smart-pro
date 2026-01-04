@@ -342,8 +342,10 @@ const Calendar = () => {
           </div>
           <Button 
             onClick={() => {
+              console.log("🔵 [Calendar] Click bouton Nouvel événement");
               setSelectedEvent(null);
               setIsEventFormOpen(true);
+              console.log("🔵 [Calendar] isEventFormOpen défini à true");
             }} 
             className="rounded-xl shadow-lg hover:shadow-xl transition-all"
           >
