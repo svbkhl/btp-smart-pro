@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Send, Loader2, Mail, Copy, CreditCard, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { sendPaymentLinkEmail } from "@/services/emailAdapters"; // Nouvel adapter centralisé
 import { Card } from "@/components/ui/card";
 import { useClients } from "@/hooks/useClients";
 
@@ -149,19 +149,21 @@ export default function SendPaymentLinkModal({
 
     setLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('send-payment-link-email', {
-        body: {
-          quote_id: quote.id,
-          payment_url: paymentUrl,
-          payment_type: paymentType,
-          amount: amount,
-          client_email: email,
-          client_name: quote.client_name,
-          custom_message: customMessage,
-        },
+      // Utiliser le nouvel adapter centralisé (enregistrement automatique dans messages)
+      const result = await sendPaymentLinkEmail({
+        quoteId: quote.id,
+        quoteNumber: quote.quote_number || quote.id.substring(0, 8),
+        clientEmail: email,
+        clientName: quote.client_name || "Client",
+        clientId: quote.client_id,
+        paymentUrl,
+        amount,
+        paymentType,
       });
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error || "Erreur lors de l'envoi du lien de paiement");
+      }
 
       toast({
         title: "✅ Email envoyé !",
