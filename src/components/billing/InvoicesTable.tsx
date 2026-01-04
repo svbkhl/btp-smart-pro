@@ -17,6 +17,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Invoice } from "@/hooks/useInvoices";
 import { 
   Search, 
@@ -27,11 +38,14 @@ import {
   CreditCard,
   Euro,
   Calendar,
-  User
+  User,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface InvoicesTableProps {
   invoices: Invoice[];
@@ -50,8 +64,35 @@ export const InvoicesTable = ({
   onPay,
   loading = false,
 }: InvoicesTableProps) => {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Facture supprimée",
+        description: "La facture a été supprimée avec succès",
+      });
+
+      // Rafraîchir la page
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error deleting invoice:", error);
+      toast({
+        title: "❌ Erreur",
+        description: error.message || "Impossible de supprimer la facture",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -241,6 +282,48 @@ export const InvoicesTable = ({
                           <CreditCard className="w-4 h-4" />
                         </Button>
                       )}
+                      
+                      {/* Bouton Supprimer avec confirmation */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Êtes-vous sûr de vouloir supprimer cette facture ?
+                              <br /><br />
+                              <strong>Numéro :</strong> {invoice.invoice_number || invoice.id.substring(0, 8)}
+                              <br />
+                              <strong>Client :</strong> {invoice.client_name}
+                              <br />
+                              <strong>Montant :</strong> {invoice.amount_ttc?.toLocaleString("fr-FR", {
+                                style: "currency",
+                                currency: "EUR",
+                              })}
+                              <br /><br />
+                              Cette action est <strong>irréversible</strong>.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteInvoice(invoice.id)}
+                              className="bg-destructive hover:bg-destructive/90"
+                            >
+                              Supprimer définitivement
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
