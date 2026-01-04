@@ -120,18 +120,32 @@ const STATUS_CONFIG: Record<string, {
 
 const MessagingNew = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
-  // Charger les messages
+  // Récupérer les filtres depuis l'URL
+  const documentIdFromUrl = searchParams.get('document');
+  const documentTypeFromUrl = searchParams.get('type') as 'quote' | 'invoice' | 'payment' | null;
+
+  // Charger les messages (avec filtre si document spécifié)
   const { data: messagesData, isLoading } = useQuery({
-    queryKey: ["messages"],
-    queryFn: () => getMessages(),
+    queryKey: ["messages", documentIdFromUrl],
+    queryFn: () => getMessages({
+      documentId: documentIdFromUrl || undefined,
+    }),
   });
 
   const messages = messagesData?.data || [];
+
+  // Afficher un message si filtré par document
+  useEffect(() => {
+    if (documentIdFromUrl && messages.length > 0) {
+      console.log(`📧 [Messagerie] Filtré sur document ${documentIdFromUrl}:`, messages.length, "messages");
+    }
+  }, [documentIdFromUrl, messages]);
 
   // Filtrer les messages
   const filteredMessages = useMemo(() => {
