@@ -64,13 +64,22 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Devis signés en attente de paiement
+  // Devis signés en attente de paiement (sans lien de paiement créé)
   const signedQuotesNeedingPayment = useMemo(() => {
+    // Récupérer les IDs des devis qui ont déjà un paiement pending
+    const quoteIdsWithPendingPayment = new Set(
+      payments
+        .filter(p => p.status === 'pending' && p.quote_id)
+        .map(p => p.quote_id)
+    );
+    
+    // Filtrer les devis signés qui n'ont PAS de paiement pending
     return quotes.filter(q => 
       q.signed && 
-      (!q.payment_status || q.payment_status === 'pending')
+      (!q.payment_status || q.payment_status === 'pending') &&
+      !quoteIdsWithPendingPayment.has(q.id)  // Exclure si paiement pending existe
     );
-  }, [quotes]);
+  }, [quotes, payments]);
 
   // Statistiques des paiements
   const stats = useMemo(() => {
