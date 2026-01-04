@@ -155,7 +155,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         quote_id: data.quote_id || undefined,
         description: data.description,
         amount_ht: prices.total_ht,  // HT calculé à partir du TTC
-        vat_rate: vatRateValue,
+        vat_rate: 20,  // TVA fixe à 20%
         due_date: data.due_date || undefined,
       };
 
