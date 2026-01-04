@@ -25,6 +25,7 @@ export default function SignaturePage() {
   const [error, setError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [signerEmail, setSignerEmail] = useState<string>("");
 
   // Déterminer si rawQuoteId est un token (avec suffixe) ou un UUID pur
   const hasToken = rawQuoteId && rawQuoteId.length > 36; // Un token a plus de 36 caractères
@@ -96,6 +97,15 @@ export default function SignaturePage() {
 
         // Le document retourné contient maintenant toutes les données nécessaires
         const quoteData = result.document;
+
+        // Récupérer l'email du signataire depuis la session de signature
+        if (result.signature_session?.signer_email) {
+          setSignerEmail(result.signature_session.signer_email);
+          console.log("📧 [SignaturePage] Email signataire depuis session:", result.signature_session.signer_email);
+        } else if (quoteData.client_email) {
+          setSignerEmail(quoteData.client_email);
+          console.log("📧 [SignaturePage] Email signataire depuis devis:", quoteData.client_email);
+        }
 
         // Vérifier si déjà signé
         if (quoteData.signed && quoteData.signed_at) {
@@ -465,7 +475,7 @@ export default function SignaturePage() {
                   <SignatureWithOTP
                     quoteId={!hasToken ? quoteId : undefined}
                     sessionToken={hasToken ? rawQuoteId : undefined}
-                    clientEmail={quote.client_email || quote.email || (quote.details?.clientEmail) || ""}
+                    clientEmail={signerEmail || ""}
                     clientName={quote.client_name}
                     onSignatureComplete={handleSignatureComplete}
                     disabled={signing}

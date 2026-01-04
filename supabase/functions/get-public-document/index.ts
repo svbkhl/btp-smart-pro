@@ -93,12 +93,15 @@ serve(async (req) => {
       }
     }
 
+    // Variable pour stocker les infos de la session
+    let signatureSession: any = null;
+
     // Si un token est fourni, récupérer quote_id ou invoice_id depuis signature_sessions
     if (token && !quote_id && !invoice_id) {
       console.log('🔍 [get-public-document] Recherche via token:', token);
       const { data: session, error: sessionError } = await supabaseClient
         .from('signature_sessions')
-        .select('quote_id, invoice_id, status, expires_at')
+        .select('quote_id, invoice_id, status, expires_at, signer_email, signer_name')
         .eq('token', token)
         .single();
 
@@ -129,6 +132,7 @@ serve(async (req) => {
       }
 
       console.log('✅ Session trouvée:', session);
+      signatureSession = session; // Stocker la session pour la retourner plus tard
       quote_id = session.quote_id;
       invoice_id = session.invoice_id;
     }
@@ -253,6 +257,7 @@ serve(async (req) => {
         document,
         document_type: documentType,
         payment,
+        signature_session: signatureSession, // Inclure les infos de la session de signature
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

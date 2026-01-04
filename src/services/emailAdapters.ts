@@ -38,9 +38,18 @@ export async function sendQuoteEmail(params: SendQuoteParams) {
     `Bonjour ${params.clientName},\n\nVeuillez trouver ci-joint votre devis ${params.quoteNumber}.\n\nCordialement.`;
 
   const bodyHtml = `
-    <p>Bonjour <strong>${params.clientName}</strong>,</p>
-    <p>Veuillez trouver ci-joint votre devis <strong>${params.quoteNumber}</strong>.</p>
-    <p>Cordialement.</p>
+    <div style="font-family: Arial, sans-serif;">
+      <p>Bonjour <strong>${params.clientName}</strong>,</p>
+      <p>Veuillez trouver ci-joint votre devis <strong>${params.quoteNumber}</strong>.</p>
+      ${params.includeSignatureLink && params.signatureUrl ? 
+        `<div style="margin: 30px 0; text-align: center;">
+          <a href="${params.signatureUrl}" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+            ✍️ Signer le devis en ligne
+          </a>
+        </div>` 
+        : ''}
+      <p>Cordialement.</p>
+    </div>
   `;
 
   // Envoyer via MessageService

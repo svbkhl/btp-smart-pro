@@ -172,40 +172,15 @@ serve(async (req) => {
     const signatureHtml = generateEmailSignature(settings);
     const signatureText = generateEmailSignatureText(settings);
 
-    // Générer le lien de signature si quote_id est fourni
-    let signatureUrl: string | null = null;
-    if (quote_id) {
-      // Récupérer l'URL de base depuis les variables d'environnement ou user_settings
-      let APP_URL = Deno.env.get("APP_URL") || 
-                    Deno.env.get("VITE_APP_URL") || 
-                    Deno.env.get("PUBLIC_URL") ||
-                    Deno.env.get("PRODUCTION_URL") ||
-                    "https://btpsmartpro.com";
-      
-      // Nettoyer l'URL (enlever le slash final)
-      APP_URL = APP_URL.replace(/\/$/, "");
-      
-      signatureUrl = `${APP_URL}/sign/${quote_id}`;
-      console.log("📝 [send-email] Lien de signature généré:", signatureUrl);
-      console.log("📝 [send-email] quote_id utilisé:", quote_id);
-    }
+    // ⚠️ NE PLUS générer automatiquement de bouton de signature
+    // Les liens de signature sont maintenant gérés par les templates HTML
+    // Pour éviter les doublons de boutons
 
-    // Préparer le contenu HTML avec signature et lien de signature
+    // Préparer le contenu HTML avec signature
     let htmlWithSignature: string | undefined;
     let textWithSignature: string | undefined;
 
-    // Ajouter le lien de signature au HTML si disponible
     let htmlContent = html || "";
-    if (signatureUrl && quote_id) {
-      const signatureButton = `
-        <div style="margin: 30px 0; text-align: center;">
-          <a href="${signatureUrl}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
-            ✍️ Signer le devis
-          </a>
-        </div>
-      `;
-      htmlContent = htmlContent + signatureButton;
-    }
 
     if (htmlContent) {
       htmlWithSignature = `${htmlContent}\n\n${signatureHtml}`;
@@ -214,18 +189,10 @@ serve(async (req) => {
     }
 
     if (text) {
-      let textContent = text;
-      if (signatureUrl && quote_id) {
-        textContent = textContent + `\n\nPour signer le devis, cliquez sur ce lien : ${signatureUrl}`;
-      }
-      textWithSignature = `${textContent}\n\n${signatureText}`;
+      textWithSignature = `${text}\n\n${signatureText}`;
     } else if (html) {
       const textFromHtml = html.replace(/<[^>]*>/g, "").replace(/\n\s*\n/g, "\n").trim();
-      if (signatureUrl && quote_id) {
-        textWithSignature = `${textFromHtml}\n\nPour signer le devis, cliquez sur ce lien : ${signatureUrl}\n\n${signatureText}`;
-      } else {
-        textWithSignature = `${textFromHtml}\n\n${signatureText}`;
-      }
+      textWithSignature = `${textFromHtml}\n\n${signatureText}`;
     }
 
     // Vérifier que RESEND_FROM_EMAIL est configuré
