@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Send, Loader2, Mail, Copy, CreditCard, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
+import { useClients } from "@/hooks/useClients";
 
 interface SendPaymentLinkModalProps {
   open: boolean;
@@ -41,19 +42,80 @@ export default function SendPaymentLinkModal({
   onSuccess,
 }: SendPaymentLinkModalProps) {
   const { toast } = useToast();
+  const { data: clients } = useClients();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
 
-  // Pré-remplir l'email
+  // Pré-remplir l'email depuis les données du devis ou du client associé
+  // EXACTEMENT comme dans SendToClientModal
   useEffect(() => {
-    if (open && quote) {
-      setEmail(quote.client_email || quote.email || "");
-      setCustomMessage("");
-      setLinkCopied(false);
+    if (!open || !quote) {
+      // Réinitialiser l'email quand le modal se ferme
+      if (!open) {
+        setEmail("");
+        setCustomMessage("");
+        setLinkCopied(false);
+      }
+      return;
     }
-  }, [open, quote]);
+
+    let clientEmail = "";
+
+    // 1. Essayer d'abord depuis le devis directement (client_email)
+    if (quote.client_email) {
+      clientEmail = quote.client_email;
+      console.log("📧 [SendPaymentLinkModal] Email trouvé dans quote.client_email:", clientEmail);
+    }
+    // 2. Chercher dans la liste des clients via client_id
+    else if (quote.client_id && clients && clients.length > 0) {
+      const client = clients.find(c => c.id === quote.client_id);
+      if (client?.email) {
+        clientEmail = client.email;
+        console.log("📧 [SendPaymentLinkModal] Email trouvé via client_id:", clientEmail);
+      }
+    }
+    // 3. Chercher par nom de client si client_name est disponible
+    else if (quote.client_name && clients && clients.length > 0) {
+      const client = clients.find(c => 
+        c.name?.toLowerCase() === quote.client_name?.toLowerCase() ||
+        c.name?.toLowerCase().includes(quote.client_name?.toLowerCase() || "")
+      );
+      if (client?.email) {
+        clientEmail = client.email;
+        console.log("📧 [SendPaymentLinkModal] Email trouvé via client_name:", clientEmail);
+      }
+    }
+    // 4. Essayer depuis les détails du devis
+    else if (quote.details && typeof quote.details === 'object') {
+      const details = quote.details as any;
+      if (details.clientEmail) {
+        clientEmail = details.clientEmail;
+        console.log("📧 [SendPaymentLinkModal] Email trouvé dans details.clientEmail:", clientEmail);
+      } else if (details.client?.email) {
+        clientEmail = details.client.email;
+        console.log("📧 [SendPaymentLinkModal] Email trouvé dans details.client.email:", clientEmail);
+      }
+    }
+    // 5. Pour les devis, chercher dans client_name si c'est un email valide
+    else if (quote.client_name && quote.client_name.includes("@")) {
+      // Si client_name contient un @, c'est peut-être un email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(quote.client_name)) {
+        clientEmail = quote.client_name;
+        console.log("📧 [SendPaymentLinkModal] Email trouvé dans client_name (format email):", clientEmail);
+      }
+    }
+    // 6. Essayer quote.email en dernier recours
+    else if (quote.email) {
+      clientEmail = quote.email;
+      console.log("📧 [SendPaymentLinkModal] Email trouvé dans quote.email:", clientEmail);
+    }
+
+    setEmail(clientEmail);
+    console.log("✅ [SendPaymentLinkModal] Email final pré-rempli:", clientEmail || "AUCUN EMAIL TROUVÉ");
+  }, [open, quote, clients]);
 
   // Copier le lien dans le presse-papier
   const handleCopyLink = async () => {
