@@ -13,7 +13,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import QuoteDetailView from "@/components/quotes/QuoteDetailView";
 import { generateQuotePDF } from "@/services/pdfService";
-import SendToClientModal from "@/components/billing/SendToClientModal";
+import { SendToClientModal } from "@/components/billing/SendToClientModal";
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
