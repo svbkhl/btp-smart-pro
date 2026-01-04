@@ -245,3 +245,4 @@ const prices = calculateFromTTC(ttcAmount, vatRateValue);
 
 **✨ Formulaire facture maintenant identique aux devis ! 🎉**
 
+

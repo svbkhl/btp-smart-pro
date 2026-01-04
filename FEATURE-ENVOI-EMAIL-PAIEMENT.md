@@ -260,3 +260,4 @@ Voici ce que reçoit le client :
 
 **Tu verras la checkbox et pourras envoyer le lien par email directement ! 📧**
 
+

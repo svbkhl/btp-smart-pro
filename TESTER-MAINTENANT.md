@@ -106,3 +106,4 @@ Le toast doit rester visible pendant **5 secondes**.
 **Priorité** : Page de signature d'abord 🎯
 
 
+
