@@ -515,6 +515,7 @@ serve(async (req) => {
           user_id: user.id,
           to_email: clientEmail, // Utiliser to_email au lieu de recipient_email
           subject: `Devis ${quoteNumber} - ${clientName}`,
+          body: emailText || `Devis ${quoteNumber} - ${clientName}`, // Colonne body (NOT NULL)
           body_html: emailHtml,
           body_text: emailText,
           email_type: emailType, // Utiliser le type déterminé
@@ -550,6 +551,7 @@ serve(async (req) => {
         user_id: user.id,
         to_email: clientEmail, // Utiliser to_email au lieu de recipient_email
         subject: `Devis ${quoteNumber} - ${clientName}`,
+        body: emailText || `Devis ${quoteNumber} - ${clientName}`, // Colonne body (NOT NULL)
         body_html: emailHtml,
         body_text: emailText,
         email_type: emailType, // Utiliser le type déterminé

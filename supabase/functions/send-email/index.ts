@@ -458,6 +458,7 @@ serve(async (req) => {
         user_id: user.id,
         to_email: to, // Utiliser to_email au lieu de recipient_email
         subject,
+        body: textWithSignature || text || subject, // Colonne body (NOT NULL)
         body_html: htmlWithSignature || null,
         body_text: textWithSignature || text || null,
         email_type: emailType, // Toujours défini, jamais null
