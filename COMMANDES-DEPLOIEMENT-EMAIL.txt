@@ -1,0 +1,78 @@
+═══════════════════════════════════════════════════════════════════
+🚀 COMMANDES À EXÉCUTER POUR DÉPLOYER LES FONCTIONS EMAIL
+═══════════════════════════════════════════════════════════════════
+
+📌 OPTION 1 : SCRIPT AUTOMATIQUE (RECOMMANDÉ)
+───────────────────────────────────────────────────────────────────
+
+Copie-colle EXACTEMENT ces 2 lignes dans ton terminal :
+
+cd "/Users/sabrikhalfallah/Downloads/BTP SMART PRO"
+./deploy-all-email-functions.sh
+
+
+📌 OPTION 2 : COMMANDES MANUELLES (SI LE SCRIPT NE MARCHE PAS)
+───────────────────────────────────────────────────────────────────
+
+Copie-colle chaque commande une par une :
+
+# 1. Corriger npm permissions
+sudo chown -R $(whoami) ~/.npm
+
+# 2. Aller dans le projet
+cd "/Users/sabrikhalfallah/Downloads/BTP SMART PRO"
+
+# 3. Déployer send-email-from-user
+npx supabase functions deploy send-email-from-user --no-verify-jwt
+
+# 4. Déployer send-payment-link-email
+npx supabase functions deploy send-payment-link-email --no-verify-jwt
+
+# 5. Déployer send-email
+npx supabase functions deploy send-email --no-verify-jwt
+
+# 6. Vérifier que tout est déployé
+npx supabase functions list
+
+
+📌 APRÈS DÉPLOIEMENT : TEST
+───────────────────────────────────────────────────────────────────
+
+1. Créer un devis dans l'app
+2. L'envoyer par email
+3. Aller dans Messagerie → Envoyés
+4. L'email DOIT apparaître ! ✅
+
+
+📌 SI L'EMAIL N'APPARAÎT PAS : VÉRIFICATION SQL
+───────────────────────────────────────────────────────────────────
+
+Ouvrir SQL Editor Supabase et exécuter :
+
+SELECT 
+  created_at,
+  email_type,
+  recipient_email,
+  subject,
+  status
+FROM email_messages
+WHERE user_id = auth.uid()
+ORDER BY created_at DESC
+LIMIT 5;
+
+
+✅ Si des résultats → Cache navigateur (ouvre en incognito)
+❌ Si 0 résultats → Fonction pas déployée (redéploie)
+
+
+═══════════════════════════════════════════════════════════════════
+🎯 RÉSULTAT ATTENDU
+═══════════════════════════════════════════════════════════════════
+
+Après déploiement, tous les emails envoyés depuis l'app (devis, 
+paiements, signatures) apparaîtront automatiquement dans 
+Messagerie → Envoyés
+
+C'est déjà codé, il suffit de déployer ! 🚀
+
+═══════════════════════════════════════════════════════════════════
