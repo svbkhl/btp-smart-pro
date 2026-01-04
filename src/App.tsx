@@ -34,7 +34,7 @@ import Calendar from './pages/Calendar';
 import MyPlanning from './pages/MyPlanning';
 import EmployeesPlanning from './pages/EmployeesPlanning';
 import Mailbox from './pages/Mailbox';
-import Messaging from './pages/Messaging';
+import MessagingNew from './pages/MessagingNew'; // Nouvelle page Messagerie (from scratch)
 import AI from './pages/AI';
 import Settings from './pages/Settings';
 import CompleteProfile from './pages/CompleteProfile';
@@ -186,7 +186,7 @@ function App() {
           path="/messaging"
           element={
             <ProtectedRoute>
-              <Messaging />
+              <MessagingNew />
             </ProtectedRoute>
           }
         />
