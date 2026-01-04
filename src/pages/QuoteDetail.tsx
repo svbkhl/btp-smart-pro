@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import QuoteDetailView from "@/components/quotes/QuoteDetailView";
 import { generateQuotePDF } from "@/services/pdfService";
+import SendToClientModal from "@/components/quotes/SendToClientModal";
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ export default function QuoteDetail() {
   const { toast } = useToast();
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showSendModal, setShowSendModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -114,10 +116,16 @@ export default function QuoteDetail() {
   };
 
   const handleSendEmail = async () => {
-    toast({
-      title: "📧 Envoi d'email",
-      description: "L'envoi d'email sera disponible prochainement",
-    });
+    if (!quote.client_email) {
+      toast({
+        title: "❌ Email manquant",
+        description: "Ce devis n'a pas d'adresse email client",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setShowSendModal(true);
   };
 
   const handleDownloadPDF = async () => {
