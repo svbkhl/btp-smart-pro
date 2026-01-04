@@ -23,7 +23,8 @@ import {
   Filter,
   DollarSign,
   AlertCircle,
-  FileText
+  FileText,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -38,6 +39,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PaymentsTabProps {
   payments: any[];
@@ -79,7 +92,27 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
     };
   }, [payments]);
 
-  const filteredPayments = payments.filter((payment) => {
+  // Dédupliquer les paiements en attente (ne garder que le plus récent par devis)
+  const deduplicatedPayments = useMemo(() => {
+    const paymentsByQuote = new Map();
+    
+    payments.forEach(payment => {
+      if (payment.status === 'pending' && payment.quote_id) {
+        const existing = paymentsByQuote.get(payment.quote_id);
+        if (!existing || new Date(payment.created_at) > new Date(existing.created_at)) {
+          paymentsByQuote.set(payment.quote_id, payment);
+        }
+      } else {
+        // Pour les paiements non-pending ou sans quote_id, les garder tous
+        const key = `other_${payment.id}`;
+        paymentsByQuote.set(key, payment);
+      }
+    });
+    
+    return Array.from(paymentsByQuote.values());
+  }, [payments]);
+
+  const filteredPayments = deduplicatedPayments.filter((payment) => {
     const matchesSearch = 
       payment.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.payment_method?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -96,6 +129,32 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
       title: "✅ Lien copié",
       description: "Le lien de paiement a été copié",
     });
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Paiement supprimé",
+        description: "Le paiement a été supprimé avec succès",
+      });
+
+      // Rafraîchir la page
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Erreur suppression paiement:', error);
+      toast({
+        title: "❌ Erreur",
+        description: error.message || "Impossible de supprimer le paiement",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -393,6 +452,46 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
                         </Button>
                       </>
                     )}
+                    
+                    {/* Bouton supprimer avec confirmation */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Supprimer
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Êtes-vous sûr de vouloir supprimer ce paiement ?
+                            <br /><br />
+                            <strong>Montant :</strong> {new Intl.NumberFormat('fr-FR', {
+                              style: 'currency',
+                              currency: 'EUR',
+                            }).format(payment.amount || 0)}
+                            <br />
+                            <strong>Statut :</strong> {payment.status === 'succeeded' ? 'Payé' : payment.status === 'pending' ? 'En attente' : 'Échoué'}
+                            <br /><br />
+                            Cette action est <strong>irréversible</strong>.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeletePayment(payment.id)}
+                            className="bg-destructive hover:bg-destructive/90"
+                          >
+                            Supprimer définitivement
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </div>
