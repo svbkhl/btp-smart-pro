@@ -232,6 +232,23 @@ export default function QuoteDetail() {
           onSendEmail={handleSendEmail}
           onDownloadPDF={handleDownloadPDF}
         />
+
+        {/* Modal d'envoi d'email */}
+        {quote && (
+          <SendToClientModal
+            open={showSendModal}
+            onOpenChange={setShowSendModal}
+            quote={quote}
+            onSuccess={() => {
+              setShowSendModal(false);
+              loadQuote(); // Rafraîchir le devis
+              toast({
+                title: "✅ Email envoyé",
+                description: "Le devis a été envoyé au client avec succès",
+              });
+            }}
+          />
+        )}
       </div>
     </PageLayout>
   );

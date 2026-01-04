@@ -215,18 +215,25 @@ export const SendToClientModal = ({
       // Marquer comme envoyé (l'Edge Function enregistre déjà dans email_messages)
       await trackEmailSent(documentType, document.id, email, `${documentType === "quote" ? "Devis" : "Facture"} ${document.quote_number || document.invoice_number}`);
 
-      // Notification de succès immédiate
+      // Notification de succès IMMÉDIATE et VISIBLE
       toast({
-        title: "✅ Email envoyé avec succès",
-        description: `Le ${documentType === "quote" ? "devis" : "facture"} ${document.quote_number || document.invoice_number} a été envoyé avec succès à ${email}${includePDF ? " (PDF inclus)" : ""}${includeSignatureLink && signatureUrl ? " (lien de signature inclus)" : ""}`,
-        duration: 5000,
+        title: "✅ Email envoyé avec succès !",
+        description: (
+          <div className="space-y-2">
+            <p className="font-semibold">
+              {documentType === "quote" ? "Devis" : "Facture"} {document.quote_number || document.invoice_number}
+            </p>
+            <p>Envoyé à : <strong>{email}</strong></p>
+            {includePDF && <p>✓ PDF inclus</p>}
+            {includeSignatureLink && signatureUrl && <p>✓ Lien de signature inclus</p>}
+          </div>
+        ),
+        duration: 8000, // 8 secondes pour avoir le temps de lire
       });
 
-      // Attendre un peu avant de fermer le modal pour que le toast soit visible
-      setTimeout(() => {
-        onSent?.();
-        onOpenChange(false);
-      }, 500);
+      // Fermer le modal immédiatement pour voir le toast
+      onSent?.();
+      onOpenChange(false);
     } catch (error: any) {
       console.error("Error sending email:", error);
       
