@@ -75,7 +75,7 @@ export const QuotesTable = ({
   const handleDeleteQuote = async (quoteId: string) => {
     try {
       const { error } = await supabase
-        .from('quotes')
+        .from('ai_quotes')  // ← Correction: table s'appelle ai_quotes
         .delete()
         .eq('id', quoteId);
 
