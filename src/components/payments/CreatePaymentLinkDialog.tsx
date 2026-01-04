@@ -23,9 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { CreditCard, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CreditCard, Loader2, AlertCircle, CheckCircle2, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CreatePaymentLinkDialogProps {
@@ -47,6 +48,9 @@ export default function CreatePaymentLinkDialog({
   
   // Type de paiement
   const [paymentType, setPaymentType] = useState<PaymentType>('total');
+  
+  // Option d'envoi par email
+  const [sendByEmail, setSendByEmail] = useState(true);
   
   // Pour acompte
   const [depositAmount, setDepositAmount] = useState<string>('');
@@ -119,32 +123,67 @@ export default function CreatePaymentLinkDialog({
 
       console.log('✅ Lien créé:', data.payment_url);
 
-      // Copier le lien dans le presse-papier
-      await navigator.clipboard.writeText(data.payment_url);
+      // Si option "Envoyer par email" est cochée
+      if (sendByEmail) {
+        try {
+          // Envoyer l'email avec le lien de paiement
+          const { error: emailError } = await supabase.functions.invoke('send-payment-link-email', {
+            body: {
+              quote_id: quote.id,
+              payment_url: data.payment_url,
+              payment_type: paymentType,
+              amount: paymentType === 'deposit' ? calculateDepositAmount() : totalAmount,
+              client_email: quote.client_email || quote.email,
+              client_name: quote.client_name,
+            },
+          });
 
-      let successMessage = '';
-      if (paymentType === 'total') {
-        successMessage = `Lien de paiement total (${new Intl.NumberFormat('fr-FR', {
-          style: 'currency',
-          currency: 'EUR',
-        }).format(totalAmount)}) créé et copié !`;
-      } else if (paymentType === 'deposit') {
-        successMessage = `Lien d'acompte (${new Intl.NumberFormat('fr-FR', {
-          style: 'currency',
-          currency: 'EUR',
-        }).format(calculateDepositAmount())}) créé et copié !`;
+          if (emailError) throw emailError;
+
+          toast({
+            title: "✅ Lien créé et envoyé !",
+            description: `Le lien de paiement a été envoyé à ${quote.client_email || quote.email}`,
+            duration: 5000,
+          });
+        } catch (emailError: any) {
+          console.error('Erreur envoi email:', emailError);
+          // Copier quand même le lien si l'email échoue
+          await navigator.clipboard.writeText(data.payment_url);
+          toast({
+            title: "⚠️ Lien créé, email non envoyé",
+            description: "Le lien a été copié dans le presse-papier, mais l'email n'a pas pu être envoyé.",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
       } else {
-        successMessage = `Plan de paiement en ${installmentsCount}x créé ! Première échéance : ${new Intl.NumberFormat('fr-FR', {
-          style: 'currency',
-          currency: 'EUR',
-        }).format(calculateInstallmentAmount())}`;
-      }
+        // Copier le lien dans le presse-papier
+        await navigator.clipboard.writeText(data.payment_url);
 
-      toast({
-        title: "✅ Lien de paiement créé",
-        description: successMessage,
-        duration: 5000,
-      });
+        let successMessage = '';
+        if (paymentType === 'total') {
+          successMessage = `Lien de paiement total (${new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: 'EUR',
+          }).format(totalAmount)}) créé et copié !`;
+        } else if (paymentType === 'deposit') {
+          successMessage = `Lien d'acompte (${new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: 'EUR',
+          }).format(calculateDepositAmount())}) créé et copié !`;
+        } else {
+          successMessage = `Plan de paiement en ${installmentsCount}x créé ! Première échéance : ${new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: 'EUR',
+          }).format(calculateInstallmentAmount())}`;
+        }
+
+        toast({
+          title: "✅ Lien de paiement créé",
+          description: successMessage,
+          duration: 5000,
+        });
+      }
 
       setOpen(false);
       if (onSuccess) onSuccess();
@@ -356,6 +395,30 @@ export default function CreatePaymentLinkDialog({
             </RadioGroup>
           </div>
 
+          {/* Option d'envoi par email */}
+          <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-lg border">
+            <Checkbox
+              id="send-by-email"
+              checked={sendByEmail}
+              onCheckedChange={(checked) => setSendByEmail(checked as boolean)}
+            />
+            <div className="flex-1 space-y-1">
+              <Label
+                htmlFor="send-by-email"
+                className="text-sm font-medium cursor-pointer flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Envoyer le lien par email au client
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {sendByEmail 
+                  ? `📧 Email envoyé à ${quote.client_email || quote.email || 'l\'adresse du client'}` 
+                  : '📋 Le lien sera seulement copié dans votre presse-papier'
+                }
+              </p>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex items-center justify-between pt-4 border-t">
             <Button
@@ -374,6 +437,11 @@ export default function CreatePaymentLinkDialog({
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Création...
+                </>
+              ) : sendByEmail ? (
+                <>
+                  <Mail className="h-4 w-4" />
+                  Créer et envoyer
                 </>
               ) : (
                 <>
