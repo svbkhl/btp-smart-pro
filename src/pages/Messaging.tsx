@@ -9,7 +9,6 @@ import {
   Mail,
   Search,
   Send, 
-  Inbox, 
   Archive, 
   Trash2, 
   Star, 
@@ -21,19 +20,18 @@ import {
   Calendar,
   User,
   Settings,
-  Loader2
+  Plus
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEmailMessages, EmailMessage } from "@/hooks/useEmailMessages";
 import { useInboxEmails, InboxEmail } from "@/hooks/useInboxEmails";
-import { sendEmail } from "@/services/emailService";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 interface Email {
@@ -92,19 +90,13 @@ const Messaging = () => {
   const { user } = useAuth();
   const { data: settings } = useUserSettings();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const [emails, setEmails] = useState<Email[]>([]);
-  const [selectedFolder, setSelectedFolder] = useState<Email["folder"]>("inbox");
+  const [selectedFolder, setSelectedFolder] = useState<Email["folder"]>("sent"); // Par défaut "sent" au lieu d'inbox
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [replyText, setReplyText] = useState("");
-  const [isComposing, setIsComposing] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [composeData, setComposeData] = useState({
-    to: "",
-    subject: "",
-    body: "",
-  });
 
   // Vérifier si un compte email est configuré
   const { data: emailConfig, isLoading: emailConfigLoading } = useQuery({
@@ -259,55 +251,6 @@ const Messaging = () => {
     setReplyText("");
   };
 
-  const handleSendCompose = async () => {
-    if (!composeData.to || !composeData.subject || !composeData.body) {
-      toast({
-        title: "Champs manquants",
-        description: "Veuillez remplir tous les champs",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      console.log("📧 Envoi d'un email...", { to: composeData.to, subject: composeData.subject });
-      
-      // Convertir le texte en HTML simple
-      const htmlBody = composeData.body.replace(/\n/g, "<br>");
-      
-      await sendEmail({
-        to: composeData.to,
-        subject: composeData.subject,
-        html: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${htmlBody}</div>`,
-        text: composeData.body,
-        type: "notification",
-      });
-
-      console.log("✅ Email envoyé avec succès");
-      
-      toast({
-        title: "Email envoyé",
-        description: "Votre email a été envoyé avec succès",
-      });
-      
-      setIsComposing(false);
-      setComposeData({ to: "", subject: "", body: "" });
-      
-      // Rafraîchir la liste des emails en invalidant la query
-      queryClient.invalidateQueries({ queryKey: ["email_messages"] });
-    } catch (error: any) {
-      console.error("❌ Erreur lors de l'envoi de l'email:", error);
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible d'envoyer l'email. Vérifiez votre configuration email.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-
   // Afficher l'interface de configuration si pas de compte email configuré
   if (!emailConfigLoading && !hasEmailConfig) {
     return (
@@ -378,56 +321,27 @@ const Messaging = () => {
               )}
             </p>
           </div>
-          <Button onClick={() => setIsComposing(true)} className="gap-2 rounded-xl">
-            <Send className="w-4 h-4" />
-            Nouveau message
+          <Button onClick={() => navigate('/facturation')} className="gap-2 rounded-xl">
+            <Plus className="w-4 h-4" />
+            Envoyer un document
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar - Dossiers */}
+          {/* Sidebar - Dossiers (Simplifié: Envoyés, Archivés, Corbeille) */}
           <div className="lg:col-span-1">
             <GlassCard className="p-6 space-y-2">
-              <Button
-                variant={selectedFolder === "inbox" ? "default" : "ghost"}
-                className="w-full justify-start gap-2 rounded-xl"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setSelectedFolder("inbox");
-                  setSelectedEmail(null); // Réinitialiser la sélection
-                }}
-              >
-                <Inbox className="w-4 h-4" />
-                Boîte de réception
-                {unreadCount > 0 && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
               <Button
                 variant={selectedFolder === "sent" ? "default" : "ghost"}
                 className="w-full justify-start gap-2 rounded-xl"
                 onClick={(e) => {
                   e.preventDefault();
                   setSelectedFolder("sent");
-                  setSelectedEmail(null); // Réinitialiser la sélection
+                  setSelectedEmail(null);
                 }}
               >
                 <Send className="w-4 h-4" />
                 Envoyés
-              </Button>
-              <Button
-                variant={selectedFolder === "drafts" ? "default" : "ghost"}
-                className="w-full justify-start gap-2 rounded-xl"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setSelectedFolder("drafts");
-                  setSelectedEmail(null); // Réinitialiser la sélection
-                }}
-              >
-                <Mail className="w-4 h-4" />
-                Brouillons
               </Button>
               <Button
                 variant={selectedFolder === "archived" ? "default" : "ghost"}
@@ -435,7 +349,7 @@ const Messaging = () => {
                 onClick={(e) => {
                   e.preventDefault();
                   setSelectedFolder("archived");
-                  setSelectedEmail(null); // Réinitialiser la sélection
+                  setSelectedEmail(null);
                 }}
               >
                 <Archive className="w-4 h-4" />
@@ -447,7 +361,7 @@ const Messaging = () => {
                 onClick={(e) => {
                   e.preventDefault();
                   setSelectedFolder("trash");
-                  setSelectedEmail(null); // Réinitialiser la sélection
+                  setSelectedEmail(null);
                 }}
               >
                 <Trash2 className="w-4 h-4" />
@@ -476,7 +390,10 @@ const Messaging = () => {
               {filteredEmails.length === 0 ? (
                 <GlassCard className="p-6 text-center">
                   <Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">Aucun email</p>
+                  <p className="text-muted-foreground font-medium mb-2">Aucun email envoyé</p>
+                  <p className="text-xs text-muted-foreground">
+                    Envoyez un devis, une facture ou un lien de paiement pour voir l'historique ici
+                  </p>
           </GlassCard>
         ) : (
                 filteredEmails.map((email) => (
@@ -622,63 +539,6 @@ const Messaging = () => {
             )}
                 </div>
               </div>
-
-        {/* Dialog de composition */}
-        {isComposing && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <GlassCard className="p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-auto">
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold">Nouveau message</h2>
-                <div className="space-y-2">
-                  <Input
-                    placeholder="À"
-                    value={composeData.to}
-                    onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Objet"
-                    value={composeData.subject}
-                    onChange={(e) =>
-                      setComposeData({ ...composeData, subject: e.target.value })
-                    }
-                  />
-                  <Textarea
-                    placeholder="Message..."
-                    value={composeData.body}
-                    onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
-                    rows={10}
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsComposing(false)}
-                    disabled={isSending}
-                  >
-                    Annuler
-                  </Button>
-                  <Button 
-                    onClick={handleSendCompose} 
-                    className="gap-2"
-                    disabled={isSending || !composeData.to || !composeData.subject || !composeData.body}
-                  >
-                    {isSending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Envoi...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        Envoyer
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </GlassCard>
-                </div>
-              )}
             </div>
     </PageLayout>
   );
