@@ -134,9 +134,81 @@ serve(async (req) => {
       currency: 'EUR',
     }).format(amount);
 
-    // Load email template
-    const templatePath = new URL('../../../templates/emails/payment-link-email.html', import.meta.url);
-    let htmlTemplate = await Deno.readTextFile(templatePath);
+    // HTML email template (inline pour éviter problèmes de path)
+    let htmlTemplate = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6;">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table cellpadding="0" cellspacing="0" border="0" width="600" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+                    
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">💳 Votre lien de paiement</h1>
+                            <p style="color: #e0e7ff; margin: 10px 0 0; font-size: 16px;">{{company_name}}</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="color: #374151; font-size: 16px; margin: 0 0 20px;">Bonjour <strong>{{client_name}}</strong>,</p>
+                            <p style="color: #374151; font-size: 16px; margin: 0 0 30px;">Merci d'avoir signé le devis <strong>{{quote_number}}</strong>. Vous pouvez maintenant procéder au paiement.</p>
+
+                            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                                <tr><td>
+                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td style="color: #6b7280; font-size: 14px; padding: 8px 0;">Devis</td>
+                                            <td align="right" style="color: #111827; font-size: 14px; font-weight: 600; padding: 8px 0;">{{quote_number}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #6b7280; font-size: 14px; padding: 8px 0; border-top: 1px solid #e5e7eb;">Type</td>
+                                            <td align="right" style="color: #111827; font-size: 14px; font-weight: 600; padding: 8px 0; border-top: 1px solid #e5e7eb;">{{payment_type_label}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #6b7280; font-size: 16px; font-weight: 600; padding: 12px 0; border-top: 2px solid #e5e7eb;">Montant</td>
+                                            <td align="right" style="color: #3b82f6; font-size: 24px; font-weight: 700; padding: 12px 0; border-top: 2px solid #e5e7eb;">{{amount}}</td>
+                                        </tr>
+                                    </table>
+                                </td></tr>
+                            </table>
+
+                            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 30px;">
+                                <tr><td align="center">
+                                    <a href="{{payment_url}}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 18px; font-weight: 700;">💳 Payer maintenant</a>
+                                </td></tr>
+                            </table>
+
+                            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 6px; margin-bottom: 30px;">
+                                <tr><td style="color: #065f46; font-size: 14px;">
+                                    <strong>✓ Paiement 100% sécurisé</strong><br>Vos informations sont protégées par Stripe.
+                                </td></tr>
+                            </table>
+
+                            <p style="color: #6b7280; font-size: 14px; margin: 0;">Lien de secours :</p>
+                            <p style="color: #3b82f6; font-size: 13px; word-break: break-all; margin: 10px 0 0; background-color: #f3f4f6; padding: 10px; border-radius: 4px;">{{payment_url}}</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px;"><strong>{{company_name}}</strong><br>{{company_phone}} • {{company_email}}</p>
+                            <p style="color: #9ca3af; font-size: 12px; margin: 0;">© {{current_year}} {{company_name}}</p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
 
     // Replace placeholders
     htmlTemplate = htmlTemplate
