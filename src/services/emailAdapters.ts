@@ -40,9 +40,6 @@ export async function sendQuoteEmail(params: SendQuoteParams) {
   const bodyHtml = `
     <p>Bonjour <strong>${params.clientName}</strong>,</p>
     <p>Veuillez trouver ci-joint votre devis <strong>${params.quoteNumber}</strong>.</p>
-    ${params.includeSignatureLink && params.signatureUrl ? 
-      `<p><a href="${params.signatureUrl}" style="display:inline-block;padding:12px 24px;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;">✍️ Signer le devis</a></p>` 
-      : ''}
     <p>Cordialement.</p>
   `;
 
@@ -105,9 +102,6 @@ export async function sendInvoiceEmail(params: SendInvoiceParams) {
   const bodyHtml = `
     <p>Bonjour <strong>${params.clientName}</strong>,</p>
     <p>Veuillez trouver ci-joint votre facture <strong>${params.invoiceNumber}</strong>.</p>
-    ${params.includeSignatureLink && params.signatureUrl ? 
-      `<p><a href="${params.signatureUrl}" style="display:inline-block;padding:12px 24px;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;">✍️ Signer la facture</a></p>` 
-      : ''}
     <p>Cordialement.</p>
   `;
 

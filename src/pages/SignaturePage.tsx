@@ -123,35 +123,44 @@ export default function SignaturePage() {
   const generatePdfPreview = async (quoteData: any) => {
     try {
       setGeneratingPdf(true);
+      console.log("📄 [SignaturePage] Génération PDF aperçu - données:", {
+        estimated_cost: quoteData.estimated_cost,
+        quote_number: quoteData.quote_number,
+        client_name: quoteData.client_name,
+        hasDetails: !!quoteData.details,
+      });
+
       const pdfBlob = await generateQuotePDF({
         result: {
-          estimatedCost: quoteData.estimated_cost,
-          workSteps: quoteData.details?.workSteps || [],
+          estimatedCost: quoteData.estimated_cost || 0,
+          workSteps: quoteData.details?.workSteps || quoteData.details?.work_steps || [],
           materials: quoteData.details?.materials || [],
-          description: quoteData.details?.description || "",
-          quote_number: quoteData.quote_number,
+          description: quoteData.details?.description || quoteData.description || "Devis sans description",
+          quote_number: quoteData.quote_number || "N/A",
         },
         companyInfo: {
           company_name: "BTP Smart Pro",
-          address: "",
-          phone: "",
-          email: "",
+          address: "Adresse de l'entreprise",
+          phone: "Téléphone",
+          email: "contact@btpsmartpro.com",
           siret: "",
         },
         clientInfo: {
-          name: quoteData.client_name,
+          name: quoteData.client_name || "Client",
           address: "",
-          email: "",
+          email: quoteData.client_email || quoteData.email || "",
           phone: "",
         },
         surface: quoteData.details?.surface || "",
-        workType: quoteData.details?.prestation || "",
+        workType: quoteData.details?.prestation || quoteData.details?.workType || "Prestation",
       });
       
       const url = URL.createObjectURL(pdfBlob);
       setPdfUrl(url);
+      console.log("✅ [SignaturePage] PDF généré avec succès");
     } catch (error) {
-      console.error("Erreur génération PDF aperçu:", error);
+      console.error("❌ [SignaturePage] Erreur génération PDF aperçu:", error);
+      // Ne pas bloquer l'UI si le PDF échoue
     } finally {
       setGeneratingPdf(false);
     }
@@ -456,7 +465,7 @@ export default function SignaturePage() {
                   <SignatureWithOTP
                     quoteId={!hasToken ? quoteId : undefined}
                     sessionToken={hasToken ? rawQuoteId : undefined}
-                    clientEmail={quote.email || quote.client_email || "client@example.com"}
+                    clientEmail={quote.client_email || quote.email || (quote.details?.clientEmail) || ""}
                     clientName={quote.client_name}
                     onSignatureComplete={handleSignatureComplete}
                     disabled={signing}
