@@ -222,18 +222,26 @@ export const useCreateEvent = () => {
         throw new Error("Vous devez être connecté pour créer un événement");
       }
 
-      // Récupérer l'ID utilisateur de manière sécurisée
-      const { data: userData } = await supabase.auth.getUser();
-      const user_id = userData?.user?.id;
+      // ✅ UTILISER DIRECTEMENT user.id depuis useAuth() au lieu de supabase.auth.getUser()
+      // Cela évite les problèmes de session corrompue
+      const user_id = user.id;
+
+      console.log("🔍 [useCreateEvent] Utilisation de user.id depuis useAuth():", {
+        user_id,
+        user_id_type: typeof user_id,
+        user_id_length: user_id?.length,
+      });
 
       if (!user_id) {
+        console.error("❌ [useCreateEvent] user.id est vide:", user);
         throw new Error("Impossible de récupérer l'ID utilisateur");
       }
 
       // Vérifier que user_id est un UUID valide
       if (user_id === "events" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
-        console.error("❌ [useCreateEvent] user_id invalide de Supabase Auth:", user_id);
-        throw new Error("Erreur d'authentification : ID utilisateur invalide");
+        console.error("❌ [useCreateEvent] user_id invalide:", user_id);
+        console.error("❌ [useCreateEvent] user complet:", user);
+        throw new Error(`Erreur d'authentification : ID utilisateur invalide (${user_id}). Veuillez vous déconnecter et vous reconnecter.`);
       }
 
       // Vérifier que start_date est présent et valide
