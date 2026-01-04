@@ -247,6 +247,36 @@ serve(async (req) => {
     const resendData = await resendResponse.json();
     console.log('✅ Email envoyé:', resendData);
 
+    // Enregistrer l'email dans email_messages
+    try {
+      const { error: insertError } = await supabaseClient
+        .from('email_messages')
+        .insert({
+          user_id: user.id,
+          recipient_email: client_email,
+          subject: `💳 Votre lien de paiement - ${quote.quote_number || 'Devis'}`,
+          body_html: htmlTemplate,
+          body_text: `Bonjour ${client_name}, voici votre lien de paiement: ${payment_url}`,
+          email_type: 'payment_link',
+          status: 'sent',
+          external_id: resendData.id,
+          sent_at: new Date().toISOString(),
+          quote_id: quote_id,
+          document_id: quote_id,
+          document_type: 'quote',
+        });
+
+      if (insertError) {
+        console.error('⚠️ Erreur enregistrement email_messages:', insertError);
+        // Ne pas faire échouer la requête si l'enregistrement échoue
+      } else {
+        console.log('✅ Email enregistré dans email_messages');
+      }
+    } catch (dbError: any) {
+      console.error('⚠️ Erreur DB email_messages:', dbError);
+      // Continue anyway
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
