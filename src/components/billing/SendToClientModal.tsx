@@ -14,8 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { Send, Loader2, Mail, FileText, FileSignature, CreditCard } from "lucide-react";
-import { sendQuoteEmail, sendInvoiceEmail, sendSignatureRequestEmail } from "@/services/emailService";
-import { trackEmailSent } from "@/services/statusTrackingService";
+import { sendQuoteEmail, sendInvoiceEmail } from "@/services/emailAdapters"; // Nouveaux adapters centralisés
 import { supabase } from "@/integrations/supabase/client";
 import { useClients } from "@/hooks/useClients";
 
@@ -187,33 +186,42 @@ export const SendToClientModal = ({
         }
       }
 
-      // Envoyer l'email
+      // Envoyer l'email via les nouveaux adapters (enregistrement automatique dans messages)
       if (documentType === "quote") {
-        await sendQuoteEmail({
-          to: email,
+        const result = await sendQuoteEmail({
           quoteId: document.id,
           quoteNumber: document.quote_number || document.id.substring(0, 8),
+          clientEmail: email,
           clientName: document.client_name || "Client",
+          clientId: document.client_id,
           includePDF,
           includeSignatureLink: includeSignatureLink && !!signatureUrl,
           signatureUrl,
           customMessage: message !== defaultMessage ? message : undefined,
         });
+
+        if (!result.success) {
+          throw new Error(result.error || "Erreur lors de l'envoi du devis");
+        }
       } else {
-        await sendInvoiceEmail({
+        const result = await sendInvoiceEmail({
           to: email,
           invoiceId: document.id,
           invoiceNumber: document.invoice_number || document.id.substring(0, 8),
           clientName: document.client_name || "Client",
+          clientId: document.client_id,
           includePDF,
           includeSignatureLink: includeSignatureLink && !!signatureUrl,
           signatureUrl,
           customMessage: message !== defaultMessage ? message : undefined,
         });
+
+        if (!result.success) {
+          throw new Error(result.error || "Erreur lors de l'envoi de la facture");
+        }
       }
 
-      // Marquer comme envoyé (l'Edge Function enregistre déjà dans email_messages)
-      await trackEmailSent(documentType, document.id, email, `${documentType === "quote" ? "Devis" : "Facture"} ${document.quote_number || document.invoice_number}`);
+      // Plus besoin de trackEmailSent() - les adapters enregistrent automatiquement dans messages !
 
       // Notification de succès IMMÉDIATE et VISIBLE
       toast({
