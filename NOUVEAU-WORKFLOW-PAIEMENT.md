@@ -83,7 +83,8 @@ Maintenant, tu as :
 - ✅ Feedback visuel "✓ Copié" quand cliqué
 
 ### 3. Email du client
-- ✅ Pré-rempli depuis le devis
+- ✅ **Pré-rempli AUTOMATIQUEMENT** depuis le devis (même logique que pour les devis)
+- ✅ Recherche intelligente : client_email → client_id → client_name → details
 - ✅ Modifiable si besoin
 - ✅ Validation email
 
@@ -103,6 +104,27 @@ Maintenant, tu as :
 - **Annuler** : Ferme le modal sans rien faire
 - **Copier le lien** : Copie dans le presse-papier (✓ feedback)
 - **Envoyer par email** : Envoie l'email au client
+
+---
+
+## 🧠 PRÉ-REMPLISSAGE AUTOMATIQUE DE L'EMAIL
+
+Le modal utilise **6 stratégies** pour trouver l'email du client :
+
+### Stratégie de recherche (dans l'ordre)
+
+1. **`quote.client_email`** - Email directement dans le devis
+2. **`client_id`** - Recherche dans la table `clients` par ID
+3. **`client_name`** - Recherche dans la table `clients` par nom
+4. **`quote.details.clientEmail`** - Email dans les détails du devis
+5. **`quote.details.client.email`** - Email dans l'objet client des détails
+6. **`quote.email`** - Fallback sur le champ email du devis
+
+### Résultat
+
+✅ **L'email est TOUJOURS pré-rempli** si disponible quelque part !
+
+Exactement comme pour l'envoi de devis → **Cohérence totale** 🎯
 
 ---
 
