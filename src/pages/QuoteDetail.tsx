@@ -128,6 +128,10 @@ export default function QuoteDetail() {
     setShowSendModal(true);
   };
 
+  const handleViewMessages = () => {
+    navigate(`/messaging?document=${id}&type=quote`);
+  };
+
   const handleDownloadPDF = async () => {
     try {
       toast({

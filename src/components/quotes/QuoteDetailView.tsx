@@ -20,7 +20,8 @@ import {
   Send,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  MessageSquare
 } from "lucide-react";
 import QuoteStatusBadge from "./QuoteStatusBadge";
 import QuoteTimeline from "./QuoteTimeline";
@@ -33,6 +34,7 @@ interface QuoteDetailViewProps {
   onDelete?: () => void;
   onSendEmail?: () => void;
   onDownloadPDF?: () => void;
+  onViewMessages?: () => void; // Nouveau : Voir dans Messagerie
 }
 
 export default function QuoteDetailView({
@@ -41,6 +43,7 @@ export default function QuoteDetailView({
   onDelete,
   onSendEmail,
   onDownloadPDF,
+  onViewMessages,
 }: QuoteDetailViewProps) {
   const [activeTab, setActiveTab] = useState("details");
 
