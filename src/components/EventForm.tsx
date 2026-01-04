@@ -212,15 +212,9 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
             <div className="space-y-2">
               <Label htmlFor="project_id">Chantier</Label>
               <Select
-                value={watch("project_id") || ""}
+                value={watch("project_id") || "none"}
                 onValueChange={(value) => {
-                  // ⚠️ SÉCURITÉ : Ne jamais accepter "events" comme valeur
-                  if (value === "events") {
-                    console.error("❌ [EventForm] Tentative de définir project_id à 'events' - bloqué!");
-                    setValue("project_id", "");
-                    return;
-                  }
-                  // Si "none" ou vide, définir à chaîne vide (sera traité comme undefined)
+                  // Si "none", définir à chaîne vide (sera traité comme undefined dans le submit)
                   setValue("project_id", value === "none" ? "" : value);
                 }}
               >
@@ -228,11 +222,10 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
                 <SelectValue placeholder="Aucun chantier" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Aucun chantier</SelectItem>
+                <SelectItem value="none">Aucun chantier</SelectItem>
                 {projects?.map((project) => {
-                  // ⚠️ SÉCURITÉ : Vérifier que project.id est un UUID valide
-                  if (!project.id || project.id === "events" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.id)) {
-                    console.warn("⚠️ [EventForm] Projet avec ID invalide ignoré:", project);
+                  // Vérifier que project.id est un UUID valide
+                  if (!project.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.id)) {
                     return null;
                   }
                   return (
@@ -241,7 +234,7 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
                     </SelectItem>
                   );
                 })}
-                </SelectContent>
+              </SelectContent>
               </Select>
             </div>
           </div>
