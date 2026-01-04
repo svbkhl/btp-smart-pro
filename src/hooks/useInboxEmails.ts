@@ -58,9 +58,9 @@ export const useInboxEmails = (options: UseInboxEmailsOptions = {}) => {
       const { data, error, count } = await query;
 
       if (error) {
-        // Si la table n'existe pas, retourner un tableau vide
-        if (error.code === "PGRST116" || error.message?.includes("does not exist")) {
-          console.warn("⚠️ Table inbox_emails n'existe pas encore");
+        // Si la table n'existe pas, retourner un tableau vide SILENCIEUSEMENT
+        // (pas de log car cette table est pour une fonctionnalité future)
+        if (error.code === "PGRST116" || error.message?.includes("does not exist") || error.code === "42P01") {
           return { data: [], count: 0 };
         }
         throw error;

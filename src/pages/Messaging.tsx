@@ -139,33 +139,51 @@ const Messaging = () => {
   const { data: emailMessagesData, isLoading: messagesLoading } = useEmailMessages();
   
   // Charger les emails entrants selon le dossier sélectionné
+  // NE PAS charger inbox_emails si on est sur l'onglet "sent" (pour éviter l'erreur 400)
   const { data: inboxEmailsData, isLoading: inboxLoading } = useInboxEmails({
     folder: selectedFolder === "inbox" ? "inbox" : selectedFolder,
   });
 
   // Charger les emails envoyés et entrants
   useEffect(() => {
+    console.log('📧 [Messagerie] Chargement emails...', {
+      fakeDataEnabled,
+      selectedFolder,
+      emailMessagesCount: emailMessagesData?.data?.length || 0,
+      inboxEmailsCount: inboxEmailsData?.data?.length || 0,
+    });
+
     if (fakeDataEnabled) {
+      console.log('📧 [Messagerie] Mode FAKE DATA activé');
       setEmails(FAKE_EMAILS);
     } else {
       const allEmails: Email[] = [];
       
       // Charger les emails envoyés depuis email_messages (pour le dossier "sent")
-      if (selectedFolder === "sent" && emailMessagesData?.data && emailMessagesData.data.length > 0) {
-        const sentEmails: Email[] = emailMessagesData.data
-          .filter((msg) => msg.status === "sent")
-          .map((msg: EmailMessage) => ({
-            id: msg.id,
-            from: (emailConfig as any)?.from_email || (emailConfig as any)?.smtp_user || user?.email || "noreply@btpsmartpro.com",
-            fromName: (emailConfig as any)?.from_name || settings?.signature_name || "BTP Smart Pro",
-            subject: msg.subject || "Sans objet",
-            preview: msg.body_text || msg.body_html?.replace(/<[^>]*>/g, "").substring(0, 100) || "",
-            date: msg.sent_at || msg.created_at,
-            isRead: true,
-            isStarred: false,
-            folder: "sent" as const,
-          }));
-        allEmails.push(...sentEmails);
+      if (selectedFolder === "sent") {
+        console.log('📧 [Messagerie] Dossier SENT sélectionné');
+        console.log('📧 [Messagerie] emailMessagesData:', emailMessagesData);
+        
+        if (emailMessagesData?.data && emailMessagesData.data.length > 0) {
+          const sentEmails: Email[] = emailMessagesData.data
+            .filter((msg) => msg.status === "sent")
+            .map((msg: EmailMessage) => ({
+              id: msg.id,
+              from: (emailConfig as any)?.from_email || (emailConfig as any)?.smtp_user || user?.email || "noreply@btpsmartpro.com",
+              fromName: (emailConfig as any)?.from_name || settings?.signature_name || "BTP Smart Pro",
+              subject: msg.subject || "Sans objet",
+              preview: msg.body_text || msg.body_html?.replace(/<[^>]*>/g, "").substring(0, 100) || "",
+              date: msg.sent_at || msg.created_at,
+              isRead: true,
+              isStarred: false,
+              folder: "sent" as const,
+            }));
+          console.log('✅ [Messagerie] Emails envoyés chargés:', sentEmails.length);
+          allEmails.push(...sentEmails);
+        } else {
+          console.warn('⚠️ [Messagerie] Aucun email dans email_messages');
+          console.log('💡 [Messagerie] Envoie un email de test (lien paiement, devis...)');
+        }
       }
 
       // Charger les emails entrants depuis inbox_emails (pour les autres dossiers)
@@ -182,9 +200,11 @@ const Messaging = () => {
           folder: msg.folder,
           attachments: msg.attachments?.length || 0,
         }));
+        console.log('✅ [Messagerie] Emails entrants chargés:', inboxEmails.length);
         allEmails.push(...inboxEmails);
       }
       
+      console.log('📧 [Messagerie] Total emails à afficher:', allEmails.length);
       setEmails(allEmails);
     }
   }, [
