@@ -25,8 +25,9 @@ import {
 import { useCreateInvoice, CreateInvoiceData } from "@/hooks/useInvoices";
 import { useClients, useCreateClient } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
-import { Loader2, Calculator, Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Loader2, Plus } from "lucide-react";
+import { calculateFromTTC } from "@/utils/priceCalculations";
+import { useToast } from "@/hooks/use-toast";
 
 const invoiceSchema = z.object({
   client_id: z.string().optional(),
@@ -56,6 +57,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
   const { data: clients } = useClients();
   const { data: quotes } = useQuotes();
   const createClient = useCreateClient();
+  const { toast } = useToast();
 
   const {
     register,
@@ -92,27 +94,19 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         setValue("quote_id", quoteId);
         setValue("client_name", quote.client_name);
         setValue("description", `Facture pour ${quote.client_name}`);
-        setValue("amount_ht", quote.estimated_cost.toString());
+        setValue("amount_ttc", quote.estimated_cost.toString());
       }
     }
   }, [quoteId, quotes, setValue]);
 
-  // Calculer les totaux
-  const calculateTotals = () => {
-    const totalHt = parseFloat(amountHt || "0") || 0;
-    const vat = parseFloat(vatRate || "20");
-    const vatAmount = (totalHt * vat) / 100;
-    const totalTtc = totalHt + vatAmount;
-
-    return { totalHt, vatAmount, totalTtc, vat };
-  };
-
-  const { totalHt, vatAmount, totalTtc, vat } = calculateTotals();
-
   const onSubmit = async (data: InvoiceFormData) => {
-    // Validation manuelle: vérifier qu'on a un montant HT
-    if (!data.amount_ht || parseFloat(data.amount_ht) <= 0) {
-      alert("Veuillez entrer un montant HT valide");
+    // Validation: vérifier qu'on a un montant TTC
+    if (!data.amount_ttc || parseFloat(data.amount_ttc) <= 0) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer un montant TTC valide",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -131,8 +125,20 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
           finalClientId = newClient.id;
         } catch (error) {
           console.error("Error creating client:", error);
+          toast({
+            title: "Erreur",
+            description: "Impossible de créer le client",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
         }
       }
+
+      // Calculer HT et TVA à partir du TTC (MODE TTC FIRST)
+      const ttcAmount = parseFloat(data.amount_ttc);
+      const vatRateValue = parseFloat(data.vat_rate || "20");
+      const prices = calculateFromTTC(ttcAmount, vatRateValue);
 
       // Préparer les données de la facture
       const invoiceData: CreateInvoiceData = {
@@ -142,18 +148,28 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         client_address: data.client_address || undefined,
         quote_id: data.quote_id || undefined,
         description: data.description,
-        amount_ht: totalHt,
-        vat_rate: parseFloat(vatRate || "20"),
+        amount_ht: prices.total_ht,  // HT calculé à partir du TTC
+        vat_rate: vatRateValue,
         due_date: data.due_date || undefined,
       };
 
       await createInvoice.mutateAsync(invoiceData);
+      
+      toast({
+        title: "Facture créée",
+        description: "La facture a été créée avec succès",
+      });
+
       onOpenChange(false);
       reset();
       setIsNewClient(false);
     } catch (error: any) {
       console.error("Error creating invoice:", error);
-      alert(`Erreur lors de la création de la facture: ${error.message || "Erreur inconnue"}`);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de créer la facture",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -306,26 +322,30 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
             )}
           </div>
 
-          {/* Montant HT */}
+          {/* Montant TTC */}
           <div className="space-y-2">
-            <Label htmlFor="amount_ht">
-              Montant HT <span className="text-red-500">*</span>
+            <Label htmlFor="amount_ttc">
+              Montant TTC (€) <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="amount_ht"
+              id="amount_ttc"
               type="number"
               step="0.01"
-              {...register("amount_ht")}
+              {...register("amount_ttc")}
               placeholder="0.00"
+              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
+            {errors.amount_ttc && (
+              <p className="text-sm text-red-500">{errors.amount_ttc.message}</p>
+            )}
           </div>
 
-          {/* TVA */}
+          {/* TVA et Date */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vat_rate">Taux de TVA (%)</Label>
               <Select
-                value={vatRate || "20"}
+                value={watch("vat_rate") || "20"}
                 onValueChange={(value) => setValue("vat_rate", value)}
               >
                 <SelectTrigger>
@@ -346,28 +366,6 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                 type="date"
                 {...register("due_date")}
               />
-            </div>
-          </div>
-
-          {/* Aperçu des totaux */}
-          <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Calculator className="w-4 h-4" />
-              <Label className="font-semibold">Aperçu des totaux</Label>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Montant HT:</span>
-              <span className="font-medium">{totalHt.toFixed(2)}€</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>TVA ({vat}%):</span>
-              <span className="font-medium">{vatAmount.toFixed(2)}€</span>
-            </div>
-            <div className="flex justify-between text-lg font-bold pt-2 border-t">
-              <span>Total TTC:</span>
-              <Badge variant="default" className="text-lg px-3 py-1">
-                {totalTtc.toFixed(2)}€
-              </Badge>
             </div>
           </div>
 
