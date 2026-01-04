@@ -393,3 +393,4 @@ async function handlePaymentIntentFailed(
   console.log('✅ Paiement marqué en échec');
 }
 
+

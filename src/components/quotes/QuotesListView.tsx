@@ -85,3 +85,4 @@ export default function QuotesListView({ quotes, loading }: QuotesListViewProps)
   );
 }
 
+

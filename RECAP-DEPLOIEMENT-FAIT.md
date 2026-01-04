@@ -126,3 +126,4 @@ Tu auras :
 
 https://supabase.com/dashboard/project/renmjmqlmafqjzldmsgs/sql/new
 
+

@@ -298,3 +298,4 @@ Tu as maintenant **exactement la même UX que pour les devis** :
 ---
 
 **🎉 DANS 2 MINUTES, TESTE LE NOUVEAU WORKFLOW ! IL EST MAGNIFIQUE ! ✨**
+

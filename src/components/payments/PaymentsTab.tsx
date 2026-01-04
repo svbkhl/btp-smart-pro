@@ -64,43 +64,6 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Devis signés en attente de paiement (sans lien de paiement créé)
-  const signedQuotesNeedingPayment = useMemo(() => {
-    // Récupérer les IDs des devis qui ont déjà un paiement pending
-    const quoteIdsWithPendingPayment = new Set(
-      payments
-        .filter(p => p.status === 'pending' && p.quote_id)
-        .map(p => p.quote_id)
-    );
-    
-    // Filtrer les devis signés qui n'ont PAS de paiement pending
-    return quotes.filter(q => 
-      q.signed && 
-      (!q.payment_status || q.payment_status === 'pending') &&
-      !quoteIdsWithPendingPayment.has(q.id)  // Exclure si paiement pending existe
-    );
-  }, [quotes, payments]);
-
-  // Statistiques des paiements
-  const stats = useMemo(() => {
-    const total = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const succeeded = payments.filter(p => p.status === 'succeeded');
-    const pending = payments.filter(p => p.status === 'pending');
-    const failed = payments.filter(p => p.status === 'failed');
-    
-    const totalSucceeded = succeeded.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const totalPending = pending.reduce((sum, p) => sum + (p.amount || 0), 0);
-    
-    return {
-      total: totalSucceeded,
-      pending: totalPending,
-      count: succeeded.length,
-      pendingCount: pending.length,
-      failedCount: failed.length,
-      conversionRate: payments.length > 0 ? (succeeded.length / payments.length) * 100 : 0,
-    };
-  }, [payments]);
-
   // Dédupliquer les paiements en attente (ne garder que le plus récent par devis)
   const deduplicatedPayments = useMemo(() => {
     const paymentsByQuote = new Map();
@@ -120,6 +83,42 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
     
     return Array.from(paymentsByQuote.values());
   }, [payments]);
+
+  // Devis signés en attente de paiement (sans lien de paiement créé)
+  const signedQuotesNeedingPayment = useMemo(() => {
+    // Récupérer les IDs des devis qui ont déjà un paiement pending (dédupliqué)
+    const quoteIdsWithPendingPayment = new Set(
+      deduplicatedPayments
+        .filter(p => p.status === 'pending' && p.quote_id)
+        .map(p => p.quote_id)
+    );
+    
+    // Filtrer les devis signés qui n'ont PAS de paiement pending
+    return quotes.filter(q => 
+      q.signed && 
+      (!q.payment_status || q.payment_status === 'pending') &&
+      !quoteIdsWithPendingPayment.has(q.id)  // Exclure si paiement pending existe
+    );
+  }, [quotes, deduplicatedPayments]);
+
+  // Statistiques des paiements (calculées APRÈS déduplication)
+  const stats = useMemo(() => {
+    const succeeded = deduplicatedPayments.filter(p => p.status === 'succeeded');
+    const pending = deduplicatedPayments.filter(p => p.status === 'pending');
+    const failed = deduplicatedPayments.filter(p => p.status === 'failed');
+    
+    const totalSucceeded = succeeded.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalPending = pending.reduce((sum, p) => sum + (p.amount || 0), 0);
+    
+    return {
+      total: totalSucceeded,
+      pending: totalPending,
+      count: succeeded.length,
+      pendingCount: pending.length,
+      failedCount: failed.length,
+      conversionRate: deduplicatedPayments.length > 0 ? (succeeded.length / deduplicatedPayments.length) * 100 : 0,
+    };
+  }, [deduplicatedPayments]);
 
   const filteredPayments = deduplicatedPayments.filter((payment) => {
     const matchesSearch = 
@@ -186,8 +185,8 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
             minimumFractionDigits: 0,
           }).format(stats.total)}
           icon={Euro}
-          trend={stats.count > 0 ? "up" : undefined}
-          trendValue={`${stats.count} paiement${stats.count > 1 ? 's' : ''}`}
+          description={`${stats.count} paiement${stats.count > 1 ? 's' : ''} réussi${stats.count > 1 ? 's' : ''}`}
+          gradient="green"
         />
         
         <KPIBlock
@@ -198,24 +197,32 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
             minimumFractionDigits: 0,
           }).format(stats.pending)}
           icon={Clock}
-          trend={stats.pendingCount > 0 ? "neutral" : undefined}
-          trendValue={`${stats.pendingCount} en cours`}
+          description={`${stats.pendingCount} paiement${stats.pendingCount > 1 ? 's' : ''} en cours`}
+          gradient="orange"
         />
         
         <KPIBlock
           title="Taux de réussite"
           value={`${stats.conversionRate.toFixed(0)}%`}
           icon={TrendingUp}
-          trend={stats.conversionRate >= 80 ? "up" : stats.conversionRate >= 50 ? "neutral" : "down"}
-          trendValue={`${stats.count} succès`}
+          trend={
+            stats.conversionRate >= 80 
+              ? { value: 15, isPositive: true } 
+              : stats.conversionRate < 50 
+              ? { value: 10, isPositive: false }
+              : undefined
+          }
+          description={`${stats.count} paiement${stats.count > 1 ? 's' : ''} réussi${stats.count > 1 ? 's' : ''}`}
+          gradient="blue"
         />
         
         <KPIBlock
           title="Échecs"
           value={stats.failedCount.toString()}
           icon={XCircle}
-          trend={stats.failedCount > 0 ? "down" : undefined}
-          trendValue={stats.failedCount > 0 ? "À relancer" : "Aucun"}
+          trend={stats.failedCount > 0 ? { value: stats.failedCount, isPositive: false } : undefined}
+          description={stats.failedCount > 0 ? "À relancer" : "Aucun échec"}
+          gradient="pink"
         />
       </div>
 

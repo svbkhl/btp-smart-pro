@@ -259,3 +259,4 @@ Voici ce que reçoit le client :
 **Teste maintenant : Facturation → Paiements → Créer lien de paiement ! 🚀**
 
 **Tu verras la checkbox et pourras envoyer le lien par email directement ! 📧**
+

@@ -228,3 +228,4 @@ npx supabase functions deploy create-payment-link --no-verify-jwt
 **📋 COMMENCE PAR REGARDER LES LOGS SUPABASE !**
 
 **C'est là que tu verras l'erreur exacte ! 🔍**
+

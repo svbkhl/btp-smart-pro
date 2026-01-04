@@ -281,3 +281,4 @@ npx supabase functions deploy send-payment-link-email --no-verify-jwt
 **🎉 TOUS TES EMAILS DANS UN SEUL ENDROIT ! HISTORIQUE COMPLET ! 📧**
 
 **Traçabilité totale de toutes les communications avec tes clients ! 🎯**
+

@@ -160,3 +160,4 @@ export default function QuoteTimeline({ quote, className }: QuoteTimelineProps) 
   );
 }
 
+
