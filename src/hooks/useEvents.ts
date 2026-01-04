@@ -230,6 +230,12 @@ export const useCreateEvent = () => {
         throw new Error("Impossible de récupérer l'ID utilisateur");
       }
 
+      // Vérifier que user_id est un UUID valide
+      if (user_id === "events" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
+        console.error("❌ [useCreateEvent] user_id invalide de Supabase Auth:", user_id);
+        throw new Error("Erreur d'authentification : ID utilisateur invalide");
+      }
+
       // Vérifier que start_date est présent et valide
       if (!data.start_date || typeof data.start_date !== 'string') {
         throw new Error('start_date is required and must be a valid ISO string');
@@ -245,52 +251,26 @@ export const useCreateEvent = () => {
         color: data.color ?? "#3b82f6",
       };
 
-      // Ajouter uniquement les champs optionnels s'ils sont définis
+      // Champs optionnels
       if (data.description) insertData.description = data.description;
       if (data.end_date) insertData.end_date = data.end_date;
       if (data.location) insertData.location = data.location;
-      
-      // ⚠️ IMPORTANT : Valider project_id pour éviter les UUID invalides
-      // Ne jamais accepter "events", "none", "", ou toute autre chaîne non-UUID
-      if (data.project_id && 
-          data.project_id.trim() !== "" &&
-          data.project_id !== "none" && 
-          data.project_id !== "events" &&
-          data.project_id !== "null" &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.project_id)) {
-        insertData.project_id = data.project_id;
-      } else if (data.project_id) {
-        // Log si project_id est fourni mais n'est pas un UUID valide
-        console.warn("⚠️ [useCreateEvent] project_id invalide ignoré:", data.project_id);
-      }
-      // Si project_id est invalide, ne pas l'inclure (sera NULL dans la DB)
-      
       if (data.reminder_minutes !== undefined) insertData.reminder_minutes = data.reminder_minutes;
       if (data.reminder_recurring !== undefined) insertData.reminder_recurring = data.reminder_recurring;
-
-      // ⚠️ Vérification finale AVANT l'insertion : S'assurer qu'aucun champ UUID ne contient "events"
-      // Vérifier tous les champs qui pourraient être des UUID
-      const uuidFields = ['user_id', 'project_id'];
-      for (const field of uuidFields) {
-        if (insertData[field] === "events" || insertData[field] === "none" || insertData[field] === "") {
-          console.error(`❌ [useCreateEvent] ERREUR : Valeur invalide '${insertData[field]}' détectée dans ${field}!`, {
-            field,
-            value: insertData[field],
-            allFields: insertData,
-          });
-          // Supprimer le champ invalide au lieu de throw pour éviter de bloquer
-          delete insertData[field];
-        }
+      
+      // Valider project_id (doit être UUID ou ne pas être inclus)
+      if (data.project_id && 
+          data.project_id !== "none" && 
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.project_id)) {
+        insertData.project_id = data.project_id;
       }
 
-      // Log pour déboguer - Vérifier tous les champs UUID
-      console.log("🔍 [useCreateEvent] Insertion événement:", {
+      // Log pour déboguer
+      console.log("🔍 [useCreateEvent] Données à insérer:", {
         user_id: insertData.user_id,
-        project_id: insertData.project_id,
+        project_id: insertData.project_id || "null",
         title: insertData.title,
         start_date: insertData.start_date,
-        auth_uid: user_id,
-        allFields: insertData, // ✅ Afficher tous les champs pour déboguer
       });
 
       // ⚠️ IMPORTANT : Insertion simple sans aucun filtre .eq()
