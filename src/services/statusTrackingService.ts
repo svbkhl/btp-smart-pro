@@ -115,7 +115,7 @@ export const trackEmailSent = async (
     // Insérer l'enregistrement
     const insertData: any = {
       user_id: session.user.id,
-      recipient_email: recipientEmail,
+      to_email: recipientEmail, // Utiliser to_email au lieu de recipient_email
       subject: emailSubject || `${documentType === "quote" ? "Devis" : "Facture"}`,
       document_type: documentType,
       document_id: documentId,
@@ -132,7 +132,7 @@ export const trackEmailSent = async (
         console.warn("⚠️ Colonne document_id manquante, tentative sans cette colonne");
         const { error: retryError } = await supabase.from("email_messages").insert({
           user_id: session.user.id,
-          recipient_email: recipientEmail,
+          to_email: recipientEmail, // Utiliser to_email au lieu de recipient_email
           subject: emailSubject || `${documentType === "quote" ? "Devis" : "Facture"}`,
           document_type: documentType,
           email_type: emailType, // Toujours défini même dans le retry

@@ -5,7 +5,7 @@ import { useAuth } from "./useAuth";
 export interface EmailMessage {
   id: string;
   user_id: string;
-  recipient_email: string;
+  to_email: string; // Utiliser to_email au lieu de recipient_email pour correspondre à la table
   subject: string;
   body_html: string | null;
   body_text: string | null;
