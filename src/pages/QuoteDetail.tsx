@@ -41,7 +41,7 @@ export default function QuoteDetail() {
       // Si pas trouvé, essayer dans quotes
       if (!data) {
         const quotesResult = await supabase
-          .from('quotes')
+          .from('ai_quotes')
           .select('*')
           .eq('id', id)
           .maybeSingle();

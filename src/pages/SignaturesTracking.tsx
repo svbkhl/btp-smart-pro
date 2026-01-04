@@ -63,7 +63,7 @@ export default function SignaturesTracking() {
         .order('signed_at', { ascending: false });
 
       const { data: quotes, error: quotesError } = await supabase
-        .from('quotes')
+        .from('ai_quotes')
         .select('*')
         .eq('signed', true)
         .order('signed_at', { ascending: false });
