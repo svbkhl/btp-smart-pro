@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,6 +28,7 @@ import { useQuotes } from "@/hooks/useQuotes";
 import { Loader2, Plus } from "lucide-react";
 import { calculateFromTTC } from "@/utils/priceCalculations";
 import { useToast } from "@/hooks/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
 
 const invoiceSchema = z.object({
   client_id: z.string().optional(),
@@ -36,8 +37,7 @@ const invoiceSchema = z.object({
   client_address: z.string().optional(),
   quote_id: z.string().optional(),
   description: z.string().min(1, "La description est requise"),
-  amount_ht: z.string().optional(),
-  vat_rate: z.string().optional(),
+  amount_ttc: z.string().min(1, "Le montant TTC est requis"),
   due_date: z.string().optional(),
 });
 
@@ -75,16 +75,23 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
       client_address: "",
       quote_id: "",
       description: "",
-      amount_ht: "",
-      vat_rate: "20",
+      amount_ttc: "",
       due_date: "",
     },
   });
 
   const selectedClientId = watch("client_id");
-  const amountHt = watch("amount_ht");
-  const vatRate = watch("vat_rate");
+  const amountTtc = watch("amount_ttc");
   const selectedQuoteId = watch("quote_id");
+
+  // Calcul automatique HT et TVA à partir du TTC (toujours 20%)
+  const calculatedPrices = useMemo(() => {
+    const ttc = parseFloat(amountTtc || "0");
+    if (ttc > 0) {
+      return calculateFromTTC(ttc, 20);
+    }
+    return null;
+  }, [amountTtc]);
 
   // Charger les données du devis si quoteId est fourni
   useEffect(() => {
@@ -135,10 +142,9 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         }
       }
 
-      // Calculer HT et TVA à partir du TTC (MODE TTC FIRST)
+      // Calculer HT et TVA à partir du TTC (MODE TTC FIRST - toujours 20%)
       const ttcAmount = parseFloat(data.amount_ttc);
-      const vatRateValue = parseFloat(data.vat_rate || "20");
-      const prices = calculateFromTTC(ttcAmount, vatRateValue);
+      const prices = calculateFromTTC(ttcAmount, 20);
 
       // Préparer les données de la facture
       const invoiceData: CreateInvoiceData = {
@@ -340,34 +346,45 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
             )}
           </div>
 
-          {/* TVA et Date */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="vat_rate">Taux de TVA (%)</Label>
-              <Select
-                value={watch("vat_rate") || "20"}
-                onValueChange={(value) => setValue("vat_rate", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">0%</SelectItem>
-                  <SelectItem value="5.5">5.5%</SelectItem>
-                  <SelectItem value="10">10%</SelectItem>
-                  <SelectItem value="20">20%</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="due_date">Date d'échéance</Label>
-              <Input
-                id="due_date"
-                type="date"
-                {...register("due_date")}
-              />
-            </div>
+          {/* Date d'échéance */}
+          <div className="space-y-2">
+            <Label htmlFor="due_date">Date d'échéance (optionnel)</Label>
+            <Input
+              id="due_date"
+              type="date"
+              {...register("due_date")}
+            />
           </div>
+
+          {/* Animation calcul automatique */}
+          <AnimatePresence>
+            {calculatedPrices && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 border border-primary/20 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Montant HT:</span>
+                    <span className="font-medium">{calculatedPrices.total_ht.toFixed(2)} €</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">TVA (20%):</span>
+                    <span className="font-medium">{calculatedPrices.vat_amount.toFixed(2)} €</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-primary/20">
+                    <span className="font-semibold">Total TTC:</span>
+                    <span className="text-xl font-bold text-primary">
+                      {calculatedPrices.total_ttc.toFixed(2)} €
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <DialogFooter>
             <Button
