@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { BackButton } from "@/components/ui/BackButton";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -27,9 +26,6 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
       
       {/* Sidebar */}
       <Sidebar />
-      
-      {/* Back Button */}
-      <BackButton />
       
       {/* Main Content Area */}
       <motion.main
