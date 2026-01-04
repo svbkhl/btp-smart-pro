@@ -174,7 +174,6 @@ export const useCreateInvoice = () => {
           client_address: data.client_address || null,
           quote_id: data.quote_id || null,
           description: data.description || null,
-          total_amount: finalAmountTtc,
           amount_ht: totalHt,
           vat_rate: vatRate,
           vat_amount: finalVatAmount,
