@@ -235,6 +235,7 @@ export default function QuoteDetail() {
           onDelete={quote.signed ? undefined : handleDelete}
           onSendEmail={handleSendEmail}
           onDownloadPDF={handleDownloadPDF}
+          onViewMessages={handleViewMessages}
         />
 
         {/* Modal d'envoi d'email */}

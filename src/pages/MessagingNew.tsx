@@ -5,7 +5,7 @@
  * Interface moderne et professionnelle.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ import { fr } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import { getMessages, Message, MessageType } from "@/services/messageService";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 // =====================================================
 // TYPES
@@ -284,6 +284,25 @@ const MessagingNew = () => {
 
         {/* Liste des messages */}
         <GlassCard className="p-6">
+          {documentIdFromUrl && (
+            <div className="mb-4 p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                📌 Filtré sur {documentTypeFromUrl === 'quote' ? 'devis' : documentTypeFromUrl === 'invoice' ? 'facture' : 'document'} : <strong>{documentIdFromUrl.substring(0, 8)}</strong>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="ml-2" 
+                  onClick={() => {
+                    searchParams.delete('document');
+                    searchParams.delete('type');
+                    setSearchParams(searchParams);
+                  }}
+                >
+                  ✕ Retirer le filtre
+                </Button>
+              </p>
+            </div>
+          )}
           {isLoading ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">Chargement...</p>
@@ -293,7 +312,7 @@ const MessagingNew = () => {
               <Mail className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold mb-2">Aucun message</h3>
               <p className="text-muted-foreground">
-                {searchQuery || filterType !== "all" || filterStatus !== "all"
+                {searchQuery || filterType !== "all" || filterStatus !== "all" || documentIdFromUrl
                   ? "Aucun message ne correspond à vos filtres"
                   : "Les emails envoyés depuis l'application apparaîtront ici"}
               </p>

@@ -71,6 +71,12 @@ export default function QuoteDetailView({
         </div>
 
         <div className="flex gap-2">
+          {onViewMessages && (
+            <Button variant="outline" onClick={onViewMessages} className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Messages
+            </Button>
+          )}
           {onDownloadPDF && (
             <Button variant="outline" onClick={onDownloadPDF} className="gap-2">
               <Download className="h-4 w-4" />
