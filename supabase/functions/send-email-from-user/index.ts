@@ -513,7 +513,7 @@ serve(async (req) => {
         
         await supabaseClient.from("email_messages").insert({
           user_id: user.id,
-          recipient_email: clientEmail,
+          to_email: clientEmail, // Utiliser to_email au lieu de recipient_email
           subject: `Devis ${quoteNumber} - ${clientName}`,
           body_html: emailHtml,
           body_text: emailText,
@@ -548,7 +548,7 @@ serve(async (req) => {
       
       await supabaseClient.from("email_messages").insert({
         user_id: user.id,
-        recipient_email: clientEmail,
+        to_email: clientEmail, // Utiliser to_email au lieu de recipient_email
         subject: `Devis ${quoteNumber} - ${clientName}`,
         body_html: emailHtml,
         body_text: emailText,

@@ -253,7 +253,7 @@ serve(async (req) => {
         .from('email_messages')
         .insert({
           user_id: user.id,
-          recipient_email: client_email,
+          to_email: client_email, // Utiliser to_email au lieu de recipient_email
           subject: `💳 Votre lien de paiement - ${quote.quote_number || 'Devis'}`,
           body_html: htmlTemplate,
           body_text: `Bonjour ${client_name}, voici votre lien de paiement: ${payment_url}`,

@@ -456,7 +456,7 @@ serve(async (req) => {
 
       const insertData: any = {
         user_id: user.id,
-        recipient_email: to,
+        to_email: to, // Utiliser to_email au lieu de recipient_email
         subject,
         body_html: htmlWithSignature || null,
         body_text: textWithSignature || text || null,
