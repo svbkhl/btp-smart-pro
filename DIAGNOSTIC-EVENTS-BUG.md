@@ -182,3 +182,4 @@ Après avoir créé un événement :
 ---
 
 **🔥 CRÉE UN ÉVÉNEMENT ET VÉRIFIE LES LOGS `🚨 [TRACE ABSOLUE]` DANS LA CONSOLE ! 🔥**
+

@@ -245,3 +245,4 @@ La synchronisation Google → App n'est pas encore implémentée. Pour l'implém
 ---
 
 **🔥 L'intégration est prête ! Configure Google Cloud Console et déploie les Edge Functions. 🔥**
+

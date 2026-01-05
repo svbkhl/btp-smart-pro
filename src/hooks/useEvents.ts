@@ -113,6 +113,8 @@ export const useCreateEvent = () => {
   const queryClient = useQueryClient();
   // ⚠️ NE PAS utiliser currentCompanyId depuis useAuth - récupérer directement depuis DB
   // pour éviter toute contamination par des valeurs invalides
+  const { data: googleConnection } = useGoogleCalendarConnection();
+  const syncWithGoogle = useSyncEventWithGoogle();
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
@@ -495,8 +497,9 @@ export const useCreateEvent = () => {
           message: error.message,
           details: error.details,
           hint: error.hint,
-          // Log de l'objet envoyé pour debug
-          payload_sent: JSON.stringify(insertData, null, 2),
+          // Log de l'objet envoyé pour debug (payload final nettoyé)
+          payload_sent: JSON.stringify(finalPayload, null, 2),
+          payload_original: JSON.stringify(insertData, null, 2),
         });
         throw error;
       }
