@@ -118,6 +118,43 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
   });
 };
 
+/**
+ * Hook pour récupérer les événements d'aujourd'hui
+ */
+export const useTodayEvents = () => {
+  const { currentCompanyId } = useAuth();
+
+  return useQuery({
+    queryKey: ["events", "today", currentCompanyId],
+    queryFn: async () => {
+      if (!currentCompanyId) {
+        return [];
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .eq("company_id", currentCompanyId)
+        .gte("start_date", today.toISOString())
+        .lt("start_date", tomorrow.toISOString())
+        .order("start_date", { ascending: true });
+
+      if (error) {
+        console.error("❌ [useTodayEvents] Erreur récupération:", error);
+        throw error;
+      }
+
+      return (data || []) as Event[];
+    },
+    enabled: !!currentCompanyId,
+  });
+};
+
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
   const { data: googleConnection } = useGoogleCalendarConnection();
