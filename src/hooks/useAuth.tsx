@@ -8,6 +8,7 @@ interface UseAuthReturn {
   isAdmin: boolean;
   isEmployee: boolean;
   userRole: 'admin' | 'member' | null;
+  currentCompanyId: string | null;
 }
 
 export const useAuth = (): UseAuthReturn => {
@@ -16,6 +17,7 @@ export const useAuth = (): UseAuthReturn => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
     // Récupérer la session initiale
@@ -23,9 +25,12 @@ export const useAuth = (): UseAuthReturn => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Vérifier si l'utilisateur est admin
+      // Vérifier si l'utilisateur est admin et récupérer company_id
       if (session?.user) {
         checkAdminStatus(session.user);
+        fetchCurrentCompanyId(session.user.id);
+      } else {
+        setCurrentCompanyId(null);
       }
     });
 
@@ -156,6 +161,28 @@ export const useAuth = (): UseAuthReturn => {
     return 'member';
   };
 
-  return { user, loading, isAdmin, isEmployee, userRole };
+  // Fonction pour récupérer le company_id actuel
+  const fetchCurrentCompanyId = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .single();
+
+      if (error || !data) {
+        setCurrentCompanyId(null);
+        return;
+      }
+
+      setCurrentCompanyId(data.company_id);
+    } catch (err) {
+      console.warn('⚠️ Erreur lors de la récupération du company_id:', err);
+      setCurrentCompanyId(null);
+    }
+  };
+
+  return { user, loading, isAdmin, isEmployee, userRole, currentCompanyId };
 };
 

@@ -56,6 +56,7 @@ import NotFound from './pages/NotFound';
 // Pages RBAC (Gestion des rôles et utilisateurs)
 import { RolesManagementGuarded } from './pages/RolesManagement';
 import { UsersManagementRBACGuarded } from './pages/UsersManagementRBAC';
+import DelegationsManagement from './pages/DelegationsManagement';
 
 function App() {
   const { user } = useAuth();
@@ -329,6 +330,14 @@ function App() {
           element={
             <ProtectedRoute>
               <UsersManagementRBACGuarded />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/delegations"
+          element={
+            <ProtectedRoute>
+              <DelegationsManagement />
             </ProtectedRoute>
           }
         />
