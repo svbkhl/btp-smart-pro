@@ -317,29 +317,86 @@ export const useCreateEvent = () => {
       }
 
       // ========================================================================
-      // ÉTAPE 6: LOG DE CONTRÔLE TEMPORAIRE (OBLIGATOIRE)
+      // ÉTAPE 6: DEBUG EVENT PAYLOAD (OBLIGATOIRE - TRACE FORCÉE)
       // ========================================================================
-      console.log("🚀 [useCreateEvent] EVENT PAYLOAD - AVANT INSERTION:", {
+      console.log("🔍 [DEBUG EVENT PAYLOAD] Valeurs AVANT insertion:", {
         user_id: insertData.user_id,
         company_id: insertData.company_id,
-        user_id_type: typeof insertData.user_id,
-        company_id_type: typeof insertData.company_id,
-        user_id_is_events: insertData.user_id === "events",
-        company_id_is_events: insertData.company_id === "events",
-        user_id_length: insertData.user_id?.length,
-        company_id_length: insertData.company_id?.length,
-        full_payload: JSON.stringify(insertData, null, 2),
+        title: insertData.title,
+        start_date: insertData.start_date,
+        all_day: insertData.all_day,
+        type: insertData.type,
+        color: insertData.color,
+        description: insertData.description,
+        location: insertData.location,
+        project_id: insertData.project_id,
       });
 
-      // ⚠️ VÉRIFICATION FINALE ABSOLUE - BLOQUER SI "events" DÉTECTÉ
-      if (insertData.user_id === "events" || insertData.company_id === "events") {
-        const error = new Error(`🚨 ERREUR CRITIQUE : Valeur "events" détectée dans les UUID ! user_id="${insertData.user_id}", company_id="${insertData.company_id}"`);
-        console.error("❌ [useCreateEvent] ERREUR CRITIQUE - Valeur 'events' détectée:", {
-          user_id: insertData.user_id,
-          company_id: insertData.company_id,
+      console.log("🔍 [DEBUG EVENT VALUES] Types et validations:", {
+        user_id: {
+          value: insertData.user_id,
+          type: typeof insertData.user_id,
+          isString: typeof insertData.user_id === 'string',
+          length: insertData.user_id?.length,
+          isUUID: isValidUUID(insertData.user_id),
+          isEvents: insertData.user_id === "events",
+          containsEvents: String(insertData.user_id).includes("events"),
+        },
+        company_id: {
+          value: insertData.company_id,
+          type: typeof insertData.company_id,
+          isString: typeof insertData.company_id === 'string',
+          length: insertData.company_id?.length,
+          isUUID: isValidUUID(insertData.company_id),
+          isEvents: insertData.company_id === "events",
+          containsEvents: String(insertData.company_id).includes("events"),
+        },
+      });
+
+      // ⚠️ VALIDATION UUID BLOQUANTE (OBLIGATOIRE)
+      if (!isValidUUID(insertData.user_id)) {
+        const error = new Error(`🚨 user_id invalide : "${insertData.user_id}" (type: ${typeof insertData.user_id}) - Insertion BLOQUÉE`);
+        console.error("❌ [useCreateEvent] VALIDATION UUID ÉCHOUÉE - user_id:", {
+          value: insertData.user_id,
+          type: typeof insertData.user_id,
+          isEvents: insertData.user_id === "events",
           full_payload: JSON.stringify(insertData, null, 2),
         });
         throw error;
+      }
+
+      if (!isValidUUID(insertData.company_id)) {
+        const error = new Error(`🚨 company_id invalide : "${insertData.company_id}" (type: ${typeof insertData.company_id}) - Insertion BLOQUÉE`);
+        console.error("❌ [useCreateEvent] VALIDATION UUID ÉCHOUÉE - company_id:", {
+          value: insertData.company_id,
+          type: typeof insertData.company_id,
+          isEvents: insertData.company_id === "events",
+          full_payload: JSON.stringify(insertData, null, 2),
+        });
+        throw error;
+      }
+
+      // ⚠️ VÉRIFICATION FINALE ABSOLUE - BLOQUER SI "events" DÉTECTÉ
+      if (insertData.user_id === "events" || insertData.company_id === "events") {
+        const error = new Error(`🚨 ERREUR CRITIQUE : Valeur "events" détectée dans les UUID ! user_id="${insertData.user_id}", company_id="${insertData.company_id}" - Insertion BLOQUÉE`);
+        console.error("❌ [useCreateEvent] ERREUR CRITIQUE - Valeur 'events' détectée:", {
+          user_id: insertData.user_id,
+          company_id: insertData.company_id,
+          user_id_is_events: insertData.user_id === "events",
+          company_id_is_events: insertData.company_id === "events",
+          full_payload: JSON.stringify(insertData, null, 2),
+        });
+        throw error;
+      }
+
+      // Vérifier qu'aucun champ ne contient "events" (même partiellement)
+      const allValues = Object.values(insertData).map(v => String(v));
+      const containsEvents = allValues.some(v => v.toLowerCase().includes("events"));
+      if (containsEvents) {
+        console.warn("⚠️ [useCreateEvent] ATTENTION : La valeur 'events' apparaît quelque part dans le payload:", {
+          allValues,
+          full_payload: JSON.stringify(insertData, null, 2),
+        });
       }
 
       // ========================================================================
