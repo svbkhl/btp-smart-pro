@@ -48,10 +48,19 @@ export interface UpdateEventData extends Partial<CreateEventData> {
 // VALIDATION UUID
 // ============================================================================
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// ⚠️ REGEX UUID STRICTE (RFC 4122 compliant)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isValidUUID(value: any): boolean {
   if (!value || typeof value !== 'string') return false;
+  
+  // ⚠️ BLOQUER EXPLICITEMENT "events" et autres valeurs invalides
+  const invalidValues = ["events", "calendar", "event", "table", "null", "undefined", ""];
+  if (invalidValues.includes(value.toLowerCase())) {
+    return false;
+  }
+  
+  // ⚠️ VÉRIFIER LE FORMAT UUID STRICT
   return UUID_REGEX.test(value);
 }
 
@@ -471,23 +480,81 @@ export const useCreateEvent = () => {
       }
 
       // ========================================================================
-      // ÉTAPE 8: INSERTION STRICTE (SANS CHAMP id)
+      // ÉTAPE 8: INSERTION STRICTE (SANS CHAMP id) - COLONNES EXPLICITES
       // ========================================================================
       // ⚠️ S'ASSURER QU'AUCUN CHAMP id N'EST ENVOYÉ (auto-généré par PostgreSQL)
-      const finalPayload = { ...insertData };
-      delete finalPayload.id; // Supprimer id si présent (ne doit jamais être envoyé)
-      delete finalPayload.created_by; // Supprimer created_by si présent (non utilisé)
-      delete finalPayload.calendar_id; // Supprimer calendar_id si présent (non utilisé)
+      // ⚠️ UTILISER DES COLONNES EXPLICITES pour éviter toute injection accidentelle
+      const finalPayload: Record<string, any> = {};
+      
+      // Construire le payload avec SEULEMENT les colonnes autorisées
+      const allowedColumns = [
+        'user_id',
+        'company_id',
+        'title',
+        'start_date',
+        'end_date',
+        'all_day',
+        'location',
+        'type',
+        'color',
+        'description',
+        'project_id',
+        'reminder_minutes',
+        'reminder_recurring'
+      ];
+      
+      for (const col of allowedColumns) {
+        if (col in insertData && insertData[col] !== undefined && insertData[col] !== null) {
+          // Validation finale pour chaque champ UUID
+          if (col.endsWith('_id')) {
+            if (!isValidUUID(insertData[col])) {
+              const error = new Error(`🚨 ERREUR CRITIQUE : Le champ ${col} n'est pas un UUID valide : "${insertData[col]}"`);
+              console.error("❌ [useCreateEvent] Validation UUID finale échouée:", {
+                field: col,
+                value: insertData[col],
+                full_payload: JSON.stringify(insertData, null, 2),
+              });
+              throw error;
+            }
+            // Vérifier explicitement que ce n'est pas "events"
+            if (String(insertData[col]).toLowerCase() === "events") {
+              const error = new Error(`🚨 ERREUR CRITIQUE : Le champ ${col} contient "events" : "${insertData[col]}"`);
+              console.error("❌ [useCreateEvent] Valeur 'events' détectée dans champ UUID:", {
+                field: col,
+                value: insertData[col],
+                full_payload: JSON.stringify(insertData, null, 2),
+              });
+              throw error;
+            }
+          }
+          finalPayload[col] = insertData[col];
+        }
+      }
 
-      console.log("🚨 [TRACE ABSOLUE] PAYLOAD FINAL NETTOYÉ:", {
+      console.log("🚨 [TRACE ABSOLUE] PAYLOAD FINAL NETTOYÉ (colonnes explicites):", {
         payload_final: finalPayload,
         payload_stringified: JSON.stringify(finalPayload, null, 2),
-        champs_supprimes: ['id', 'created_by', 'calendar_id'].filter(f => f in insertData),
+        colonnes_autorisees: allowedColumns,
+        colonnes_utilisees: Object.keys(finalPayload),
       });
 
+      // ⚠️ VALIDATION FINALE ABSOLUE AVANT INSERTION
+      if (!isValidUUID(finalPayload.user_id)) {
+        throw new Error(`🚨 user_id invalide avant insertion : "${finalPayload.user_id}"`);
+      }
+      if (!isValidUUID(finalPayload.company_id)) {
+        throw new Error(`🚨 company_id invalide avant insertion : "${finalPayload.company_id}"`);
+      }
+      if (finalPayload.user_id === "events" || finalPayload.company_id === "events") {
+        throw new Error(`🚨 Valeur "events" détectée avant insertion ! user_id="${finalPayload.user_id}", company_id="${finalPayload.company_id}"`);
+      }
+
+      // ⚠️ INSERTION AVEC COLONNES EXPLICITES
       const { data: event, error } = await supabase
         .from("events")
-        .insert([finalPayload])
+        .insert([finalPayload], {
+          // Ne pas spécifier de colonnes ici, mais le payload est déjà strict
+        })
         .select("*")
         .single();
 
@@ -578,6 +645,8 @@ export const useUpdateEvent = () => {
 export const useDeleteEvent = () => {
   const queryClient = useQueryClient();
   const { currentCompanyId } = useAuth();
+  const { data: googleConnection } = useGoogleCalendarConnection();
+  const syncWithGoogle = useSyncEventWithGoogle();
 
   return useMutation({
     mutationFn: async (id: string) => {
