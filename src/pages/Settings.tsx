@@ -142,12 +142,12 @@ const Settings = () => {
                 <AdminContactRequests />
               </TabsContent>
               <TabsContent value="users" className="mt-0">
-                <div className="[&>div]:p-0 [&>div>div]:p-0">
+                <div className="[&_div]:!p-0 [&_main]:!p-0">
                   <UsersManagementRBAC />
                 </div>
               </TabsContent>
               <TabsContent value="roles" className="mt-0">
-                <div className="[&>div]:p-0 [&>div>div]:p-0">
+                <div className="[&_div]:!p-0 [&_main]:!p-0">
                   <RolesManagement />
                 </div>
               </TabsContent>
