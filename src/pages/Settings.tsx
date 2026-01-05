@@ -13,12 +13,13 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2 } from "lucide-react";
+import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
 import { UserManagementSettings } from "@/components/settings/UserManagementSettings";
 import { RolesAndPermissionsSettings } from "@/components/settings/RolesAndPermissionsSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
+import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 
@@ -32,7 +33,14 @@ const Settings = () => {
   const defaultTab = tabFromUrl || "company";
   
   // Compter le nombre d'onglets (ajuster selon si admin)
-  const isAdministrator = userRole === 'admin' || isAdmin;
+          const isAdministrator = userRole === 'admin' || isAdmin;
+  
+  // Ajuster le nombre de colonnes selon les onglets
+  const tabCount = isAdministrator 
+    ? 10 // company, companies, contact-requests, users, roles, admin-company, demo, stripe, email, integrations, notifications, security
+    : isAdmin
+    ? 8 // company, companies, contact-requests, users, roles, admin-company, stripe, email, integrations, notifications, security
+    : 6; // company, stripe, email, integrations, notifications, security
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -55,10 +63,10 @@ const Settings = () => {
         <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className={`grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto ${
             isAdministrator 
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-10" 
+              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-12" 
               : isAdmin
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
-              : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-8"
+              : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
           }`}>
             <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
