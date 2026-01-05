@@ -16,13 +16,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
-import { UserManagementSettings } from "@/components/settings/UserManagementSettings";
-import { RolesAndPermissionsSettings } from "@/components/settings/RolesAndPermissionsSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 import DelegationsManagement from "@/pages/DelegationsManagement";
+import RolesManagement from "@/pages/RolesManagement";
+import UsersManagementRBAC from "@/pages/UsersManagementRBAC";
 import { usePermissions } from "@/hooks/usePermissions";
 
 const Settings = () => {
@@ -142,10 +142,14 @@ const Settings = () => {
                 <AdminContactRequests />
               </TabsContent>
               <TabsContent value="users" className="mt-0">
-                <UserManagementSettings />
+                <div className="[&>div]:p-0 [&>div>div]:p-0">
+                  <UsersManagementRBAC />
+                </div>
               </TabsContent>
               <TabsContent value="roles" className="mt-0">
-                <RolesAndPermissionsSettings />
+                <div className="[&>div]:p-0 [&>div>div]:p-0">
+                  <RolesManagement />
+                </div>
               </TabsContent>
               {canManageDelegations && (
                 <TabsContent value="delegations" className="mt-0">
