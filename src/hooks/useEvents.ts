@@ -110,14 +110,15 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
 
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
-  const { user, currentCompanyId } = useAuth();
+  // ⚠️ NE PAS utiliser currentCompanyId depuis useAuth - récupérer directement depuis DB
+  // pour éviter toute contamination par des valeurs invalides
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
       console.log("🔵 [useCreateEvent] DÉBUT - Données reçues:", data);
 
       // ========================================================================
-      // ÉTAPE 1: Récupérer l'utilisateur authentifié
+      // ÉTAPE 1: Récupérer l'utilisateur authentifié (SEULE SOURCE)
       // ========================================================================
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
       
@@ -126,40 +127,91 @@ export const useCreateEvent = () => {
         throw new Error("Vous devez être connecté pour créer un événement");
       }
 
+      // ⚠️ FORCER user_id depuis auth.getUser() UNIQUEMENT
       const user_id = currentUser.id;
-      console.log("✅ [useCreateEvent] User ID récupéré:", user_id);
+      
+      console.log("✅ [useCreateEvent] User ID récupéré depuis auth.getUser():", {
+        user_id,
+        type: typeof user_id,
+        length: user_id?.length,
+        isString: typeof user_id === 'string',
+      });
 
-      // Validation UUID user_id
-      validateUUIDField("user_id", user_id);
-
-      // ========================================================================
-      // ÉTAPE 2: Récupérer le company_id
-      // ========================================================================
-      let company_id: string;
-
-      // Essayer d'abord depuis le contexte (plus rapide)
-      if (currentCompanyId && isValidUUID(currentCompanyId)) {
-        company_id = currentCompanyId;
-        console.log("✅ [useCreateEvent] Company ID depuis contexte:", company_id);
-      } else {
-        // Sinon, récupérer depuis company_users
-        const { data: companyUserData, error: companyError } = await supabase
-          .from("company_users")
-          .select("company_id")
-          .eq("user_id", user_id)
-          .single();
-
-        if (companyError || !companyUserData?.company_id) {
-          console.error("❌ [useCreateEvent] Erreur company_id:", companyError);
-          throw new Error("Impossible de récupérer votre entreprise. Veuillez contacter le support.");
-        }
-
-        company_id = companyUserData.company_id;
-        console.log("✅ [useCreateEvent] Company ID depuis DB:", company_id);
+      // Validation UUID user_id STRICTE
+      if (!user_id || typeof user_id !== 'string') {
+        const error = new Error(`user_id invalide : type ${typeof user_id}, valeur "${user_id}"`);
+        console.error("❌ [useCreateEvent] user_id invalide (type):", error);
+        throw error;
       }
 
-      // Validation UUID company_id
-      validateUUIDField("company_id", company_id);
+      validateUUIDField("user_id (depuis auth)", user_id);
+
+      // Vérifier que user_id n'est PAS "events" ou autre valeur invalide
+      const invalidUserIds = ["events", "calendar", "event", "table", "null", "undefined", ""];
+      if (invalidUserIds.includes(user_id.toLowerCase())) {
+        const error = new Error(`user_id contient une valeur invalide: "${user_id}". Ce doit être un UUID valide.`);
+        console.error("❌ [useCreateEvent] user_id valeur invalide:", error);
+        throw error;
+      }
+
+      // ========================================================================
+      // ÉTAPE 2: Récupérer le company_id (SEULE SOURCE : company_users)
+      // ========================================================================
+      // ⚠️ NE JAMAIS utiliser de valeur depuis contexte, route, ou paramètre
+      // ⚠️ TOUJOURS récupérer depuis company_users avec user_id validé
+      
+      const { data: companyUserData, error: companyError } = await supabase
+        .from("company_users")
+        .select("company_id")
+        .eq("user_id", user_id)
+        .limit(1)
+        .maybeSingle(); // Utiliser maybeSingle() au lieu de single() pour éviter erreur si plusieurs
+
+      if (companyError) {
+        console.error("❌ [useCreateEvent] Erreur récupération company_id:", {
+          error: companyError,
+          code: companyError.code,
+          message: companyError.message,
+          user_id_used: user_id,
+        });
+        throw new Error("Impossible de récupérer votre entreprise. Veuillez contacter le support.");
+      }
+
+      if (!companyUserData?.company_id) {
+        const error = new Error("Aucune entreprise associée à votre compte. Veuillez contacter le support.");
+        console.error("❌ [useCreateEvent] Aucun company_id trouvé:", {
+          companyUserData,
+          user_id_used: user_id,
+        });
+        throw error;
+      }
+
+      // ⚠️ FORCER company_id depuis company_users UNIQUEMENT
+      const company_id = companyUserData.company_id;
+
+      console.log("✅ [useCreateEvent] Company ID récupéré depuis company_users:", {
+        company_id,
+        type: typeof company_id,
+        length: company_id?.length,
+        isString: typeof company_id === 'string',
+      });
+
+      // Validation UUID company_id STRICTE
+      if (!company_id || typeof company_id !== 'string') {
+        const error = new Error(`company_id invalide : type ${typeof company_id}, valeur "${company_id}"`);
+        console.error("❌ [useCreateEvent] company_id invalide (type):", error);
+        throw error;
+      }
+
+      validateUUIDField("company_id (depuis DB)", company_id);
+
+      // Vérifier que company_id n'est PAS "events" ou autre valeur invalide
+      const invalidCompanyIds = ["events", "calendar", "event", "table", "null", "undefined", ""];
+      if (invalidCompanyIds.includes(company_id.toLowerCase())) {
+        const error = new Error(`company_id contient une valeur invalide: "${company_id}". Ce doit être un UUID valide.`);
+        console.error("❌ [useCreateEvent] company_id valeur invalide:", error);
+        throw error;
+      }
 
       // ========================================================================
       // ÉTAPE 3: Valider les données d'entrée
@@ -265,10 +317,34 @@ export const useCreateEvent = () => {
       }
 
       // ========================================================================
-      // ÉTAPE 6: INSERTION
+      // ÉTAPE 6: LOG DE CONTRÔLE TEMPORAIRE (OBLIGATOIRE)
       // ========================================================================
-      console.log("🚀 [useCreateEvent] INSERTION - Envoi à Supabase:", JSON.stringify(insertData, null, 2));
+      console.log("🚀 [useCreateEvent] EVENT PAYLOAD - AVANT INSERTION:", {
+        user_id: insertData.user_id,
+        company_id: insertData.company_id,
+        user_id_type: typeof insertData.user_id,
+        company_id_type: typeof insertData.company_id,
+        user_id_is_events: insertData.user_id === "events",
+        company_id_is_events: insertData.company_id === "events",
+        user_id_length: insertData.user_id?.length,
+        company_id_length: insertData.company_id?.length,
+        full_payload: JSON.stringify(insertData, null, 2),
+      });
 
+      // ⚠️ VÉRIFICATION FINALE ABSOLUE - BLOQUER SI "events" DÉTECTÉ
+      if (insertData.user_id === "events" || insertData.company_id === "events") {
+        const error = new Error(`🚨 ERREUR CRITIQUE : Valeur "events" détectée dans les UUID ! user_id="${insertData.user_id}", company_id="${insertData.company_id}"`);
+        console.error("❌ [useCreateEvent] ERREUR CRITIQUE - Valeur 'events' détectée:", {
+          user_id: insertData.user_id,
+          company_id: insertData.company_id,
+          full_payload: JSON.stringify(insertData, null, 2),
+        });
+        throw error;
+      }
+
+      // ========================================================================
+      // ÉTAPE 7: INSERTION
+      // ========================================================================
       const { data: event, error } = await supabase
         .from("events")
         .insert([insertData])
