@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Mail, UserPlus, Shield, Crown, Users, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
 import { usePermissions } from '@/hooks/usePermissions';
 import { AuditLogHelpers } from '@/services/auditLogService';
