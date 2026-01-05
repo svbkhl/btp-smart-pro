@@ -119,6 +119,15 @@ INSERT INTO public.permissions (key, resource, action, description, category) VA
 ON CONFLICT (key) DO NOTHING;
 
 -- ============================================================================
+-- PERMISSIONS: DELEGATIONS (Délégations temporaires)
+-- ============================================================================
+
+INSERT INTO public.permissions (key, resource, action, description, category) VALUES
+('delegations.read', 'delegations', 'read', 'Voir les délégations temporaires', 'users'),
+('delegations.manage', 'delegations', 'manage', 'Gérer les délégations temporaires', 'users')
+ON CONFLICT (key) DO NOTHING;
+
+-- ============================================================================
 -- PERMISSIONS: AUDIT (Audit logs)
 -- ============================================================================
 

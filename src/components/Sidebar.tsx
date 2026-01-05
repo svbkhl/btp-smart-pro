@@ -21,7 +21,8 @@ import {
   ChevronRight,
   Pin,
   PinOff,
-  ShieldCheck
+  ShieldCheck,
+  UserCog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -127,16 +128,13 @@ const getMenuGroups = (company: ReturnType<typeof useCompany>["data"]): MenuGrou
 };
 
 // Groupe de menu pour les paramètres (toujours visible)
-const settingsMenuGroup: MenuGroup = {
-  items: [
-    { icon: Settings, label: "Paramètres", path: "/settings" },
-  ],
-};
+// Note: Les items admin seront ajoutés dynamiquement selon les permissions
 
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, userRole } = useAuth();
+  const { isOwner, can } = usePermissions();
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
@@ -148,6 +146,26 @@ export default function Sidebar() {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { data: company } = useCompany();
   const menuGroups = getMenuGroups(company);
+
+  // Menu paramètres avec items admin conditionnels
+  const settingsMenuItems: MenuItem[] = [
+    { icon: Settings, label: "Paramètres", path: "/settings" },
+  ];
+
+  // Ajouter les items admin si l'utilisateur a les permissions
+  if (isOwner || can("roles.read")) {
+    settingsMenuItems.push({ icon: ShieldCheck, label: "Rôles", path: "/roles" });
+  }
+  if (isOwner || can("users.read")) {
+    settingsMenuItems.push({ icon: Users, label: "Utilisateurs", path: "/users" });
+  }
+  if (isOwner || can("delegations.manage")) {
+    settingsMenuItems.push({ icon: UserCog, label: "Délégations", path: "/delegations" });
+  }
+
+  const settingsMenuGroup: MenuGroup = {
+    items: settingsMenuItems,
+  };
 
   // Fonction pour vérifier si un chemin est actif
   const isActive = (path: string) => {
