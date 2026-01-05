@@ -30,7 +30,7 @@ export const GoogleCalendarConnection = () => {
     const code = urlParams.get("code");
     const state = urlParams.get("state");
 
-    if (code && state && !isConnecting) {
+    if (code && state && !isConnecting && currentCompanyId) {
       setIsConnecting(true);
       
       try {
@@ -47,13 +47,16 @@ export const GoogleCalendarConnection = () => {
               setIsConnecting(false);
             },
           });
+        } else {
+          console.error("Company ID mismatch in OAuth callback");
+          setIsConnecting(false);
         }
       } catch (error) {
         console.error("Erreur lors du parsing du state:", error);
         setIsConnecting(false);
       }
     }
-  }, [code, state, currentCompanyId, exchangeCode, isConnecting]);
+  }, [currentCompanyId, exchangeCode, isConnecting]);
 
   const handleConnect = async () => {
     try {

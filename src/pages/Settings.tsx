@@ -110,10 +110,6 @@ const Settings = () => {
               <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Emails</span>
             </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">Intégrations</span>
-            </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Bell className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Notifications</span>
@@ -160,6 +156,12 @@ const Settings = () => {
 
           <TabsContent value="email" className="mt-0">
             <EmailSettings />
+          </TabsContent>
+
+          <TabsContent value="integrations" className="mt-0">
+            <div className="space-y-6">
+              <GoogleCalendarConnection />
+            </div>
           </TabsContent>
 
           <TabsContent value="notifications" className="mt-0">
