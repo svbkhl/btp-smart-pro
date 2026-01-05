@@ -307,7 +307,17 @@ export const useCreateEvent = () => {
         throw new Error("Erreur critique : données invalides. Veuillez rafraîchir la page.");
       }
 
-      // Insertion
+      // Log final avant insertion
+      console.log("🔍 [useCreateEvent] Insertion finale:", {
+        user_id: insertData.user_id,
+        company_id: insertData.company_id,
+        user_id_type: typeof insertData.user_id,
+        company_id_type: typeof insertData.company_id,
+        user_id_valid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(insertData.user_id),
+        company_id_valid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(insertData.company_id),
+      });
+
+      // Insertion avec gestion d'erreur détaillée
       const { data: event, error } = await supabase
         .from("events")
         .insert([insertData])
