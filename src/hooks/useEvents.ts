@@ -228,35 +228,26 @@ export const useCreateEvent = () => {
       
       console.log("✅ [useCreateEvent] Événement créé avec succès:", event);
 
-      // Synchroniser avec Google Calendar si connecté
+      // 6️⃣ Synchroniser avec Google Calendar si connecté
+      // ⚠️ La synchronisation se fait via Edge Function Supabase (sécurisée)
+      // ⚠️ Les tokens Google ne sont jamais exposés au front-end
       if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
         try {
+          console.log("🔄 [useCreateEvent] Synchronisation avec Google Calendar...");
           await syncWithGoogle.mutateAsync({
             action: "create",
             eventId: event.id,
           });
           console.log("✅ [useCreateEvent] Événement synchronisé avec Google Calendar");
-        } catch (syncError) {
+        } catch (syncError: any) {
           console.error("⚠️ [useCreateEvent] Erreur synchronisation Google Calendar:", syncError);
-          // Ne pas bloquer la création si la sync échoue
+          // ⚠️ Ne pas bloquer la création si la sync échoue
+          // L'événement est déjà créé dans Supabase, la sync peut être réessayée plus tard
         }
+      } else {
+        console.log("ℹ️ [useCreateEvent] Synchronisation Google Calendar désactivée ou non connecté");
       }
 
-      return event as Event;
-
-      // Synchroniser avec Google Calendar si connecté
-      if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
-        try {
-          await syncWithGoogle.mutateAsync({
-            action: "create",
-            eventId: event.id,
-          });
-          console.log("✅ [useCreateEvent] Événement synchronisé avec Google Calendar");
-        } catch (syncError) {
-          console.error("⚠️ [useCreateEvent] Erreur synchronisation Google Calendar:", syncError);
-          // Ne pas bloquer la création si la sync échoue
-        }
-      }
 
       return event as Event;
     },
