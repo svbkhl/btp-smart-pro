@@ -125,7 +125,13 @@ export const useCreateEvent = () => {
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
-      // 1️⃣ Récupérer l'utilisateur actuel
+      // ============================================================================
+      // ⚠️ SÉCURITÉ : Ne JAMAIS utiliser useParams(), router.query, ou route.params
+      // ⚠️ Les UUID doivent TOUJOURS provenir de supabase.auth.getUser() ou de la DB
+      // ⚠️ Cela empêche l'injection accidentelle de "events" depuis l'URL /events
+      // ============================================================================
+
+      // 1️⃣ Récupérer l'utilisateur actuel depuis Supabase Auth (SEULE SOURCE)
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user || !user.id) {
@@ -134,7 +140,9 @@ export const useCreateEvent = () => {
       
       const userId = user.id;
 
-      // 2️⃣ Récupérer l'id de la société depuis company_users
+      // 2️⃣ Récupérer l'id de la société depuis company_users (SEULE SOURCE)
+      // ⚠️ NE JAMAIS utiliser currentCompanyId depuis useAuth() ou contexte
+      // ⚠️ TOUJOURS récupérer depuis la base de données pour éviter la contamination
       const { data: companyUserData, error: companyError } = await supabase
         .from("company_users")
         .select("company_id")
@@ -148,18 +156,21 @@ export const useCreateEvent = () => {
       
       const companyId = companyUserData.company_id;
 
-      // 3️⃣ Validation des UUIDs
+      // 3️⃣ Validation stricte des UUIDs (RFC 4122 compliant)
+      // ⚠️ Bloque explicitement "events", "calendar", "event", etc.
       if (!isValidUUID(userId)) {
-        throw new Error('user_id invalide');
+        throw new Error(`user_id invalide: "${userId}" (doit être un UUID valide, pas "events" ou autre valeur)`);
       }
       if (!isValidUUID(companyId)) {
-        throw new Error('company_id invalide');
+        throw new Error(`company_id invalide: "${companyId}" (doit être un UUID valide, pas "events" ou autre valeur)`);
       }
 
-      // 4️⃣ Préparer le payload propre
+      // 4️⃣ Préparer le payload propre et sécurisé
+      // ⚠️ Construire le payload avec SEULEMENT les champs autorisés
+      // ⚠️ Tous les UUID sont déjà validés (userId, companyId)
       const payload: Record<string, any> = {
-        user_id: userId,
-        company_id: companyId,
+        user_id: userId,        // ✅ UUID validé depuis auth.getUser()
+        company_id: companyId,  // ✅ UUID validé depuis company_users
         title: data.title.trim(),
         start_date: data.start_date,
         all_day: data.all_day ?? false,
@@ -167,7 +178,7 @@ export const useCreateEvent = () => {
         color: data.color || "#3b82f6",
       };
 
-      // Champs optionnels
+      // Champs optionnels (validation stricte)
       if (data.description && data.description.trim()) {
         payload.description = data.description.trim();
       }
@@ -180,8 +191,13 @@ export const useCreateEvent = () => {
         payload.location = data.location.trim();
       }
       
-      if (data.project_id && isValidUUID(data.project_id)) {
-        payload.project_id = data.project_id;
+      // ⚠️ project_id : validation UUID stricte avant ajout
+      if (data.project_id) {
+        if (isValidUUID(data.project_id)) {
+          payload.project_id = data.project_id;
+        } else {
+          console.warn(`⚠️ [useCreateEvent] project_id invalide ignoré: "${data.project_id}"`);
+        }
       }
       
       if (typeof data.reminder_minutes === 'number' && data.reminder_minutes >= 0) {
@@ -192,9 +208,12 @@ export const useCreateEvent = () => {
         payload.reminder_recurring = data.reminder_recurring;
       }
 
-      console.log('DEBUG EVENT PAYLOAD', payload); // pour vérifier avant l'insertion
+      // ⚠️ DEBUG : Vérifier visuellement que tous les UUID sont corrects
+      console.log('DEBUG EVENT PAYLOAD', payload);
 
-      // 5️⃣ Insert dans Supabase
+      // 5️⃣ Insert sécurisé dans Supabase
+      // ⚠️ Le payload ne contient QUE des UUID validés
+      // ⚠️ Aucune valeur "events" ne peut être injectée
       const { data: event, error } = await supabase
         .from('events')
         .insert([payload])
@@ -203,6 +222,7 @@ export const useCreateEvent = () => {
 
       if (error) {
         console.error('Erreur insertion event:', error);
+        console.error('Payload envoyé:', JSON.stringify(payload, null, 2));
         throw error;
       }
       
@@ -223,21 +243,6 @@ export const useCreateEvent = () => {
       }
 
       return event as Event;
-
-      if (error) {
-        console.error("❌ [useCreateEvent] Erreur insertion Supabase:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          // Log de l'objet envoyé pour debug (payload final nettoyé)
-          payload_sent: JSON.stringify(finalPayload, null, 2),
-          payload_original: JSON.stringify(insertData, null, 2),
-        });
-        throw error;
-      }
-      
-      console.log("✅ [useCreateEvent] Événement créé avec succès:", event);
 
       // Synchroniser avec Google Calendar si connecté
       if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
