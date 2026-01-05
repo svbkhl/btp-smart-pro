@@ -285,6 +285,12 @@ export const useCreateEvent = () => {
         insertData.project_id = data.project_id;
       }
 
+      // Vérifier que company_id est un UUID valide
+      if (!company_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(company_id)) {
+        console.error("❌ [useCreateEvent] company_id invalide:", company_id);
+        throw new Error("Erreur : ID entreprise invalide. Veuillez contacter le support.");
+      }
+
       // Log pour déboguer
       console.log("🔍 [useCreateEvent] Données à insérer:", {
         user_id: insertData.user_id,
@@ -293,6 +299,13 @@ export const useCreateEvent = () => {
         title: insertData.title,
         start_date: insertData.start_date,
       });
+
+      // Vérifier une dernière fois que user_id et company_id sont valides
+      if (insertData.user_id === "events" || insertData.company_id === "events") {
+        console.error("❌ [useCreateEvent] Erreur critique: user_id ou company_id = 'events'");
+        console.error("❌ [useCreateEvent] insertData complet:", JSON.stringify(insertData, null, 2));
+        throw new Error("Erreur critique : données invalides. Veuillez rafraîchir la page.");
+      }
 
       // Insertion
       const { data: event, error } = await supabase

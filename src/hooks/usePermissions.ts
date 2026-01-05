@@ -98,7 +98,6 @@ export function usePermissions(): UsePermissionsReturn {
         .select('role_id, roles(id, slug, name, is_system, color, icon)')
         .eq('user_id', user.id)
         .eq('company_id', currentCompanyId)
-        .eq('status', 'active')
         .single();
 
       if (error) {
