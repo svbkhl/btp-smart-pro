@@ -1,31 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { queryWithTimeout } from "@/utils/queryWithTimeout";
-import { FAKE_EVENTS } from "@/fakeData/calendar";
-import { MOCK_EVENTS } from "@/utils/mockData"; // Pour compatibilité
-import { useAuth } from "./useAuth";
+import { useAuth } from "@/hooks/useAuth";
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 export interface Event {
   id: string;
   user_id: string;
-  project_id?: string;
+  company_id: string;
+  project_id?: string | null;
   title: string;
-  description?: string;
+  description?: string | null;
   start_date: string;
-  end_date?: string;
+  end_date?: string | null;
   all_day: boolean;
-  location?: string;
+  location?: string | null;
   type: "meeting" | "task" | "deadline" | "reminder" | "other";
   color: string;
-  reminder_minutes?: number;
-  reminder_recurring?: boolean;
+  reminder_minutes?: number | null;
+  reminder_recurring?: boolean | null;
   created_at: string;
   updated_at: string;
-  project_name?: string;
 }
 
 export interface CreateEventData {
-  project_id?: string;
   title: string;
   description?: string;
   start_date: string;
@@ -34,6 +34,7 @@ export interface CreateEventData {
   location?: string;
   type?: "meeting" | "task" | "deadline" | "reminder" | "other";
   color?: string;
+  project_id?: string;
   reminder_minutes?: number;
   reminder_recurring?: boolean;
 }
@@ -42,182 +43,82 @@ export interface UpdateEventData extends Partial<CreateEventData> {
   id: string;
 }
 
-// Récupérer tous les événements
+// ============================================================================
+// VALIDATION UUID
+// ============================================================================
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(value: any): boolean {
+  if (!value || typeof value !== 'string') return false;
+  return UUID_REGEX.test(value);
+}
+
+function validateUUIDField(fieldName: string, value: any): void {
+  if (!isValidUUID(value)) {
+    const error = new Error(`Champ ${fieldName} invalide : attendu UUID, reçu "${value}" (type: ${typeof value})`);
+    console.error(`❌ [useEvents] Validation UUID échouée:`, {
+      fieldName,
+      value,
+      valueType: typeof value,
+      valueLength: value?.length,
+    });
+    throw error;
+  }
+}
+
+// ============================================================================
+// HOOKS
+// ============================================================================
+
 export const useEvents = (startDate?: Date, endDate?: Date) => {
+  const { currentCompanyId } = useAuth();
+
   return useQuery({
-    queryKey: ["events", startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ["events", currentCompanyId, startDate, endDate],
     queryFn: async () => {
-      return queryWithTimeout(
-        async () => {
-          // Vérifier que les dates sont valides avant de les utiliser
-          const hasValidDates = startDate && endDate && 
-            startDate instanceof Date && 
-            endDate instanceof Date &&
-            !isNaN(startDate.getTime()) && 
-            !isNaN(endDate.getTime());
+      if (!currentCompanyId) {
+        console.warn("⚠️ [useEvents] Pas de company_id, retour vide");
+        return [];
+      }
 
-          // Construire la requête de base
-          let query = supabase
-            .from("events")
-            .select("*")
-            .order("start_date", { ascending: true });
+      let query = supabase
+        .from("events")
+        .select("*")
+        .eq("company_id", currentCompanyId)
+        .order("start_date", { ascending: true });
 
-          // Appliquer les filtres uniquement si les dates sont valides
-          if (hasValidDates) {
-            const startISO = startDate.toISOString();
-            const endISO = endDate.toISOString();
-            
-            // Vérifier que les dates ne sont pas undefined avant d'appliquer les filtres
-            if (startISO && endISO) {
-              query = query
-                .gte("start_date", startISO)
-                .lte("start_date", endISO);
-            }
-          }
+      if (startDate) {
+        query = query.gte("start_date", startDate.toISOString());
+      }
+      if (endDate) {
+        query = query.lte("start_date", endDate.toISOString());
+      }
 
-          const { data, error } = await query;
+      const { data, error } = await query;
 
-          if (error) {
-            // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
-            // Si fake data activé → retourne FAKE_EVENTS
-            // Si fake data désactivé → retourne []
-            throw error;
-          }
+      if (error) {
+        console.error("❌ [useEvents] Erreur récupération:", error);
+        throw error;
+      }
 
-          // Récupérer les noms de projets séparément si nécessaire
-          const eventsWithProjects = await Promise.all(
-            (data || []).map(async (event: any) => {
-              let project_name: string | undefined;
-              
-              if (event.project_id) {
-                try {
-                  const { data: project } = await supabase
-                    .from("projects")
-                    .select("name")
-                    .eq("id", event.project_id)
-                    .single();
-                  project_name = project?.name;
-                } catch (err) {
-                  // Ignorer les erreurs de récupération du projet
-                  console.warn("Erreur récupération projet:", err);
-                }
-              }
-              
-              return {
-                ...event,
-                project_name,
-              } as Event;
-            })
-          );
-
-          // Retourner les vraies données (même si vide)
-          // queryWithTimeout gère le fallback automatiquement
-          return eventsWithProjects;
-        },
-        FAKE_EVENTS,
-        "useEvents"
-      );
+      return (data || []) as Event[];
     },
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000, // 5 minutes
-    throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
-    refetchInterval: 60000, // Polling automatique toutes les 60s
+    enabled: !!currentCompanyId,
   });
 };
 
-// Récupérer les événements du jour
-export const useTodayEvents = () => {
-  return useQuery({
-    queryKey: ["events", "today"],
-    queryFn: async () => {
-      return queryWithTimeout(
-        async () => {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-
-          // Vérifier que les dates sont valides
-          const todayISO = today.toISOString();
-          const tomorrowISO = tomorrow.toISOString();
-
-          if (!todayISO || !tomorrowISO) {
-            console.error('Invalid date range for today events');
-            return [];
-          }
-
-          const { data, error } = await supabase
-            .from("events")
-            .select("*")
-            .gte("start_date", todayISO)
-            .lt("start_date", tomorrowISO)
-            .order("start_date", { ascending: true });
-
-          if (error) {
-            // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
-            // Si fake data activé → retourne FAKE_EVENTS filtrés
-            // Si fake data désactivé → retourne []
-            throw error;
-          }
-
-          // Récupérer les noms de projets séparément si nécessaire
-          const eventsWithProjects = await Promise.all(
-            (data || []).map(async (event: any) => {
-              let project_name: string | undefined;
-              
-              if (event.project_id) {
-                try {
-                  const { data: project } = await supabase
-                    .from("projects")
-                    .select("name")
-                    .eq("id", event.project_id)
-                    .single();
-                  project_name = project?.name;
-                } catch (err) {
-                  // Ignorer les erreurs de récupération du projet
-                  console.warn("Erreur récupération projet:", err);
-                }
-              }
-              
-              return {
-                ...event,
-                project_name,
-              } as Event;
-            })
-          );
-
-          // Retourner les vraies données (même si vide)
-          // queryWithTimeout gère le fallback automatiquement
-          return eventsWithProjects;
-        },
-        FAKE_EVENTS.filter(e => {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          const eventDate = new Date(e.start_date);
-          return eventDate >= today && eventDate < tomorrow;
-        }),
-        "useTodayEvents"
-      );
-    },
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
-    throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
-    refetchInterval: 60000, // Polling automatique toutes les 60s
-  });
-};
-
-// Créer un événement
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, currentCompanyId } = useAuth();
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
-      // ✅ RÉCUPÉRER L'UTILISATEUR DIRECTEMENT DEPUIS SUPABASE
+      console.log("🔵 [useCreateEvent] DÉBUT - Données reçues:", data);
+
+      // ========================================================================
+      // ÉTAPE 1: Récupérer l'utilisateur authentifié
+      // ========================================================================
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !currentUser) {
@@ -226,98 +127,148 @@ export const useCreateEvent = () => {
       }
 
       const user_id = currentUser.id;
+      console.log("✅ [useCreateEvent] User ID récupéré:", user_id);
 
-      console.log("🔍 [useCreateEvent] User ID récupéré:", {
-        user_id,
-        user_id_type: typeof user_id,
-        user_id_length: user_id?.length,
-      });
+      // Validation UUID user_id
+      validateUUIDField("user_id", user_id);
 
-      // Vérifier que user_id est un UUID valide
-      if (!user_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
-        console.error("❌ [useCreateEvent] user_id invalide:", user_id);
-        throw new Error(`Erreur d'authentification : ID utilisateur invalide. Veuillez vous déconnecter et vous reconnecter.`);
+      // ========================================================================
+      // ÉTAPE 2: Récupérer le company_id
+      // ========================================================================
+      let company_id: string;
+
+      // Essayer d'abord depuis le contexte (plus rapide)
+      if (currentCompanyId && isValidUUID(currentCompanyId)) {
+        company_id = currentCompanyId;
+        console.log("✅ [useCreateEvent] Company ID depuis contexte:", company_id);
+      } else {
+        // Sinon, récupérer depuis company_users
+        const { data: companyUserData, error: companyError } = await supabase
+          .from("company_users")
+          .select("company_id")
+          .eq("user_id", user_id)
+          .single();
+
+        if (companyError || !companyUserData?.company_id) {
+          console.error("❌ [useCreateEvent] Erreur company_id:", companyError);
+          throw new Error("Impossible de récupérer votre entreprise. Veuillez contacter le support.");
+        }
+
+        company_id = companyUserData.company_id;
+        console.log("✅ [useCreateEvent] Company ID depuis DB:", company_id);
       }
 
-      // ✅ RÉCUPÉRER LE company_id depuis company_users
-      const { data: companyUserData, error: companyError } = await supabase
-        .from("company_users")
-        .select("company_id")
-        .eq("user_id", user_id)
-        .single();
+      // Validation UUID company_id
+      validateUUIDField("company_id", company_id);
 
-      if (companyError || !companyUserData?.company_id) {
-        console.error("❌ [useCreateEvent] Erreur company_id:", companyError);
-        throw new Error("Impossible de récupérer votre entreprise. Veuillez contacter le support.");
+      // ========================================================================
+      // ÉTAPE 3: Valider les données d'entrée
+      // ========================================================================
+      if (!data.title || typeof data.title !== 'string' || data.title.trim() === '') {
+        throw new Error('Le titre est requis');
       }
 
-      const company_id = companyUserData.company_id;
-
-      console.log("🔍 [useCreateEvent] Company ID récupéré:", company_id);
-
-      // Vérifier que start_date est présent et valide
       if (!data.start_date || typeof data.start_date !== 'string') {
         throw new Error('La date de début est requise');
       }
 
-      // Construire l'objet d'insertion
-      const insertData: any = {
-        user_id,
-        company_id, // ✅ OBLIGATOIRE pour l'isolation multi-tenant
-        title: data.title,
+      // ========================================================================
+      // ÉTAPE 4: Construire l'objet d'insertion STRICT
+      // ========================================================================
+      const insertData: Record<string, any> = {
+        // UUIDs (OBLIGATOIRES et VALIDÉS)
+        user_id: user_id,
+        company_id: company_id,
+        
+        // Champs obligatoires
+        title: data.title.trim(),
         start_date: data.start_date,
         all_day: data.all_day ?? false,
-        type: data.type ?? "meeting",
-        color: data.color ?? "#3b82f6",
+        
+        // Champs avec valeurs par défaut
+        type: data.type || "meeting",
+        color: data.color || "#3b82f6",
       };
 
-      // Champs optionnels
-      if (data.description) insertData.description = data.description;
-      if (data.end_date) insertData.end_date = data.end_date;
-      if (data.location) insertData.location = data.location;
-      if (data.reminder_minutes !== undefined) insertData.reminder_minutes = data.reminder_minutes;
-      if (data.reminder_recurring !== undefined) insertData.reminder_recurring = data.reminder_recurring;
-      
-      // Valider project_id (doit être UUID ou ne pas être inclus)
-      if (data.project_id && 
-          data.project_id !== "none" && 
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.project_id)) {
-        insertData.project_id = data.project_id;
+      // Champs optionnels (seulement si définis et valides)
+      if (data.description && typeof data.description === 'string' && data.description.trim() !== '') {
+        insertData.description = data.description.trim();
       }
 
-      // Vérifier que company_id est un UUID valide
-      if (!company_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(company_id)) {
-        console.error("❌ [useCreateEvent] company_id invalide:", company_id);
-        throw new Error("Erreur : ID entreprise invalide. Veuillez contacter le support.");
+      if (data.end_date && typeof data.end_date === 'string' && data.end_date.trim() !== '') {
+        insertData.end_date = data.end_date;
       }
 
-      // Log pour déboguer
-      console.log("🔍 [useCreateEvent] Données à insérer:", {
-        user_id: insertData.user_id,
-        company_id: insertData.company_id,
-        project_id: insertData.project_id || "null",
-        title: insertData.title,
-        start_date: insertData.start_date,
+      if (data.location && typeof data.location === 'string' && data.location.trim() !== '') {
+        insertData.location = data.location.trim();
+      }
+
+      if (typeof data.reminder_minutes === 'number' && data.reminder_minutes >= 0) {
+        insertData.reminder_minutes = data.reminder_minutes;
+      }
+
+      if (typeof data.reminder_recurring === 'boolean') {
+        insertData.reminder_recurring = data.reminder_recurring;
+      }
+
+      // project_id (UUID valide uniquement)
+      if (data.project_id) {
+        if (isValidUUID(data.project_id)) {
+          insertData.project_id = data.project_id;
+        } else {
+          console.warn("⚠️ [useCreateEvent] project_id invalide ignoré:", data.project_id);
+        }
+      }
+
+      // ========================================================================
+      // ÉTAPE 5: VALIDATION FINALE STRICTE
+      // ========================================================================
+      console.log("🔍 [useCreateEvent] VALIDATION FINALE - Objet à insérer:", {
+        ...insertData,
+        // Logs détaillés pour chaque champ UUID
+        user_id_info: {
+          value: insertData.user_id,
+          type: typeof insertData.user_id,
+          isValid: isValidUUID(insertData.user_id),
+          length: insertData.user_id?.length,
+        },
+        company_id_info: {
+          value: insertData.company_id,
+          type: typeof insertData.company_id,
+          isValid: isValidUUID(insertData.company_id),
+          length: insertData.company_id?.length,
+        },
+        project_id_info: insertData.project_id ? {
+          value: insertData.project_id,
+          type: typeof insertData.project_id,
+          isValid: isValidUUID(insertData.project_id),
+        } : "non défini",
       });
 
-      // Vérifier une dernière fois que user_id et company_id sont valides
-      if (insertData.user_id === "events" || insertData.company_id === "events") {
-        console.error("❌ [useCreateEvent] Erreur critique: user_id ou company_id = 'events'");
-        console.error("❌ [useCreateEvent] insertData complet:", JSON.stringify(insertData, null, 2));
-        throw new Error("Erreur critique : données invalides. Veuillez rafraîchir la page.");
+      // Vérifier qu'aucun champ UUID ne contient "events" ou autre valeur invalide
+      const invalidValues = ["events", "calendar", "event", "table", "null", "undefined"];
+      for (const [key, value] of Object.entries(insertData)) {
+        if (key.includes('_id') && typeof value === 'string') {
+          if (invalidValues.includes(value.toLowerCase())) {
+            const error = new Error(`Valeur invalide détectée dans ${key}: "${value}". Ce champ doit être un UUID valide.`);
+            console.error("❌ [useCreateEvent] Valeur invalide détectée:", { key, value });
+            throw error;
+          }
+        }
       }
 
-      // Log final avant insertion
-      console.log("🔍 [useCreateEvent] Insertion finale:", {
-        user_id: insertData.user_id,
-        company_id: insertData.company_id,
-        user_id_type: typeof insertData.user_id,
-        company_id_type: typeof insertData.company_id,
-        user_id_valid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(insertData.user_id),
-        company_id_valid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(insertData.company_id),
-      });
+      // Validation finale des UUID
+      validateUUIDField("user_id (final)", insertData.user_id);
+      validateUUIDField("company_id (final)", insertData.company_id);
+      if (insertData.project_id) {
+        validateUUIDField("project_id (final)", insertData.project_id);
+      }
 
-      // Insertion avec gestion d'erreur détaillée
+      // ========================================================================
+      // ÉTAPE 6: INSERTION
+      // ========================================================================
+      console.log("🚀 [useCreateEvent] INSERTION - Envoi à Supabase:", JSON.stringify(insertData, null, 2));
+
       const { data: event, error } = await supabase
         .from("events")
         .insert([insertData])
@@ -325,14 +276,18 @@ export const useCreateEvent = () => {
         .single();
 
       if (error) {
-        console.error("❌ [useCreateEvent] Erreur insertion:", error);
-        console.error("Code:", error.code);
-        console.error("Message:", error.message);
-        console.error("Details:", error.details);
+        console.error("❌ [useCreateEvent] Erreur insertion Supabase:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          // Log de l'objet envoyé pour debug
+          payload_sent: JSON.stringify(insertData, null, 2),
+        });
         throw error;
       }
       
-      console.log("✅ [useCreateEvent] Événement créé:", event);
+      console.log("✅ [useCreateEvent] Événement créé avec succès:", event);
       return event as Event;
     },
     onSuccess: () => {
@@ -341,21 +296,31 @@ export const useCreateEvent = () => {
   });
 };
 
-// Mettre à jour un événement
 export const useUpdateEvent = () => {
   const queryClient = useQueryClient();
+  const { currentCompanyId } = useAuth();
 
   return useMutation({
     mutationFn: async (data: UpdateEventData) => {
       const { id, ...updateData } = data;
+
+      if (!isValidUUID(id)) {
+        throw new Error("ID d'événement invalide");
+      }
+
       const { data: event, error } = await supabase
         .from("events")
         .update(updateData)
         .eq("id", id)
-        .select()
+        .eq("company_id", currentCompanyId || "")
+        .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ [useUpdateEvent] Erreur:", error);
+        throw error;
+      }
+
       return event as Event;
     },
     onSuccess: () => {
@@ -364,19 +329,29 @@ export const useUpdateEvent = () => {
   });
 };
 
-// Supprimer un événement
 export const useDeleteEvent = () => {
   const queryClient = useQueryClient();
+  const { currentCompanyId } = useAuth();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("events").delete().eq("id", id);
+      if (!isValidUUID(id)) {
+        throw new Error("ID d'événement invalide");
+      }
 
-      if (error) throw error;
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", id)
+        .eq("company_id", currentCompanyId || "");
+
+      if (error) {
+        console.error("❌ [useDeleteEvent] Erreur:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 };
-
