@@ -217,41 +217,53 @@ export const useCreateEvent = () => {
 
   return useMutation({
     mutationFn: async (data: CreateEventData) => {
-      // Vérifier que l'utilisateur est connecté
-      if (!user) {
+      // ✅ RÉCUPÉRER L'UTILISATEUR DIRECTEMENT DEPUIS SUPABASE
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser) {
+        console.error("❌ [useCreateEvent] Erreur auth:", authError);
         throw new Error("Vous devez être connecté pour créer un événement");
       }
 
-      // ✅ UTILISER DIRECTEMENT user.id depuis useAuth() au lieu de supabase.auth.getUser()
-      // Cela évite les problèmes de session corrompue
-      const user_id = user.id;
+      const user_id = currentUser.id;
 
-      console.log("🔍 [useCreateEvent] Utilisation de user.id depuis useAuth():", {
+      console.log("🔍 [useCreateEvent] User ID récupéré:", {
         user_id,
         user_id_type: typeof user_id,
         user_id_length: user_id?.length,
       });
 
-      if (!user_id) {
-        console.error("❌ [useCreateEvent] user.id est vide:", user);
-        throw new Error("Impossible de récupérer l'ID utilisateur");
+      // Vérifier que user_id est un UUID valide
+      if (!user_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
+        console.error("❌ [useCreateEvent] user_id invalide:", user_id);
+        throw new Error(`Erreur d'authentification : ID utilisateur invalide. Veuillez vous déconnecter et vous reconnecter.`);
       }
 
-      // Vérifier que user_id est un UUID valide
-      if (user_id === "events" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
-        console.error("❌ [useCreateEvent] user_id invalide:", user_id);
-        console.error("❌ [useCreateEvent] user complet:", user);
-        throw new Error(`Erreur d'authentification : ID utilisateur invalide (${user_id}). Veuillez vous déconnecter et vous reconnecter.`);
+      // ✅ RÉCUPÉRER LE company_id depuis company_users
+      const { data: companyUserData, error: companyError } = await supabase
+        .from("company_users")
+        .select("company_id")
+        .eq("user_id", user_id)
+        .single();
+
+      if (companyError || !companyUserData?.company_id) {
+        console.error("❌ [useCreateEvent] Erreur company_id:", companyError);
+        throw new Error("Impossible de récupérer votre entreprise. Veuillez contacter le support.");
       }
+
+      const company_id = companyUserData.company_id;
+
+      console.log("🔍 [useCreateEvent] Company ID récupéré:", company_id);
 
       // Vérifier que start_date est présent et valide
       if (!data.start_date || typeof data.start_date !== 'string') {
-        throw new Error('start_date is required and must be a valid ISO string');
+        throw new Error('La date de début est requise');
       }
 
-      // Construire l'objet d'insertion - NE JAMAIS inclure 'id' ou utiliser .eq() sur un insert
+      // Construire l'objet d'insertion
       const insertData: any = {
-        user_id: user_id, // ✅ OBLIGATOIRE : Inclure le user_id
+        user_id,
+        company_id, // ✅ OBLIGATOIRE pour l'isolation multi-tenant
         title: data.title,
         start_date: data.start_date,
         all_day: data.all_day ?? false,
@@ -276,18 +288,18 @@ export const useCreateEvent = () => {
       // Log pour déboguer
       console.log("🔍 [useCreateEvent] Données à insérer:", {
         user_id: insertData.user_id,
+        company_id: insertData.company_id,
         project_id: insertData.project_id || "null",
         title: insertData.title,
         start_date: insertData.start_date,
       });
 
-      // ⚠️ IMPORTANT : Insertion simple sans aucun filtre .eq()
-      // Ne jamais utiliser .eq("id", ...) ou tout autre filtre lors d'un insert
+      // Insertion
       const { data: event, error } = await supabase
         .from("events")
-        .insert([insertData]) // ✅ Utiliser un tableau
-        .select("*") // ✅ Sélectionner toutes les colonnes retournées
-        .single(); // ✅ Retourner un seul objet
+        .insert([insertData])
+        .select("*")
+        .single();
 
       if (error) {
         console.error("❌ [useCreateEvent] Erreur insertion:", error);
