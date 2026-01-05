@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useGoogleCalendarConnection, useSyncEventWithGoogle } from "@/hooks/useGoogleCalendar";
 
 // ============================================================================
 // TYPES
@@ -421,6 +422,21 @@ export const useCreateEvent = () => {
       }
       
       console.log("✅ [useCreateEvent] Événement créé avec succès:", event);
+
+      // Synchroniser avec Google Calendar si connecté
+      if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
+        try {
+          await syncWithGoogle.mutateAsync({
+            action: "create",
+            eventId: event.id,
+          });
+          console.log("✅ [useCreateEvent] Événement synchronisé avec Google Calendar");
+        } catch (syncError) {
+          console.error("⚠️ [useCreateEvent] Erreur synchronisation Google Calendar:", syncError);
+          // Ne pas bloquer la création si la sync échoue
+        }
+      }
+
       return event as Event;
     },
     onSuccess: () => {
@@ -454,6 +470,20 @@ export const useUpdateEvent = () => {
         throw error;
       }
 
+      // Synchroniser avec Google Calendar si connecté
+      if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
+        try {
+          await syncWithGoogle.mutateAsync({
+            action: "update",
+            eventId: id,
+          });
+          console.log("✅ [useUpdateEvent] Événement synchronisé avec Google Calendar");
+        } catch (syncError) {
+          console.error("⚠️ [useUpdateEvent] Erreur synchronisation Google Calendar:", syncError);
+          // Ne pas bloquer la mise à jour si la sync échoue
+        }
+      }
+
       return event as Event;
     },
     onSuccess: () => {
@@ -481,6 +511,20 @@ export const useDeleteEvent = () => {
       if (error) {
         console.error("❌ [useDeleteEvent] Erreur:", error);
         throw error;
+      }
+
+      // Synchroniser avec Google Calendar si connecté
+      if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
+        try {
+          await syncWithGoogle.mutateAsync({
+            action: "delete",
+            eventId: id,
+          });
+          console.log("✅ [useDeleteEvent] Événement supprimé de Google Calendar");
+        } catch (syncError) {
+          console.error("⚠️ [useDeleteEvent] Erreur synchronisation Google Calendar:", syncError);
+          // Ne pas bloquer la suppression si la sync échoue
+        }
       }
     },
     onSuccess: () => {
