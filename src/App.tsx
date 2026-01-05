@@ -53,6 +53,10 @@ import AcceptInvitation from './pages/AcceptInvitation';
 import StripeCallback from './pages/StripeCallback';
 import NotFound from './pages/NotFound';
 
+// Pages RBAC (Gestion des rôles et utilisateurs)
+import { RolesManagementGuarded } from './pages/RolesManagement';
+import { UsersManagementRBACGuarded } from './pages/UsersManagementRBAC';
+
 function App() {
   const { user } = useAuth();
   const location = useLocation();
@@ -307,6 +311,24 @@ function App() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminCompanies />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Routes RBAC - Gestion des rôles et utilisateurs */}
+        <Route
+          path="/roles"
+          element={
+            <ProtectedRoute>
+              <RolesManagementGuarded />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute>
+              <UsersManagementRBACGuarded />
             </ProtectedRoute>
           }
         />
