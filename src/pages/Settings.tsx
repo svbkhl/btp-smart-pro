@@ -22,9 +22,12 @@ import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminContactRequests from "@/pages/AdminContactRequests";
+import DelegationsManagement from "@/pages/DelegationsManagement";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const Settings = () => {
   const { user, isAdmin, userRole } = useAuth();
+  const { isOwner, can } = usePermissions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -33,14 +36,16 @@ const Settings = () => {
   const defaultTab = tabFromUrl || "company";
   
   // Compter le nombre d'onglets (ajuster selon si admin)
-          const isAdministrator = userRole === 'admin' || isAdmin;
+  const isAdministrator = userRole === 'admin' || isAdmin;
+  const canManageDelegations = isOwner || can("delegations.manage");
   
   // Ajuster le nombre de colonnes selon les onglets
+  // company, companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (si admin), stripe, email, integrations, notifications, security
   const tabCount = isAdministrator 
-    ? 10 // company, companies, contact-requests, users, roles, admin-company, demo, stripe, email, integrations, notifications, security
+    ? (canManageDelegations ? 13 : 12) // +1 si delegations
     : isAdmin
-    ? 8 // company, companies, contact-requests, users, roles, admin-company, stripe, email, integrations, notifications, security
-    : 6; // company, stripe, email, integrations, notifications, security
+    ? (canManageDelegations ? 10 : 9) // +1 si delegations
+    : 7; // company, stripe, email, integrations, notifications, security
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -61,13 +66,7 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className={`grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto ${
-            isAdministrator 
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-12" 
-              : isAdmin
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-8"
-              : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
-          }`}>
+          <TabsList className="grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
             <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Entreprise</span>
@@ -138,6 +137,11 @@ const Settings = () => {
               <TabsContent value="roles" className="mt-0">
                 <RolesAndPermissionsSettings />
               </TabsContent>
+              {canManageDelegations && (
+                <TabsContent value="delegations" className="mt-0">
+                  <DelegationsManagement />
+                </TabsContent>
+              )}
               <TabsContent value="admin-company" className="mt-0">
                 <AdminCompanySettings />
               </TabsContent>

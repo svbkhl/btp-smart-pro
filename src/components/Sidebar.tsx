@@ -148,24 +148,11 @@ export default function Sidebar() {
   const { data: company } = useCompany();
   const menuGroups = getMenuGroups(company);
 
-  // Menu paramètres avec items admin conditionnels
-  const settingsMenuItems: MenuItem[] = [
-    { icon: Settings, label: "Paramètres", path: "/settings" },
-  ];
-
-  // Ajouter les items admin si l'utilisateur a les permissions
-  if (isOwner || can("roles.read")) {
-    settingsMenuItems.push({ icon: ShieldCheck, label: "Rôles", path: "/roles" });
-  }
-  if (isOwner || can("users.read")) {
-    settingsMenuItems.push({ icon: Users, label: "Utilisateurs", path: "/users" });
-  }
-  if (isOwner || can("delegations.manage")) {
-    settingsMenuItems.push({ icon: UserCog, label: "Délégations", path: "/delegations" });
-  }
-
+  // Menu paramètres (uniquement le lien vers Settings)
   const settingsMenuGroup: MenuGroup = {
-    items: settingsMenuItems,
+    items: [
+      { icon: Settings, label: "Paramètres", path: "/settings" },
+    ],
   };
 
   // Fonction pour vérifier si un chemin est actif
