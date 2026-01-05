@@ -401,11 +401,91 @@ export const useCreateEvent = () => {
       }
 
       // ========================================================================
-      // ÉTAPE 7: INSERTION
+      // ÉTAPE 7: LOG ULTRA-DÉTAILLÉ AVANT INSERTION (TRACE ABSOLUE)
       // ========================================================================
+      console.log("🚨 [TRACE ABSOLUE] PAYLOAD FINAL AVANT INSERTION SUPABASE:", {
+        payload_complet: insertData,
+        payload_stringified: JSON.stringify(insertData, null, 2),
+        payload_keys: Object.keys(insertData),
+        payload_values: Object.values(insertData),
+        verification_uuid_fields: {
+          user_id: {
+            value: insertData.user_id,
+            isUUID: isValidUUID(insertData.user_id),
+            isEvents: insertData.user_id === "events",
+            type: typeof insertData.user_id,
+          },
+          company_id: {
+            value: insertData.company_id,
+            isUUID: isValidUUID(insertData.company_id),
+            isEvents: insertData.company_id === "events",
+            type: typeof insertData.company_id,
+          },
+          project_id: insertData.project_id ? {
+            value: insertData.project_id,
+            isUUID: isValidUUID(insertData.project_id),
+            isEvents: insertData.project_id === "events",
+            type: typeof insertData.project_id,
+          } : null,
+        },
+        // Vérifier chaque valeur individuellement
+        toutes_les_valeurs: Object.entries(insertData).map(([key, value]) => ({
+          key,
+          value: String(value),
+          type: typeof value,
+          isEvents: String(value) === "events",
+          containsEvents: String(value).toLowerCase().includes("events"),
+        })),
+      });
+
+      // ⚠️ VÉRIFICATION FINALE ABSOLUE - BLOQUER TOUT CHAMP UUID INVALIDE
+      const uuidFields = ['user_id', 'company_id', 'project_id', 'id', 'created_by', 'calendar_id'];
+      for (const field of uuidFields) {
+        if (field in insertData && insertData[field] !== null && insertData[field] !== undefined) {
+          const value = insertData[field];
+          if (typeof value === 'string') {
+            // Vérifier que ce n'est pas "events" ou autre valeur invalide
+            if (value.toLowerCase() === "events" || value.toLowerCase() === "calendar" || value.toLowerCase() === "event") {
+              const error = new Error(`🚨 ERREUR CRITIQUE : Le champ ${field} contient la valeur invalide "${value}". Insertion BLOQUÉE.`);
+              console.error("❌ [useCreateEvent] ERREUR CRITIQUE - Champ UUID invalide:", {
+                field,
+                value,
+                full_payload: JSON.stringify(insertData, null, 2),
+              });
+              throw error;
+            }
+            // Vérifier que c'est un UUID valide
+            if (!isValidUUID(value)) {
+              const error = new Error(`🚨 ERREUR CRITIQUE : Le champ ${field} n'est pas un UUID valide : "${value}". Insertion BLOQUÉE.`);
+              console.error("❌ [useCreateEvent] ERREUR CRITIQUE - Champ UUID invalide:", {
+                field,
+                value,
+                full_payload: JSON.stringify(insertData, null, 2),
+              });
+              throw error;
+            }
+          }
+        }
+      }
+
+      // ========================================================================
+      // ÉTAPE 8: INSERTION STRICTE (SANS CHAMP id)
+      // ========================================================================
+      // ⚠️ S'ASSURER QU'AUCUN CHAMP id N'EST ENVOYÉ (auto-généré par PostgreSQL)
+      const finalPayload = { ...insertData };
+      delete finalPayload.id; // Supprimer id si présent (ne doit jamais être envoyé)
+      delete finalPayload.created_by; // Supprimer created_by si présent (non utilisé)
+      delete finalPayload.calendar_id; // Supprimer calendar_id si présent (non utilisé)
+
+      console.log("🚨 [TRACE ABSOLUE] PAYLOAD FINAL NETTOYÉ:", {
+        payload_final: finalPayload,
+        payload_stringified: JSON.stringify(finalPayload, null, 2),
+        champs_supprimes: ['id', 'created_by', 'calendar_id'].filter(f => f in insertData),
+      });
+
       const { data: event, error } = await supabase
         .from("events")
-        .insert([insertData])
+        .insert([finalPayload])
         .select("*")
         .single();
 
