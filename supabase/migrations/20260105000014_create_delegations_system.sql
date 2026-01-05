@@ -52,9 +52,9 @@ CREATE INDEX idx_delegations_ends_at ON public.delegations(ends_at);
 CREATE INDEX idx_delegations_active ON public.delegations(company_id, to_user_id, ends_at, revoked_at)
   WHERE revoked_at IS NULL;
 
--- Index composite pour requêtes fréquentes
+-- Index composite pour requêtes fréquentes (sans now() car pas IMMUTABLE)
 CREATE INDEX idx_delegations_active_user ON public.delegations(to_user_id, company_id, ends_at, revoked_at)
-  WHERE revoked_at IS NULL AND ends_at > now();
+  WHERE revoked_at IS NULL;
 
 -- ============================================================================
 -- 3) TRIGGER: Auto-update updated_at
