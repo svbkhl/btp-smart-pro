@@ -33,6 +33,9 @@ import {
   Plus,
   Download,
 } from "lucide-react";
+import { useSyncPlanningWithGoogle } from "@/hooks/usePlanningSync";
+import { useGoogleCalendarConnection } from "@/hooks/useGoogleCalendar";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
@@ -73,10 +76,12 @@ interface Assignment {
 const JOURS_SEMAINE = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
 
 const EmployeesPlanning = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, currentCompanyId } = useAuth();
   const { toast } = useToast();
   const { fakeDataEnabled } = useFakeDataStore();
   const { data: settings } = useUserSettings();
+  const { data: googleConnection } = useGoogleCalendarConnection();
+  const syncPlanning = useSyncPlanningWithGoogle();
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -272,6 +277,8 @@ const EmployeesPlanning = () => {
     }
 
     try {
+      let assignmentId: string;
+
       if (editDialog.assignment) {
         // Mise à jour
         const { error } = await supabase
@@ -285,9 +292,10 @@ const EmployeesPlanning = () => {
           .eq("id", editDialog.assignment.id);
 
         if (error) throw error;
+        assignmentId = editDialog.assignment.id;
       } else {
         // Création
-        const { error } = await supabase.from("employee_assignments").insert({
+        const { data: newAssignment, error } = await supabase.from("employee_assignments").insert({
           employee_id: editDialog.employeeId,
           project_id: editForm.project_id,
           jour: editDialog.jour!,
@@ -295,9 +303,24 @@ const EmployeesPlanning = () => {
           heures: editForm.heures,
           heure_debut: editForm.heure_debut,
           heure_fin: editForm.heure_fin,
-        });
+          company_id: currentCompanyId, // Ajouter company_id
+        }).select("id").single();
 
         if (error) throw error;
+        assignmentId = newAssignment.id;
+      }
+
+      // Synchroniser avec Google Calendar si connecté et activé
+      if (googleConnection && googleConnection.sync_planning_enabled && assignmentId) {
+        try {
+          await syncPlanning.mutateAsync({
+            assignment_id: assignmentId,
+            action: editDialog.assignment ? "update" : "create",
+          });
+        } catch (syncError) {
+          console.error("Erreur synchronisation Google Calendar:", syncError);
+          // Ne pas bloquer l'utilisateur si la sync échoue
+        }
       }
 
       toast({
@@ -326,6 +349,24 @@ const EmployeesPlanning = () => {
         .eq("id", assignmentId);
 
       if (error) throw error;
+
+      // Synchroniser avec Google Calendar si connecté et sync planning activée
+      if (
+        googleConnection &&
+        googleConnection.enabled &&
+        googleConnection.sync_planning_enabled &&
+        googleConnection.sync_direction !== "google_to_app"
+      ) {
+        try {
+          await syncPlanning.mutateAsync({
+            action: "delete",
+            assignmentId,
+          });
+        } catch (syncError: any) {
+          console.error("⚠️ [deleteAssignment] Erreur synchronisation Google Calendar:", syncError);
+          // Ne pas bloquer l'opération si la sync échoue
+        }
+      }
 
       toast({
         title: "Succès",

@@ -12,11 +12,13 @@ import { useAuth } from "@/hooks/useAuth";
 
 export interface GoogleCalendarConnection {
   id: string;
-  user_id: string;
   company_id: string;
+  owner_user_id: string;
   google_email: string;
   calendar_id: string;
+  calendar_name: string;
   sync_direction: "app_to_google" | "bidirectional" | "google_to_app";
+  sync_planning_enabled: boolean;
   enabled: boolean;
   expires_at: string;
   last_sync_at: string | null;
@@ -29,22 +31,21 @@ export interface GoogleCalendarConnection {
 // ============================================================================
 
 /**
- * Récupère la connexion Google Calendar active de l'utilisateur
+ * Récupère la connexion Google Calendar active de l'entreprise
  */
 export const useGoogleCalendarConnection = () => {
-  const { user, currentCompanyId } = useAuth();
+  const { currentCompanyId } = useAuth();
 
   return useQuery({
-    queryKey: ["google_calendar_connection", user?.id, currentCompanyId],
+    queryKey: ["google_calendar_connection", currentCompanyId],
     queryFn: async () => {
-      if (!user?.id || !currentCompanyId) {
+      if (!currentCompanyId) {
         return null;
       }
 
       const { data, error } = await supabase
         .from("google_calendar_connections")
         .select("*")
-        .eq("user_id", user.id)
         .eq("company_id", currentCompanyId)
         .eq("enabled", true)
         .maybeSingle();
@@ -56,7 +57,7 @@ export const useGoogleCalendarConnection = () => {
 
       return data as GoogleCalendarConnection | null;
     },
-    enabled: !!user?.id && !!currentCompanyId,
+    enabled: !!currentCompanyId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -73,8 +74,8 @@ export const useGetGoogleAuthUrl = () => {
         throw new Error("Company ID manquant");
       }
 
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth", {
-        body: { action: "get_auth_url", company_id: currentCompanyId },
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise", {
+        body: { action: "get_auth_url" },
       });
 
       if (error) {
@@ -100,8 +101,8 @@ export const useExchangeGoogleCode = () => {
         throw new Error("Company ID manquant");
       }
 
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth", {
-        body: { action: "exchange_code", code, company_id: currentCompanyId },
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise", {
+        body: { action: "exchange_code", code },
       });
 
       if (error) {
@@ -125,7 +126,7 @@ export const useDisconnectGoogleCalendar = () => {
 
   return useMutation({
     mutationFn: async (connectionId: string) => {
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth", {
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise", {
         body: { action: "disconnect", connection_id: connectionId },
       });
 
@@ -160,11 +161,12 @@ export const useSyncEventWithGoogle = () => {
         throw new Error("Company ID manquant");
       }
 
-      const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
+      const { data, error } = await supabase.functions.invoke("google-calendar-sync-entreprise", {
         body: {
           action,
           event_id: eventId,
           company_id: currentCompanyId,
+          event_type: "event",
         },
       });
 

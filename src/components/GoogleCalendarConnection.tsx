@@ -12,11 +12,13 @@ import {
   useExchangeGoogleCode,
   useDisconnectGoogleCalendar 
 } from "@/hooks/useGoogleCalendar";
-import { Calendar, CheckCircle2, XCircle, Loader2, ExternalLink } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, Loader2, ExternalLink, Crown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export const GoogleCalendarConnection = () => {
   const { currentCompanyId } = useAuth();
+  const { isOwner } = usePermissions();
   const { data: connection, isLoading } = useGoogleCalendarConnection();
   const getAuthUrl = useGetGoogleAuthUrl();
   const exchangeCode = useExchangeGoogleCode();
@@ -107,7 +109,10 @@ export const GoogleCalendarConnection = () => {
           )}
         </div>
         <CardDescription>
-          Synchronisez vos événements avec votre calendrier Google personnel
+          {isOwner 
+            ? "Connectez Google Calendar pour synchroniser les événements et plannings de l'entreprise"
+            : "Seul le propriétaire de l'entreprise peut connecter Google Calendar"
+          }
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -170,26 +175,38 @@ export const GoogleCalendarConnection = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Connectez votre compte Google Calendar pour synchroniser automatiquement vos événements.
-            </p>
-            <Button
-              onClick={handleConnect}
-              disabled={getAuthUrl.isPending || isConnecting}
-              className="w-full"
-            >
-              {getAuthUrl.isPending || isConnecting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Connexion en cours...
-                </>
-              ) : (
-                <>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Connecter Google Calendar
-                </>
-              )}
-            </Button>
+            {isOwner ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Connectez Google Calendar pour créer un calendrier dédié à votre entreprise.
+                  Les événements et plannings seront automatiquement synchronisés.
+                </p>
+                <Button
+                  onClick={handleConnect}
+                  disabled={getAuthUrl.isPending || isConnecting}
+                  className="w-full"
+                >
+                  {getAuthUrl.isPending || isConnecting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Connexion en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Connecter Google Calendar
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <Crown className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Seul le propriétaire de l'entreprise peut connecter Google Calendar.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

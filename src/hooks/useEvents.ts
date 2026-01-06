@@ -261,7 +261,7 @@ export const useCreateEvent = () => {
       
       console.log("✅ [useCreateEvent] Événement créé avec succès:", event);
 
-      // 6️⃣ Synchroniser avec Google Calendar si connecté
+      // 6️⃣ Synchroniser avec Google Calendar si connecté (niveau entreprise)
       // ⚠️ La synchronisation se fait via Edge Function Supabase (sécurisée)
       // ⚠️ Les tokens Google ne sont jamais exposés au front-end
       if (googleConnection && googleConnection.enabled && googleConnection.sync_direction !== "google_to_app") {
