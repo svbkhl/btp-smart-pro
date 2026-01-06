@@ -15,6 +15,32 @@
 ALTER TABLE public.google_calendar_connections 
 DROP CONSTRAINT IF EXISTS google_calendar_connections_user_id_company_id_key;
 
+-- Supprimer l'ancienne contrainte UNIQUE(company_id) si elle existe
+ALTER TABLE public.google_calendar_connections 
+DROP CONSTRAINT IF EXISTS google_calendar_connections_company_id_unique;
+
+-- Nettoyer les doublons : garder seulement la connexion la plus récente par entreprise
+DO $$
+DECLARE
+  dup_record RECORD;
+BEGIN
+  -- Supprimer les doublons en gardant le plus récent
+  FOR dup_record IN 
+    SELECT company_id, array_agg(id ORDER BY created_at DESC) as ids
+    FROM public.google_calendar_connections
+    WHERE company_id IS NOT NULL
+    GROUP BY company_id
+    HAVING COUNT(*) > 1
+  LOOP
+    -- Supprimer tous sauf le premier (le plus récent)
+    DELETE FROM public.google_calendar_connections
+    WHERE company_id = dup_record.company_id
+    AND id != dup_record.ids[1];
+    
+    RAISE NOTICE '✅ Doublons supprimés pour company_id: %', dup_record.company_id;
+  END LOOP;
+END $$;
+
 -- Ajouter colonne pour identifier le propriétaire (patron qui a connecté)
 DO $$
 BEGIN
@@ -30,9 +56,20 @@ BEGIN
 END $$;
 
 -- Modifier la contrainte UNIQUE pour être par entreprise uniquement
-ALTER TABLE public.google_calendar_connections 
-ADD CONSTRAINT google_calendar_connections_company_id_unique 
-UNIQUE(company_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'google_calendar_connections_company_id_unique'
+  ) THEN
+    ALTER TABLE public.google_calendar_connections 
+    ADD CONSTRAINT google_calendar_connections_company_id_unique 
+    UNIQUE(company_id);
+    RAISE NOTICE '✅ Contrainte UNIQUE(company_id) ajoutée';
+  ELSE
+    RAISE NOTICE '✅ Contrainte UNIQUE(company_id) existe déjà';
+  END IF;
+END $$;
 
 -- Ajouter colonne pour le nom du calendrier Google créé
 DO $$
@@ -157,7 +194,7 @@ BEGIN
     AND table_name = 'employee_assignments' 
     AND column_name = 'company_id'
   ) THEN
-    -- Ajouter la colonne company_id
+    -- Ajouter la colonne company_id (nullable d'abord)
     ALTER TABLE public.employee_assignments ADD COLUMN company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE;
     
     -- Migrer les données existantes depuis employees
@@ -165,10 +202,28 @@ BEGIN
     SET company_id = e.company_id
     FROM public.employees e
     WHERE ea.employee_id = e.id
-    AND ea.company_id IS NULL;
+    AND ea.company_id IS NULL
+    AND e.company_id IS NOT NULL;
     
-    -- Rendre la colonne NOT NULL après migration
-    ALTER TABLE public.employee_assignments ALTER COLUMN company_id SET NOT NULL;
+    -- Si certains assignments n'ont toujours pas de company_id, essayer via projects
+    UPDATE public.employee_assignments ea
+    SET company_id = p.company_id
+    FROM public.projects p
+    WHERE ea.project_id = p.id
+    AND ea.company_id IS NULL
+    AND p.company_id IS NOT NULL;
+    
+    -- Vérifier s'il reste des assignments sans company_id
+    IF EXISTS (
+      SELECT 1 FROM public.employee_assignments WHERE company_id IS NULL
+    ) THEN
+      RAISE WARNING '⚠️ Certains employee_assignments n''ont pas de company_id (employee ou project sans company_id)';
+      -- Ne pas rendre NOT NULL si des données sont NULL
+    ELSE
+      -- Rendre la colonne NOT NULL après migration complète
+      ALTER TABLE public.employee_assignments ALTER COLUMN company_id SET NOT NULL;
+      RAISE NOTICE '✅ Colonne company_id ajoutée et rendue NOT NULL à employee_assignments';
+    END IF;
     
     RAISE NOTICE '✅ Colonne company_id ajoutée à employee_assignments';
   END IF;
