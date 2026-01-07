@@ -1,0 +1,40 @@
+# Commandes pour Pousser vers GitHub
+
+## Si vous avez un Personal Access Token GitHub
+
+```bash
+cd "/Users/sabrikhalfallah/Downloads/BTP SMART PRO"
+git push https://VOTRE_TOKEN@github.com/svbkhl/btp-smart-pro.git main
+```
+
+**Remplacez `VOTRE_TOKEN`** par votre Personal Access Token GitHub.
+
+---
+
+## Pour créer un Personal Access Token
+
+1. Allez sur : https://github.com/settings/tokens
+2. Cliquez sur "Generate new token (classic)"
+3. Donnez un nom : `Vercel Deploy`
+4. Cochez `repo` (toutes les cases)
+5. Cliquez sur "Generate token"
+6. **COPIEZ LE TOKEN** (vous ne le reverrez plus !)
+
+---
+
+## Exemple de commande
+
+```bash
+git push https://ghp_xxxxxxxxxxxxxxxxxxxx@github.com/svbkhl/btp-smart-pro.git main
+```
+
+---
+
+## Après le push
+
+Vercel va automatiquement :
+- ✅ Détecter le push
+- ✅ Builder le projet
+- ✅ Déployer en production
+
+**Temps** : 2-3 minutes

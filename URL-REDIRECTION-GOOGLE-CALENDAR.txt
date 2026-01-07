@@ -1,0 +1,3 @@
+https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-oauth-entreprise-pkce
+
+

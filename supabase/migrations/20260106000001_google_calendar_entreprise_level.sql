@@ -118,7 +118,7 @@ DROP POLICY IF EXISTS "Users can delete their own google calendar connections" O
 CREATE POLICY "Owners can view company google calendar connection"
 ON public.google_calendar_connections FOR SELECT
 USING (
-  company_id = public.current_company_id()
+  google_calendar_connections.company_id = public.current_company_id()
   AND EXISTS (
     SELECT 1 FROM public.company_users cu
     JOIN public.roles r ON cu.role_id = r.id
@@ -132,13 +132,13 @@ USING (
 CREATE POLICY "Owners can create company google calendar connection"
 ON public.google_calendar_connections FOR INSERT
 WITH CHECK (
-  company_id = public.current_company_id()
-  AND owner_user_id = auth.uid()
+  google_calendar_connections.company_id = public.current_company_id()
+  AND google_calendar_connections.owner_user_id = auth.uid()
   AND EXISTS (
     SELECT 1 FROM public.company_users cu
     JOIN public.roles r ON cu.role_id = r.id
     WHERE cu.user_id = auth.uid()
-    AND cu.company_id = company_id
+    AND cu.company_id = google_calendar_connections.company_id
     AND r.slug = 'owner'
   )
 );
@@ -147,7 +147,7 @@ WITH CHECK (
 CREATE POLICY "Owners can update company google calendar connection"
 ON public.google_calendar_connections FOR UPDATE
 USING (
-  company_id = public.current_company_id()
+  google_calendar_connections.company_id = public.current_company_id()
   AND EXISTS (
     SELECT 1 FROM public.company_users cu
     JOIN public.roles r ON cu.role_id = r.id
@@ -157,12 +157,12 @@ USING (
   )
 )
 WITH CHECK (
-  company_id = public.current_company_id()
+  google_calendar_connections.company_id = public.current_company_id()
   AND EXISTS (
     SELECT 1 FROM public.company_users cu
     JOIN public.roles r ON cu.role_id = r.id
     WHERE cu.user_id = auth.uid()
-    AND cu.company_id = company_id
+    AND cu.company_id = google_calendar_connections.company_id
     AND r.slug = 'owner'
   )
 );
@@ -171,7 +171,7 @@ WITH CHECK (
 CREATE POLICY "Owners can delete company google calendar connection"
 ON public.google_calendar_connections FOR DELETE
 USING (
-  company_id = public.current_company_id()
+  google_calendar_connections.company_id = public.current_company_id()
   AND EXISTS (
     SELECT 1 FROM public.company_users cu
     JOIN public.roles r ON cu.role_id = r.id

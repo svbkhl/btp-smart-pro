@@ -29,13 +29,28 @@ interface GoogleEvent {
 }
 
 serve(async (req) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+  // Headers CORS complets
+  const origin = req.headers.get("Origin");
+  const allowedOrigins = [
+    "https://btpsmartpro.com",
+    "https://www.btpsmartpro.com",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ];
+  
+  const corsHeaders: Record<string, string> = {
+    "Access-Control-Allow-Origin": allowedOrigins.includes(origin || "") ? origin! : "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Max-Age": "86400",
   };
 
+  // Gérer les requêtes OPTIONS (preflight)
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -86,9 +101,21 @@ serve(async (req) => {
       );
     }
 
-    // Vérifier si le token est expiré et le rafraîchir si nécessaire
+    // Vérifier si le token est expiré ou va expirer dans les 5 prochaines minutes
+    // et le rafraîchir si nécessaire
     let accessToken = connection.access_token;
-    if (new Date(connection.expires_at) <= new Date()) {
+    const expiresAt = new Date(connection.expires_at);
+    const now = new Date();
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
+    if (expiresAt <= fiveMinutesFromNow) {
+      if (!connection.refresh_token) {
+        return new Response(
+          JSON.stringify({ error: "Token expired and no refresh token available" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: {
@@ -111,8 +138,16 @@ serve(async (req) => {
           .update({
             access_token: newTokens.access_token,
             expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
           })
           .eq("id", connection.id);
+      } else {
+        const error = await refreshResponse.text();
+        console.error("Google token refresh error:", error);
+        return new Response(
+          JSON.stringify({ error: "Failed to refresh token", details: error }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
 

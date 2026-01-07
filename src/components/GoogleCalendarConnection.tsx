@@ -37,7 +37,9 @@ export const GoogleCalendarConnection = () => {
     try {
       // Appeler google-calendar-oauth et rediriger vers data.url
       const authUrl = await getAuthUrl.mutateAsync();
-      window.location.href = authUrl;
+      if (typeof window !== "undefined") {
+        window.location.href = authUrl;
+      }
     } catch (error) {
       console.error("Erreur lors de la connexion:", error);
     }
@@ -139,7 +141,11 @@ export const GoogleCalendarConnection = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open("https://calendar.google.com", "_blank")}
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.open("https://calendar.google.com", "_blank");
+                  }
+                }}
                 className="flex-1"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />

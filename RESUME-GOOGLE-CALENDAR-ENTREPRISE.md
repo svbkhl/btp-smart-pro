@@ -118,7 +118,7 @@
    - Activer Google Calendar API
    - Créer un OAuth 2.0 Client ID (type "Web application")
    - Ajouter les URI de redirection autorisés :
-     - `https://{votre-projet}.supabase.co/functions/v1/google-calendar-oauth-entreprise`
+     - `https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-oauth-entreprise-pkce`
      - `http://localhost:54321/functions/v1/google-calendar-oauth-entreprise` (pour développement local)
 
 3. **Configurer les secrets Supabase** :

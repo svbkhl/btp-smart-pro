@@ -1,0 +1,63 @@
+═══════════════════════════════════════════════════════════════
+🚀 COMMANDES POUR DÉPLOYER LES FONCTIONS GOOGLE CALENDAR
+═══════════════════════════════════════════════════════════════
+
+⚠️ IMPORTANT : Utilisez les NOMS COMPLETS des fonctions !
+
+═══════════════════════════════════════════════════════════════
+📋 FONCTIONS À DÉPLOYER
+═══════════════════════════════════════════════════════════════
+
+1. google-calendar-oauth
+2. google-calendar-oauth-entreprise-pkce
+3. google-calendar-sync-entreprise
+
+═══════════════════════════════════════════════════════════════
+💻 COMMANDES CLI (UNE PAR UNE)
+═══════════════════════════════════════════════════════════════
+
+# 1. Déployer google-calendar-oauth
+supabase functions deploy google-calendar-oauth --no-verify-jwt
+
+# 2. Déployer google-calendar-oauth-entreprise-pkce
+supabase functions deploy google-calendar-oauth-entreprise-pkce --no-verify-jwt
+
+# 3. Déployer google-calendar-sync-entreprise
+supabase functions deploy google-calendar-sync-entreprise --no-verify-jwt
+
+═══════════════════════════════════════════════════════════════
+🎯 OU UTILISER LE SCRIPT AUTOMATIQUE
+═══════════════════════════════════════════════════════════════
+
+cd "/Users/sabrikhalfallah/Downloads/BTP SMART PRO"
+./DEPLOY-GOOGLE-CALENDAR-FUNCTIONS.sh
+
+═══════════════════════════════════════════════════════════════
+🌐 OU VIA DASHBOARD (PLUS SIMPLE)
+═══════════════════════════════════════════════════════════════
+
+1. Allez sur: https://supabase.com/dashboard/project/renmjmqlmafqjzldmsgs/functions
+
+2. Pour chaque fonction:
+   - Trouvez la fonction dans la liste
+   - Cliquez sur les 3 points (menu)
+   - Cliquez sur "Redeploy" ou "Deploy"
+
+═══════════════════════════════════════════════════════════════
+❌ ERREURS COURANTES
+═══════════════════════════════════════════════════════════════
+
+❌ "google-ca" → Nom incomplet
+✅ "google-calendar-oauth" → Nom complet
+
+❌ "google-calendar-oauth-entreprise" → Nom incorrect
+✅ "google-calendar-oauth-entreprise-pkce" → Nom complet
+
+═══════════════════════════════════════════════════════════════
+✅ VÉRIFICATION
+═══════════════════════════════════════════════════════════════
+
+Après déploiement, vérifiez:
+- Dashboard → Functions → Vérifiez que les 3 fonctions sont actives
+- Testez la connexion Google Calendar dans l'app
+

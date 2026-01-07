@@ -102,7 +102,10 @@ export const useExchangeGoogleCode = () => {
       }
 
       // Récupérer le code_verifier depuis sessionStorage (si PKCE utilisé)
-      const codeVerifier = sessionStorage.getItem("google_oauth_code_verifier");
+      // Vérifier que nous sommes côté client
+      const codeVerifier = typeof window !== "undefined" 
+        ? sessionStorage.getItem("google_oauth_code_verifier")
+        : null;
 
       // Utiliser la version PKCE de l'Edge Function pour l'échange
       const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
@@ -120,7 +123,7 @@ export const useExchangeGoogleCode = () => {
       }
 
       // Nettoyer le code_verifier après utilisation (si présent)
-      if (codeVerifier) {
+      if (codeVerifier && typeof window !== "undefined") {
         sessionStorage.removeItem("google_oauth_code_verifier");
       }
 

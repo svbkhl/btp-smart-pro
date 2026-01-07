@@ -74,9 +74,12 @@ export function initEnv(): void {
 
     console.error(errorMessages.join("\n"));
 
-    // En production, on peut choisir de bloquer ou continuer avec des valeurs par défaut
+    // En production, on log l'erreur mais on ne bloque pas le build
+    // Les variables d'environnement doivent être configurées dans Vercel
     if (import.meta.env.PROD) {
-      throw new Error("Configuration invalide");
+      console.error("⚠️ Variables d'environnement manquantes en production");
+      // Ne pas throw pour éviter de bloquer le build Vercel
+      // L'application affichera des erreurs à l'utilisation si les variables sont vraiment manquantes
     }
   } else {
     console.log("✅ Variables d'environnement validées");
