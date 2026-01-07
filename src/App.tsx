@@ -37,6 +37,7 @@ import Mailbox from './pages/Mailbox';
 import MessagingNew from './pages/MessagingNew'; // Nouvelle page Messagerie (from scratch)
 import AI from './pages/AI';
 import Settings from './pages/Settings';
+import { GoogleCalendarIntegration } from './pages/GoogleCalendarIntegration';
 import CompleteProfile from './pages/CompleteProfile';
 import ClientsAndQuotes from './pages/ClientsAndQuotes';
 import EmployeesAndRH from './pages/EmployeesAndRH';
@@ -216,6 +217,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/integrations/google"
+          element={
+            <ProtectedRoute>
+              <GoogleCalendarIntegration />
             </ProtectedRoute>
           }
         />

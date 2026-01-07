@@ -64,50 +64,64 @@ export const useGoogleCalendarConnection = () => {
 
 /**
  * Obtient l'URL d'authentification Google
+ * SIMPLIFIÉ : Appelle google-calendar-oauth et retourne data.url
+ * Google + Supabase gèrent le reste
  */
 export const useGetGoogleAuthUrl = () => {
-  const { currentCompanyId } = useAuth();
-
   return useMutation({
     mutationFn: async () => {
-      if (!currentCompanyId) {
-        throw new Error("Company ID manquant");
-      }
-
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise", {
-        body: { action: "get_auth_url" },
-      });
+      // Appeler google-calendar-oauth (version simple)
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth");
 
       if (error) {
         console.error("❌ [useGetGoogleAuthUrl] Erreur:", error);
         throw error;
       }
 
-      return data.auth_url as string;
+      if (!data?.url) {
+        throw new Error("URL d'authentification non reçue");
+      }
+
+      return data.url as string;
     },
   });
 };
 
 /**
  * Échange le code d'autorisation contre des tokens
+ * Utilise google-calendar-oauth-entreprise-pkce pour l'échange
  */
 export const useExchangeGoogleCode = () => {
   const queryClient = useQueryClient();
   const { currentCompanyId } = useAuth();
 
   return useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: async ({ code, state }: { code: string; state: string }) => {
       if (!currentCompanyId) {
         throw new Error("Company ID manquant");
       }
 
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise", {
-        body: { action: "exchange_code", code },
+      // Récupérer le code_verifier depuis sessionStorage (si PKCE utilisé)
+      const codeVerifier = sessionStorage.getItem("google_oauth_code_verifier");
+
+      // Utiliser la version PKCE de l'Edge Function pour l'échange
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
+        body: { 
+          action: "exchange_code", 
+          code,
+          code_verifier: codeVerifier || undefined,
+          state,
+        },
       });
 
       if (error) {
         console.error("❌ [useExchangeGoogleCode] Erreur:", error);
         throw error;
+      }
+
+      // Nettoyer le code_verifier après utilisation (si présent)
+      if (codeVerifier) {
+        sessionStorage.removeItem("google_oauth_code_verifier");
       }
 
       // Invalider le cache de la connexion
@@ -126,7 +140,7 @@ export const useDisconnectGoogleCalendar = () => {
 
   return useMutation({
     mutationFn: async (connectionId: string) => {
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise", {
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
         body: { action: "disconnect", connection_id: connectionId },
       });
 

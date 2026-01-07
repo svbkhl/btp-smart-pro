@@ -12,6 +12,10 @@ import {
   useExchangeGoogleCode,
   useDisconnectGoogleCalendar 
 } from "@/hooks/useGoogleCalendar";
+import { 
+  useCanConnectGoogleCalendar,
+  useCanManageGoogleCalendarSettings 
+} from "@/hooks/useGoogleCalendarRoles";
 import { Calendar, CheckCircle2, XCircle, Loader2, ExternalLink, Crown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -19,49 +23,19 @@ import { usePermissions } from "@/hooks/usePermissions";
 export const GoogleCalendarConnection = () => {
   const { currentCompanyId } = useAuth();
   const { isOwner } = usePermissions();
+  const canConnect = useCanConnectGoogleCalendar();
+  const canManage = useCanManageGoogleCalendarSettings();
   const { data: connection, isLoading } = useGoogleCalendarConnection();
   const getAuthUrl = useGetGoogleAuthUrl();
   const exchangeCode = useExchangeGoogleCode();
   const disconnect = useDisconnectGoogleCalendar();
 
-  const [isConnecting, setIsConnecting] = useState(false);
-
-  // Gérer le callback OAuth
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
-    const state = urlParams.get("state");
-
-    if (code && state && !isConnecting && currentCompanyId) {
-      setIsConnecting(true);
-      
-      try {
-        const stateData = JSON.parse(atob(state));
-        if (stateData.company_id === currentCompanyId) {
-          exchangeCode.mutate(code, {
-            onSuccess: () => {
-              // Nettoyer l'URL
-              window.history.replaceState({}, document.title, window.location.pathname);
-              setIsConnecting(false);
-            },
-            onError: (error) => {
-              console.error("Erreur lors de l'échange du code:", error);
-              setIsConnecting(false);
-            },
-          });
-        } else {
-          console.error("Company ID mismatch in OAuth callback");
-          setIsConnecting(false);
-        }
-      } catch (error) {
-        console.error("Erreur lors du parsing du state:", error);
-        setIsConnecting(false);
-      }
-    }
-  }, [currentCompanyId, exchangeCode, isConnecting]);
+  // Le callback OAuth est maintenant géré par la page GoogleCalendarIntegration
+  // Ce composant ne gère plus la redirection
 
   const handleConnect = async () => {
     try {
+      // Appeler google-calendar-oauth et rediriger vers data.url
       const authUrl = await getAuthUrl.mutateAsync();
       window.location.href = authUrl;
     } catch (error) {
@@ -109,7 +83,7 @@ export const GoogleCalendarConnection = () => {
           )}
         </div>
         <CardDescription>
-          {isOwner 
+          {canConnect 
             ? "Connectez Google Calendar pour synchroniser les événements et plannings de l'entreprise"
             : "Seul le propriétaire de l'entreprise peut connecter Google Calendar"
           }
@@ -148,7 +122,7 @@ export const GoogleCalendarConnection = () => {
               <Button
                 variant="outline"
                 onClick={handleDisconnect}
-                disabled={disconnect.isPending}
+                disabled={disconnect.isPending || !canManage}
                 className="flex-1"
               >
                 {disconnect.isPending ? (

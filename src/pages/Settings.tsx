@@ -13,6 +13,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { useToast } from "@/components/ui/use-toast";
+import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
 import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
@@ -26,14 +29,82 @@ import UsersManagementRBAC from "@/pages/UsersManagementRBAC";
 import { usePermissions } from "@/hooks/usePermissions";
 
 const Settings = () => {
-  const { user, isAdmin, userRole } = useAuth();
+  const { user, isAdmin, userRole, currentCompanyId } = useAuth();
   const { isOwner, can } = usePermissions();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
+  const exchangeCode = useExchangeGoogleCode();
   
   // Lire le paramètre tab de l'URL
   const tabFromUrl = searchParams.get("tab");
   const defaultTab = tabFromUrl || "company";
+  
+  // Gérer le callback Google Calendar OAuth
+  const googleCalendarStatus = searchParams.get("google_calendar_status");
+  const googleCalendarCode = searchParams.get("code");
+  const googleCalendarError = searchParams.get("error");
+  const googleCalendarState = searchParams.get("state");
+  
+  // Gérer le callback OAuth Google Calendar
+  useEffect(() => {
+    if (googleCalendarStatus === "success" && googleCalendarCode && currentCompanyId) {
+      // Échanger le code contre des tokens
+      exchangeCode.mutate(
+        { code: googleCalendarCode, state: googleCalendarState || "" },
+        {
+          onSuccess: () => {
+            toast({
+              title: "✅ Connexion réussie",
+              description: "Google Calendar a été connecté avec succès",
+            });
+            
+            // Nettoyer l'URL mais garder tab=integrations
+            const newParams = new URLSearchParams();
+            newParams.set("tab", "integrations");
+            setSearchParams(newParams);
+          },
+          onError: (error: any) => {
+            console.error("❌ Erreur lors de l'échange du code:", error);
+            toast({
+              title: "❌ Erreur de connexion",
+              description: error.message || "Impossible de finaliser la connexion Google Calendar",
+              variant: "destructive",
+            });
+            
+            // Nettoyer l'URL mais garder tab=integrations
+            const newParams = new URLSearchParams();
+            newParams.set("tab", "integrations");
+            setSearchParams(newParams);
+          },
+        }
+      );
+    } else if (googleCalendarStatus === "error" || googleCalendarError) {
+      // Afficher l'erreur
+      toast({
+        title: "❌ Erreur de connexion",
+        description: googleCalendarError || "Une erreur est survenue lors de la connexion Google Calendar",
+        variant: "destructive",
+      });
+      
+      // Nettoyer l'URL mais garder tab=integrations
+      const newParams = new URLSearchParams();
+      newParams.set("tab", "integrations");
+      setSearchParams(newParams);
+    } else if (googleCalendarStatus === "success" && googleCalendarCode && !currentCompanyId) {
+      // Company ID manquant
+      toast({
+        title: "❌ Erreur de connexion",
+        description: "Company ID manquant. Veuillez vous assurer d'être connecté à une entreprise.",
+        variant: "destructive",
+      });
+      
+      // Nettoyer l'URL mais garder tab=integrations
+      const newParams = new URLSearchParams();
+      newParams.set("tab", "integrations");
+      setSearchParams(newParams);
+    }
+  }, [googleCalendarStatus, googleCalendarCode, googleCalendarError, googleCalendarState, currentCompanyId, exchangeCode, toast, setSearchParams]);
   
   // Compter le nombre d'onglets (ajuster selon si admin)
   const isAdministrator = userRole === 'admin' || isAdmin;
