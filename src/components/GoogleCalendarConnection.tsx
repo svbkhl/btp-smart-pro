@@ -29,19 +29,23 @@ export const GoogleCalendarConnection = () => {
   const getAuthUrl = useGetGoogleAuthUrl();
   const exchangeCode = useExchangeGoogleCode();
   const disconnect = useDisconnectGoogleCalendar();
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Le callback OAuth est maintenant géré par la page GoogleCalendarIntegration
   // Ce composant ne gère plus la redirection
 
   const handleConnect = async () => {
     try {
+      setIsConnecting(true);
       // Appeler google-calendar-oauth et rediriger vers data.url
       const authUrl = await getAuthUrl.mutateAsync();
       if (typeof window !== "undefined") {
         window.location.href = authUrl;
       }
+      // Note: setIsConnecting(false) n'est pas appelé car on redirige vers Google
     } catch (error) {
       console.error("Erreur lors de la connexion:", error);
+      setIsConnecting(false);
     }
   };
 
