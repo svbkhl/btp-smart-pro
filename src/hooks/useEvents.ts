@@ -242,11 +242,17 @@ export const useCreateEvent = () => {
       }
 
       // ⚠️ DEBUG : Vérifier visuellement que tous les UUID sont corrects
-      console.log('DEBUG EVENT PAYLOAD', payload);
+      console.log('🔍 [useCreateEvent] Payload avant insertion:', JSON.stringify(payload, null, 2));
+      console.log('🔍 [useCreateEvent] Types des valeurs:', {
+        user_id: typeof payload.user_id,
+        company_id: typeof payload.company_id,
+        project_id: typeof payload.project_id,
+      });
 
       // 5️⃣ Insert sécurisé dans Supabase
       // ⚠️ Le payload ne contient QUE des UUID validés
       // ⚠️ Aucune valeur "events" ne peut être injectée
+      // ⚠️ Utiliser insert avec un tableau pour éviter les problèmes de parsing PostgREST
       const { data: event, error } = await supabase
         .from('events')
         .insert([payload])

@@ -82,9 +82,24 @@ export const GoogleCalendarConnection = () => {
             <CardTitle>Google Calendar</CardTitle>
           </div>
           {connection && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Connecté
+            <Badge 
+              variant="outline" 
+              className={connection.enabled 
+                ? "bg-green-50 text-green-700 border-green-200" 
+                : "bg-yellow-50 text-yellow-700 border-yellow-200"
+              }
+            >
+              {connection.enabled ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Connecté
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Désactivé
+                </>
+              )}
             </Badge>
           )}
         </div>
@@ -98,6 +113,14 @@ export const GoogleCalendarConnection = () => {
       <CardContent>
         {connection ? (
           <div className="space-y-4">
+            {!connection.enabled && (
+              <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  ⚠️ La connexion Google Calendar est configurée mais désactivée. 
+                  Reconnectez-vous pour l'activer.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Compte Google :</span>

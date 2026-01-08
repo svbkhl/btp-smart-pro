@@ -47,7 +47,8 @@ export const useGoogleCalendarConnection = () => {
         .from("google_calendar_connections")
         .select("*")
         .eq("company_id", currentCompanyId)
-        .eq("enabled", true)
+        // Ne pas filtrer par enabled=true pour voir toutes les connexions
+        // Le composant affichera le statut même si enabled=false
         .maybeSingle();
 
       if (error) {
@@ -120,12 +121,18 @@ export const useExchangeGoogleCode = () => {
         ? sessionStorage.getItem("google_oauth_code_verifier")
         : null;
 
+      console.log("🔍 [useExchangeGoogleCode] Paramètres d'échange:");
+      console.log("  - code:", code ? "present" : "missing");
+      console.log("  - code_verifier:", codeVerifier ? "present" : "missing");
+      console.log("  - state:", state ? "present" : "missing");
+      console.log("  - company_id:", effectiveCompanyId || "missing");
+
       // Utiliser la version PKCE de l'Edge Function pour l'échange
       const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
         body: { 
           action: "exchange_code", 
           code,
-          code_verifier: codeVerifier || undefined,
+          code_verifier: codeVerifier || undefined, // Peut être undefined si PKCE n'a pas été utilisé
           state,
           company_id: effectiveCompanyId, // Passer explicitement le company_id
         },
