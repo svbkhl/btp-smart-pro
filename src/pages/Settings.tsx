@@ -46,12 +46,26 @@ const Settings = () => {
   const googleCalendarError = searchParams.get("error");
   const googleCalendarState = searchParams.get("state");
   
+  // Décoder le state pour récupérer company_id si disponible
+  let companyIdFromState: string | null = null;
+  if (googleCalendarState) {
+    try {
+      const decodedState = JSON.parse(atob(googleCalendarState));
+      companyIdFromState = decodedState.company_id || null;
+    } catch (e) {
+      console.warn("⚠️ Could not decode state:", e);
+    }
+  }
+  
+  // Utiliser company_id du state si currentCompanyId n'est pas disponible
+  const effectiveCompanyId = currentCompanyId || companyIdFromState;
+  
   // Gérer le callback OAuth Google Calendar
   useEffect(() => {
-    if (googleCalendarStatus === "success" && googleCalendarCode && currentCompanyId) {
+    if (googleCalendarStatus === "success" && googleCalendarCode && effectiveCompanyId) {
       // Échanger le code contre des tokens
       exchangeCode.mutate(
-        { code: googleCalendarCode, state: googleCalendarState || "" },
+        { code: googleCalendarCode, state: googleCalendarState || "", companyId: effectiveCompanyId },
         {
           onSuccess: () => {
             toast({
@@ -79,6 +93,18 @@ const Settings = () => {
           },
         }
       );
+    } else if (googleCalendarStatus === "success" && googleCalendarCode && !effectiveCompanyId) {
+      // Company ID manquant même après décodage du state
+      toast({
+        title: "❌ Erreur de connexion",
+        description: "Company ID manquant. Veuillez vous assurer d'être connecté à une entreprise.",
+        variant: "destructive",
+      });
+      
+      // Nettoyer l'URL mais garder tab=integrations
+      const newParams = new URLSearchParams();
+      newParams.set("tab", "integrations");
+      setSearchParams(newParams);
     } else if (googleCalendarStatus === "error" || googleCalendarError) {
       // Afficher l'erreur
       toast({
@@ -104,7 +130,7 @@ const Settings = () => {
       newParams.set("tab", "integrations");
       setSearchParams(newParams);
     }
-  }, [googleCalendarStatus, googleCalendarCode, googleCalendarError, googleCalendarState, currentCompanyId, exchangeCode, toast, setSearchParams]);
+  }, [googleCalendarStatus, googleCalendarCode, googleCalendarError, googleCalendarState, currentCompanyId, effectiveCompanyId, exchangeCode, toast, setSearchParams]);
   
   // Compter le nombre d'onglets (ajuster selon si admin)
   const isAdministrator = userRole === 'admin' || isAdmin;

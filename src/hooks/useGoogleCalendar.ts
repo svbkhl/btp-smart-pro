@@ -96,8 +96,21 @@ export const useExchangeGoogleCode = () => {
   const { currentCompanyId } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ code, state }: { code: string; state: string }) => {
-      if (!currentCompanyId) {
+    mutationFn: async ({ code, state, companyId }: { code: string; state: string; companyId?: string }) => {
+      // Utiliser companyId fourni, ou currentCompanyId, ou essayer de décoder depuis state
+      let effectiveCompanyId = companyId || currentCompanyId;
+      
+      // Si toujours pas de company_id, essayer de le décoder depuis le state
+      if (!effectiveCompanyId && state) {
+        try {
+          const decodedState = JSON.parse(atob(state));
+          effectiveCompanyId = decodedState.company_id || null;
+        } catch (e) {
+          console.warn("⚠️ Could not decode state for company_id:", e);
+        }
+      }
+      
+      if (!effectiveCompanyId) {
         throw new Error("Company ID manquant");
       }
 
@@ -114,6 +127,7 @@ export const useExchangeGoogleCode = () => {
           code,
           code_verifier: codeVerifier || undefined,
           state,
+          company_id: effectiveCompanyId, // Passer explicitement le company_id
         },
       });
 

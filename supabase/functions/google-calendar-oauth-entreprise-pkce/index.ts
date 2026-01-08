@@ -171,7 +171,7 @@ serve(async (req) => {
     // ACTION: exchange_code - Échanger le code d'autorisation contre des tokens (avec PKCE)
     // ========================================================================
     if (action === "exchange_code") {
-      const { code, code_verifier, state } = await req.json();
+      const { code, code_verifier, state, company_id: companyIdFromBody } = await req.json();
 
       if (!code || !code_verifier) {
         return new Response(
@@ -180,22 +180,49 @@ serve(async (req) => {
         );
       }
 
-      // Vérifier le state
+      // Vérifier le state et récupérer company_id depuis le state ou le body
       let stateData;
+      let effectiveCompanyId = companyId; // Utiliser celui de la session par défaut
+      
       try {
         stateData = JSON.parse(atob(state));
-        if (stateData.company_id !== companyId || stateData.user_id !== user.id) {
+        
+        // Utiliser company_id du body si fourni, sinon celui du state, sinon celui de la session
+        if (companyIdFromBody) {
+          effectiveCompanyId = companyIdFromBody;
+        } else if (stateData.company_id) {
+          effectiveCompanyId = stateData.company_id;
+        }
+        
+        // Vérifier que le user_id correspond
+        if (stateData.user_id !== user.id) {
           return new Response(
-            JSON.stringify({ error: "Invalid state" }),
+            JSON.stringify({ error: "Invalid state: user_id mismatch" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-      } catch {
-        return new Response(
-          JSON.stringify({ error: "Invalid state format" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        
+        // Vérifier que company_id est présent
+        if (!effectiveCompanyId) {
+          return new Response(
+            JSON.stringify({ error: "Company ID manquant" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (e) {
+        // Si le state ne peut pas être décodé, utiliser company_id du body si fourni
+        if (companyIdFromBody) {
+          effectiveCompanyId = companyIdFromBody;
+        } else {
+          return new Response(
+            JSON.stringify({ error: "Invalid state format and no company_id provided" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
+      
+      // Utiliser effectiveCompanyId au lieu de companyId pour le reste de la fonction
+      const finalCompanyId = effectiveCompanyId;
 
       // Échanger le code contre des tokens avec PKCE
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -245,7 +272,7 @@ serve(async (req) => {
       const { data: company, error: companyError } = await supabaseClient
         .from("companies")
         .select("name")
-        .eq("id", companyId)
+        .eq("id", finalCompanyId)
         .single();
 
       if (companyError || !company) {
@@ -285,11 +312,11 @@ serve(async (req) => {
       const { data: existingConnection, error: fetchError } = await supabaseClient
         .from("google_calendar_connections")
         .select("*")
-        .eq("company_id", companyId)
+        .eq("company_id", finalCompanyId)
         .maybeSingle();
 
       const connectionData = {
-        company_id: companyId,
+        company_id: finalCompanyId,
         owner_user_id: user.id,
         google_email: userInfo.email,
         calendar_id: googleCalendar.id,
@@ -337,7 +364,7 @@ serve(async (req) => {
       await supabaseClient
         .from("companies")
         .update({ google_calendar_id: googleCalendar.id })
-        .eq("id", companyId);
+        .eq("id", finalCompanyId);
 
       return new Response(
         JSON.stringify({ 
