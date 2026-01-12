@@ -121,11 +121,14 @@ export const useExchangeGoogleCode = () => {
         ? sessionStorage.getItem("google_oauth_code_verifier")
         : null;
 
-      console.log("🔍 [useExchangeGoogleCode] Paramètres d'échange:");
-      console.log("  - code:", code ? "present" : "missing");
-      console.log("  - code_verifier:", codeVerifier ? "present" : "missing");
-      console.log("  - state:", state ? "present" : "missing");
-      console.log("  - company_id:", effectiveCompanyId || "missing");
+      // Logs de debugging (une seule fois)
+      if (process.env.NODE_ENV === 'development') {
+        console.log("🔍 [useExchangeGoogleCode] Paramètres d'échange:");
+        console.log("  - code:", code ? "present" : "missing");
+        console.log("  - code_verifier:", codeVerifier ? "present" : "missing");
+        console.log("  - state:", state ? "present" : "missing");
+        console.log("  - company_id:", effectiveCompanyId || "missing");
+      }
 
       // Utiliser la version PKCE de l'Edge Function pour l'échange
       const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
@@ -140,7 +143,20 @@ export const useExchangeGoogleCode = () => {
 
       if (error) {
         console.error("❌ [useExchangeGoogleCode] Erreur:", error);
-        throw error;
+        
+        // Essayer d'extraire le message d'erreur détaillé
+        let errorMessage = "Impossible de finaliser la connexion Google Calendar";
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        if (error.context?.msg) {
+          errorMessage = error.context.msg;
+        }
+        
+        // Créer une erreur avec le message détaillé
+        const detailedError = new Error(errorMessage);
+        (detailedError as any).originalError = error;
+        throw detailedError;
       }
 
       // Nettoyer le code_verifier après utilisation (si présent)

@@ -12,6 +12,25 @@ const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const GOOGLE_REDIRECT_URI = Deno.env.get("GOOGLE_REDIRECT_URI") || "";
 
+/**
+ * Retourne un message d'aide selon le code d'erreur Google
+ */
+function getGoogleErrorHint(errorCode: string | undefined): string | undefined {
+  if (!errorCode) return undefined;
+  
+  const hints: Record<string, string> = {
+    "invalid_grant": "Le code OAuth a expiré ou a déjà été utilisé. Relancez la connexion depuis le début.",
+    "invalid_client": "GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET incorrect. Vérifiez les secrets Supabase.",
+    "redirect_uri_mismatch": "GOOGLE_REDIRECT_URI ne correspond pas à celui configuré dans Google Cloud Console.",
+    "invalid_request": "Requête invalide. Vérifiez que tous les paramètres sont corrects.",
+    "unauthorized_client": "Le client OAuth n'est pas autorisé pour ce type de requête.",
+    "unsupported_grant_type": "Type de grant non supporté.",
+    "invalid_scope": "Les scopes demandés ne sont pas valides.",
+  };
+  
+  return hints[errorCode] || `Erreur Google: ${errorCode}`;
+}
+
 interface GoogleTokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -141,18 +160,33 @@ serve(async (req) => {
     let action = url.searchParams.get("action");
     
     // Si l'action n'est pas dans l'URL, essayer de la récupérer depuis le body
-    if (!action) {
+    // Pour les requêtes POST, l'action est généralement dans le body
+    if (!action && req.method === "POST") {
       try {
-        const body = await req.clone().json();
-        action = body.action;
+        // Cloner la requête pour pouvoir la lire plusieurs fois
+        const clonedReq = req.clone();
+        const bodyText = await clonedReq.text();
+        if (bodyText) {
+          const body = JSON.parse(bodyText);
+          action = body.action;
+        }
       } catch (e) {
         // Ignorer si le body n'est pas JSON ou vide
+        console.warn("⚠️ [Request] Could not parse body for action:", e);
       }
     }
     
     console.log("🔍 [Request] Action:", action || "not provided");
     console.log("🔍 [Request] Method:", req.method);
     console.log("🔍 [Request] URL:", req.url);
+    
+    // Si toujours pas d'action, retourner une erreur
+    if (!action) {
+      return new Response(
+        JSON.stringify({ error: "Missing action parameter. Provide ?action=exchange_code in URL or in body." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ========================================================================
     // ACTION: get_auth_url - Générer l'URL d'authentification Google avec PKCE
@@ -313,12 +347,28 @@ serve(async (req) => {
         console.log("⚠️ [exchange_code] Échange sans PKCE");
       }
       
+      console.log("🔄 [exchange_code] Appel à Google token endpoint...");
+      console.log("🔄 [exchange_code] Token params:", {
+        hasClientId: !!tokenParams.client_id,
+        hasClientSecret: !!tokenParams.client_secret,
+        hasCode: !!tokenParams.code,
+        hasRedirectUri: !!tokenParams.redirect_uri,
+        hasCodeVerifier: !!tokenParams.code_verifier,
+        grantType: tokenParams.grant_type
+      });
+
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams(tokenParams),
+      });
+
+      console.log("📥 [exchange_code] Réponse Google reçue:", {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        ok: tokenResponse.ok
       });
 
       if (!tokenResponse.ok) {
@@ -329,18 +379,42 @@ serve(async (req) => {
         } catch {
           errorDetails = errorText;
         }
-        console.error("❌ [exchange_code] Google token exchange error:", errorDetails);
+        console.error("❌ [exchange_code] ========================================");
+        console.error("❌ [exchange_code] ERREUR GOOGLE TOKEN EXCHANGE");
+        console.error("❌ [exchange_code] ========================================");
         console.error("❌ [exchange_code] Status:", tokenResponse.status);
-        console.error("❌ [exchange_code] Headers:", Object.fromEntries(tokenResponse.headers.entries()));
+        console.error("❌ [exchange_code] Status Text:", tokenResponse.statusText);
+        console.error("❌ [exchange_code] Error Details:", JSON.stringify(errorDetails, null, 2));
+        console.error("❌ [exchange_code] Error Text:", errorText);
+        console.error("❌ [exchange_code] Request Params:", {
+          client_id: tokenParams.client_id ? "present" : "missing",
+          client_secret: tokenParams.client_secret ? "present" : "missing",
+          code: tokenParams.code ? "present" : "missing",
+          redirect_uri: tokenParams.redirect_uri,
+          grant_type: tokenParams.grant_type,
+          code_verifier: tokenParams.code_verifier ? "present" : "missing"
+        });
+        console.error("❌ [exchange_code] ========================================");
+        
+        // Extraire le message d'erreur de Google
+        const googleError = errorDetails?.error || errorDetails?.error_description || errorText;
+        const errorMessage = errorDetails?.error_description || errorDetails?.error || "Failed to exchange code for tokens";
+        
+        console.error("❌ [exchange_code] Message d'erreur Google:", errorMessage);
+        
         return new Response(
           JSON.stringify({ 
-            error: "Failed to exchange code for tokens", 
+            error: errorMessage,
+            error_code: errorDetails?.error || "token_exchange_failed",
             details: errorDetails,
-            status: tokenResponse.status
+            status: tokenResponse.status,
+            hint: getGoogleErrorHint(errorDetails?.error)
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("✅ [exchange_code] Token exchange réussi !");
 
       const tokens: GoogleTokenResponse = await tokenResponse.json();
 
