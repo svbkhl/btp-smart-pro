@@ -171,35 +171,46 @@ serve(async (req) => {
     // ACTION: exchange_code - Échanger le code d'autorisation contre des tokens (avec PKCE)
     // ========================================================================
     if (action === "exchange_code") {
-      const { code, code_verifier, state, company_id: companyIdFromBody } = await req.json();
+      const body = await req.json();
+      const { code, code_verifier, state, company_id: companyIdFromBody } = body;
+      
+      console.log("🔍 [exchange_code] Paramètres reçus:");
+      console.log("  - code:", code ? "present" : "missing");
+      console.log("  - code_verifier:", code_verifier ? "present" : "missing");
+      console.log("  - state:", state ? "present" : "missing");
+      console.log("  - company_id (body):", companyIdFromBody || "not provided");
+      console.log("  - company_id (session):", companyId || "not available");
 
-      if (!code || !code_verifier) {
+      if (!code) {
+        console.error("❌ [exchange_code] Code manquant");
         return new Response(
-          JSON.stringify({ error: "code and code_verifier are required" }),
+          JSON.stringify({ error: "code is required", received: { code: !!code, code_verifier: !!code_verifier, state: !!state, company_id: !!companyIdFromBody } }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       // Vérifier le state et récupérer company_id depuis le state ou le body
-      let stateData;
+      let stateData: any = null;
       let effectiveCompanyId = companyId; // Utiliser celui de la session par défaut
       
       try {
-        stateData = JSON.parse(atob(state));
-        
-        // Utiliser company_id du body si fourni, sinon celui du state, sinon celui de la session
-        if (companyIdFromBody) {
-          effectiveCompanyId = companyIdFromBody;
-        } else if (stateData.company_id) {
-          effectiveCompanyId = stateData.company_id;
-        }
-        
-        // Vérifier que le user_id correspond
-        if (stateData.user_id !== user.id) {
-          return new Response(
-            JSON.stringify({ error: "Invalid state: user_id mismatch" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+        if (state) {
+          stateData = JSON.parse(atob(state));
+          
+          // Utiliser company_id du body si fourni, sinon celui du state, sinon celui de la session
+          if (companyIdFromBody) {
+            effectiveCompanyId = companyIdFromBody;
+          } else if (stateData.company_id) {
+            effectiveCompanyId = stateData.company_id;
+          }
+          
+          // Vérifier que le user_id correspond
+          if (stateData.user_id && stateData.user_id !== user.id) {
+            return new Response(
+              JSON.stringify({ error: "Invalid state: user_id mismatch" }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
         
         // Vérifier que company_id est présent
@@ -210,10 +221,11 @@ serve(async (req) => {
           );
         }
       } catch (e) {
+        console.warn("⚠️ [exchange_code] Erreur lors du décodage du state:", e);
         // Si le state ne peut pas être décodé, utiliser company_id du body si fourni
         if (companyIdFromBody) {
           effectiveCompanyId = companyIdFromBody;
-        } else {
+        } else if (!effectiveCompanyId) {
           return new Response(
             JSON.stringify({ error: "Invalid state format and no company_id provided" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -223,21 +235,44 @@ serve(async (req) => {
       
       // Utiliser effectiveCompanyId au lieu de companyId pour le reste de la fonction
       const finalCompanyId = effectiveCompanyId;
+      
+      // code_verifier est optionnel si PKCE n'a pas été utilisé initialement
+      // Si absent, on essaie de le récupérer depuis le state
+      let finalCodeVerifier = code_verifier;
+      if (!finalCodeVerifier && stateData?.code_verifier) {
+        finalCodeVerifier = stateData.code_verifier;
+        console.log("✅ [exchange_code] code_verifier récupéré depuis le state");
+      }
+      
+      if (!finalCodeVerifier) {
+        console.warn("⚠️ [exchange_code] code_verifier manquant - tentative sans PKCE");
+        // Continuer sans PKCE si le code_verifier n'est pas disponible
+        // Google acceptera l'échange sans PKCE si le flow initial n'utilisait pas PKCE
+      }
 
-      // Échanger le code contre des tokens avec PKCE
+      // Échanger le code contre des tokens (avec ou sans PKCE selon disponibilité)
+      const tokenParams: Record<string, string> = {
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        code: code,
+        grant_type: "authorization_code",
+        redirect_uri: GOOGLE_REDIRECT_URI,
+      };
+      
+      // Ajouter code_verifier seulement s'il est disponible (PKCE)
+      if (finalCodeVerifier) {
+        tokenParams.code_verifier = finalCodeVerifier;
+        console.log("✅ [exchange_code] Utilisation de PKCE");
+      } else {
+        console.log("⚠️ [exchange_code] Échange sans PKCE");
+      }
+      
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({
-          client_id: GOOGLE_CLIENT_ID,
-          client_secret: GOOGLE_CLIENT_SECRET,
-          code: code,
-          grant_type: "authorization_code",
-          redirect_uri: GOOGLE_REDIRECT_URI,
-          code_verifier: code_verifier, // PKCE
-        }),
+        body: new URLSearchParams(tokenParams),
       });
 
       if (!tokenResponse.ok) {
