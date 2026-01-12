@@ -81,46 +81,50 @@ export const GoogleCalendarConnection = () => {
             <Calendar className="h-5 w-5" />
             <CardTitle>Google Calendar</CardTitle>
           </div>
-          {connection && (
+          {connection && connection.enabled && (
             <Badge 
               variant="outline" 
-              className={connection.enabled 
-                ? "bg-green-50 text-green-700 border-green-200" 
-                : "bg-yellow-50 text-yellow-700 border-yellow-200"
-              }
+              className="bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
             >
-              {connection.enabled ? (
-                <>
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Connecté
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-3 w-3 mr-1" />
-                  Désactivé
-                </>
-              )}
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Connecté
+            </Badge>
+          )}
+          {connection && !connection.enabled && (
+            <Badge 
+              variant="outline" 
+              className="bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800"
+            >
+              <XCircle className="h-3 w-3 mr-1" />
+              Désactivé
             </Badge>
           )}
         </div>
         <CardDescription>
-          {canConnect 
+          {connection && connection.enabled
+            ? `Google Calendar connecté avec ${connection.google_email}`
+            : canConnect 
             ? "Connectez Google Calendar pour synchroniser les événements et plannings de l'entreprise"
-            : "Seul le propriétaire de l'entreprise peut connecter Google Calendar"
+            : "Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar"
           }
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {connection ? (
+        {connection && connection.enabled ? (
           <div className="space-y-4">
-            {!connection.enabled && (
-              <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  ⚠️ La connexion Google Calendar est configurée mais désactivée. 
-                  Reconnectez-vous pour l'activer.
+            {/* Message de succès bien visible */}
+            <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  Google Calendar connecté avec succès
                 </p>
               </div>
-            )}
+              <p className="text-xs text-green-700 dark:text-green-300">
+                Les événements et plannings seront automatiquement synchronisés avec Google Calendar.
+              </p>
+            </div>
+            
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Compte Google :</span>
@@ -128,7 +132,7 @@ export const GoogleCalendarConnection = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Calendrier :</span>
-                <span className="text-sm font-medium">{connection.calendar_id}</span>
+                <span className="text-sm font-medium">{connection.calendar_name || connection.calendar_id}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Synchronisation :</span>
@@ -179,6 +183,32 @@ export const GoogleCalendarConnection = () => {
                 Ouvrir Google Calendar
               </Button>
             </div>
+          </div>
+        ) : connection && !connection.enabled ? (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                ⚠️ La connexion Google Calendar est configurée mais désactivée. 
+                Reconnectez-vous pour l'activer.
+              </p>
+            </div>
+            <Button
+              onClick={handleConnect}
+              disabled={getAuthUrl.isPending || isConnecting}
+              className="w-full"
+            >
+              {getAuthUrl.isPending || isConnecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Reconnexion en cours...
+                </>
+              ) : (
+                <>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Reconnecter Google Calendar
+                </>
+              )}
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
