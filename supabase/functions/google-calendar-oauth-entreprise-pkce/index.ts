@@ -12,25 +12,6 @@ const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const GOOGLE_REDIRECT_URI = Deno.env.get("GOOGLE_REDIRECT_URI") || "";
 
-/**
- * Retourne un message d'aide selon le code d'erreur Google
- */
-function getGoogleErrorHint(errorCode: string | undefined): string | undefined {
-  if (!errorCode) return undefined;
-  
-  const hints: Record<string, string> = {
-    "invalid_grant": "Le code OAuth a expiré ou a déjà été utilisé. Relancez la connexion depuis le début.",
-    "invalid_client": "GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET incorrect. Vérifiez les secrets Supabase.",
-    "redirect_uri_mismatch": "GOOGLE_REDIRECT_URI ne correspond pas à celui configuré dans Google Cloud Console.",
-    "invalid_request": "Requête invalide. Vérifiez que tous les paramètres sont corrects.",
-    "unauthorized_client": "Le client OAuth n'est pas autorisé pour ce type de requête.",
-    "unsupported_grant_type": "Type de grant non supporté.",
-    "invalid_scope": "Les scopes demandés ne sont pas valides.",
-  };
-  
-  return hints[errorCode] || `Erreur Google: ${errorCode}`;
-}
-
 interface GoogleTokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -397,18 +378,38 @@ serve(async (req) => {
         console.error("❌ [exchange_code] ========================================");
         
         // Extraire le message d'erreur de Google
-        const googleError = errorDetails?.error || errorDetails?.error_description || errorText;
-        const errorMessage = errorDetails?.error_description || errorDetails?.error || "Failed to exchange code for tokens";
+        const googleError = errorDetails?.error || "unknown_error";
+        const googleErrorDescription = errorDetails?.error_description || errorText || "No description";
         
-        console.error("❌ [exchange_code] Message d'erreur Google:", errorMessage);
+        // Message d'erreur plus explicite
+        let userMessage = "Impossible d'échanger le code d'autorisation";
+        if (googleError === "invalid_grant") {
+          userMessage = "Le code d'autorisation a expiré ou a déjà été utilisé. Veuillez relancer la connexion.";
+        } else if (googleError === "invalid_client") {
+          userMessage = "Erreur de configuration Google OAuth. Vérifiez les identifiants dans Supabase Secrets.";
+        } else if (googleError === "redirect_uri_mismatch") {
+          userMessage = "L'URI de redirection ne correspond pas. Vérifiez GOOGLE_REDIRECT_URI dans Supabase Secrets.";
+        }
         
         return new Response(
           JSON.stringify({ 
-            error: errorMessage,
-            error_code: errorDetails?.error || "token_exchange_failed",
+            error: "Failed to exchange code for tokens",
+            google_error: googleError,
+            google_error_description: googleErrorDescription,
             details: errorDetails,
             status: tokenResponse.status,
-            hint: getGoogleErrorHint(errorDetails?.error)
+            message: userMessage,
+            technical_details: process.env.NODE_ENV === "development" ? {
+              error_text: errorText,
+              request_params: {
+                has_client_id: !!tokenParams.client_id,
+                has_client_secret: !!tokenParams.client_secret,
+                has_code: !!tokenParams.code,
+                redirect_uri: tokenParams.redirect_uri,
+                grant_type: tokenParams.grant_type,
+                has_code_verifier: !!tokenParams.code_verifier
+              }
+            } : undefined
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

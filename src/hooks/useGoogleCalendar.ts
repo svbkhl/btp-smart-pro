@@ -143,20 +143,19 @@ export const useExchangeGoogleCode = () => {
 
       if (error) {
         console.error("❌ [useExchangeGoogleCode] Erreur:", error);
+        console.error("❌ [useExchangeGoogleCode] Error details:", {
+          message: error.message,
+          context: error.context,
+          status: error.status,
+          data: error.data
+        });
         
-        // Essayer d'extraire le message d'erreur détaillé
-        let errorMessage = "Impossible de finaliser la connexion Google Calendar";
-        if (error.message) {
-          errorMessage = error.message;
-        }
-        if (error.context?.msg) {
-          errorMessage = error.context.msg;
+        // Si l'erreur contient des détails, les afficher
+        if (error.data) {
+          console.error("❌ [useExchangeGoogleCode] Error data:", JSON.stringify(error.data, null, 2));
         }
         
-        // Créer une erreur avec le message détaillé
-        const detailedError = new Error(errorMessage);
-        (detailedError as any).originalError = error;
-        throw detailedError;
+        throw error;
       }
 
       // Nettoyer le code_verifier après utilisation (si présent)
