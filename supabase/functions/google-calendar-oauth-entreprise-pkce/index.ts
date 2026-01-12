@@ -417,41 +417,95 @@ serve(async (req) => {
 
       console.log("✅ [exchange_code] Token exchange réussi !");
 
-      const tokens: GoogleTokenResponse = await tokenResponse.json();
+      let tokens: GoogleTokenResponse;
+      try {
+        tokens = await tokenResponse.json();
+        console.log("✅ [exchange_code] Tokens reçus:", {
+          hasAccessToken: !!tokens.access_token,
+          hasRefreshToken: !!tokens.refresh_token,
+          expiresIn: tokens.expires_in,
+          tokenType: tokens.token_type
+        });
+      } catch (e) {
+        console.error("❌ [exchange_code] Erreur lors du parsing des tokens:", e);
+        return new Response(
+          JSON.stringify({ error: "Failed to parse token response", details: String(e) }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Récupérer les informations du compte Google
+      console.log("🔄 [exchange_code] Récupération des infos utilisateur Google...");
       const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
         },
       });
 
+      console.log("📥 [exchange_code] Réponse userinfo:", {
+        status: userInfoResponse.status,
+        statusText: userInfoResponse.statusText,
+        ok: userInfoResponse.ok
+      });
+
       if (!userInfoResponse.ok) {
+        const errorText = await userInfoResponse.text();
+        console.error("❌ [exchange_code] Erreur lors de la récupération userinfo:", errorText);
         return new Response(
-          JSON.stringify({ error: "Failed to fetch user info" }),
+          JSON.stringify({ error: "Failed to fetch user info", details: errorText, status: userInfoResponse.status }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const userInfo = await userInfoResponse.json();
+      let userInfo: any;
+      try {
+        userInfo = await userInfoResponse.json();
+        console.log("✅ [exchange_code] User info reçue:", {
+          email: userInfo.email,
+          name: userInfo.name,
+          id: userInfo.id
+        });
+      } catch (e) {
+        console.error("❌ [exchange_code] Erreur lors du parsing userinfo:", e);
+        return new Response(
+          JSON.stringify({ error: "Failed to parse user info", details: String(e) }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+      console.log("📅 [exchange_code] Token expire le:", expiresAt.toISOString());
 
       // Récupérer le nom de l'entreprise
+      console.log("🔄 [exchange_code] Récupération de l'entreprise:", finalCompanyId);
       const { data: company, error: companyError } = await supabaseClient
         .from("companies")
         .select("name")
         .eq("id", finalCompanyId)
         .single();
 
-      if (companyError || !company) {
+      if (companyError) {
+        console.error("❌ [exchange_code] Erreur lors de la récupération de l'entreprise:", companyError);
         return new Response(
-          JSON.stringify({ error: "Company not found" }),
+          JSON.stringify({ error: "Company not found", details: companyError }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
+      if (!company) {
+        console.error("❌ [exchange_code] Entreprise non trouvée:", finalCompanyId);
+        return new Response(
+          JSON.stringify({ error: "Company not found", company_id: finalCompanyId }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("✅ [exchange_code] Entreprise trouvée:", company.name);
+
       // Créer un calendrier Google dédié pour l'entreprise
       const calendarName = `Planning – ${company.name}`;
+      console.log("🔄 [exchange_code] Création du calendrier Google:", calendarName);
+      
       const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/calendars", {
         method: "POST",
         headers: {
@@ -465,23 +519,59 @@ serve(async (req) => {
         }),
       });
 
+      console.log("📥 [exchange_code] Réponse création calendrier:", {
+        status: calendarResponse.status,
+        statusText: calendarResponse.statusText,
+        ok: calendarResponse.ok
+      });
+
       if (!calendarResponse.ok) {
-        const error = await calendarResponse.text();
-        console.error("Google Calendar creation error:", error);
+        const errorText = await calendarResponse.text();
+        let errorDetails: any;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch {
+          errorDetails = errorText;
+        }
+        console.error("❌ [exchange_code] Erreur création calendrier Google:", errorDetails);
         return new Response(
-          JSON.stringify({ error: "Failed to create Google Calendar", details: error }),
+          JSON.stringify({ error: "Failed to create Google Calendar", details: errorDetails, status: calendarResponse.status }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const googleCalendar: GoogleCalendar = await calendarResponse.json();
+      let googleCalendar: GoogleCalendar;
+      try {
+        googleCalendar = await calendarResponse.json();
+        console.log("✅ [exchange_code] Calendrier créé:", {
+          id: googleCalendar.id,
+          summary: googleCalendar.summary
+        });
+      } catch (e) {
+        console.error("❌ [exchange_code] Erreur lors du parsing du calendrier:", e);
+        return new Response(
+          JSON.stringify({ error: "Failed to parse calendar response", details: String(e) }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Enregistrer ou mettre à jour la connexion
+      console.log("🔄 [exchange_code] Vérification connexion existante...");
       const { data: existingConnection, error: fetchError } = await supabaseClient
         .from("google_calendar_connections")
         .select("*")
         .eq("company_id", finalCompanyId)
         .maybeSingle();
+
+      if (fetchError) {
+        console.error("❌ [exchange_code] Erreur lors de la vérification connexion existante:", fetchError);
+        return new Response(
+          JSON.stringify({ error: "Failed to check existing connection", details: fetchError }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("📊 [exchange_code] Connexion existante:", existingConnection ? "Oui" : "Non");
 
       const connectionData = {
         company_id: finalCompanyId,
@@ -498,9 +588,19 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       };
 
+      console.log("💾 [exchange_code] Données à sauvegarder:", {
+        company_id: connectionData.company_id,
+        owner_user_id: connectionData.owner_user_id,
+        google_email: connectionData.google_email,
+        calendar_id: connectionData.calendar_id,
+        has_access_token: !!connectionData.access_token,
+        has_refresh_token: !!connectionData.refresh_token
+      });
+
       let result;
       if (existingConnection) {
         // Mettre à jour la connexion existante
+        console.log("🔄 [exchange_code] Mise à jour connexion existante:", existingConnection.id);
         const { data, error } = await supabaseClient
           .from("google_calendar_connections")
           .update(connectionData)
@@ -511,6 +611,7 @@ serve(async (req) => {
         result = { data, error };
       } else {
         // Créer une nouvelle connexion
+        console.log("🔄 [exchange_code] Création nouvelle connexion...");
         const { data, error } = await supabaseClient
           .from("google_calendar_connections")
           .insert(connectionData)
@@ -521,12 +622,19 @@ serve(async (req) => {
       }
 
       if (result.error) {
-        console.error("Database error:", result.error);
+        console.error("❌ [exchange_code] ========================================");
+        console.error("❌ [exchange_code] ERREUR BASE DE DONNÉES");
+        console.error("❌ [exchange_code] ========================================");
+        console.error("❌ [exchange_code] Error:", JSON.stringify(result.error, null, 2));
+        console.error("❌ [exchange_code] Connection Data:", JSON.stringify(connectionData, null, 2));
+        console.error("❌ [exchange_code] ========================================");
         return new Response(
           JSON.stringify({ error: "Failed to save connection", details: result.error }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("✅ [exchange_code] Connexion sauvegardée:", result.data?.id);
 
       // Mettre à jour companies.google_calendar_id
       await supabaseClient
