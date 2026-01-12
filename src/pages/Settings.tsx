@@ -13,7 +13,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
 import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
@@ -35,6 +35,10 @@ const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const exchangeCode = useExchangeGoogleCode();
+  
+  // Ref pour éviter les appels multiples
+  const hasProcessedOAuth = useRef(false);
+  const oauthCodeRef = useRef<string | null>(null);
   
   // Lire le paramètre tab de l'URL
   const tabFromUrl = searchParams.get("tab");
@@ -60,8 +64,35 @@ const Settings = () => {
   // Utiliser company_id du state si currentCompanyId n'est pas disponible
   const effectiveCompanyId = currentCompanyId || companyIdFromState;
   
-  // Gérer le callback OAuth Google Calendar
+  // Gérer le callback OAuth Google Calendar (une seule fois)
   useEffect(() => {
+    // Si pas de paramètres OAuth dans l'URL, ne rien faire
+    if (!googleCalendarCode && !googleCalendarStatus && !googleCalendarError) {
+      return;
+    }
+    
+    // Créer une clé unique pour cette tentative OAuth
+    const oauthKey = `${googleCalendarCode || ''}-${googleCalendarStatus || ''}-${googleCalendarError || ''}`;
+    
+    // Si cette tentative a déjà été traitée, ne rien faire
+    if (hasProcessedOAuth.current === oauthKey) {
+      return;
+    }
+    
+    // Si en cours de traitement, ne rien faire
+    if (exchangeCode.isPending) {
+      return;
+    }
+    
+    // Marquer cette tentative comme traitée IMMÉDIATEMENT
+    hasProcessedOAuth.current = oauthKey;
+    
+    // Nettoyer l'URL immédiatement pour éviter les re-déclenchements
+    const newParams = new URLSearchParams();
+    newParams.set("tab", "integrations");
+    setSearchParams(newParams, { replace: true });
+    
+    // Traiter le callback
     if (googleCalendarStatus === "success" && googleCalendarCode && effectiveCompanyId) {
       // Échanger le code contre des tokens
       exchangeCode.mutate(
@@ -72,11 +103,6 @@ const Settings = () => {
               title: "✅ Connexion réussie",
               description: "Google Calendar a été connecté avec succès",
             });
-            
-            // Nettoyer l'URL mais garder tab=integrations
-            const newParams = new URLSearchParams();
-            newParams.set("tab", "integrations");
-            setSearchParams(newParams);
           },
           onError: (error: any) => {
             console.error("❌ Erreur lors de l'échange du code:", error);
@@ -85,11 +111,6 @@ const Settings = () => {
               description: error.message || "Impossible de finaliser la connexion Google Calendar",
               variant: "destructive",
             });
-            
-            // Nettoyer l'URL mais garder tab=integrations
-            const newParams = new URLSearchParams();
-            newParams.set("tab", "integrations");
-            setSearchParams(newParams);
           },
         }
       );
@@ -100,11 +121,6 @@ const Settings = () => {
         description: "Company ID manquant. Veuillez vous assurer d'être connecté à une entreprise.",
         variant: "destructive",
       });
-      
-      // Nettoyer l'URL mais garder tab=integrations
-      const newParams = new URLSearchParams();
-      newParams.set("tab", "integrations");
-      setSearchParams(newParams);
     } else if (googleCalendarStatus === "error" || googleCalendarError) {
       // Afficher l'erreur
       toast({
@@ -112,25 +128,9 @@ const Settings = () => {
         description: googleCalendarError || "Une erreur est survenue lors de la connexion Google Calendar",
         variant: "destructive",
       });
-      
-      // Nettoyer l'URL mais garder tab=integrations
-      const newParams = new URLSearchParams();
-      newParams.set("tab", "integrations");
-      setSearchParams(newParams);
-    } else if (googleCalendarStatus === "success" && googleCalendarCode && !currentCompanyId) {
-      // Company ID manquant
-      toast({
-        title: "❌ Erreur de connexion",
-        description: "Company ID manquant. Veuillez vous assurer d'être connecté à une entreprise.",
-        variant: "destructive",
-      });
-      
-      // Nettoyer l'URL mais garder tab=integrations
-      const newParams = new URLSearchParams();
-      newParams.set("tab", "integrations");
-      setSearchParams(newParams);
     }
-  }, [googleCalendarStatus, googleCalendarCode, googleCalendarError, googleCalendarState, currentCompanyId, effectiveCompanyId, exchangeCode, toast, setSearchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleCalendarCode]); // Dépendre uniquement du code pour éviter les re-déclenchements
   
   // Compter le nombre d'onglets (ajuster selon si admin)
   const isAdministrator = userRole === 'admin' || isAdmin;

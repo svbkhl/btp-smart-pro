@@ -182,7 +182,8 @@ export const GoogleCalendarConnection = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {canConnect ? (
+            {/* Toujours afficher le bouton si canConnect est true, sinon afficher le message */}
+            {canConnect || isOwner ? (
               <>
                 <p className="text-sm text-muted-foreground">
                   Connectez Google Calendar pour créer un calendrier dédié à votre entreprise.
@@ -212,6 +213,12 @@ export const GoogleCalendarConnection = () => {
                 <p className="text-sm text-muted-foreground">
                   Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar.
                 </p>
+                {/* Debug: Afficher les valeurs pour comprendre pourquoi canConnect est false */}
+                {process.env.NODE_ENV === 'development' && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Debug: canConnect={String(canConnect)}, isOwner={String(isOwner)}
+                  </p>
+                )}
               </div>
             )}
           </div>
