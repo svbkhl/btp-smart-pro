@@ -182,7 +182,7 @@ export const GoogleCalendarConnection = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {isOwner ? (
+            {canConnect ? (
               <>
                 <p className="text-sm text-muted-foreground">
                   Connectez Google Calendar pour créer un calendrier dédié à votre entreprise.
@@ -210,7 +210,7 @@ export const GoogleCalendarConnection = () => {
               <div className="text-center py-4">
                 <Crown className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Seul le propriétaire de l'entreprise peut connecter Google Calendar.
+                  Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar.
                 </p>
               </div>
             )}

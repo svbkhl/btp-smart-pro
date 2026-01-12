@@ -8,20 +8,20 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 /**
  * Vérifie si l'utilisateur peut connecter Google Calendar
- * Seul le propriétaire (owner) peut connecter
+ * Le propriétaire (owner) et les administrateurs (admin) peuvent connecter
  */
 export function useCanConnectGoogleCalendar() {
-  const { isOwner } = usePermissions();
-  return isOwner;
+  const { isOwner, isAdmin } = usePermissions();
+  return isOwner || isAdmin;
 }
 
 /**
  * Vérifie si l'utilisateur peut gérer les paramètres Google Calendar
- * Seul le propriétaire (owner) peut gérer
+ * Le propriétaire (owner) et les administrateurs (admin) peuvent gérer
  */
 export function useCanManageGoogleCalendarSettings() {
-  const { isOwner } = usePermissions();
-  return isOwner;
+  const { isOwner, isAdmin } = usePermissions();
+  return isOwner || isAdmin;
 }
 
 /**
