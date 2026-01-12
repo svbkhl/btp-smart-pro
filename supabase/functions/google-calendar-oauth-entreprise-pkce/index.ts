@@ -109,24 +109,50 @@ serve(async (req) => {
       );
     }
 
-    // Vérifier que l'utilisateur est owner
+    // Vérifier que l'utilisateur est owner ou admin
     const { data: companyUser, error: roleError } = await supabaseClient
       .from("company_users")
       .select("company_id, roles(slug)")
       .eq("user_id", user.id)
       .single();
 
-    if (roleError || !companyUser || companyUser.roles?.slug !== "owner") {
+    if (roleError || !companyUser) {
+      console.error("❌ [Role check] Error or no company user:", roleError);
       return new Response(
-        JSON.stringify({ error: "Only company owners can manage Google Calendar connection" }),
+        JSON.stringify({ error: "User not associated with a company or insufficient permissions" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const userRoleSlug = companyUser.roles?.slug;
+    if (userRoleSlug !== "owner" && userRoleSlug !== "admin") {
+      console.error("❌ [Role check] User role is not owner or admin:", userRoleSlug);
+      return new Response(
+        JSON.stringify({ error: "Only company owners or administrators can manage Google Calendar connection" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("✅ [Role check] User has permission:", userRoleSlug);
+
     const companyId = companyUser.company_id;
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action");
+    let action = url.searchParams.get("action");
+    
+    // Si l'action n'est pas dans l'URL, essayer de la récupérer depuis le body
+    if (!action) {
+      try {
+        const body = await req.clone().json();
+        action = body.action;
+      } catch (e) {
+        // Ignorer si le body n'est pas JSON ou vide
+      }
+    }
+    
+    console.log("🔍 [Request] Action:", action || "not provided");
+    console.log("🔍 [Request] Method:", req.method);
+    console.log("🔍 [Request] URL:", req.url);
 
     // ========================================================================
     // ACTION: get_auth_url - Générer l'URL d'authentification Google avec PKCE
@@ -171,8 +197,28 @@ serve(async (req) => {
     // ACTION: exchange_code - Échanger le code d'autorisation contre des tokens (avec PKCE)
     // ========================================================================
     if (action === "exchange_code") {
-      const body = await req.json();
+      let body: any;
+      try {
+        const bodyText = await req.text();
+        console.log("🔍 [exchange_code] Body raw:", bodyText);
+        body = JSON.parse(bodyText);
+      } catch (e) {
+        console.error("❌ [exchange_code] Erreur lors du parsing du body:", e);
+        return new Response(
+          JSON.stringify({ error: "Invalid request body", details: String(e) }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       const { code, code_verifier, state, company_id: companyIdFromBody } = body;
+      
+      console.log("🔍 [exchange_code] Body parsé:", {
+        hasCode: !!code,
+        hasCodeVerifier: !!code_verifier,
+        hasState: !!state,
+        hasCompanyId: !!companyIdFromBody,
+        companyId: companyIdFromBody
+      });
       
       console.log("🔍 [exchange_code] Paramètres reçus:");
       console.log("  - code:", code ? "present" : "missing");
@@ -276,10 +322,22 @@ serve(async (req) => {
       });
 
       if (!tokenResponse.ok) {
-        const error = await tokenResponse.text();
-        console.error("Google token exchange error:", error);
+        const errorText = await tokenResponse.text();
+        let errorDetails: any;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch {
+          errorDetails = errorText;
+        }
+        console.error("❌ [exchange_code] Google token exchange error:", errorDetails);
+        console.error("❌ [exchange_code] Status:", tokenResponse.status);
+        console.error("❌ [exchange_code] Headers:", Object.fromEntries(tokenResponse.headers.entries()));
         return new Response(
-          JSON.stringify({ error: "Failed to exchange code for tokens", details: error }),
+          JSON.stringify({ 
+            error: "Failed to exchange code for tokens", 
+            details: errorDetails,
+            status: tokenResponse.status
+          }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -597,9 +655,16 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("❌ [ERROR] Unhandled error:", error);
+    console.error("❌ [ERROR] Error stack:", error instanceof Error ? error.stack : "No stack");
+    console.error("❌ [ERROR] Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : String(error),
+        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : undefined
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
