@@ -82,14 +82,14 @@ CREATE TRIGGER validate_event_uuid_fields_trigger
   EXECUTE FUNCTION public.validate_event_uuid_fields();
 
 -- ============================================================================
--- ÉTAPE 4: Vérifier que create_notification accepte 'events' comme string
+-- ÉTAPE 4: Vérifier que create_notification existe
 -- ============================================================================
 
--- Vérifier la signature de create_notification
+-- Vérifier que la fonction create_notification existe
 DO $$
 DECLARE
   func_exists BOOLEAN;
-  param_count INTEGER;
+  func_args TEXT;
 BEGIN
   SELECT EXISTS (
     SELECT 1 FROM pg_proc p
@@ -99,16 +99,19 @@ BEGIN
   ) INTO func_exists;
   
   IF func_exists THEN
-    SELECT COUNT(*) INTO param_count
+    -- Récupérer les arguments de la fonction
+    SELECT pg_get_function_arguments(p.oid) INTO func_args
     FROM pg_proc p
     JOIN pg_namespace n ON p.pronamespace = n.oid
-    JOIN pg_proc_arguments pa ON p.oid = pa.prooid
     WHERE n.nspname = 'public'
-    AND p.proname = 'create_notification';
+    AND p.proname = 'create_notification'
+    LIMIT 1;
     
-    RAISE NOTICE '✅ Fonction create_notification existe avec % paramètres', param_count;
+    RAISE NOTICE '✅ Fonction create_notification existe';
+    RAISE NOTICE '   Arguments: %', func_args;
   ELSE
     RAISE WARNING '⚠️ Fonction create_notification n''existe pas - le trigger notify_on_event_created pourrait échouer';
+    RAISE NOTICE '   Vous pouvez ignorer ce warning si vous n''utilisez pas les notifications';
   END IF;
 END $$;
 
