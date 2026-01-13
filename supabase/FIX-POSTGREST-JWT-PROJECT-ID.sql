@@ -150,27 +150,18 @@ END $$;
 -- ÉTAPE 7: Créer des policies RLS SÉCURISÉES (sans JWT claims)
 -- ============================================================================
 
--- Helper function pour obtenir company_id de l'utilisateur
-CREATE OR REPLACE FUNCTION public.get_user_company_id()
-RETURNS UUID
-LANGUAGE SQL
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT cu.company_id 
-  FROM public.company_users cu 
-  WHERE cu.user_id = auth.uid() 
-  LIMIT 1;
-$$;
-
 -- Policy SELECT
 CREATE POLICY "Company users can view events"
 ON public.events FOR SELECT
 USING (
   auth.uid() IS NOT NULL
   AND user_id = auth.uid()
-  AND company_id = public.get_user_company_id()
+  AND company_id = (
+    SELECT cu.company_id 
+    FROM public.company_users cu 
+    WHERE cu.user_id = auth.uid() 
+    LIMIT 1
+  )
 );
 
 -- Policy INSERT (ACCEPTE project_id NULL)
@@ -179,14 +170,24 @@ ON public.events FOR INSERT
 WITH CHECK (
   auth.uid() IS NOT NULL
   AND user_id = auth.uid()
-  AND company_id = public.get_user_company_id()
+  AND company_id = (
+    SELECT cu.company_id 
+    FROM public.company_users cu 
+    WHERE cu.user_id = auth.uid() 
+    LIMIT 1
+  )
   -- ⚠️ IMPORTANT: project_id peut être NULL
   -- ⚠️ Aucune vérification JWT claim ici
   AND (
     project_id IS NULL
     OR project_id IN (
-      SELECT id FROM public.projects 
-      WHERE company_id = public.get_user_company_id()
+      SELECT p.id FROM public.projects p
+      WHERE p.company_id = (
+        SELECT cu.company_id 
+        FROM public.company_users cu 
+        WHERE cu.user_id = auth.uid() 
+        LIMIT 1
+      )
     )
   )
 );
@@ -197,18 +198,33 @@ ON public.events FOR UPDATE
 USING (
   auth.uid() IS NOT NULL
   AND user_id = auth.uid()
-  AND company_id = public.get_user_company_id()
+  AND company_id = (
+    SELECT cu.company_id 
+    FROM public.company_users cu 
+    WHERE cu.user_id = auth.uid() 
+    LIMIT 1
+  )
 )
 WITH CHECK (
   auth.uid() IS NOT NULL
   AND user_id = auth.uid()
-  AND company_id = public.get_user_company_id()
+  AND company_id = (
+    SELECT cu.company_id 
+    FROM public.company_users cu 
+    WHERE cu.user_id = auth.uid() 
+    LIMIT 1
+  )
   -- ⚠️ IMPORTANT: project_id peut être NULL
   AND (
     project_id IS NULL
     OR project_id IN (
-      SELECT id FROM public.projects 
-      WHERE company_id = public.get_user_company_id()
+      SELECT p.id FROM public.projects p
+      WHERE p.company_id = (
+        SELECT cu.company_id 
+        FROM public.company_users cu 
+        WHERE cu.user_id = auth.uid() 
+        LIMIT 1
+      )
     )
   )
 );
@@ -219,7 +235,12 @@ ON public.events FOR DELETE
 USING (
   auth.uid() IS NOT NULL
   AND user_id = auth.uid()
-  AND company_id = public.get_user_company_id()
+  AND company_id = (
+    SELECT cu.company_id 
+    FROM public.company_users cu 
+    WHERE cu.user_id = auth.uid() 
+    LIMIT 1
+  )
 );
 
 -- ============================================================================
