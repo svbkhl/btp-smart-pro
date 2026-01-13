@@ -210,6 +210,30 @@ export const useExchangeGoogleCode = () => {
       // Invalider le cache de la connexion
       queryClient.invalidateQueries({ queryKey: ["google_calendar_connection"] });
 
+      // ⚠️ IMPORTANT: Initialiser le webhook Google Calendar après connexion réussie
+      // Cela active les notifications push pour la synchronisation Google → App
+      if (data && effectiveCompanyId) {
+        try {
+          console.log("🔄 [useExchangeGoogleCode] Initialisation du webhook Google Calendar...");
+          const { data: watchData, error: watchError } = await supabase.functions.invoke(
+            "google-calendar-watch",
+            {
+              body: { company_id: effectiveCompanyId },
+            }
+          );
+
+          if (watchError) {
+            console.warn("⚠️ [useExchangeGoogleCode] Erreur initialisation webhook:", watchError);
+            // Ne pas bloquer le flow si le webhook échoue (peut être configuré plus tard)
+          } else {
+            console.log("✅ [useExchangeGoogleCode] Webhook Google Calendar initialisé:", watchData);
+          }
+        } catch (watchErr) {
+          console.warn("⚠️ [useExchangeGoogleCode] Erreur lors de l'initialisation du webhook:", watchErr);
+          // Ne pas bloquer le flow si le webhook échoue
+        }
+      }
+
       return data;
     },
   });
