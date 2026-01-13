@@ -102,21 +102,26 @@ serve(async (req) => {
     if (resourceState === "exists" || resourceState === "not_exists") {
       console.log("🔄 [webhook] Changement détecté, déclenchement sync incrémentale");
 
-      // Appeler la fonction de sync incrémentale de manière asynchrone
-      // (on ne veut pas bloquer la réponse à Google)
       const connection = webhook.google_calendar_connections;
       
       if (connection) {
-        // Créer une tâche de synchronisation (on peut utiliser une table de jobs)
-        // Pour l'instant, on appelle directement la fonction de sync
-        // Dans un vrai système, on utiliserait une queue
+        // Appeler google-calendar-sync-changes de manière asynchrone
+        // (ne pas bloquer la réponse à Google)
+        fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/google-calendar-sync-changes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            company_id: webhook.company_id,
+            calendar_id: connection.calendar_id,
+          }),
+        }).catch(error => {
+          console.error("❌ [webhook] Erreur déclenchement sync:", error);
+        });
         
-        // Note: On pourrait aussi appeler directement google-calendar-sync-incremental
-        // mais pour éviter les timeouts, on le fait de manière asynchrone
-        
-        // Pour l'instant, on retourne juste un succès
-        // La sync sera déclenchée par un cron job qui vérifie les webhooks récents
-        console.log("✅ [webhook] Changement enregistré, sync sera traitée par cron");
+        console.log("✅ [webhook] Sync déclenchée de manière asynchrone");
       }
     }
 

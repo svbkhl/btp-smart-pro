@@ -197,13 +197,15 @@ serve(async (req) => {
 
           const googleEventResponse = await response.json();
 
-          // Mettre à jour l'événement
+          // Mettre à jour l'événement avec google_event_id ET google_calendar_id
           await supabaseClient
             .from("events")
             .update({
+              google_calendar_id: connection.calendar_id, // ⚠️ OBLIGATOIRE pour la clé composite
               google_event_id: googleEventResponse.id,
               synced_with_google: true,
               google_sync_error: null,
+              last_update_source: "app", // Modification venant de l'app
               last_synced_at: new Date().toISOString(),
             })
             .eq("id", item.event_id);
@@ -246,9 +248,11 @@ serve(async (req) => {
             await supabaseClient
               .from("events")
               .update({
+                google_calendar_id: connection.calendar_id, // ⚠️ OBLIGATOIRE pour la clé composite
                 google_event_id: googleEventResponse.id,
                 synced_with_google: true,
                 google_sync_error: null,
+                last_update_source: "app", // Modification venant de l'app
                 last_synced_at: new Date().toISOString(),
               })
               .eq("id", item.event_id);
@@ -289,6 +293,7 @@ serve(async (req) => {
               .update({
                 synced_with_google: true,
                 google_sync_error: null,
+                last_update_source: "app", // Modification venant de l'app
                 last_synced_at: new Date().toISOString(),
               })
               .eq("id", item.event_id);

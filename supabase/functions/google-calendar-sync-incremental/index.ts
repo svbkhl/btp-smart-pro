@@ -258,23 +258,33 @@ async function processEvents(
 
   for (const googleEvent of events) {
     try {
-      // ⚠️ ANTI-LOOP: Marquer updated_source = 'google' pour éviter de renvoyer à Google
+      // ⚠️ ANTI-LOOP: Marquer last_update_source = 'google' pour éviter de renvoyer à Google
       
-      // Si l'événement est annulé, le supprimer
+      // Si l'événement est annulé, le supprimer (soft delete avec deleted_at)
       if (googleEvent.status === "cancelled") {
+        const calendarId = connection.calendar_id;
+        
+        // Chercher par clé composite (google_calendar_id, google_event_id)
         const { data: existingEvent } = await supabaseClient
           .from("events")
           .select("id")
+          .eq("google_calendar_id", calendarId)
           .eq("google_event_id", googleEvent.id)
-          .eq("company_id", connection.company_id)
-          .single();
+          .is("deleted_at", null) // Seulement si pas déjà supprimé
+          .maybeSingle();
 
         if (existingEvent) {
+          // Soft delete avec deleted_at
           await supabaseClient
             .from("events")
-            .delete()
+            .update({ 
+              deleted_at: new Date().toISOString(),
+              last_update_source: "google",
+              last_synced_at: new Date().toISOString(),
+            })
             .eq("id", existingEvent.id);
           deleted++;
+          console.log(`✅ [sync-incremental] Événement supprimé (soft delete): ${existingEvent.id}`);
         }
         continue;
       }
@@ -290,47 +300,13 @@ async function processEvents(
       }
 
       const eventTitle = googleEvent.summary || "Sans titre";
+      const calendarId = connection.calendar_id;
       
-      // ⚠️ STRATÉGIE DE MATCHING AMÉLIORÉE :
-      // 1. Chercher d'abord par google_event_id (le plus fiable)
-      // 2. Si pas trouvé, chercher par title + start_date (pour éviter les doublons)
-      // 3. Seulement créer si vraiment aucun match
+      // ⚠️ CLÉ COMPOSITE: (google_calendar_id, google_event_id)
+      // C'est la seule façon fiable d'éviter les doublons
       
-      let existingEvent = null;
-      
-      // 1. Chercher par google_event_id
-      const { data: eventByGoogleId } = await supabaseClient
-        .from("events")
-        .select("*")
-        .eq("google_event_id", googleEvent.id)
-        .eq("company_id", connection.company_id)
-        .maybeSingle();
-      
-      if (eventByGoogleId) {
-        existingEvent = eventByGoogleId;
-        console.log(`✅ [sync-incremental] Événement trouvé par google_event_id: ${googleEvent.id}`);
-      } else {
-        // 2. Chercher par title + start_date (pour éviter les doublons si google_event_id manquant)
-        // Normaliser la date pour la comparaison (enlever les heures si all_day)
-        const startDateForMatch = allDay 
-          ? startDate.split("T")[0] 
-          : new Date(startDate).toISOString();
-        
-        const { data: eventByTitleAndDate } = await supabaseClient
-          .from("events")
-          .select("*")
-          .eq("company_id", connection.company_id)
-          .eq("title", eventTitle)
-          .gte("start_date", new Date(new Date(startDateForMatch).getTime() - 5 * 60 * 1000).toISOString()) // -5 min
-          .lte("start_date", new Date(new Date(startDateForMatch).getTime() + 5 * 60 * 1000).toISOString()) // +5 min
-          .is("google_event_id", null) // Seulement ceux qui n'ont pas encore de google_event_id
-          .maybeSingle();
-        
-        if (eventByTitleAndDate) {
-          existingEvent = eventByTitleAndDate;
-          console.log(`✅ [sync-incremental] Événement trouvé par title+date: ${eventTitle} - ${startDateForMatch}`);
-        }
-      }
+      // Récupérer google_updated_at depuis Google (si disponible)
+      const googleUpdatedAt = googleEvent.updated ? new Date(googleEvent.updated).toISOString() : null;
 
       const eventData = {
         company_id: connection.company_id,
@@ -343,28 +319,78 @@ async function processEvents(
         location: googleEvent.location || null,
         type: "meeting" as const,
         color: googleEvent.colorId ? `#${googleEvent.colorId}` : "#3b82f6",
-        google_event_id: googleEvent.id, // ⚠️ Toujours mettre à jour google_event_id
+        google_calendar_id: calendarId, // ⚠️ OBLIGATOIRE pour la clé composite
+        google_event_id: googleEvent.id, // ⚠️ OBLIGATOIRE pour la clé composite
+        google_updated_at: googleUpdatedAt,
         synced_with_google: true,
         google_sync_error: null,
-        updated_source: "google", // ⚠️ IMPORTANT: Évite la boucle
+        last_update_source: "google", // ⚠️ IMPORTANT: Évite la boucle
         last_synced_at: new Date().toISOString(),
+        deleted_at: null, // Réactiver si c'était supprimé
       };
 
-      if (existingEvent) {
-        // Mettre à jour l'événement existant (NE PAS CRÉER DE NOUVEAU)
-        await supabaseClient
+      // ⚠️ UPSERT avec onConflict sur (google_calendar_id, google_event_id)
+      // Cela garantit qu'on UPDATE toujours l'existant, jamais de doublon
+      const { data: upsertedEvent, error: upsertError } = await supabaseClient
+        .from("events")
+        .upsert(eventData, {
+          onConflict: "google_calendar_id,google_event_id",
+          ignoreDuplicates: false, // On veut UPDATE, pas ignorer
+        })
+        .select()
+        .single();
+
+      if (upsertError) {
+        // Si l'upsert échoue (contrainte unique), essayer UPDATE manuel
+        console.warn(`⚠️ [sync-incremental] Upsert échoué, tentative UPDATE: ${upsertError.message}`);
+        
+        const { data: existingEvent } = await supabaseClient
           .from("events")
-          .update(eventData)
-          .eq("id", existingEvent.id);
-        updated++;
-        console.log(`✅ [sync-incremental] Événement mis à jour: ${existingEvent.id} (titre: ${eventTitle})`);
+          .select("id")
+          .eq("google_calendar_id", calendarId)
+          .eq("google_event_id", googleEvent.id)
+          .maybeSingle();
+        
+        if (existingEvent) {
+          // UPDATE l'existant
+          const { error: updateError } = await supabaseClient
+            .from("events")
+            .update(eventData)
+            .eq("id", existingEvent.id);
+          
+          if (updateError) {
+            console.error(`❌ [sync-incremental] Erreur UPDATE: ${updateError.message}`);
+            throw updateError;
+          }
+          updated++;
+          console.log(`✅ [sync-incremental] Événement mis à jour (UPDATE): ${existingEvent.id} (titre: ${eventTitle})`);
+        } else {
+          // INSERT seulement si vraiment pas trouvé
+          const { error: insertError } = await supabaseClient
+            .from("events")
+            .insert(eventData);
+          
+          if (insertError) {
+            console.error(`❌ [sync-incremental] Erreur INSERT: ${insertError.message}`);
+            throw insertError;
+          }
+          created++;
+          console.log(`✅ [sync-incremental] Nouvel événement créé (INSERT): ${eventTitle} (google_event_id: ${googleEvent.id})`);
+        }
       } else {
-        // Créer un nouvel événement seulement si vraiment aucun match
-        await supabaseClient
-          .from("events")
-          .insert(eventData);
-        created++;
-        console.log(`✅ [sync-incremental] Nouvel événement créé: ${eventTitle} (google_event_id: ${googleEvent.id})`);
+        // Upsert réussi
+        if (upsertedEvent) {
+          // Vérifier si c'était un UPDATE ou INSERT en comparant created_at
+          const wasInsert = new Date(upsertedEvent.created_at).getTime() > Date.now() - 5000; // Créé il y a moins de 5 secondes
+          
+          if (wasInsert) {
+            created++;
+            console.log(`✅ [sync-incremental] Nouvel événement créé (UPSERT): ${eventTitle} (google_event_id: ${googleEvent.id})`);
+          } else {
+            updated++;
+            console.log(`✅ [sync-incremental] Événement mis à jour (UPSERT): ${upsertedEvent.id} (titre: ${eventTitle})`);
+          }
+        }
       }
 
     } catch (error) {

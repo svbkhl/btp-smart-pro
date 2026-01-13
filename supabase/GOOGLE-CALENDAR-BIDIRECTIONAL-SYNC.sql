@@ -143,17 +143,21 @@ BEGIN
     RETURN COALESCE(NEW, OLD);
   END IF;
 
-  -- ⚠️ ANTI-LOOP: Ne pas synchroniser si updated_source = 'google'
+  -- ⚠️ ANTI-LOOP: Ne pas synchroniser si last_update_source = 'google'
   IF TG_OP = 'UPDATE' THEN
-    IF OLD.updated_source = 'google' THEN
+    IF COALESCE(OLD.last_update_source, 'app') = 'google' THEN
+      RETURN NEW;
+    END IF;
+    -- Ne pas synchroniser si updated_at <= last_synced_at (déjà synchronisé)
+    IF OLD.last_synced_at IS NOT NULL AND NEW.updated_at <= OLD.last_synced_at THEN
       RETURN NEW;
     END IF;
   END IF;
 
   -- Déterminer l'action
   IF TG_OP = 'INSERT' THEN
-    -- Ne synchroniser que si updated_source = 'app' (par défaut)
-    IF COALESCE(NEW.updated_source, 'app') = 'app' THEN
+    -- Ne synchroniser que si last_update_source = 'app' (par défaut)
+    IF COALESCE(NEW.last_update_source, 'app') = 'app' THEN
       INSERT INTO public.google_calendar_sync_queue (company_id, event_id, action)
       VALUES (v_company_id, NEW.id, 'create')
       ON CONFLICT (event_id, action, status) 
@@ -161,8 +165,8 @@ BEGIN
       DO NOTHING;
     END IF;
   ELSIF TG_OP = 'UPDATE' THEN
-    -- Ne synchroniser que si updated_source = 'app'
-    IF COALESCE(NEW.updated_source, 'app') = 'app' THEN
+    -- Ne synchroniser que si last_update_source = 'app'
+    IF COALESCE(NEW.last_update_source, 'app') = 'app' THEN
       -- Vérifier si l'événement a déjà un google_event_id
       IF NEW.google_event_id IS NOT NULL THEN
         INSERT INTO public.google_calendar_sync_queue (company_id, event_id, action)
@@ -296,7 +300,7 @@ $$;
 -- ÉTAPE 8: Commentaires
 -- ============================================================================
 
-COMMENT ON COLUMN public.events.updated_source IS 'Source de la dernière modification: app ou google (pour éviter les boucles)';
+COMMENT ON COLUMN public.events.last_update_source IS 'Source de la dernière modification: app ou google (pour éviter les boucles)';
 COMMENT ON COLUMN public.events.last_synced_at IS 'Timestamp de la dernière synchronisation avec Google Calendar';
 COMMENT ON COLUMN public.google_calendar_connections.sync_token IS 'Token de synchronisation incrémentale Google Calendar (pour éviter de re-télécharger tout)';
 COMMENT ON TABLE public.google_calendar_sync_queue IS 'Queue de synchronisation pour éviter les appels directs depuis les triggers';
