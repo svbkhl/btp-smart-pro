@@ -14,10 +14,15 @@ DELETE FROM public.events
 WHERE company_id::text = 'events'
    OR user_id::text = 'events'
    OR project_id::text = 'events'
+   OR project_id::text = 'undefined'
    OR id::text = 'events'
    OR NOT (company_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
    OR NOT (user_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
-   OR (project_id IS NOT NULL AND NOT (project_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'));
+   OR (project_id IS NOT NULL AND (
+     project_id::text = 'undefined'
+     OR project_id::text = ''
+     OR NOT (project_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+   ));
 
 -- ============================================================================
 -- ÉTAPE 2: Fonction de validation UUID stricte
@@ -30,7 +35,7 @@ IMMUTABLE
 STRICT
 AS $$
 DECLARE
-  invalid_values TEXT[] := ARRAY['events', 'calendar', 'event', 'table', 'null', 'undefined', ''];
+  invalid_values TEXT[] := ARRAY['events', 'calendar', 'event', 'table', 'null', 'undefined', '', 'null', 'NULL'];
 BEGIN
   -- Vérifier que c'est une string non vide
   IF uuid_text IS NULL OR uuid_text = '' THEN
@@ -156,11 +161,19 @@ BEGIN
     END IF;
   END IF;
   
-  -- ⚠️ VALIDATION STRICTE project_id si défini
+  -- ⚠️ VALIDATION STRICTE project_id si défini (peut être NULL)
   IF NEW.project_id IS NOT NULL THEN
+    -- ⚠️ Vérifier que project_id n'est pas une string invalide
+    IF NEW.project_id::TEXT = 'events' OR NEW.project_id::TEXT = 'undefined' OR NEW.project_id::TEXT = '' THEN
+      RAISE EXCEPTION 'project_id invalide: "%" (doit être un UUID valide ou NULL, pas "events", "undefined" ou chaîne vide)', NEW.project_id;
+    END IF;
+    
     IF NOT public.is_valid_uuid_strict(NEW.project_id::TEXT) THEN
       RAISE EXCEPTION 'project_id invalide: "%" (doit être un UUID valide ou NULL)', NEW.project_id;
     END IF;
+  ELSE
+    -- ⚠️ S'assurer que project_id est bien NULL (pas undefined)
+    NEW.project_id := NULL;
   END IF;
   
   -- ⚠️ S'assurer que google_event_id est bien TEXT (pas UUID)
@@ -248,7 +261,29 @@ WITH CHECK (
 );
 
 -- ============================================================================
--- ÉTAPE 7: Vérifier la structure de la table
+-- ÉTAPE 7: Vérifier que project_id est nullable
+-- ============================================================================
+
+DO $$
+BEGIN
+  -- Vérifier que project_id est nullable
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'events' 
+    AND column_name = 'project_id'
+    AND is_nullable = 'NO'
+  ) THEN
+    -- Rendre project_id nullable si ce n'est pas déjà le cas
+    ALTER TABLE public.events ALTER COLUMN project_id DROP NOT NULL;
+    RAISE NOTICE '✅ project_id rendu nullable';
+  ELSE
+    RAISE NOTICE '✅ project_id est déjà nullable';
+  END IF;
+END $$;
+
+-- ============================================================================
+-- ÉTAPE 8: Vérifier la structure de la table
 -- ============================================================================
 
 DO $$
