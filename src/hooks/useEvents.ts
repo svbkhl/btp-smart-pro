@@ -92,6 +92,12 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
         return [];
       }
 
+      // ⚠️ VALIDATION STRICTE : Vérifier que currentCompanyId est un UUID valide
+      if (!isValidUUID(currentCompanyId)) {
+        console.error("❌ [useEvents] company_id invalide:", currentCompanyId);
+        throw new Error(`Company ID invalide: "${currentCompanyId}" (doit être un UUID valide)`);
+      }
+
       let query = supabase
         .from("events")
         .select("*")
@@ -130,6 +136,12 @@ export const useTodayEvents = () => {
     queryFn: async () => {
       if (!currentCompanyId) {
         return [];
+      }
+
+      // ⚠️ VALIDATION STRICTE : Vérifier que currentCompanyId est un UUID valide
+      if (!isValidUUID(currentCompanyId)) {
+        console.error("❌ [useTodayEvents] company_id invalide:", currentCompanyId);
+        throw new Error(`Company ID invalide: "${currentCompanyId}" (doit être un UUID valide)`);
       }
 
       const { data, error } = await supabase
@@ -253,9 +265,10 @@ export const useCreateEvent = () => {
       // ⚠️ Le payload ne contient QUE des UUID validés
       // ⚠️ Aucune valeur "events" ne peut être injectée
       // ⚠️ Utiliser insert avec un tableau pour éviter les problèmes de parsing PostgREST
+      // ⚠️ Ne PAS utiliser .eq() ou autres filtres après insert - le trigger et RLS gèrent la sécurité
       const { data: event, error } = await supabase
         .from('events')
-        .insert([payload])
+        .insert(payload)  // Pas besoin de tableau si payload est déjà un objet
         .select('*')
         .single();
 
@@ -355,11 +368,17 @@ export const useDeleteEvent = () => {
         throw new Error("ID d'événement invalide");
       }
 
+      // ⚠️ VALIDATION STRICTE : Vérifier que currentCompanyId est un UUID valide
+      if (!currentCompanyId || !isValidUUID(currentCompanyId)) {
+        throw new Error(`Company ID invalide: "${currentCompanyId}" (doit être un UUID valide)`);
+      }
+
+      // ⚠️ Ne pas utiliser .eq("company_id", ...) - la RLS policy gère déjà l'isolation
+      // ⚠️ La RLS vérifie automatiquement que l'événement appartient à la bonne entreprise
       const { error } = await supabase
         .from("events")
         .delete()
-        .eq("id", id)
-        .eq("company_id", currentCompanyId || "");
+        .eq("id", id);
 
       if (error) {
         console.error("❌ [useDeleteEvent] Erreur:", error);
