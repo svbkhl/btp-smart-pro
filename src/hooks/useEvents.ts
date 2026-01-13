@@ -253,22 +253,35 @@ export const useCreateEvent = () => {
         payload.reminder_recurring = data.reminder_recurring;
       }
 
+      // ⚠️ NETTOYER le payload : Supprimer toutes les clés avec des valeurs undefined
+      // ⚠️ PostgreSQL ne peut pas gérer undefined - il faut soit omettre la clé, soit utiliser null
+      const cleanPayload: Record<string, any> = {};
+      for (const [key, value] of Object.entries(payload)) {
+        // Ne pas inclure les valeurs undefined dans le payload
+        if (value !== undefined) {
+          cleanPayload[key] = value;
+        }
+      }
+
       // ⚠️ DEBUG : Vérifier visuellement que tous les UUID sont corrects
-      console.log('🔍 [useCreateEvent] Payload avant insertion:', JSON.stringify(payload, null, 2));
-      console.log('🔍 [useCreateEvent] Types des valeurs:', {
-        user_id: typeof payload.user_id,
-        company_id: typeof payload.company_id,
-        project_id: typeof payload.project_id,
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [useCreateEvent] Payload nettoyé avant insertion:', JSON.stringify(cleanPayload, null, 2));
+        console.log('🔍 [useCreateEvent] Types des valeurs:', {
+          user_id: typeof cleanPayload.user_id,
+          company_id: typeof cleanPayload.company_id,
+          project_id: typeof cleanPayload.project_id,
+          has_project_id: 'project_id' in cleanPayload,
+        });
+      }
 
       // 5️⃣ Insert sécurisé dans Supabase
-      // ⚠️ Le payload ne contient QUE des UUID validés
+      // ⚠️ Le payload ne contient QUE des UUID validés et aucune valeur undefined
       // ⚠️ Aucune valeur "events" ne peut être injectée
       // ⚠️ Utiliser insert avec un tableau pour éviter les problèmes de parsing PostgREST
       // ⚠️ Ne PAS utiliser .eq() ou autres filtres après insert - le trigger et RLS gèrent la sécurité
       const { data: event, error } = await supabase
         .from('events')
-        .insert(payload)  // Pas besoin de tableau si payload est déjà un objet
+        .insert([cleanPayload])  // Tableau requis par PostgREST, payload nettoyé
         .select('*')
         .single();
 
@@ -321,11 +334,12 @@ export const useUpdateEvent = () => {
         throw new Error("ID d'événement invalide");
       }
 
+      // ⚠️ Ne pas utiliser .eq("company_id", ...) - la RLS policy gère déjà l'isolation
+      // ⚠️ La RLS vérifie automatiquement que l'événement appartient à la bonne entreprise
       const { data: event, error } = await supabase
         .from("events")
         .update(updateData)
         .eq("id", id)
-        .eq("company_id", currentCompanyId || "")
         .select("*")
         .single();
 

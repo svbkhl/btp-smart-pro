@@ -119,17 +119,34 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
         validProjectId = data.project_id;
       }
 
+      // ⚠️ Construire eventData sans valeurs undefined
+      // ⚠️ PostgreSQL ne peut pas gérer undefined - soit omettre la clé, soit utiliser null
       const eventData: CreateEventData = {
         title: data.title,
-        description: data.description || undefined,
         start_date: data.start_date,
-        end_date: data.end_date || undefined,
         all_day: data.all_day || false,
-        location: data.location || undefined,
         type: data.type || "meeting",
         color: data.color || "#3b82f6",
-        project_id: validProjectId,
       };
+      
+      // Ajouter les champs optionnels seulement s'ils ont une valeur
+      if (data.description && data.description.trim()) {
+        eventData.description = data.description.trim();
+      }
+      
+      if (data.end_date && data.end_date.trim()) {
+        eventData.end_date = data.end_date;
+      }
+      
+      if (data.location && data.location.trim()) {
+        eventData.location = data.location.trim();
+      }
+      
+      // ⚠️ project_id : seulement si validProjectId est défini (UUID valide)
+      if (validProjectId) {
+        eventData.project_id = validProjectId;
+      }
+      // Si validProjectId est undefined, on ne l'inclut pas dans eventData
       
       console.log("📝 [EventForm] Données à envoyer:", eventData);
 
