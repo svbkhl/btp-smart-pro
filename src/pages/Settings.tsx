@@ -106,9 +106,26 @@ const Settings = () => {
           },
           onError: (error: any) => {
             console.error("❌ Erreur lors de l'échange du code:", error);
+            console.error("❌ Détails de l'erreur:", {
+              message: error.message,
+              context: error.context,
+              status: error.status,
+              data: error.data
+            });
+            
+            // Extraire le message d'erreur détaillé
+            let errorMessage = error.message || "Impossible de finaliser la connexion Google Calendar";
+            if (error.data?.message) {
+              errorMessage = error.data.message;
+            } else if (error.data?.google_error_description) {
+              errorMessage = error.data.google_error_description;
+            } else if (error.data?.error) {
+              errorMessage = error.data.error;
+            }
+            
             toast({
               title: "❌ Erreur de connexion",
-              description: error.message || "Impossible de finaliser la connexion Google Calendar",
+              description: errorMessage,
               variant: "destructive",
             });
           },

@@ -153,6 +153,14 @@ export const useExchangeGoogleCode = () => {
         // Si l'erreur contient des détails, les afficher
         if (error.data) {
           console.error("❌ [useExchangeGoogleCode] Error data:", JSON.stringify(error.data, null, 2));
+          
+          // Si c'est une erreur structurée de l'Edge Function, la propager
+          if (error.data.error || error.data.message) {
+            const enhancedError = new Error(error.data.message || error.data.error || error.message);
+            (enhancedError as any).data = error.data;
+            (enhancedError as any).status = error.status || error.data.status;
+            throw enhancedError;
+          }
         }
         
         throw error;
