@@ -204,10 +204,8 @@ export const useExchangeGoogleCode = () => {
         throw error;
       }
 
-      // Nettoyer le code_verifier après utilisation (si présent)
-      if (codeVerifier && typeof window !== "undefined") {
-        sessionStorage.removeItem("google_oauth_code_verifier");
-      }
+      // Nettoyer le code_verifier après utilisation réussie
+      clearCodeVerifier();
 
       // Invalider le cache de la connexion
       queryClient.invalidateQueries({ queryKey: ["google_calendar_connection"] });
