@@ -173,19 +173,42 @@ serve(async (req) => {
     // ACTION: get_auth_url - Générer l'URL d'authentification Google avec PKCE
     // ========================================================================
     if (action === "get_auth_url") {
+      // Récupérer le body pour obtenir code_challenge depuis le frontend
+      let body: any = {};
+      try {
+        const bodyText = await req.text();
+        if (bodyText) {
+          body = JSON.parse(bodyText);
+        }
+      } catch (e) {
+        console.warn("⚠️ [get_auth_url] Could not parse body:", e);
+      }
+
+      const codeChallenge = body.code_challenge;
+      
+      if (!codeChallenge) {
+        return new Response(
+          JSON.stringify({ 
+            error: "code_challenge is required. Generate it client-side using PKCE (RFC 7636)." 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("🔐 [get_auth_url] PKCE code_challenge reçu depuis le frontend");
+
       const scopes = [
         "https://www.googleapis.com/auth/calendar",
         "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
       ].join(" ");
 
-      // Générer PKCE
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
-
+      // Créer le state avec user_id et company_id (sans code_verifier pour sécurité)
       const state = btoa(JSON.stringify({ 
         user_id: user.id, 
         company_id: companyId,
-        code_verifier: codeVerifier // Inclure le verifier dans le state pour le callback
+        // Ne PAS inclure code_verifier dans le state - il doit rester côté client
       }));
       
       const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -199,10 +222,12 @@ serve(async (req) => {
       authUrl.searchParams.set("code_challenge", codeChallenge);
       authUrl.searchParams.set("code_challenge_method", "S256");
 
+      console.log("✅ [get_auth_url] URL OAuth générée avec PKCE");
+      console.log("🔗 [get_auth_url] Redirect URI:", GOOGLE_REDIRECT_URI);
+
       return new Response(
         JSON.stringify({ 
-          auth_url: authUrl.toString(),
-          code_verifier: codeVerifier // Retourner aussi pour stockage côté client
+          url: authUrl.toString()
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -331,9 +356,13 @@ serve(async (req) => {
       console.log("🔄 [exchange_code] Appel à Google token endpoint...");
       console.log("🔄 [exchange_code] Token params:", {
         hasClientId: !!tokenParams.client_id,
+        clientIdLength: tokenParams.client_id?.length || 0,
         hasClientSecret: !!tokenParams.client_secret,
+        clientSecretLength: tokenParams.client_secret?.length || 0,
         hasCode: !!tokenParams.code,
-        hasRedirectUri: !!tokenParams.redirect_uri,
+        codeLength: tokenParams.code?.length || 0,
+        codePreview: tokenParams.code ? tokenParams.code.substring(0, 20) + "..." : "missing",
+        redirectUri: tokenParams.redirect_uri,
         hasCodeVerifier: !!tokenParams.code_verifier,
         grantType: tokenParams.grant_type
       });
@@ -419,26 +448,95 @@ serve(async (req) => {
 
       let tokens: GoogleTokenResponse;
       try {
+        // Utiliser .json() directement au lieu de .text() puis JSON.parse()
         tokens = await tokenResponse.json();
-        console.log("✅ [exchange_code] Tokens reçus:", {
+        
+        console.log("✅ [exchange_code] Tokens reçus de Google:", {
           hasAccessToken: !!tokens.access_token,
+          accessTokenLength: tokens.access_token?.length || 0,
+          accessTokenPreview: tokens.access_token ? tokens.access_token.substring(0, 30) + "..." : "MISSING",
           hasRefreshToken: !!tokens.refresh_token,
+          refreshTokenLength: tokens.refresh_token?.length || 0,
           expiresIn: tokens.expires_in,
-          tokenType: tokens.token_type
+          tokenType: tokens.token_type || "Bearer",
+          scope: tokens.scope,
+          allKeys: Object.keys(tokens)
         });
+        
+        // Vérifier que les scopes incluent userinfo
+        if (tokens.scope && !tokens.scope.includes("userinfo")) {
+          console.warn("⚠️ [exchange_code] Les scopes ne semblent pas inclure userinfo:", tokens.scope);
+        }
+        
+        // Vérifier que le token est valide
+        if (!tokens.access_token) {
+          console.error("❌ [exchange_code] ========================================");
+          console.error("❌ [exchange_code] Access token MANQUANT dans la réponse Google !");
+          console.error("❌ [exchange_code] Réponse complète:", JSON.stringify(tokens, null, 2));
+          console.error("❌ [exchange_code] ========================================");
+          return new Response(
+            JSON.stringify({ error: "Access token missing in Google response", response: tokens }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        if (tokens.access_token.length < 10) {
+          console.error("❌ [exchange_code] Access token semble invalide (trop court):", tokens.access_token);
+          return new Response(
+            JSON.stringify({ error: "Invalid access token received from Google", token_length: tokens.access_token.length }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        console.log("✅ [exchange_code] Token validé avec succès !");
       } catch (e) {
-        console.error("❌ [exchange_code] Erreur lors du parsing des tokens:", e);
+        console.error("❌ [exchange_code] ========================================");
+        console.error("❌ [exchange_code] ERREUR LORS DU PARSING DES TOKENS");
+        console.error("❌ [exchange_code] ========================================");
+        console.error("❌ [exchange_code] Erreur:", e);
+        console.error("❌ [exchange_code] Type d'erreur:", typeof e);
+        console.error("❌ [exchange_code] Message:", e instanceof Error ? e.message : String(e));
+        console.error("❌ [exchange_code] Stack:", e instanceof Error ? e.stack : "No stack");
+        console.error("❌ [exchange_code] ========================================");
+        
         return new Response(
-          JSON.stringify({ error: "Failed to parse token response", details: String(e) }),
+          JSON.stringify({ error: "Failed to parse token response", details: String(e), error_type: typeof e }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       // Récupérer les informations du compte Google
       console.log("🔄 [exchange_code] Récupération des infos utilisateur Google...");
+      
+      // Construire le header Authorization correctement
+      // Google utilise toujours "Bearer" pour les access tokens OAuth 2.0
+      const tokenType = tokens.token_type || "Bearer";
+      const authHeader = `${tokenType} ${tokens.access_token}`;
+      
+      console.log("🔑 [exchange_code] Préparation requête userinfo:", {
+        tokenType: tokenType,
+        tokenLength: tokens.access_token.length,
+        tokenStart: tokens.access_token.substring(0, 30) + "...",
+        headerPreview: authHeader.substring(0, 60) + "...",
+        headerLength: authHeader.length,
+        url: "https://www.googleapis.com/oauth2/v2/userinfo"
+      });
+      
+      // Vérifier que le token n'est pas vide
+      if (!tokens.access_token || tokens.access_token.trim().length === 0) {
+        console.error("❌ [exchange_code] Access token est vide !");
+        return new Response(
+          JSON.stringify({ error: "Access token is empty", tokens_received: Object.keys(tokens) }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
+          "Authorization": authHeader,
+          "Accept": "application/json",
+          "Content-Type": "application/json",
         },
       });
 
@@ -575,7 +673,8 @@ serve(async (req) => {
 
       const connectionData = {
         company_id: finalCompanyId,
-        owner_user_id: user.id,
+        user_id: user.id, // Colonne NOT NULL dans la table
+        owner_user_id: user.id, // Colonne optionnelle pour référence
         google_email: userInfo.email,
         calendar_id: googleCalendar.id,
         calendar_name: calendarName,
@@ -590,6 +689,7 @@ serve(async (req) => {
 
       console.log("💾 [exchange_code] Données à sauvegarder:", {
         company_id: connectionData.company_id,
+        user_id: connectionData.user_id,
         owner_user_id: connectionData.owner_user_id,
         google_email: connectionData.google_email,
         calendar_id: connectionData.calendar_id,

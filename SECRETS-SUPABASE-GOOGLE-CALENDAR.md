@@ -37,8 +37,10 @@ Vous devez configurer **3 secrets** dans Supabase pour que l'intégration Google
 
 1. Cliquez sur **"Add new secret"** ou **"New secret"**
 2. **Name** : `GOOGLE_REDIRECT_URI`
-3. **Value** : `https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-oauth-entreprise-pkce`
-4. Cliquez sur **"Save"** ou **"Add"**
+3. **Value** : `https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback`
+4. Cliquez sur **"Save"** ou **"Add"`
+
+**⚠️ IMPORTANT** : Cette URI doit pointer vers `google-calendar-callback` (la fonction qui reçoit le callback OAuth de Google)
 
 ---
 
@@ -59,7 +61,7 @@ supabase link --project-ref renmjmqlmafqjzldmsgs
 # Ajouter les secrets
 supabase secrets set GOOGLE_CLIENT_ID="VOTRE_CLIENT_ID_ICI"
 supabase secrets set GOOGLE_CLIENT_SECRET="VOTRE_CLIENT_SECRET_ICI"
-supabase secrets set GOOGLE_REDIRECT_URI="https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-oauth-entreprise-pkce"
+supabase secrets set GOOGLE_REDIRECT_URI="https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback"
 ```
 
 **Remplacez** :
@@ -81,7 +83,7 @@ supabase secrets set GOOGLE_REDIRECT_URI="https://renmjmqlmafqjzldmsgs.supabase.
    - **Name** : `BTP Smart Pro - Google Calendar`
    - **Authorized redirect URIs** : 
      ```
-     https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-oauth-entreprise-pkce
+     https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback
      ```
    - Cliquez sur **"Create"**
 5. **Copiez le Client ID** (exemple : `123456789-abc...`)

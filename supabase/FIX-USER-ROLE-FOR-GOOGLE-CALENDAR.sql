@@ -1,30 +1,66 @@
 -- ============================================================================
 -- FIX: Assigner le rôle OWNER/ADMIN pour permettre la connexion Google Calendar
 -- ============================================================================
--- Ce script vérifie et assigne le rôle owner ou admin à l'utilisateur actuel
+-- Ce script vérifie et assigne le rôle owner ou admin à un utilisateur
 -- pour qu'il puisse connecter Google Calendar
+-- ============================================================================
+-- 
+-- UTILISATION:
+-- 1. Remplacez 'VOTRE_EMAIL@example.com' par votre email dans la variable user_email ci-dessous
+-- 2. OU remplacez 'VOTRE_USER_ID' par votre UUID utilisateur dans la variable user_id_param
+-- 3. Exécutez le script
 -- ============================================================================
 
 -- ============================================================================
--- ÉTAPE 1: Vérifier l'utilisateur actuel et son entreprise
+-- CONFIGURATION: Modifiez ces valeurs selon vos besoins
 -- ============================================================================
 
 DO $$
 DECLARE
+  -- OPTION 1: Trouver l'utilisateur par email (recommandé)
+  user_email TEXT := 'sabri.khalfallah6@gmail.com'; -- ⚠️ MODIFIEZ ICI avec votre email
+  
+  -- OPTION 2: Utiliser directement un user_id (si vous connaissez l'UUID)
+  -- user_id_param UUID := NULL; -- ⚠️ OU décommentez et mettez votre UUID ici
+  
+  -- Variables internes
   current_user_id UUID;
   current_company_id UUID;
   owner_role_id UUID;
   admin_role_id UUID;
   existing_company_user RECORD;
 BEGIN
-  -- Récupérer l'ID de l'utilisateur actuel
+  -- ============================================================================
+  -- ÉTAPE 1: Trouver l'utilisateur
+  -- ============================================================================
+  
+  -- Essayer d'abord avec auth.uid() (si exécuté depuis l'app)
   current_user_id := auth.uid();
   
+  -- Si pas de session, utiliser l'email ou user_id_param
   IF current_user_id IS NULL THEN
-    RAISE EXCEPTION '❌ Aucun utilisateur connecté. Connectez-vous d''abord.';
+    -- Si user_id_param est défini, l'utiliser
+    -- IF user_id_param IS NOT NULL THEN
+    --   current_user_id := user_id_param;
+    -- ELSIF user_email IS NOT NULL THEN
+    IF user_email IS NOT NULL THEN
+      -- Trouver l'utilisateur par email
+      SELECT id INTO current_user_id
+      FROM auth.users
+      WHERE email = user_email
+      LIMIT 1;
+      
+      IF current_user_id IS NULL THEN
+        RAISE EXCEPTION '❌ Aucun utilisateur trouvé avec l''email: %. Vérifiez l''email dans le script.', user_email;
+      END IF;
+      
+      RAISE NOTICE '✅ Utilisateur trouvé par email (%): %', user_email, current_user_id;
+    ELSE
+      RAISE EXCEPTION '❌ Aucun utilisateur trouvé. Modifiez user_email ou user_id_param dans le script.';
+    END IF;
+  ELSE
+    RAISE NOTICE '✅ Utilisateur connecté (session): %', current_user_id;
   END IF;
-  
-  RAISE NOTICE '✅ Utilisateur connecté: %', current_user_id;
   
   -- Récupérer la première entreprise de l'utilisateur
   SELECT company_id INTO current_company_id
@@ -48,7 +84,7 @@ BEGIN
   END IF;
   
   -- ============================================================================
-  -- ÉTAPE 2: Vérifier si les rôles système existent pour cette entreprise
+  -- ÉTAPE 3: Vérifier si les rôles système existent pour cette entreprise
   -- ============================================================================
   
   -- Récupérer le rôle OWNER
@@ -105,18 +141,16 @@ BEGIN
   
   IF existing_company_user IS NULL THEN
     -- Créer une nouvelle entrée avec le rôle OWNER
-    INSERT INTO public.company_users (company_id, user_id, role_id, status)
-    VALUES (current_company_id, current_user_id, owner_role_id, 'active')
+    INSERT INTO public.company_users (company_id, user_id, role_id)
+    VALUES (current_company_id, current_user_id, owner_role_id)
     ON CONFLICT (company_id, user_id) DO UPDATE
-    SET role_id = owner_role_id,
-        status = 'active';
+    SET role_id = owner_role_id;
     
     RAISE NOTICE '✅ Entrée créée dans company_users avec le rôle OWNER';
   ELSIF existing_company_user.role_id IS NULL THEN
     -- Mettre à jour avec le rôle OWNER
     UPDATE public.company_users
-    SET role_id = owner_role_id,
-        status = 'active'
+    SET role_id = owner_role_id
     WHERE user_id = current_user_id
     AND company_id = current_company_id;
     
@@ -142,7 +176,7 @@ BEGIN
   END IF;
   
   -- ============================================================================
-  -- ÉTAPE 4: Vérification finale
+  -- ÉTAPE 5: Vérification finale
   -- ============================================================================
   
   RAISE NOTICE '';
@@ -154,8 +188,7 @@ BEGIN
     cu.user_id,
     cu.company_id,
     r.slug AS role_slug,
-    r.name AS role_name,
-    cu.status
+    r.name AS role_name
   INTO existing_company_user
   FROM public.company_users cu
   JOIN public.roles r ON r.id = cu.role_id
@@ -166,7 +199,6 @@ BEGIN
     RAISE NOTICE '✅ Utilisateur: %', existing_company_user.user_id;
     RAISE NOTICE '✅ Entreprise: %', existing_company_user.company_id;
     RAISE NOTICE '✅ Rôle: % (%)', existing_company_user.role_name, existing_company_user.role_slug;
-    RAISE NOTICE '✅ Statut: %', existing_company_user.status;
     
     IF existing_company_user.role_slug IN ('owner', 'admin') THEN
       RAISE NOTICE '';

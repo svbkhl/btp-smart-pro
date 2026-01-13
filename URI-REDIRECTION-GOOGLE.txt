@@ -1,0 +1,18 @@
+URI de redirection à configurer dans Google Cloud Console :
+
+https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback
+
+⚠️ IMPORTANT : Cette URI doit pointer vers "google-calendar-callback" (pas "google-calendar-oauth-entreprise-pkce")
+
+Cette URI doit être :
+1. Configurée dans Supabase Secrets comme GOOGLE_REDIRECT_URI
+2. Ajoutée dans Google Cloud Console → OAuth 2.0 Client ID → Authorized redirect URIs
+
+Les deux doivent être IDENTIQUES (caractère par caractère).
+
+Étapes rapides :
+1. Supabase Dashboard → Settings → Secrets → GOOGLE_REDIRECT_URI = https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback
+2. Google Cloud Console → APIs & Services → Credentials → Votre OAuth Client ID → Authorized redirect URIs → Ajouter la même URI
+3. Sauvegarder partout
+4. Attendre 1-2 minutes pour la propagation
+5. Tester la connexion

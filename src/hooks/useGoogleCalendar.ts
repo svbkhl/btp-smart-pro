@@ -5,6 +5,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { 
+  generateCodeVerifier, 
+  generateCodeChallenge, 
+  storeCodeVerifier,
+  clearCodeVerifier 
+} from "@/utils/pkce";
 
 // ============================================================================
 // TYPES
@@ -64,22 +70,50 @@ export const useGoogleCalendarConnection = () => {
 };
 
 /**
- * Obtient l'URL d'authentification Google
- * SIMPLIFIÉ : Appelle google-calendar-oauth et retourne data.url
- * Google + Supabase gèrent le reste
+ * Obtient l'URL d'authentification Google avec PKCE
+ * Génère code_verifier et code_challenge côté frontend (RFC 7636)
+ * Stocke code_verifier dans sessionStorage pour l'échange
  */
 export const useGetGoogleAuthUrl = () => {
+  const { currentCompanyId } = useAuth();
+
   return useMutation({
     mutationFn: async () => {
-      // Appeler google-calendar-oauth (version simple)
-      const { data, error } = await supabase.functions.invoke("google-calendar-oauth");
+      if (!currentCompanyId) {
+        throw new Error("Company ID manquant");
+      }
+
+      // 1. Générer PKCE côté frontend (RFC 7636)
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      // 2. Stocker code_verifier dans sessionStorage pour l'échange
+      storeCodeVerifier(codeVerifier);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log("🔐 [useGetGoogleAuthUrl] PKCE généré:");
+        console.log("  - code_verifier:", codeVerifier.substring(0, 20) + "...");
+        console.log("  - code_challenge:", codeChallenge.substring(0, 20) + "...");
+      }
+
+      // 3. Appeler l'Edge Function avec code_challenge
+      const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
+        body: {
+          action: "get_auth_url",
+          code_challenge: codeChallenge,
+          company_id: currentCompanyId,
+        },
+      });
 
       if (error) {
+        // Nettoyer le code_verifier en cas d'erreur
+        clearCodeVerifier();
         console.error("❌ [useGetGoogleAuthUrl] Erreur:", error);
         throw error;
       }
 
       if (!data?.url) {
+        clearCodeVerifier();
         throw new Error("URL d'authentification non reçue");
       }
 
@@ -115,17 +149,21 @@ export const useExchangeGoogleCode = () => {
         throw new Error("Company ID manquant");
       }
 
-      // Récupérer le code_verifier depuis sessionStorage (si PKCE utilisé)
+      // Récupérer le code_verifier depuis sessionStorage (PKCE RFC 7636)
       // Vérifier que nous sommes côté client
       const codeVerifier = typeof window !== "undefined" 
         ? sessionStorage.getItem("google_oauth_code_verifier")
         : null;
 
+      if (!codeVerifier) {
+        throw new Error("code_verifier manquant. Le flow PKCE nécessite un code_verifier stocké dans sessionStorage.");
+      }
+
       // Logs de debugging (une seule fois)
       if (process.env.NODE_ENV === 'development') {
-        console.log("🔍 [useExchangeGoogleCode] Paramètres d'échange:");
+        console.log("🔍 [useExchangeGoogleCode] Paramètres d'échange PKCE:");
         console.log("  - code:", code ? "present" : "missing");
-        console.log("  - code_verifier:", codeVerifier ? "present" : "missing");
+        console.log("  - code_verifier:", codeVerifier ? `present (${codeVerifier.length} chars)` : "missing");
         console.log("  - state:", state ? "present" : "missing");
         console.log("  - company_id:", effectiveCompanyId || "missing");
       }
@@ -135,7 +173,7 @@ export const useExchangeGoogleCode = () => {
         body: { 
           action: "exchange_code", 
           code,
-          code_verifier: codeVerifier || undefined, // Peut être undefined si PKCE n'a pas été utilisé
+          code_verifier: codeVerifier, // Requis pour PKCE
           state,
           company_id: effectiveCompanyId, // Passer explicitement le company_id
         },

@@ -1,0 +1,17 @@
+URI à copier-coller exactement (sans espace, sans slash final) :
+
+https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback
+
+À configurer dans 2 endroits :
+
+1. SUPABASE SECRETS :
+   - URL : https://supabase.com/dashboard/project/renmjmqlmafqjzldmsgs/settings/secrets
+   - Secret : GOOGLE_REDIRECT_URI
+   - Valeur : https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback
+
+2. GOOGLE CLOUD CONSOLE :
+   - URL : https://console.cloud.google.com/apis/credentials
+   - OAuth 2.0 Client ID → Authorized redirect URIs
+   - Ajouter : https://renmjmqlmafqjzldmsgs.supabase.co/functions/v1/google-calendar-callback
+
+IMPORTANT : Les deux doivent être IDENTIQUES (caractère par caractère) !

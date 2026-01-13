@@ -1,0 +1,26 @@
+LIENS DIRECTS POUR CONFIGURER GOOGLE OAUTH :
+
+1. OAuth Consent Screen (Ajouter utilisateurs de test) :
+   https://console.cloud.google.com/apis/credentials/consent
+
+2. Credentials (Voir vos OAuth Client IDs) :
+   https://console.cloud.google.com/apis/credentials
+
+ÉTAPES RAPIDES :
+
+1. Ouvrir : https://console.cloud.google.com/apis/credentials/consent
+2. Faire défiler jusqu'à "Test users"
+3. Cliquer sur "ADD USERS"
+4. Ajouter : sabri.khalfallah6@gmail.com
+5. Ajouter d'autres emails si nécessaire
+6. Cliquer sur "ADD"
+7. Sauvegarder
+8. Tester la connexion
+
+EMAILS À AJOUTER :
+- sabri.khalfallah6@gmail.com (votre email)
+- [Ajoutez les emails de vos utilisateurs ici]
+
+RÉSULTAT :
+✅ Les utilisateurs ajoutés pourront se connecter immédiatement
+✅ Plus d'erreur "developer hasn't given you access"
