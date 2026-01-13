@@ -102,6 +102,7 @@ export const useEvents = (startDate?: Date, endDate?: Date) => {
         .from("events")
         .select("*")
         .eq("company_id", currentCompanyId)
+        .is("deleted_at", null) // ⚠️ Filtrer les événements supprimés (soft delete)
         .order("start_date", { ascending: true });
 
       if (startDate) {
@@ -148,6 +149,7 @@ export const useTodayEvents = () => {
         .from("events")
         .select("*")
         .eq("company_id", currentCompanyId)
+        .is("deleted_at", null) // ⚠️ Filtrer les événements supprimés (soft delete)
         .gte("start_date", today + "T00:00:00")
         .lte("start_date", today + "T23:59:59")
         .order("start_date", { ascending: true });
