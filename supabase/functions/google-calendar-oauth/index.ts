@@ -85,7 +85,7 @@ serve(async (req) => {
     }
 
     const scope = encodeURIComponent(
-      "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events"
+      "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"
     );
 
     // Créer le state avec user_id et company_id si disponibles
