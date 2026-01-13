@@ -162,13 +162,13 @@ CREATE TABLE IF NOT EXISTS public.google_calendar_webhooks (
   sync_token TEXT, -- Token pour sync incrémentale
   enabled BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  
-  -- Un webhook actif par company/calendar
-  CONSTRAINT google_calendar_webhooks_company_calendar_unique
-    UNIQUE(company_id, calendar_id)
-    WHERE enabled = true
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Index UNIQUE partiel : un webhook actif par company/calendar
+CREATE UNIQUE INDEX IF NOT EXISTS google_calendar_webhooks_company_calendar_unique
+ON public.google_calendar_webhooks(company_id, calendar_id)
+WHERE enabled = true;
 
 CREATE INDEX IF NOT EXISTS idx_google_calendar_webhooks_company_id
 ON public.google_calendar_webhooks(company_id);
@@ -224,12 +224,13 @@ CREATE TABLE IF NOT EXISTS public.google_calendar_sync_queue (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
   error_message TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  processed_at TIMESTAMP WITH TIME ZONE,
-  
-  -- Éviter les doublons
-  UNIQUE(event_id, action, status) 
-    WHERE status IN ('pending', 'processing')
+  processed_at TIMESTAMP WITH TIME ZONE
 );
+
+-- Index UNIQUE partiel : éviter les doublons dans la queue
+CREATE UNIQUE INDEX IF NOT EXISTS google_calendar_sync_queue_unique
+ON public.google_calendar_sync_queue(event_id, action, status)
+WHERE status IN ('pending', 'processing');
 
 CREATE INDEX IF NOT EXISTS idx_google_calendar_sync_queue_company_status 
 ON public.google_calendar_sync_queue(company_id, status) 
