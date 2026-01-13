@@ -252,6 +252,9 @@ USING (
 -- ÉTAPE 6: Fonction pour queue sync (App -> Google)
 -- ============================================================================
 
+-- Supprimer l'ancienne version si elle existe (pour éviter conflit de signature)
+DROP FUNCTION IF EXISTS public.queue_google_calendar_sync();
+
 CREATE OR REPLACE FUNCTION public.queue_google_calendar_sync()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -379,6 +382,9 @@ CREATE TRIGGER trigger_queue_google_calendar_sync_delete
 -- ÉTAPE 8: Fonction helper pour récupérer token valide
 -- ============================================================================
 
+-- Supprimer l'ancienne version si elle existe (pour éviter conflit de signature)
+DROP FUNCTION IF EXISTS public.get_valid_google_calendar_token(UUID);
+
 CREATE OR REPLACE FUNCTION public.get_valid_google_calendar_token(p_company_id UUID)
 RETURNS TABLE (
   connection_id UUID,
@@ -430,6 +436,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ÉTAPE 9: Fonction de nettoyage de la queue
 -- ============================================================================
 
+-- Supprimer l'ancienne version si elle existe (pour éviter conflit de signature)
+DROP FUNCTION IF EXISTS public.cleanup_google_calendar_sync_queue();
+
 CREATE OR REPLACE FUNCTION public.cleanup_google_calendar_sync_queue()
 RETURNS void AS $$
 BEGIN
@@ -456,6 +465,9 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 -- ÉTAPE 10: Fonction de nettoyage des webhooks expirés
 -- ============================================================================
+
+-- Supprimer l'ancienne version si elle existe (pour éviter conflit de signature)
+DROP FUNCTION IF EXISTS public.cleanup_expired_google_webhooks();
 
 CREATE OR REPLACE FUNCTION public.cleanup_expired_google_webhooks()
 RETURNS void AS $$
