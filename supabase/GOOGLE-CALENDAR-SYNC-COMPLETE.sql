@@ -101,31 +101,24 @@ BEGIN
   END LOOP;
 END $$;
 
--- Supprimer l'index existant si présent
+-- Supprimer l'index et la contrainte existants si présents
 DROP INDEX IF EXISTS events_google_calendar_event_unique_idx;
+ALTER TABLE public.events DROP CONSTRAINT IF EXISTS events_google_calendar_event_unique;
 
--- Créer l'index UNIQUE composite (NULL values autorisés)
-CREATE UNIQUE INDEX IF NOT EXISTS events_google_calendar_event_unique_idx
+-- ⚠️ IMPORTANT: Créer une contrainte UNIQUE normale (sans WHERE)
+-- PostgreSQL traite les NULL comme distincts dans les contraintes UNIQUE
+-- Cela permet:
+-- - Plusieurs lignes avec (NULL, NULL) ou (NULL, val) ou (val, NULL)
+-- - Mais PAS plusieurs lignes avec (val1, val2) identiques (non-NULL)
+-- C'est exactement ce qu'on veut pour éviter les doublons Google Calendar
+ALTER TABLE public.events
+ADD CONSTRAINT events_google_calendar_event_unique
+UNIQUE(google_calendar_id, google_event_id);
+
+-- Créer aussi un index partiel pour les performances (optionnel mais recommandé)
+CREATE INDEX IF NOT EXISTS idx_events_google_composite_partial
 ON public.events(google_calendar_id, google_event_id)
 WHERE google_calendar_id IS NOT NULL AND google_event_id IS NOT NULL;
-
--- Créer la contrainte UNIQUE nommée (pour onConflict dans Supabase)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.events'::regclass
-    AND conname = 'events_google_calendar_event_unique'
-  ) THEN
-    ALTER TABLE public.events
-    ADD CONSTRAINT events_google_calendar_event_unique
-    UNIQUE USING INDEX events_google_calendar_event_unique_idx;
-    
-    RAISE NOTICE '✅ Contrainte UNIQUE (google_calendar_id, google_event_id) créée';
-  ELSE
-    RAISE NOTICE '✅ Contrainte UNIQUE existe déjà';
-  END IF;
-END $$;
 
 -- ============================================================================
 -- ÉTAPE 3: Ajouter sync_token à google_calendar_connections
@@ -549,7 +542,9 @@ CREATE INDEX IF NOT EXISTS idx_events_google_event_id
 ON public.events(google_event_id) 
 WHERE google_event_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_events_google_composite 
+-- Index partiel pour performances (la contrainte UNIQUE crée déjà un index)
+-- On peut créer un index partiel supplémentaire pour optimiser les requêtes
+CREATE INDEX IF NOT EXISTS idx_events_google_composite_partial 
 ON public.events(google_calendar_id, google_event_id) 
 WHERE google_calendar_id IS NOT NULL AND google_event_id IS NOT NULL;
 
@@ -616,7 +611,7 @@ BEGIN
     AND column_name = 'deleted_at'
   ) INTO has_deleted_at;
   
-  -- Vérifier la contrainte
+  -- Vérifier la contrainte UNIQUE
   SELECT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'public.events'::regclass
