@@ -426,7 +426,10 @@ const Calendar = () => {
                 <h3 className="text-lg font-semibold">{selectedEvent.title}</h3>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setIsEventFormOpen(true); setSelectedEvent(null); }} className="rounded-xl">
+                <Button variant="outline" size="sm" onClick={() => { 
+                  console.log("🔵 [Calendar] Clic Modifier - selectedEvent:", selectedEvent);
+                  setIsEventFormOpen(true);
+                }} className="rounded-xl">
                   Modifier
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => setEventToDelete(selectedEvent)} className="rounded-xl">
@@ -491,7 +494,16 @@ const Calendar = () => {
 
         <EventForm
           open={isEventFormOpen}
-          onOpenChange={setIsEventFormOpen}
+          onOpenChange={(open) => {
+            console.log("🔵 [Calendar] EventForm onOpenChange:", open);
+            console.log("🔵 [Calendar] selectedEvent:", selectedEvent);
+            console.log("🔵 [Calendar] selectedEvent?.title:", selectedEvent?.title);
+            setIsEventFormOpen(open);
+            // Réinitialiser selectedEvent quand on ferme le formulaire
+            if (!open) {
+              setSelectedEvent(null);
+            }
+          }}
           event={selectedEvent || undefined}
           defaultDate={currentDate}
         />

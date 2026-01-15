@@ -248,6 +248,10 @@ USING (
   )
 );
 
+-- ⚠️ IMPORTANT: Pas de politique INSERT nécessaire
+-- La fonction queue_google_calendar_sync() utilise SECURITY DEFINER
+-- pour contourner RLS et insérer dans la queue via les triggers
+
 -- ============================================================================
 -- ÉTAPE 6: Fonction pour queue sync (App -> Google)
 -- ============================================================================
@@ -354,7 +358,7 @@ BEGIN
 
   RETURN COALESCE(NEW, OLD);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ============================================================================
 -- ÉTAPE 7: Créer les triggers sur events

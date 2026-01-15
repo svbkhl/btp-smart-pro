@@ -7,6 +7,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createGoogleEventPayload } from "../_shared/google-calendar-helpers.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
@@ -125,6 +126,36 @@ serve(async (req) => {
           continue;
         }
 
+        // ⚠️ ANTI-LOOP: Ignorer si l'événement vient de Google
+        if (event.last_update_source === "google") {
+          console.log(`⏭️ [sync-processor] Événement ignoré (vient de Google): ${event.id}`);
+          await supabaseClient
+            .from("google_calendar_sync_queue")
+            .update({ 
+              status: "completed",
+              processed_at: new Date().toISOString()
+            })
+            .eq("id", item.id);
+          continue;
+        }
+
+        // ⚠️ ANTI-LOOP: Ignorer si déjà synchronisé récemment
+        if (event.last_synced_at && event.updated_at) {
+          const lastSynced = new Date(event.last_synced_at).getTime();
+          const lastUpdated = new Date(event.updated_at).getTime();
+          if (lastUpdated <= lastSynced) {
+            console.log(`⏭️ [sync-processor] Événement déjà synchronisé: ${event.id}`);
+            await supabaseClient
+              .from("google_calendar_sync_queue")
+              .update({ 
+                status: "completed",
+                processed_at: new Date().toISOString()
+              })
+              .eq("id", item.id);
+            continue;
+          }
+        }
+
         // Vérifier et rafraîchir le token si nécessaire
         let accessToken = connection.access_token;
         if (new Date(connection.expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
@@ -165,20 +196,20 @@ serve(async (req) => {
 
         // Traiter selon l'action
         if (item.action === "create") {
+          // ⚠️ PRODUCTION READY: Utiliser helper pour formatage dates correct
+          const googleEventPayload = createGoogleEventPayload(
+            event.title,
+            event.description,
+            event.location,
+            event.start_date,
+            event.end_date || null,
+            event.all_day || false,
+            "Europe/Paris"
+          );
+          
           const googleEvent: GoogleEvent = {
-            summary: event.title,
-            description: event.description || undefined,
-            location: event.location || undefined,
-            start: event.all_day
-              ? { date: event.start_date.split("T")[0] }
-              : { dateTime: event.start_date, timeZone: "Europe/Paris" },
-            end: event.end_date
-              ? event.all_day
-                ? { date: event.end_date.split("T")[0] }
-                : { dateTime: event.end_date, timeZone: "Europe/Paris" }
-              : event.all_day
-              ? { date: event.start_date.split("T")[0] }
-              : { dateTime: event.start_date, timeZone: "Europe/Paris" },
+            ...googleEventPayload,
+            colorId: event.color ? event.color.replace("#", "") : undefined,
           };
 
           const response = await fetch(baseUrl, {
@@ -258,20 +289,19 @@ serve(async (req) => {
               .eq("id", item.event_id);
           } else {
             // Mettre à jour l'événement existant
+            const googleEventPayload = createGoogleEventPayload(
+              event.title,
+              event.description,
+              event.location,
+              event.start_date,
+              event.end_date || null,
+              event.all_day || false,
+              "Europe/Paris"
+            );
+            
             const googleEvent: GoogleEvent = {
-              summary: event.title,
-              description: event.description || undefined,
-              location: event.location || undefined,
-              start: event.all_day
-                ? { date: event.start_date.split("T")[0] }
-                : { dateTime: event.start_date, timeZone: "Europe/Paris" },
-              end: event.end_date
-                ? event.all_day
-                  ? { date: event.end_date.split("T")[0] }
-                  : { dateTime: event.end_date, timeZone: "Europe/Paris" }
-                : event.all_day
-                ? { date: event.start_date.split("T")[0] }
-                : { dateTime: event.start_date, timeZone: "Europe/Paris" },
+              ...googleEventPayload,
+              colorId: event.color ? event.color.replace("#", "") : undefined,
             };
 
             const response = await fetch(`${baseUrl}/${event.google_event_id}`, {

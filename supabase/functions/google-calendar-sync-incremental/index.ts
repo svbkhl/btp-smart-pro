@@ -7,6 +7,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseGoogleCalendarDate, isGoogleEventAllDay } from "../_shared/google-calendar-helpers.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
@@ -28,6 +29,7 @@ interface GoogleEvent {
   location?: string;
   status?: string;
   colorId?: string;
+  updated?: string;
 }
 
 serve(async (req) => {
@@ -289,10 +291,10 @@ async function processEvents(
         continue;
       }
 
-      // Convertir les dates Google en format app
-      const startDate = googleEvent.start?.dateTime || googleEvent.start?.date;
-      const endDate = googleEvent.end?.dateTime || googleEvent.end?.date;
-      const allDay = !!googleEvent.start?.date && !googleEvent.start?.dateTime;
+      // ⚠️ PRODUCTION READY: Convertir les dates avec helpers
+      const startDate = parseGoogleCalendarDate(googleEvent.start);
+      const endDate = parseGoogleCalendarDate(googleEvent.end);
+      const allDay = isGoogleEventAllDay(googleEvent.start);
 
       if (!startDate) {
         console.warn("⚠️ [sync-incremental] Événement sans start_date:", googleEvent.id);
@@ -329,8 +331,34 @@ async function processEvents(
         deleted_at: null, // Réactiver si c'était supprimé
       };
 
-      // ⚠️ UPSERT avec onConflict sur (google_calendar_id, google_event_id)
-      // Cela garantit qu'on UPDATE toujours l'existant, jamais de doublon
+      // ⚠️ PRODUCTION READY: UPSERT robuste avec vérification google_updated_at
+      // 1. Chercher l'événement existant par clé composite
+      const { data: existingEvent, error: findError } = await supabaseClient
+        .from("events")
+        .select("id, google_updated_at, created_at")
+        .eq("google_calendar_id", calendarId)
+        .eq("google_event_id", googleEvent.id)
+        .maybeSingle();
+
+      if (findError && findError.code !== 'PGRST116') { // PGRST116 = not found (normal)
+        console.error(`❌ [sync-incremental] Erreur recherche événement: ${findError.message}`);
+        throw findError;
+      }
+
+      // 2. Vérifier conflit de dates (ignorer update obsolète)
+      if (existingEvent && googleUpdatedAt) {
+        const existingUpdatedAt = existingEvent.google_updated_at 
+          ? new Date(existingEvent.google_updated_at).getTime() 
+          : 0;
+        const newUpdatedAt = new Date(googleUpdatedAt).getTime();
+        
+        if (existingUpdatedAt >= newUpdatedAt) {
+          console.log(`⏭️ [sync-incremental] Update ignoré (obsolète): ${googleEvent.id} (existant: ${existingUpdatedAt}, nouveau: ${newUpdatedAt})`);
+          continue; // Ignorer cet événement
+        }
+      }
+
+      // 3. UPSERT avec onConflict (PostgreSQL gère automatiquement)
       const { data: upsertedEvent, error: upsertError } = await supabaseClient
         .from("events")
         .upsert(eventData, {
@@ -341,55 +369,44 @@ async function processEvents(
         .single();
 
       if (upsertError) {
-        // Si l'upsert échoue (contrainte unique), essayer UPDATE manuel
-        console.warn(`⚠️ [sync-incremental] Upsert échoué, tentative UPDATE: ${upsertError.message}`);
+        // Erreur critique : log et continuer (ne pas bloquer toute la sync)
+        console.error(`❌ [sync-incremental] Erreur UPSERT critique: ${upsertError.message}`, {
+          calendar_id: calendarId,
+          event_id: googleEvent.id,
+          error_code: upsertError.code,
+        });
         
-        const { data: existingEvent } = await supabaseClient
-          .from("events")
-          .select("id")
-          .eq("google_calendar_id", calendarId)
-          .eq("google_event_id", googleEvent.id)
-          .maybeSingle();
-        
+        // Essayer UPDATE manuel en dernier recours
         if (existingEvent) {
-          // UPDATE l'existant
           const { error: updateError } = await supabaseClient
             .from("events")
             .update(eventData)
             .eq("id", existingEvent.id);
           
           if (updateError) {
-            console.error(`❌ [sync-incremental] Erreur UPDATE: ${updateError.message}`);
-            throw updateError;
-          }
-          updated++;
-          console.log(`✅ [sync-incremental] Événement mis à jour (UPDATE): ${existingEvent.id} (titre: ${eventTitle})`);
-        } else {
-          // INSERT seulement si vraiment pas trouvé
-          const { error: insertError } = await supabaseClient
-            .from("events")
-            .insert(eventData);
-          
-          if (insertError) {
-            console.error(`❌ [sync-incremental] Erreur INSERT: ${insertError.message}`);
-            throw insertError;
-          }
-          created++;
-          console.log(`✅ [sync-incremental] Nouvel événement créé (INSERT): ${eventTitle} (google_event_id: ${googleEvent.id})`);
-        }
-      } else {
-        // Upsert réussi
-        if (upsertedEvent) {
-          // Vérifier si c'était un UPDATE ou INSERT en comparant created_at
-          const wasInsert = new Date(upsertedEvent.created_at).getTime() > Date.now() - 5000; // Créé il y a moins de 5 secondes
-          
-          if (wasInsert) {
-            created++;
-            console.log(`✅ [sync-incremental] Nouvel événement créé (UPSERT): ${eventTitle} (google_event_id: ${googleEvent.id})`);
+            console.error(`❌ [sync-incremental] UPDATE manuel échoué: ${updateError.message}`);
+            // Ne pas throw : continuer avec les autres événements
           } else {
             updated++;
-            console.log(`✅ [sync-incremental] Événement mis à jour (UPSERT): ${upsertedEvent.id} (titre: ${eventTitle})`);
+            console.log(`✅ [sync-incremental] Événement mis à jour (UPDATE manuel): ${existingEvent.id}`);
           }
+        } else {
+          console.error(`❌ [sync-incremental] Impossible d'insérer: événement non trouvé et UPSERT échoué`);
+        }
+        continue; // Passer au suivant
+      }
+
+      // 4. Compter UPDATE vs INSERT
+      if (upsertedEvent) {
+        const wasInsert = existingEvent === null || 
+          (new Date(upsertedEvent.created_at).getTime() > Date.now() - 2000); // Créé il y a moins de 2 secondes
+        
+        if (wasInsert) {
+          created++;
+          console.log(`✅ [sync-incremental] Nouvel événement créé: ${eventTitle} (${googleEvent.id})`);
+        } else {
+          updated++;
+          console.log(`✅ [sync-incremental] Événement mis à jour: ${eventTitle} (${upsertedEvent.id})`);
         }
       }
 

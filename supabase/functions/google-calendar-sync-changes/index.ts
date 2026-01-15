@@ -7,6 +7,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseGoogleCalendarDate, isGoogleEventAllDay } from "../_shared/google-calendar-helpers.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
@@ -264,10 +265,10 @@ async function processEvents(
         continue;
       }
 
-      // Convertir les dates
-      const startDate = googleEvent.start?.dateTime || googleEvent.start?.date;
-      const endDate = googleEvent.end?.dateTime || googleEvent.end?.date;
-      const allDay = !!googleEvent.start?.date && !googleEvent.start?.dateTime;
+      // ⚠️ PRODUCTION READY: Convertir les dates avec helper
+      const startDate = parseGoogleCalendarDate(googleEvent.start);
+      const endDate = parseGoogleCalendarDate(googleEvent.end);
+      const allDay = isGoogleEventAllDay(googleEvent.start);
 
       if (!startDate) {
         console.warn("⚠️ [sync-changes] Événement sans start_date:", googleEvent.id);
@@ -298,7 +299,29 @@ async function processEvents(
         deleted_at: null,
       };
 
-      // ⚠️ UPSERT avec onConflict sur (google_calendar_id, google_event_id)
+      // ⚠️ PRODUCTION READY: UPSERT robuste avec vérification google_updated_at
+      // 1. Chercher l'événement existant
+      const { data: existingEvent } = await supabaseClient
+        .from("events")
+        .select("id, google_updated_at, created_at")
+        .eq("google_calendar_id", calendarId)
+        .eq("google_event_id", googleEvent.id)
+        .maybeSingle();
+
+      // 2. Vérifier conflit de dates (ignorer update obsolète)
+      if (existingEvent && googleUpdatedAt) {
+        const existingUpdatedAt = existingEvent.google_updated_at 
+          ? new Date(existingEvent.google_updated_at).getTime() 
+          : 0;
+        const newUpdatedAt = new Date(googleUpdatedAt).getTime();
+        
+        if (existingUpdatedAt >= newUpdatedAt) {
+          console.log(`⏭️ [sync-changes] Update ignoré (obsolète): ${googleEvent.id}`);
+          continue;
+        }
+      }
+
+      // 3. UPSERT
       const { data: upsertedEvent, error: upsertError } = await supabaseClient
         .from("events")
         .upsert(eventData, {
@@ -310,29 +333,28 @@ async function processEvents(
 
       if (upsertError) {
         console.error(`❌ [sync-changes] Erreur upsert: ${upsertError.message}`);
-        // Fallback: UPDATE manuel
-        const { data: existingEvent } = await supabaseClient
-          .from("events")
-          .select("id, created_at")
-          .eq("google_calendar_id", calendarId)
-          .eq("google_event_id", googleEvent.id)
-          .maybeSingle();
-        
+        // Fallback: UPDATE manuel seulement si événement existe
         if (existingEvent) {
-          await supabaseClient
+          const { error: updateError } = await supabaseClient
             .from("events")
             .update(eventData)
             .eq("id", existingEvent.id);
-          updated++;
+          
+          if (updateError) {
+            console.error(`❌ [sync-changes] UPDATE manuel échoué: ${updateError.message}`);
+          } else {
+            updated++;
+          }
         } else {
-          // INSERT si vraiment pas trouvé
-          await supabaseClient
-            .from("events")
-            .insert(eventData);
-          created++;
+          console.error(`❌ [sync-changes] Impossible d'insérer: UPSERT échoué et événement non trouvé`);
         }
-      } else if (upsertedEvent) {
-        const wasInsert = new Date(upsertedEvent.created_at).getTime() > Date.now() - 5000;
+        continue;
+      }
+
+      // 4. Compter
+      if (upsertedEvent) {
+        const wasInsert = existingEvent === null || 
+          (new Date(upsertedEvent.created_at).getTime() > Date.now() - 2000);
         if (wasInsert) {
           created++;
         } else {

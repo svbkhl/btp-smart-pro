@@ -48,7 +48,9 @@ interface EventFormProps {
 }
 
 export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormProps) => {
-  console.log("🟢 [EventForm] Render - open:", open, "event:", event?.id);
+  console.log("🟢 [EventForm] Render - open:", open, "event:", event);
+  console.log("🟢 [EventForm] Event title:", event?.title);
+  console.log("🟢 [EventForm] Event data:", JSON.stringify(event, null, 2));
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createEvent = useCreateEvent();
@@ -78,19 +80,50 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
   });
 
   useEffect(() => {
-    if (event) {
-      reset({
+    console.log("🔄 [EventForm] useEffect déclenché - open:", open, "event:", event?.id, "event?.title:", event?.title);
+    
+    // ⚠️ IMPORTANT: Ne pré-remplir que quand le formulaire est ouvert ET qu'un événement est fourni
+    if (open && event) {
+      // ⚠️ IMPORTANT: Pré-remplir le formulaire avec les données de l'événement
+      console.log("🔄 [EventForm] Pré-remplissage formulaire avec événement:", {
+        id: event.id,
         title: event.title,
+        description: event.description,
+        start_date: event.start_date,
+        location: event.location,
+      });
+      
+      // Formater les dates correctement
+      const startDateFormatted = event.start_date 
+        ? format(new Date(event.start_date), "yyyy-MM-dd'T'HH:mm")
+        : "";
+      
+      const endDateFormatted = event.end_date 
+        ? format(new Date(event.end_date), "yyyy-MM-dd'T'HH:mm")
+        : "";
+      
+      const formData = {
+        title: event.title || "",
         description: event.description || "",
-        start_date: event.start_date ? format(new Date(event.start_date), "yyyy-MM-dd'T'HH:mm") : "",
-        end_date: event.end_date ? format(new Date(event.end_date), "yyyy-MM-dd'T'HH:mm") : "",
+        start_date: startDateFormatted,
+        end_date: endDateFormatted,
         all_day: event.all_day || false,
         location: event.location || "",
-        type: event.type || "meeting",
+        type: (event.type as "meeting" | "task" | "deadline" | "reminder" | "other") || "meeting",
         color: event.color || "#3b82f6",
         project_id: event.project_id || "",
-      });
-    } else if (defaultDate) {
+      };
+      
+      console.log("🔄 [EventForm] Données à reset:", formData);
+      console.log("🔄 [EventForm] Titre dans formData:", formData.title);
+      
+      // Utiliser reset avec les options pour ne pas perdre les valeurs
+      reset(formData, { keepDefaultValues: false });
+      
+      console.log("✅ [EventForm] Formulaire pré-rempli avec titre:", formData.title);
+    } else if (open && defaultDate && !event) {
+      // Nouvel événement avec date par défaut
+      console.log("🔄 [EventForm] Nouvel événement - réinitialisation formulaire");
       reset({
         title: "",
         description: "",
@@ -102,8 +135,22 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
         color: "#3b82f6",
         project_id: "",
       });
+    } else if (!open) {
+      // Réinitialiser quand le formulaire se ferme
+      console.log("🔄 [EventForm] Formulaire fermé - réinitialisation");
+      reset({
+        title: "",
+        description: "",
+        start_date: defaultDate ? format(defaultDate, "yyyy-MM-dd'T'HH:mm") : "",
+        end_date: "",
+        all_day: false,
+        location: "",
+        type: "meeting",
+        color: "#3b82f6",
+        project_id: "",
+      });
     }
-  }, [event, defaultDate, open, reset]);
+  }, [open, event, defaultDate, reset]);
 
   const onSubmit = async (data: EventFormData) => {
     console.log("✅ [EventForm] Soumission du formulaire:", data);
@@ -158,9 +205,8 @@ export const EventForm = ({ open, onOpenChange, event, defaultDate }: EventFormP
         console.log("✅ [EventForm] Événement créé");
       }
       
-      // Fermer le modal et réinitialiser
+      // Fermer le modal (le reset sera fait par le useEffect quand open devient false)
       onOpenChange(false);
-      reset();
     } catch (error: any) {
       console.error("❌ [EventForm] Erreur:", error);
       alert(`Erreur: ${error.message || "Impossible de sauvegarder l'événement"}`);
