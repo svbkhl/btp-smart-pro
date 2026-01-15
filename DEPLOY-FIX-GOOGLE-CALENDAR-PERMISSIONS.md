@@ -25,7 +25,16 @@ cd "/Users/sabrikhalfallah/Downloads/BTP SMART PRO"
 supabase functions deploy send-invitation
 ```
 
-### Étape 2 : Corriger les utilisateurs existants (optionnel mais recommandé)
+### Étape 2 : Corriger la fonction SQL `accept_invitation`
+
+La fonction SQL `accept_invitation` doit aussi être corrigée pour utiliser `role_id` :
+
+1. Ouvrez **Supabase Dashboard** → **SQL Editor**
+2. Exécutez le script : `supabase/FIX-ACCEPT-INVITATION-ROLE-ID.sql`
+
+Ce script corrige la fonction pour qu'elle utilise `role_id` au lieu de `role` dans `company_users`.
+
+### Étape 3 : Corriger les utilisateurs existants (optionnel mais recommandé)
 
 Si vous avez déjà invité des utilisateurs avant cette correction, exécutez le script SQL pour corriger leurs `role_id` :
 
@@ -37,7 +46,7 @@ Ce script :
 - Récupère leur rôle depuis `user_roles`
 - Met à jour `company_users` avec le bon `role_id` depuis la table `roles`
 
-### Étape 3 : Vérifier que tout fonctionne
+### Étape 4 : Vérifier que tout fonctionne
 
 1. **Inviter un nouveau patron** avec le rôle "owner"
 2. **Vérifier** que le patron peut voir le bouton "Connecter Google Calendar"
