@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,8 +37,23 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   const [loading, setLoading] = useState(false);
   // État explicite pour contrôler l'affichage de l'aperçu
   // Ne se réinitialise QUE via action utilisateur (bouton "Fermer" ou "Créer un nouveau devis")
+  // Utiliser useRef pour persister même après re-render causé par invalidations de queries
+  const quoteRef = useRef<any>(null);
+  const isPreviewOpenRef = useRef<boolean>(false);
   const [quote, setQuote] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  
+  // Synchroniser les refs avec les états pour persister lors des re-renders
+  useEffect(() => {
+    quoteRef.current = quote;
+  }, [quote]);
+  
+  useEffect(() => {
+    isPreviewOpenRef.current = isPreviewOpen;
+  }, [isPreviewOpen]);
+  
+  // Debug: logger les changements d'état pour diagnostiquer
+  console.log('[SimpleQuoteForm] Render - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current);
 
   const selectedClient = clients.find((c) => c.id === clientId);
 
@@ -122,8 +137,13 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
       );
 
       // Décorréler la génération de l'affichage : générer ≠ fermer l'aperçu
+      console.log('[SimpleQuoteForm] Setting quote and opening preview');
+      // Mettre à jour les refs ET les états pour persister lors des re-renders
+      quoteRef.current = result;
+      isPreviewOpenRef.current = true;
       setQuote(result);
       setIsPreviewOpen(true); // Ouvrir explicitement l'aperçu
+      console.log('[SimpleQuoteForm] Quote set, isPreviewOpen set to true');
 
       toast({
         title: "✅ Devis généré !",
@@ -146,22 +166,24 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   };
 
   const handleDownloadPDF = async () => {
-    if (!quote || !companyInfo) return;
+    const currentQuote = quote || quoteRef.current;
+    if (!currentQuote || !companyInfo) return;
 
     try {
+      const currentQuote = quote || quoteRef.current;
       await downloadQuotePDF({
-        result: quote.details,
+        result: currentQuote.details,
         companyInfo: companyInfo,
         clientInfo: {
-          name: quote.client_name,
-          email: quote.client_email,
-          phone: quote.client_phone,
-          location: quote.client_address,
+          name: currentQuote.client_name,
+          email: currentQuote.client_email,
+          phone: currentQuote.client_phone,
+          location: currentQuote.client_address,
         },
-        surface: quote.surface.toString(),
-        workType: quote.prestation,
-        quoteDate: new Date(quote.created_at),
-        quoteNumber: quote.quote_number,
+        surface: currentQuote.surface.toString(),
+        workType: currentQuote.prestation,
+        quoteDate: new Date(currentQuote.created_at),
+        quoteNumber: currentQuote.quote_number,
         // Ajouter automatiquement la signature depuis les paramètres
         signatureData: companyInfo.signature_data,
         signedBy: companyInfo.signature_name || companyInfo.company_name || companyInfo.contact_name,
@@ -187,15 +209,21 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
     setSurface("");
     setPrix("");
     setClientId("");
+    // Réinitialiser les refs ET les états
+    quoteRef.current = null;
+    isPreviewOpenRef.current = false;
     setQuote(null);
     setIsPreviewOpen(false); // Fermer l'aperçu via action utilisateur
+    console.log('[SimpleQuoteForm] Reset - cleared quote and preview');
   };
 
   const handleClosePreview = () => {
     // Fermer l'aperçu explicitement via action utilisateur
+    isPreviewOpenRef.current = false;
     setIsPreviewOpen(false);
     // Ne pas réinitialiser quote pour permettre de le rouvrir si nécessaire
     // L'utilisateur peut toujours créer un nouveau devis avec handleReset
+    console.log('[SimpleQuoteForm] Close preview - kept quote, closed preview');
   };
 
   const handleGoToFacturation = () => {
@@ -203,8 +231,26 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   };
 
   // Afficher l'aperçu SEULEMENT si quote existe ET isPreviewOpen est true
+  // Utiliser les refs comme fallback si les états sont réinitialisés par un re-render
   // Cela garantit que l'aperçu ne disparaît pas après re-render ou invalidation de queries
-  if (quote && isPreviewOpen) {
+  const shouldShowPreview = (quote || quoteRef.current) && (isPreviewOpen || isPreviewOpenRef.current);
+  console.log('[SimpleQuoteForm] Render check - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current, 'should show preview:', shouldShowPreview);
+  
+  // Si les états ont été réinitialisés mais que les refs ont encore les valeurs, restaurer les états
+  useEffect(() => {
+    if (!quote && quoteRef.current) {
+      console.log('[SimpleQuoteForm] Restoring quote from ref');
+      setQuote(quoteRef.current);
+    }
+    if (!isPreviewOpen && isPreviewOpenRef.current) {
+      console.log('[SimpleQuoteForm] Restoring isPreviewOpen from ref');
+      setIsPreviewOpen(true);
+    }
+  }, [quote, isPreviewOpen]);
+  
+  if (shouldShowPreview) {
+    // Utiliser quote ou quoteRef.current pour l'affichage
+    const displayQuote = quote || quoteRef.current;
     return (
       <div className="space-y-6">
         {/* Message de succès */}
@@ -216,7 +262,7 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
                 Devis créé avec succès !
               </h3>
               <p className="text-sm text-green-700 dark:text-green-300">
-                Le devis {quote.quote_number} a été enregistré et est disponible dans la section Facturation.
+                Le devis {displayQuote.quote_number} a été enregistré et est disponible dans la section Facturation.
               </p>
             </div>
           </div>
@@ -227,7 +273,7 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Devis {quote.quote_number}
+              Devis {displayQuote.quote_number}
             </h2>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
@@ -241,18 +287,18 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
           </div>
 
           <QuoteDisplay
-            result={quote.details}
+            result={displayQuote.details}
             companyInfo={companyInfo}
             clientInfo={{
-              name: quote.client_name,
-              email: quote.client_email,
-              phone: quote.client_phone,
-              location: quote.client_address,
+              name: displayQuote.client_name,
+              email: displayQuote.client_email,
+              phone: displayQuote.client_phone,
+              location: displayQuote.client_address,
             }}
-            surface={quote.surface.toString()}
-            workType={quote.prestation}
-            quoteDate={new Date(quote.created_at)}
-            quoteNumber={quote.quote_number}
+            surface={displayQuote.surface.toString()}
+            workType={displayQuote.prestation}
+            quoteDate={new Date(displayQuote.created_at)}
+            quoteNumber={displayQuote.quote_number}
           />
         </GlassCard>
 

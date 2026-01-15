@@ -36,7 +36,15 @@ export default function AIQuotesTab() {
           </p>
         </div>
 
-        <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+        <Dialog 
+          open={showCreateForm} 
+          onOpenChange={(open) => {
+            // Ne fermer le dialog QUE si l'utilisateur le ferme explicitement
+            // ET que l'aperçu n'est pas ouvert
+            // Utiliser une clé stable pour éviter le remount du composant
+            setShowCreateForm(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
@@ -50,10 +58,14 @@ export default function AIQuotesTab() {
                 Remplissez les informations et l'IA générera un devis professionnel
               </DialogDescription>
             </DialogHeader>
-            <SimpleQuoteForm onSuccess={() => {
-              // Ne pas fermer automatiquement le dialog
-              // L'utilisateur fermera manuellement après avoir vu l'aperçu
-            }} />
+            {/* Clé stable pour éviter le remount qui réinitialiserait l'état */}
+            <SimpleQuoteForm 
+              key="simple-quote-form-stable"
+              onSuccess={() => {
+                // Ne pas fermer automatiquement le dialog
+                // L'utilisateur fermera manuellement après avoir vu l'aperçu
+              }} 
+            />
           </DialogContent>
         </Dialog>
       </div>
