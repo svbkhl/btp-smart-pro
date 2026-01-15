@@ -22,9 +22,10 @@ import { useNavigate } from "react-router-dom";
 
 interface SimpleQuoteFormProps {
   onSuccess?: () => void;
+  onPreviewStateChange?: (isOpen: boolean) => void; // Callback pour notifier le parent de l'état de l'aperçu
 }
 
-export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
+export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuoteFormProps = {}) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
@@ -50,7 +51,11 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   
   useEffect(() => {
     isPreviewOpenRef.current = isPreviewOpen;
-  }, [isPreviewOpen]);
+    // Notifier le parent de l'état de l'aperçu
+    if (onPreviewStateChange) {
+      onPreviewStateChange(isPreviewOpen);
+    }
+  }, [isPreviewOpen, onPreviewStateChange]);
   
   // Debug: logger les changements d'état pour diagnostiquer
   console.log('[SimpleQuoteForm] Render - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current);

@@ -20,6 +20,7 @@ import {
 
 export default function AIQuotesTab() {
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false); // État pour savoir si l'aperçu est ouvert
   const { data: quotes = [], isLoading } = useAIQuotes();
 
   return (
@@ -39,9 +40,15 @@ export default function AIQuotesTab() {
         <Dialog 
           open={showCreateForm} 
           onOpenChange={(open) => {
+            // PROTECTION : Ne pas fermer le dialog si l'aperçu est ouvert
+            // L'utilisateur doit d'abord fermer l'aperçu avant de fermer le dialog
+            if (!open && isPreviewOpen) {
+              console.log('[AIQuotesTab] Tentative de fermeture du dialog alors que l\'aperçu est ouvert - bloquée');
+              // Ne pas fermer le dialog si l'aperçu est ouvert
+              return;
+            }
             // Ne fermer le dialog QUE si l'utilisateur le ferme explicitement
             // ET que l'aperçu n'est pas ouvert
-            // Utiliser une clé stable pour éviter le remount du composant
             setShowCreateForm(open);
           }}
         >
@@ -64,7 +71,12 @@ export default function AIQuotesTab() {
               onSuccess={() => {
                 // Ne pas fermer automatiquement le dialog
                 // L'utilisateur fermera manuellement après avoir vu l'aperçu
-              }} 
+              }}
+              onPreviewStateChange={(isOpen) => {
+                // Mettre à jour l'état local pour protéger contre la fermeture du dialog
+                setIsPreviewOpen(isOpen);
+                console.log('[AIQuotesTab] Preview state changed:', isOpen);
+              }}
             />
           </DialogContent>
         </Dialog>
