@@ -187,34 +187,29 @@ serve(async (req) => {
     // Create Supabase admin client
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Récupérer l'utilisateur qui envoie l'invitation
+    // Récupérer l'utilisateur qui envoie l'invitation depuis le JWT
     const authHeader = req.headers.get("Authorization");
     let invitedByUserId: string | null = null;
     
     if (authHeader) {
       try {
-        // Créer un client avec le token utilisateur pour récupérer l'utilisateur
-        const userClient = createClient(
-          supabaseUrl,
-          Deno.env.get("SUPABASE_ANON_KEY") || "",
-          {
-            global: {
-              headers: { Authorization: authHeader },
-            },
+        // Décoder le JWT pour récupérer l'user_id
+        // Le token JWT contient l'user_id dans le payload
+        const token = authHeader.replace("Bearer ", "");
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          if (payload.sub) {
+            invitedByUserId = payload.sub;
+            logger.info("Invitation sender identified from JWT", { 
+              requestId,
+              invitedByUserId: payload.sub
+            });
           }
-        );
-        
-        const { data: { user }, error: userError } = await userClient.auth.getUser();
-        if (!userError && user) {
-          invitedByUserId = user.id;
-          logger.info("Invitation sender identified", { 
-            requestId,
-            invitedByUserId: user.id,
-            email: user.email
-          });
         }
       } catch (err) {
-        logger.warn("Could not identify invitation sender", err, { requestId });
+        logger.warn("Could not decode JWT to identify invitation sender", err, { requestId });
+        // Ce n'est pas critique, on continue avec invited_by = null
       }
     }
 
