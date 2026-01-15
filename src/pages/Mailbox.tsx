@@ -132,7 +132,8 @@ const Mailbox = () => {
   const hasEmailConfig = !!emailConfig && (emailConfig.smtp_host || emailConfig.provider);
 
   // Charger l'historique des emails envoyés
-  const { data: emailMessages = [], isLoading: messagesLoading } = useEmailMessages();
+  const { data: emailMessagesResult, isLoading: messagesLoading } = useEmailMessages();
+  const emailMessages = emailMessagesResult?.data || [];
 
   // Charger les emails seulement si mode démo activé OU si email configuré
   useEffect(() => {
@@ -146,7 +147,7 @@ const Mailbox = () => {
           id: msg.id,
           from: emailConfig?.from_email || emailConfig?.smtp_user || "noreply@btpsmartpro.com",
           fromName: emailConfig?.from_name || settings?.signature_name || "BTP Smart Pro",
-          subject: msg.subject,
+          subject: msg.subject || "Sans objet",
           preview: msg.body_text || msg.body_html?.replace(/<[^>]*>/g, "").substring(0, 100) || "",
           date: msg.sent_at || msg.created_at,
           isRead: true,

@@ -64,8 +64,14 @@ export const useEmailMessages = (options: UseEmailMessagesOptions = {}) => {
         throw error;
       }
 
+      // Mapper recipient_email vers to_email pour compatibilité avec l'interface
+      const mappedData = (data || []).map((msg: any) => ({
+        ...msg,
+        to_email: msg.recipient_email || msg.to_email || "",
+      })) as EmailMessage[];
+
       return {
-        data: (data || []) as EmailMessage[],
+        data: mappedData,
         count: count || 0,
       };
     },
@@ -98,7 +104,15 @@ export const useEmailMessageById = (id: string | null) => {
         throw error;
       }
 
-      return data as EmailMessage | null;
+      // Mapper recipient_email vers to_email pour compatibilité
+      if (data) {
+        return {
+          ...data,
+          to_email: (data as any).recipient_email || (data as any).to_email || "",
+        } as EmailMessage;
+      }
+
+      return null;
     },
     enabled: !!user && !!id,
   });
