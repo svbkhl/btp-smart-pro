@@ -57,33 +57,35 @@ export const useUserSettings = () => {
 
           // Si les settings n'existent pas, créer un enregistrement vide
           if (!data) {
-              const { data: newSettings, error: insertError } = await supabase
-                .from("user_settings")
-                .insert({ user_id: user.id })
-                .select()
-                .single();
+            const { data: newSettings, error: insertError } = await supabase
+              .from("user_settings")
+              .insert({ user_id: user.id })
+              .select()
+              .single();
 
-              if (insertError) {
-                // Si erreur d'insertion et fake data activé, retourner fake data
-                const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-                if (isFakeDataEnabled()) {
-                  return FAKE_USER_SETTINGS;
-                }
-                throw insertError;
+            if (insertError) {
+              // Si erreur d'insertion et fake data activé, retourner fake data
+              const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
+              if (isFakeDataEnabled()) {
+                return FAKE_USER_SETTINGS;
               }
-
-              return newSettings as UserSettings;
+              throw insertError;
             }
 
-            // Si fake data activé, retourner fake data
-            const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-            if (isFakeDataEnabled()) {
-              return FAKE_USER_SETTINGS;
+            if (!newSettings) {
+              throw new Error("Failed to create user settings");
             }
 
-            throw error;
+            return newSettings as UserSettings;
           }
 
+          // Si fake data activé, retourner fake data
+          const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
+          if (isFakeDataEnabled()) {
+            return FAKE_USER_SETTINGS;
+          }
+
+          // data existe forcément ici car on a vérifié !data plus haut
           return data as UserSettings;
         },
         {
