@@ -7,16 +7,28 @@ import { FAKE_QUOTES } from "@/fakeData/quotes";
 import { generateQuoteNumber } from "@/utils/documentNumbering";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { extractUUID } from "@/utils/uuidExtractor";
+import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { computeQuoteTotals } from "@/utils/quoteCalculations";
 
 export interface Quote {
   id: string;
   user_id: string;
+  company_id?: string; // Multi-tenant
   client_name: string;
   client_email?: string;
+  client_id?: string; // Lien vers clients
   project_id?: string;
   quote_number: string;
   status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "signed" | "paid";
   estimated_cost: number;
+  // Nouveaux champs refonte pro
+  mode?: "simple" | "detailed"; // Mode devis
+  tva_rate?: number; // Taux TVA personnalisable
+  subtotal_ht?: number; // Total HT calculé
+  total_tva?: number; // Total TVA calculé
+  total_ttc?: number; // Total TTC calculé
+  currency?: string; // Devise (défaut: EUR)
+  // Ancien format (compatibilité)
   details?: {
     estimatedCost: number;
     items: Array<{
@@ -41,10 +53,16 @@ export interface Quote {
 
 export interface CreateQuoteData {
   client_name: string;
+  client_id?: string; // Lien vers clients
   project_id?: string;
   quote_number?: string;
   status?: "draft" | "sent" | "accepted" | "rejected" | "expired";
   estimated_cost: number;
+  // Nouveaux champs refonte pro
+  mode?: "simple" | "detailed"; // Mode devis
+  tva_rate?: number; // Taux TVA (défaut: 0.20)
+  currency?: string; // Devise (défaut: EUR)
+  // Ancien format (compatibilité)
   details?: {
     estimatedCost: number;
     items: Array<{
@@ -78,10 +96,17 @@ export const useQuotes = () => {
         async () => {
           if (!user) throw new Error("User not authenticated");
 
+          // Récupérer company_id pour filtrage multi-tenant
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            console.warn("User is not a member of any company");
+            return [];
+          }
+
           const { data, error } = await supabase
             .from("ai_quotes")
             .select("*")
-            .eq("user_id", user.id)
+            .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
           if (error) throw error;
@@ -178,17 +203,42 @@ export const useCreateQuote = () => {
     mutationFn: async (quoteData: CreateQuoteData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer company_id
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise pour créer un devis");
+      }
+
       // Générer le numéro de devis automatiquement
       const quoteNumber = await generateQuoteNumber(user.id);
       console.log("📄 Numéro de devis généré:", quoteNumber);
+
+      // Valeurs par défaut
+      const mode = quoteData.mode || "simple";
+      const tvaRate = quoteData.tva_rate ?? 0.20;
+      const currency = quoteData.currency || "EUR";
+
+      // Calculer les totaux initiaux (sera recalculé par trigger si lignes existent)
+      const initialTotals = {
+        subtotal_ht: quoteData.estimated_cost || 0,
+        total_tva: (quoteData.estimated_cost || 0) * tvaRate,
+        total_ttc: (quoteData.estimated_cost || 0) * (1 + tvaRate),
+      };
 
       const { data, error } = await supabase
         .from("ai_quotes")
         .insert({
           ...quoteData,
           user_id: user.id,
+          company_id: companyId,
           quote_number: quoteNumber,
           status: quoteData.status || "draft",
+          mode: mode,
+          tva_rate: tvaRate,
+          currency: currency,
+          subtotal_ht: initialTotals.subtotal_ht,
+          total_tva: initialTotals.total_tva,
+          total_ttc: initialTotals.total_ttc,
         })
         .select()
         .single();
