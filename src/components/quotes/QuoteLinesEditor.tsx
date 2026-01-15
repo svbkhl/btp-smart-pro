@@ -151,19 +151,28 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
     if (!user) return;
 
     try {
-      // Estimer le prix si matériau
-      let unitPrice = libraryItem.default_unit_price_ht;
-      let priceSource: "manual" | "library" | "market_estimate" | "ai_estimate" = "library";
+      // Résoudre le prix selon l'ordre de priorité PRO
+      // 1) Prix de la bibliothèque (priorité absolue)
+      let resolvedPrice = await resolvePriceFromLibrary(libraryItem.id, user.id);
       
-      if (!unitPrice && libraryItem.default_category === "material" && libraryItem.default_unit) {
-        const estimate = await estimateMaterialPrice(
+      // 2) Si pas de prix dans la bibliothèque, chercher dans catalogue/IA
+      if (!resolvedPrice || !resolvedPrice.price) {
+        resolvedPrice = await resolveLinePrice(
           libraryItem.label,
-          libraryItem.default_unit,
-          user.id
+          libraryItem.default_category || null,
+          libraryItem.default_unit || null,
+          user.id,
+          libraryItem.default_unit_price_ht // Passer le prix library s'il existe
         );
-        unitPrice = estimate.price;
-        priceSource = estimate.source === "catalog" ? "market_estimate" : "ai_estimate";
       }
+
+      // Mapper la source vers le format attendu
+      const priceSourceMap: Record<PriceSource, "manual" | "library" | "market_estimate" | "ai_estimate"> = {
+        library: "library",
+        catalog: "market_estimate",
+        ai_estimate: "ai_estimate",
+        manual: "manual",
+      };
 
       await createLine.mutateAsync({
         quote_id: quoteId,
@@ -172,9 +181,9 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
         category: libraryItem.default_category || "other",
         unit: libraryItem.default_unit || null,
         quantity: null, // L'utilisateur devra saisir
-        unit_price_ht: unitPrice || null,
+        unit_price_ht: resolvedPrice.price,
         tva_rate: tvaRate,
-        price_source: priceSource,
+        price_source: priceSourceMap[resolvedPrice.source],
       });
 
       // Mettre à jour la bibliothèque (incrémenter times_used)
@@ -210,19 +219,55 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Erreur",
+        description: "Vous devez être connecté",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      // Résoudre le prix si non fourni manuellement
+      let finalPrice = newLine.unit_price_ht;
+      let finalPriceSource: "manual" | "library" | "market_estimate" | "ai_estimate" = "manual";
+
+      if (!finalPrice && newLine.label.trim()) {
+        const resolved = await resolveLinePrice(
+          newLine.label.trim(),
+          newLine.category || null,
+          newLine.unit || null,
+          user.id
+        );
+        finalPrice = resolved.price;
+        
+        const priceSourceMap: Record<PriceSource, "manual" | "library" | "market_estimate" | "ai_estimate"> = {
+          library: "library",
+          catalog: "market_estimate",
+          ai_estimate: "ai_estimate",
+          manual: "manual",
+        };
+        finalPriceSource = priceSourceMap[resolved.source];
+      } else if (finalPrice) {
+        // Prix saisi manuellement
+        finalPriceSource = "manual";
+      }
+
       await createLine.mutateAsync({
         quote_id: quoteId,
         ...newLine,
+        unit_price_ht: finalPrice,
         tva_rate: newLine.tva_rate ?? tvaRate,
+        price_source: finalPriceSource,
       });
 
-      // Ajouter à la bibliothèque si souhaité
+      // Ajouter à la bibliothèque pour mémoriser
       if (newLine.label.trim()) {
         await upsertLibrary.mutateAsync({
           label: newLine.label.trim(),
           default_unit: newLine.unit || undefined,
-          default_unit_price_ht: newLine.unit_price_ht || undefined,
+          default_unit_price_ht: finalPrice || undefined,
           default_category: newLine.category || undefined,
         });
       }
@@ -454,6 +499,14 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(totals.total_ht)}
+                      {line.price_source && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {line.price_source === "library" && "📚 Bibliothèque"}
+                          {line.price_source === "market_estimate" && "📊 Catalogue"}
+                          {line.price_source === "ai_estimate" && "🤖 Estimation"}
+                          {line.price_source === "manual" && "✏️ Manuel"}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {formatTvaRate(lineData?.tva_rate ?? tvaRate)}
@@ -583,15 +636,22 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
                   />
                 </TableCell>
                 <TableCell>
-                  {newLine.quantity && newLine.unit_price_ht
-                    ? formatCurrency(
+                  {newLine.quantity && newLine.unit_price_ht ? (
+                    <>
+                      {formatCurrency(
                         computeLineTotals({
                           quantity: newLine.quantity,
                           unit_price_ht: newLine.unit_price_ht,
                           tva_rate: newLine.tva_rate ?? tvaRate,
                         }).total_ht
-                      )
-                    : "-"}
+                      )}
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        ✏️ À valider
+                      </div>
+                    </>
+                  ) : (
+                    "-"
+                  )}
                 </TableCell>
                 <TableCell>{formatTvaRate(newLine.tva_rate ?? tvaRate)}</TableCell>
                 <TableCell>

@@ -406,32 +406,105 @@ IMPORTANT:
         if (quoteMode === 'detailed' && savedQuote?.id && aiResponse.lines && Array.isArray(aiResponse.lines)) {
           console.log("📝 Creating quote lines from AI response...");
           try {
-            const linesToInsert = aiResponse.lines.map((line: any, index: number) => {
-              // Estimer le prix si manquant (via materials_price_catalog ou estimation)
-              let unitPrice = line.unit_price_ht;
-              if (!unitPrice && line.category === 'material' && line.unit) {
-                // Estimation basique (sera améliorée avec materials_price_catalog)
-                unitPrice = 20; // Prix par défaut
+            // Fonction helper pour résoudre le prix selon l'ordre de priorité PRO
+            const resolvePriceForLine = async (line: any): Promise<{ price: number | null; source: string }> => {
+              // 1) Si l'IA a fourni un prix, l'utiliser (mais marquer comme ai_estimate)
+              if (line.unit_price_ht && line.unit_price_ht > 0) {
+                return { price: line.unit_price_ht, source: 'ai_estimate' };
               }
 
-              return {
-                quote_id: savedQuote.id,
-                company_id: companyId,
-                position: index,
-                label: line.label || 'Ligne sans nom',
-                description: line.description || null,
-                category: line.category || 'other',
-                unit: line.unit || null,
-                quantity: line.quantity || null,
-                unit_price_ht: unitPrice || null,
-                tva_rate: finalTvaRate,
-                price_source: unitPrice ? 'ai_estimate' : 'manual',
-                metadata: {
-                  ai_generated: true,
-                  original_line: line,
-                },
+              // 2) Chercher dans la bibliothèque
+              try {
+                const labelNormalized = line.label?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
+                const { data: libraryItem } = await supabase
+                  .from("quote_line_library")
+                  .select("*")
+                  .eq("company_id", companyId)
+                  .eq("label_normalized", labelNormalized)
+                  .maybeSingle();
+
+                if (libraryItem?.default_unit_price_ht) {
+                  return { price: libraryItem.default_unit_price_ht, source: 'library' };
+                }
+              } catch (err) {
+                console.warn("Error checking library:", err);
+              }
+
+              // 3) Chercher dans le catalogue (uniquement pour matériaux)
+              if (line.category === 'material' && line.unit) {
+                try {
+                  const materialKey = line.label?.toLowerCase().trim().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_') || '';
+                  
+                  // Catalogue company
+                  const { data: companyPrice } = await supabase
+                    .from("materials_price_catalog")
+                    .select("*")
+                    .eq("company_id", companyId)
+                    .eq("material_key", materialKey)
+                    .eq("unit", line.unit)
+                    .maybeSingle();
+
+                  if (companyPrice?.avg_unit_price_ht) {
+                    return { price: companyPrice.avg_unit_price_ht, source: 'catalog' };
+                  }
+
+                  // Catalogue global
+                  const { data: globalPrice } = await supabase
+                    .from("materials_price_catalog")
+                    .select("*")
+                    .is("company_id", null)
+                    .eq("material_key", materialKey)
+                    .eq("unit", line.unit)
+                    .maybeSingle();
+
+                  if (globalPrice?.avg_unit_price_ht) {
+                    return { price: globalPrice.avg_unit_price_ht, source: 'catalog' };
+                  }
+                } catch (err) {
+                  console.warn("Error checking catalog:", err);
+                }
+              }
+
+              // 4) Fallback : estimation basique (très conservatrice)
+              // L'utilisateur devra valider/modifier
+              const defaultEstimates: Record<string, number> = {
+                m2: 20.0, ml: 15.0, u: 10.0, kg: 5.0, h: 50.0, forfait: 100.0
               };
-            });
+              const estimatedPrice = line.unit ? (defaultEstimates[line.unit] || 10.0) : null;
+
+              return { 
+                price: estimatedPrice, 
+                source: estimatedPrice ? 'ai_estimate' : 'manual' 
+              };
+            };
+
+            const linesToInsert = await Promise.all(
+              aiResponse.lines.map(async (line: any, index: number) => {
+                const { price: unitPrice, source: priceSource } = await resolvePriceForLine(line);
+
+                return {
+                  quote_id: savedQuote.id,
+                  company_id: companyId,
+                  position: index,
+                  label: line.label || 'Ligne sans nom',
+                  description: line.description || null,
+                  category: line.category || 'other',
+                  unit: line.unit || null,
+                  quantity: line.quantity || null,
+                  unit_price_ht: unitPrice,
+                  tva_rate: finalTvaRate,
+                  price_source: priceSource as any,
+                  metadata: {
+                    ai_generated: true,
+                    original_line: line,
+                    price_resolution: {
+                      source: priceSource,
+                      resolved_at: new Date().toISOString(),
+                    },
+                  },
+                };
+              })
+            );
 
             const { error: linesError } = await supabase
               .from('quote_lines')
