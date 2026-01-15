@@ -1070,14 +1070,90 @@ export const AIQuoteGenerator = () => {
             </CardContent>
           </Card>
           
-          {/* Bouton pour fermer l'aperçu */}
-          <div className="flex justify-center">
+          {/* Boutons d'action */}
+          <div className="flex justify-center gap-3">
             <Button variant="outline" onClick={() => setIsPreviewOpen(false)} className="gap-2">
               Fermer l'aperçu
             </Button>
+            <Button variant="outline" onClick={handleReset} className="gap-2">
+              Nouveau devis
+            </Button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        // Formulaire de génération (affiché quand pas de résultat ou aperçu fermé)
+        <div className="space-y-6">
+          {/* Stepper */}
+          <Stepper currentStep={currentStep} steps={steps} />
+
+          {/* Step Content */}
+          {currentStep === 0 && (
+            <Step1Description
+              description={description}
+              onDescriptionChange={setDescription}
+              onNext={handleNext}
+            />
+          )}
+
+          {currentStep === 1 && (
+            <Step2TechnicalData
+              selectedClientId={selectedClientId}
+              clientName={clientName}
+              clientEmail={clientEmail}
+              clientPhone={clientPhone}
+              clientAddress={clientAddress}
+              isNewClient={isNewClient}
+              clients={clients}
+              clientsLoading={clientsLoading}
+              onClientChange={handleClientChange}
+              onClientNameChange={setClientName}
+              onClientEmailChange={setClientEmail}
+              onClientPhoneChange={setClientPhone}
+              onClientAddressChange={setClientAddress}
+              onToggleNewClient={handleToggleNewClient}
+              surface={surface}
+              workType={workType}
+              customWorkType={customWorkType}
+              region={region}
+              materials={materials}
+              materialInput={materialInput}
+              imageUrls={imageUrls}
+              onSurfaceChange={setSurface}
+              onWorkTypeChange={setWorkType}
+              onCustomWorkTypeChange={setCustomWorkType}
+              onRegionChange={setRegion}
+              onMaterialInputChange={setMaterialInput}
+              onAddMaterial={handleAddMaterial}
+              onRemoveMaterial={handleRemoveMaterial}
+              onAddCommonMaterial={handleAddCommonMaterial}
+              onImagesChange={setImageUrls}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+            />
+          )}
+
+          {currentStep === 2 && (
+            <Step3Recap
+              description={description}
+              clientName={clientName}
+              clientEmail={clientEmail}
+              clientPhone={clientPhone}
+              clientAddress={clientAddress}
+              surface={surface}
+              workType={workType}
+              customWorkType={customWorkType}
+              region={region}
+              materials={materials}
+              imageUrls={imageUrls}
+              quoteFormat={quoteFormat}
+              onQuoteFormatChange={setQuoteFormat}
+              onPrevious={handlePrevious}
+              onGenerate={handleGenerate}
+              loading={loading}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };
