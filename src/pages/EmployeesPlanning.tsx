@@ -37,7 +37,6 @@ import { useSyncPlanningWithGoogle } from "@/hooks/usePlanningSync";
 import { useGoogleCalendarConnection } from "@/hooks/useGoogleCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
