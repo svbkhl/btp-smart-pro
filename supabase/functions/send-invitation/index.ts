@@ -51,8 +51,9 @@ function recordEmailSent(email: string): void {
  * Edge Function pour envoyer des invitations utilisateur
  * 
  * Règles métier :
- * 1. Si l'utilisateur N'EXISTE PAS → inviteUserByEmail (invitation)
- * 2. Si l'utilisateur EXISTE (email_exists) → generateLink type "magiclink" (connexion/activation)
+ * 1. Si l'utilisateur N'EXISTE PAS → Créer invitation dans table invitations + envoyer lien /accept-invitation
+ *    L'utilisateur choisit son mot de passe sur /accept-invitation
+ * 2. Si l'utilisateur EXISTE → generateLink type "magiclink" (connexion/activation)
  * 3. L'utilisateur reçoit TOUJOURS un email exploitable
  * 
  * 🔒 SÉCURITÉ REDIRECTION :
@@ -186,6 +187,132 @@ serve(async (req) => {
     // Create Supabase admin client
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // Récupérer l'utilisateur qui envoie l'invitation
+    const authHeader = req.headers.get("Authorization");
+    let invitedByUserId: string | null = null;
+    
+    if (authHeader) {
+      try {
+        // Créer un client avec le token utilisateur pour récupérer l'utilisateur
+        const userClient = createClient(
+          supabaseUrl,
+          Deno.env.get("SUPABASE_ANON_KEY") || "",
+          {
+            global: {
+              headers: { Authorization: authHeader },
+            },
+          }
+        );
+        
+        const { data: { user }, error: userError } = await userClient.auth.getUser();
+        if (!userError && user) {
+          invitedByUserId = user.id;
+          logger.info("Invitation sender identified", { 
+            requestId,
+            invitedByUserId: user.id,
+            email: user.email
+          });
+        }
+      } catch (err) {
+        logger.warn("Could not identify invitation sender", err, { requestId });
+      }
+    }
+
+    /**
+     * Fonction helper pour valider et construire l'URL de l'application
+     * 
+     * RÈGLES STRICTES :
+     * - localhost est INTERDIT en production (inaccessible depuis les emails)
+     * - Tous les liens doivent pointer vers le domaine de production
+     * - HTTPS requis en production
+     * 
+     * @param requestId - ID de la requête pour les logs
+     * @returns URL de base validée (toujours https://btpsmartpro.com en production)
+     */
+    function getValidatedAppUrl(requestId: string): string {
+      const APP_URL = Deno.env.get("APP_URL");
+      const PRODUCTION_URL = "https://btpsmartpro.com";
+      
+      // Si APP_URL n'est pas configurée, utiliser production
+      if (!APP_URL) {
+        logger.warn("APP_URL not configured, using production URL", { 
+          requestId,
+          fallback: PRODUCTION_URL,
+          note: "Configure APP_URL in Supabase Dashboard → Edge Functions → Secrets"
+        });
+        return PRODUCTION_URL;
+      }
+      
+      const appUrlLower = APP_URL.toLowerCase().trim();
+      
+      // REFUSER catégoriquement localhost, 127.0.0.1, 0.0.0.0
+      const isLocalhost = 
+        appUrlLower.includes('localhost') || 
+        appUrlLower.includes('127.0.0.1') || 
+        appUrlLower.includes('0.0.0.0') ||
+        appUrlLower.startsWith('http://localhost') ||
+        appUrlLower.startsWith('https://localhost');
+      
+      if (isLocalhost) {
+        logger.error("APP_URL contains localhost - FORBIDDEN in production", { 
+          requestId,
+          appUrl: APP_URL,
+          reason: "localhost is inaccessible from email links in production",
+          action: "Forcing production URL",
+          fallback: PRODUCTION_URL
+        });
+        return PRODUCTION_URL;
+      }
+      
+      // Valider le format de l'URL
+      try {
+        const urlObj = new URL(APP_URL);
+        
+        // Vérifier HTTPS en production
+        if (urlObj.protocol !== 'https:') {
+          logger.warn("APP_URL is not HTTPS, forcing production HTTPS", { 
+            requestId,
+            appUrl: APP_URL,
+            protocol: urlObj.protocol,
+            corrected: PRODUCTION_URL
+          });
+          return PRODUCTION_URL;
+        }
+        
+        // URL valide
+        const cleanUrl = APP_URL.replace(/\/$/, '');
+        
+        // Validation finale : vérifier qu'il n'y a pas de localhost
+        const cleanUrlLower = cleanUrl.toLowerCase();
+        if (cleanUrlLower.includes('localhost') || cleanUrlLower.includes('127.0.0.1')) {
+          logger.error("CRITICAL: APP_URL contains localhost after cleaning", { 
+            requestId,
+            cleanUrl,
+            action: "Forcing production URL"
+          });
+          return PRODUCTION_URL;
+        }
+        
+        logger.info("App URL validated successfully (NO LOCALHOST)", { 
+          requestId, 
+          appUrl: cleanUrl,
+          source: APP_URL,
+          protocol: urlObj.protocol,
+          hostname: urlObj.hostname
+        });
+        
+        return cleanUrl;
+      } catch (urlError) {
+        logger.error("APP_URL is invalid, using production URL", { 
+          requestId,
+          appUrl: APP_URL,
+          error: urlError instanceof Error ? urlError.message : String(urlError),
+          fallback: PRODUCTION_URL
+        });
+        return PRODUCTION_URL;
+      }
+    }
+
     /**
      * Fonction helper pour valider et construire l'URL de redirection
      * 
@@ -282,296 +409,128 @@ serve(async (req) => {
       }
     }
     
-    // Obtenir l'URL de redirection validée (GARANTIE sans localhost)
+    // Obtenir l'URL de base de l'application (pour /accept-invitation)
+    const appBaseUrl = getValidatedAppUrl(requestId);
+    
+    // Obtenir l'URL de redirection validée (GARANTIE sans localhost) pour les utilisateurs existants
     const redirectUrl = getValidatedRedirectUrl(requestId);
 
-    // ÉTAPE 1 : Tenter d'inviter avec inviteUserByEmail
-    // Cette méthode fonctionne uniquement pour les NOUVEAUX utilisateurs
-    try {
-      // Construire les options - redirectTo est optionnel
-      const inviteOptions: { redirectTo?: string } = {};
-      if (redirectUrl) {
-        inviteOptions.redirectTo = redirectUrl;
-      }
+    // ÉTAPE 1 : Vérifier si l'utilisateur existe déjà
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u: any) => u.email?.toLowerCase() === emailToInvite.toLowerCase()
+    );
 
-      logger.debug("Calling inviteUserByEmail", { 
+    // Si l'utilisateur existe déjà, utiliser generateLink (magic link)
+    if (existingUser) {
+      logger.info("User already exists, generating magic link", { 
         requestId,
         email: emailToInvite,
-        hasRedirectTo: !!redirectUrl,
-        redirectUrl: redirectUrl
+        userId: existingUser.id
       });
+      
+      return await handleExistingUser(supabase, emailToInvite, redirectUrl, dbRole, companyId, requestId, createCorsResponse);
+    }
 
-      const result = await supabase.auth.admin.inviteUserByEmail(
-        emailToInvite,
-        Object.keys(inviteOptions).length > 0 ? inviteOptions : undefined
-      );
-
-      // Si succès, l'utilisateur n'existait pas et l'invitation a été envoyée
-      if (!result.error && result.data?.user) {
-        const userId = result.data.user.id;
-        
-        // Assigner le rôle à l'utilisateur
-        // IMPORTANT : Le trigger handle_new_user peut avoir déjà créé un rôle par défaut
-        // On utilise upsert pour mettre à jour ou créer le rôle
-        try {
-          // D'abord, supprimer tous les rôles existants pour cet utilisateur
-          // (au cas où la table aurait UNIQUE(user_id, role) et plusieurs rôles)
-          const { error: deleteError } = await supabase
-            .from('user_roles')
-            .delete()
-            .eq('user_id', userId);
-
-          if (deleteError) {
-            logger.warn("Failed to delete existing roles", deleteError, { 
-              requestId,
-              userId
-            });
-            // On continue quand même
-          }
-
-          // Insérer le nouveau rôle
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: userId,
-              role: dbRole,
-            });
-
-          if (roleError) {
-            // Si erreur de contrainte unique, essayer upsert
-            if (roleError.code === '23505' || roleError.message?.includes('unique')) {
-              const { error: upsertError } = await supabase
-                .from('user_roles')
-                .upsert({
-                  user_id: userId,
-                  role: dbRole,
-                }, {
-                  onConflict: 'user_id'
-                });
-
-              if (upsertError) {
-                logger.warn("Failed to assign role to user (upsert also failed)", upsertError, { 
-                  requestId,
-                  userId,
-                  dbRole
-                });
-              } else {
-                logger.info("Role assigned successfully via upsert", { 
-                  requestId,
-                  userId,
-                  dbRole
-                });
-              }
-            } else {
-              logger.warn("Failed to assign role to user", roleError, { 
-                requestId,
-                userId,
-                dbRole
-              });
-            }
-            // On continue même si l'assignation de rôle échoue
-          } else {
-            logger.info("Role assigned successfully", { 
-              requestId,
-              userId,
-              dbRole
-            });
-          }
-        } catch (roleErr) {
-          logger.warn("Exception assigning role", roleErr, { 
-            requestId,
-            userId,
-            dbRole
-          });
-          // On continue même si l'assignation de rôle échoue
-        }
-
-        // Si companyId est fourni, lier l'utilisateur à l'entreprise
-        if (companyId) {
-          try {
-            // Récupérer le role_id correspondant au slug du rôle
-            // Mapping: owner -> 'owner', admin -> 'admin', member -> 'employee'
-            const roleSlugMapping: Record<'dirigeant' | 'administrateur' | 'salarie', 'owner' | 'admin' | 'employee'> = {
-              dirigeant: 'owner',
-              administrateur: 'admin',
-              salarie: 'employee',
-            };
-            
-            const targetRoleSlug = roleSlugMapping[dbRole];
-            
-            // Récupérer le role_id depuis la table roles
-            const { data: roleData, error: roleLookupError } = await supabase
-              .from('roles')
-              .select('id')
-              .eq('slug', targetRoleSlug)
-              .single();
-
-            if (roleLookupError || !roleData) {
-              logger.warn("Failed to find role_id for role slug", roleLookupError, { 
-                requestId,
-                dbRole,
-                targetRoleSlug
-              });
-              // Continuer sans role_id (sera NULL, mais l'utilisateur sera quand même lié)
-            }
-
-            const { error: companyError } = await supabase
-              .from('company_users')
-              .upsert({
-                company_id: companyId,
-                user_id: userId,
-                role_id: roleData?.id || null, // Utiliser role_id au lieu de role
-              }, {
-                onConflict: 'company_id,user_id'
-              });
-
-            if (companyError) {
-              logger.warn("Failed to link user to company", companyError, { 
-                requestId,
-                userId,
-                companyId,
-                role_id: roleData?.id || null
-              });
-            } else {
-              logger.info("User linked to company successfully", { 
-                requestId,
-                userId,
-                companyId,
-                role_id: roleData?.id || null,
-                role_slug: targetRoleSlug
-              });
-            }
-          } catch (companyErr) {
-            logger.warn("Exception linking user to company", companyErr, { 
-              requestId,
-              userId,
-              companyId
-            });
-          }
-        }
-
-        // Enregistrer l'envoi dans le cooldown
-        recordEmailSent(emailToInvite);
-        
-        logger.info("Invitation sent successfully to new user (Supabase auto-sends email)", { 
-          requestId, 
-          userId,
-          email: emailToInvite,
-          dbRole,
-          method: "inviteUserByEmail"
-        });
-        const successResponse = createSuccessResponse({
-          reason: "invitation_sent",
-          message: "Invitation envoyée avec succès !",
-          user: { 
-            id: userId, 
-            email: result.data.user.email 
-          },
-        });
-        return createCorsResponse(successResponse);
-      }
-
-      // Si erreur, vérifier si c'est email_exists
-      const error = result.error;
-    if (error) {
-        // Log détaillé de l'erreur avec sérialisation JSON
-        const errorDetails = {
-          message: error.message || 'No message',
-          code: error.code || 'No code',
-          status: error.status || 'No status',
-          name: error.name || 'No name',
-          serialized: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+    // ÉTAPE 2 : L'utilisateur n'existe pas → Créer une invitation dans la table invitations
+    // L'utilisateur choisira son mot de passe sur /accept-invitation
+    try {
+      // Générer un token unique pour l'invitation
+      const invitationToken = crypto.randomUUID();
+      
+      // Date d'expiration (7 jours)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      
+      // Récupérer le role_id si companyId est fourni
+      let roleId: string | null = null;
+      if (companyId) {
+        const roleSlugMapping: Record<'owner' | 'admin' | 'member', 'owner' | 'admin' | 'employee'> = {
+          owner: 'owner',
+          admin: 'admin',
+          member: 'employee',
         };
         
-        const isEmailExists = 
-          error.code === "email_exists" ||
-          error.status === 422 ||
-          (error.name === "AuthApiError" && error.status === 422) ||
-          String(error.message || "").toLowerCase().includes("already been registered") ||
-          String(error.message || "").toLowerCase().includes("already exists");
+        const targetRoleSlug = roleSlugMapping[requestedRole || 'member'];
+        
+        const { data: roleData } = await supabase
+          .from('roles')
+          .select('id')
+          .eq('slug', targetRoleSlug)
+          .single();
+        
+        roleId = roleData?.id || null;
+      }
 
-        if (isEmailExists) {
-          // Utilisateur existe → utiliser generateLink type "magiclink" + Resend (PAS une erreur)
-          logger.info("User already exists, generating magic link and sending via Resend", { 
-            requestId, 
-            email: emailToInvite,
-            method: "generateLink-magiclink + Resend"
-          });
-          
-          return await handleExistingUser(supabase, emailToInvite, redirectUrl, dbRole, companyId, requestId, createCorsResponse);
-        }
+      // Créer l'invitation dans la table invitations
+      const { data: invitationData, error: invitationError } = await supabase
+        .from('invitations')
+        .insert({
+          email: emailToInvite,
+          company_id: companyId || null,
+          role: requestedRole || 'member',
+          role_id: roleId,
+          invited_by: invitedByUserId || null,
+          token: invitationToken,
+          status: 'pending',
+          expires_at: expiresAt.toISOString(),
+        })
+        .select()
+        .single();
 
-        // Autre erreur de inviteUserByEmail (vraie erreur)
-        logger.error("Error from inviteUserByEmail", error, { 
+      if (invitationError) {
+        logger.error("Failed to create invitation", invitationError, { 
           requestId,
           email: emailToInvite,
-          errorDetails
+          companyId
         });
-        const errorMessage = error.message || "Erreur lors de l'invitation";
-        const errorResponse = createErrorResponse(
-          errorMessage,
-          ErrorCode.INTERNAL_ERROR,
-          {
-            code: error.code,
-            status: error.status
-          }
-        );
-        return createCorsResponse(errorResponse, error.status || 500);
+        throw invitationError;
       }
 
-      // Cas inattendu : pas d'erreur mais pas de user non plus
-      logger.error("Unexpected result from inviteUserByEmail", undefined, { 
-        requestId,
-        hasData: !!result.data,
-        hasUser: !!result.data?.user,
-        hasError: !!result.error
-      });
-      const errorResponse = createErrorResponse(
-        "Erreur inattendue lors de l'invitation",
-        ErrorCode.INTERNAL_ERROR
+      // Construire le lien vers /accept-invitation
+      const acceptInvitationUrl = `${appBaseUrl}/accept-invitation?token=${invitationToken}`;
+
+      // Envoyer l'email avec le lien vers /accept-invitation
+      const emailResult = await sendInvitationEmailViaResend(
+        emailToInvite, 
+        acceptInvitationUrl, 
+        requestId
       );
-      return createCorsResponse(errorResponse, 500);
+
+      if (!emailResult.success) {
+        // Supprimer l'invitation si l'email n'a pas pu être envoyé
+        await supabase
+          .from('invitations')
+          .delete()
+          .eq('id', invitationData.id);
+        
+        throw new Error(emailResult.error || "Failed to send invitation email");
+      }
+
+      // Enregistrer l'envoi dans le cooldown
+      recordEmailSent(emailToInvite);
+      
+      logger.info("Invitation created and email sent successfully", { 
+        requestId, 
+        email: emailToInvite,
+        invitationId: invitationData.id,
+        token: invitationToken,
+        method: "custom invitation with password choice"
+      });
+      
+      const successResponse = createSuccessResponse({
+        reason: "invitation_sent",
+        message: "Invitation envoyée avec succès ! L'utilisateur pourra choisir son mot de passe.",
+      });
+      return createCorsResponse(successResponse);
 
     } catch (inviteErr: any) {
-      // inviteUserByEmail a lancé une exception (AuthApiError)
-      // Log détaillé avec sérialisation JSON
-      const exceptionDetails = {
-        message: inviteErr?.message || 'No message',
-        code: inviteErr?.code || 'No code',
-        status: inviteErr?.status || 'No status',
-        name: inviteErr?.name || 'No name',
-        stack: inviteErr?.stack || 'No stack',
-        serialized: JSON.stringify(inviteErr, Object.getOwnPropertyNames(inviteErr), 2),
-      };
-
-      // Vérifier si c'est une erreur email_exists
-      const errMsg = String(inviteErr?.message || "").toLowerCase();
-      const isEmailExists = 
-        inviteErr?.code === "email_exists" ||
-        (inviteErr?.name === "AuthApiError" && inviteErr?.status === 422) ||
-        inviteErr?.status === 422 ||
-        errMsg.includes("already been registered") ||
-        errMsg.includes("already exists") ||
-        errMsg.includes("email address has already been registered");
-
-      if (isEmailExists) {
-        // Utilisateur existe → utiliser generateLink type "magiclink" + Resend (PAS une erreur)
-        logger.info("Exception indicates user exists, generating magic link and sending via Resend", { 
-          requestId, 
-          email: emailToInvite,
-          method: "generateLink-magiclink + Resend"
-        });
-        
-        return await handleExistingUser(supabase, emailToInvite, redirectUrl, dbRole, companyId, requestId, createCorsResponse);
-      }
-
-      // Autre exception (vraie erreur)
-      logger.error("Exception from inviteUserByEmail", inviteErr, { 
+      logger.error("Exception creating invitation", inviteErr, { 
         requestId,
-        email: emailToInvite,
-        exceptionDetails
+        email: emailToInvite
       });
-      const errorMessage = inviteErr?.message || "Erreur lors de l'invitation";
+      
+      const errorMessage = inviteErr?.message || "Erreur lors de la création de l'invitation";
       const errorResponse = createErrorResponse(
         errorMessage,
         ErrorCode.INTERNAL_ERROR,
@@ -583,6 +542,18 @@ serve(async (req) => {
       );
       return createCorsResponse(errorResponse, inviteErr?.status || 500);
     }
+
+    // Ce code ne devrait jamais être atteint car on gère les nouveaux utilisateurs
+    // avec la création d'invitation ci-dessus, et les utilisateurs existants avec handleExistingUser
+    logger.error("Unexpected code path reached", undefined, { 
+      requestId,
+      email: emailToInvite
+    });
+    const errorResponse = createErrorResponse(
+      "Erreur inattendue lors de l'invitation",
+      ErrorCode.INTERNAL_ERROR
+    );
+    return createCorsResponse(errorResponse, 500);
 
   } catch (err: any) {
     // Erreur globale non capturée - Log avec sérialisation JSON
@@ -668,8 +639,12 @@ async function sendInvitationEmailViaResend(
                 Vous avez été invité à rejoindre BTP Smart Pro, votre plateforme de gestion complète pour les professionnels du BTP.
               </p>
               
+              <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
+                Cliquez sur le bouton ci-dessous pour créer votre compte. Vous pourrez choisir votre mot de passe lors de la création.
+              </p>
+              
               <p style="margin: 0 0 30px 0; font-size: 16px; color: #333;">
-                Cliquez sur le bouton ci-dessous pour créer votre compte ou vous connecter :
+                Si vous avez déjà un compte, vous serez redirigé vers la connexion.
               </p>
               
               <!-- CTA Button -->
@@ -677,7 +652,7 @@ async function sendInvitationEmailViaResend(
                 <tr>
                   <td align="center">
                     <a href="${actionLink}" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);">
-                      Créer mon compte / Me connecter
+                      Créer mon compte et choisir mon mot de passe
                     </a>
                   </td>
                 </tr>
