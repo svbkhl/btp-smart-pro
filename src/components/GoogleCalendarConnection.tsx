@@ -103,6 +103,8 @@ export const GoogleCalendarConnection = () => {
         <CardDescription>
           {connection && connection.enabled
             ? `Google Calendar connecté avec ${connection.google_email}`
+            : connection && !connection.enabled
+            ? `Google Calendar configuré avec ${connection.google_email} (désactivé)`
             : canConnect 
             ? "Connectez Google Calendar pour synchroniser les événements et plannings de l'entreprise"
             : "Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar"
@@ -239,15 +241,35 @@ export const GoogleCalendarConnection = () => {
               </>
             ) : (
               <div className="text-center py-4">
-                <Crown className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar.
-                </p>
-                {/* Debug: Afficher les valeurs pour comprendre pourquoi canConnect est false */}
-                {process.env.NODE_ENV === 'development' && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Debug: canConnect={String(canConnect)}, isOwner={String(isOwner)}
-                  </p>
+                {connection ? (
+                  <>
+                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-600 dark:text-green-400" />
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      Google Calendar est déjà configuré
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {connection.enabled 
+                        ? `Connecté avec ${connection.google_email}`
+                        : `Configuré avec ${connection.google_email} (désactivé)`
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Seul le propriétaire ou l'administrateur peut modifier la configuration.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Crown className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar.
+                    </p>
+                    {/* Debug: Afficher les valeurs pour comprendre pourquoi canConnect est false */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Debug: canConnect={String(canConnect)}, isOwner={String(isOwner)}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}
