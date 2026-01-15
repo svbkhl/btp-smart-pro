@@ -143,9 +143,30 @@ export const useCreateInvoice = () => {
     mutationFn: async (data: CreateInvoiceData) => {
       if (!user) throw new Error("User not authenticated");
 
-      // Générer le numéro de facture automatiquement
-      const invoiceNumber = await generateInvoiceNumber(user.id);
-      console.log("📄 Numéro de facture généré:", invoiceNumber);
+      // ⚠️ IMPORTANT: Si la facture est créée depuis un devis, utiliser le même numéro
+      let invoiceNumber: string;
+      if (data.quote_id) {
+        // Récupérer le numéro du devis
+        const { data: quote, error: quoteError } = await supabase
+          .from("ai_quotes")
+          .select("quote_number")
+          .eq("id", data.quote_id)
+          .eq("user_id", user.id)
+          .single();
+
+        if (quoteError || !quote?.quote_number) {
+          console.warn("⚠️ Impossible de récupérer le numéro du devis, génération d'un nouveau numéro");
+          invoiceNumber = await generateInvoiceNumber(user.id);
+        } else {
+          // Utiliser le même numéro que le devis
+          invoiceNumber = quote.quote_number;
+          console.log("📄 Numéro de facture = numéro de devis:", invoiceNumber);
+        }
+      } else {
+        // Générer un nouveau numéro de facture
+        invoiceNumber = await generateInvoiceNumber(user.id);
+        console.log("📄 Numéro de facture généré:", invoiceNumber);
+      }
 
       // Calculer les montants
       const vatRate = data.vat_rate || 20;

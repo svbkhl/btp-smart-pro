@@ -192,9 +192,9 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
                   {invoice.service_lines.map((line, index) => (
                     <tr key={index} className="border-t">
                       <td className="p-3">{line.description}</td>
-                      <td className="text-right p-3">{line.quantity}</td>
-                      <td className="text-right p-3">{line.unit_price.toFixed(2)}€</td>
-                      <td className="text-right p-3 font-medium">{line.total.toFixed(2)}€</td>
+                      <td className="text-right p-3">{line.quantity || 0}</td>
+                      <td className="text-right p-3">{(line.unit_price || 0).toFixed(2)}€</td>
+                      <td className="text-right p-3 font-medium">{(line.total || 0).toFixed(2)}€</td>
                     </tr>
                   ))}
                 </tbody>
@@ -210,18 +210,18 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
           <div className="w-full md:w-80 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Montant HT:</span>
-              <span className="font-medium">{invoice.amount_ht.toFixed(2)}€</span>
+              <span className="font-medium">{(invoice.amount_ht || 0).toFixed(2)}€</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">TVA ({invoice.vat_rate}%):</span>
-              <span className="font-medium">{invoice.vat_amount.toFixed(2)}€</span>
+              <span className="text-muted-foreground">TVA ({invoice.vat_rate || 20}%):</span>
+              <span className="font-medium">{(invoice.vat_amount || 0).toFixed(2)}€</span>
             </div>
             <Separator />
             <div className="flex justify-between text-lg font-bold">
               <span>Total TTC:</span>
               <span className="flex items-center gap-2">
                 <Euro className="w-5 h-5" />
-                {invoice.amount_ttc.toFixed(2)}€
+                {(invoice.amount_ttc || 0).toFixed(2)}€
               </span>
             </div>
           </div>
