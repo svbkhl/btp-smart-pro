@@ -26,7 +26,10 @@ import {
 import QuoteStatusBadge from "./QuoteStatusBadge";
 import QuoteTimeline from "./QuoteTimeline";
 import QuotePaymentSection from "./QuotePaymentSection";
+import { QuoteLinesEditor } from "./QuoteLinesEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useQuoteLines } from "@/hooks/useQuoteLines";
+import { computeQuoteTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
 
 interface QuoteDetailViewProps {
   quote: any;
@@ -46,6 +49,14 @@ export default function QuoteDetailView({
   onViewMessages,
 }: QuoteDetailViewProps) {
   const [activeTab, setActiveTab] = useState("details");
+  const quoteMode = quote.mode || "simple";
+  const tvaRate = quote.tva_rate ?? 0.20;
+  const { data: lines = [] } = useQuoteLines(quoteMode === "detailed" ? quote.id : undefined);
+  const [quoteTotals, setQuoteTotals] = useState({
+    subtotal_ht: quote.subtotal_ht ?? quote.estimated_cost ?? 0,
+    total_tva: quote.total_tva ?? (quote.estimated_cost ?? 0) * tvaRate,
+    total_ttc: quote.total_ttc ?? (quote.estimated_cost ?? 0) * (1 + tvaRate),
+  });
 
   const isReadOnly = quote.signed || quote.status === 'signed';
 
@@ -175,37 +186,27 @@ export default function QuoteDetailView({
                 <div>
                   <p className="text-sm text-muted-foreground">Total TTC</p>
                   <p className="text-3xl font-bold text-primary">
-                    {new Intl.NumberFormat('fr-FR', {
-                      style: 'currency',
-                      currency: 'EUR',
-                    }).format(quote.estimated_cost || quote.total_ttc || 0)}
+                    {formatCurrency(quoteTotals.total_ttc || quote.estimated_cost || 0, quote.currency)}
                   </p>
                 </div>
-                {quote.details && (
-                  <>
-                    {quote.details.total_ht && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total HT</span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', {
-                            style: 'currency',
-                            currency: 'EUR',
-                          }).format(quote.details.total_ht)}
-                        </span>
-                      </div>
-                    )}
-                    {quote.details.vat_amount && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">TVA (20%)</span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', {
-                            style: 'currency',
-                            currency: 'EUR',
-                          }).format(quote.details.vat_amount)}
-                        </span>
-                      </div>
-                    )}
-                  </>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total HT</span>
+                  <span className="font-medium">
+                    {formatCurrency(quoteTotals.subtotal_ht || quote.estimated_cost || 0, quote.currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">TVA ({formatTvaRate(tvaRate)})</span>
+                  <span className="font-medium">
+                    {formatCurrency(quoteTotals.total_tva || 0, quote.currency)}
+                  </span>
+                </div>
+                {quoteMode === "detailed" && (
+                  <div className="pt-2 border-t">
+                    <Badge variant="outline" className="text-xs">
+                      Mode détaillé
+                    </Badge>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -226,8 +227,75 @@ export default function QuoteDetailView({
             </Card>
           )}
 
-          {/* Détails des travaux */}
-          {quote.details?.workSteps && quote.details.workSteps.length > 0 && (
+          {/* Lignes détaillées (mode detailed) */}
+          {quoteMode === "detailed" && !isReadOnly && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Lignes du devis</CardTitle>
+                <CardDescription>
+                  Gérez les lignes détaillées du devis avec quantités, unités et prix
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QuoteLinesEditor
+                  quoteId={quote.id}
+                  tvaRate={tvaRate}
+                  onTotalsChange={setQuoteTotals}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Affichage lignes en lecture seule (si signé) */}
+          {quoteMode === "detailed" && isReadOnly && lines.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Lignes du devis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {lines.map((line) => {
+                    const totals = computeQuoteTotals([line], tvaRate);
+                    return (
+                      <div key={line.id} className="p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold">{line.label}</p>
+                            {line.description && (
+                              <p className="text-sm text-muted-foreground mt-1">{line.description}</p>
+                            )}
+                            <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                              {line.quantity && line.unit && (
+                                <span>
+                                  {line.quantity} {line.unit}
+                                </span>
+                              )}
+                              {line.unit_price_ht && (
+                                <span>
+                                  {formatCurrency(line.unit_price_ht)} / {line.unit || "u"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-primary">
+                              {formatCurrency(totals.total_ttc)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              HT: {formatCurrency(totals.subtotal_ht)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Détails des travaux (mode simple ou fallback) */}
+          {quoteMode === "simple" && quote.details?.workSteps && quote.details.workSteps.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Détails des prestations</CardTitle>
@@ -245,10 +313,7 @@ export default function QuoteDetailView({
                         </div>
                         {step.cost && (
                           <p className="font-bold text-primary">
-                            {new Intl.NumberFormat('fr-FR', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            }).format(step.cost)}
+                            {formatCurrency(step.cost)}
                           </p>
                         )}
                       </div>

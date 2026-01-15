@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useQuoteLines, useCreateQuoteLine, useUpdateQuoteLine, useDeleteQuoteLine, QuoteLine } from "@/hooks/useQuoteLines";
 import { useSearchQuoteLineLibrary, useUpsertQuoteLineLibrary } from "@/hooks/useQuoteLineLibrary";
-import { useGetMaterialPrice, estimateMaterialPrice } from "@/hooks/useMaterialsPriceCatalog";
+import { estimateMaterialPrice } from "@/hooks/useMaterialsPriceCatalog";
 import { useAuth } from "@/hooks/useAuth";
 import { computeLineTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
 import { Plus, Trash2, Edit2, Save, X, Search, Sparkles } from "lucide-react";
@@ -153,6 +153,8 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
     try {
       // Estimer le prix si matériau
       let unitPrice = libraryItem.default_unit_price_ht;
+      let priceSource: "manual" | "library" | "market_estimate" | "ai_estimate" = "library";
+      
       if (!unitPrice && libraryItem.default_category === "material" && libraryItem.default_unit) {
         const estimate = await estimateMaterialPrice(
           libraryItem.label,
@@ -160,6 +162,7 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
           user.id
         );
         unitPrice = estimate.price;
+        priceSource = estimate.source === "catalog" ? "market_estimate" : "ai_estimate";
       }
 
       await createLine.mutateAsync({
@@ -171,7 +174,7 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
         quantity: null, // L'utilisateur devra saisir
         unit_price_ht: unitPrice || null,
         tva_rate: tvaRate,
-        price_source: unitPrice ? "library" : "manual",
+        price_source: priceSource,
       });
 
       // Mettre à jour la bibliothèque (incrémenter times_used)

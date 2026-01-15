@@ -34,6 +34,19 @@ interface ClientInfo {
   location?: string;
 }
 
+interface QuoteLine {
+  label: string;
+  description?: string;
+  category?: string;
+  unit?: string;
+  quantity?: number;
+  unit_price_ht?: number;
+  total_ht: number;
+  tva_rate: number;
+  total_tva: number;
+  total_ttc: number;
+}
+
 interface DownloadQuotePDFParams {
   result: QuoteResult;
   companyInfo: CompanyInfo;
@@ -46,7 +59,13 @@ interface DownloadQuotePDFParams {
   signatureData?: string;
   signedBy?: string;
   signedAt?: string;
-  quoteFormat?: string;
+  quoteFormat?: string; // Ancien format (compatibilité)
+  mode?: "simple" | "detailed"; // Nouveau format
+  tvaRate?: number; // Taux TVA
+  lines?: QuoteLine[]; // Lignes détaillées (mode detailed)
+  subtotal_ht?: number; // Total HT
+  total_tva?: number; // Total TVA
+  total_ttc?: number; // Total TTC
 }
 
 /**
@@ -290,9 +309,134 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
     // Description supprimée - la phrase standard sera dans le tableau des prestations
 
     // ============================================
-    // TABLEAU DES PRESTATIONS
+    // TABLEAU DES PRESTATIONS / LIGNES
     // ============================================
-    if (result.workSteps && result.workSteps.length > 0) {
+    
+    // Mode détaillé : afficher les lignes quote_lines
+    if (quoteMode === "detailed" && lines && lines.length > 0) {
+      if (yPosition > pageHeight - 80) {
+        doc.addPage();
+        yPosition = margin;
+      }
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Détail des prestations:', margin, yPosition);
+      yPosition += 7;
+
+      // En-tête du tableau détaillé
+      doc.setFillColor(...primaryColor);
+      doc.rect(margin, yPosition, contentWidth, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Libellé', margin + 2, yPosition + 5.5);
+      doc.text('Unité', margin + 60, yPosition + 5.5);
+      doc.text('Qté', margin + 75, yPosition + 5.5);
+      doc.text('Prix unit. HT', margin + 85, yPosition + 5.5);
+      doc.text('Total HT', margin + 110, yPosition + 5.5);
+      doc.text('TVA', margin + 135, yPosition + 5.5);
+      doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
+      yPosition += 8;
+
+      doc.setTextColor(...textColor);
+      doc.setFont('helvetica', 'normal');
+      let totalHT = 0;
+      let totalTVA = 0;
+      let totalTTC = 0;
+
+      lines.forEach((line, index) => {
+        if (yPosition > pageHeight - 50) {
+          doc.addPage();
+          yPosition = margin;
+          // Réafficher l'en-tête
+          doc.setFillColor(...primaryColor);
+          doc.rect(margin, yPosition, contentWidth, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Libellé', margin + 2, yPosition + 5.5);
+          doc.text('Unité', margin + 60, yPosition + 5.5);
+          doc.text('Qté', margin + 75, yPosition + 5.5);
+          doc.text('Prix unit. HT', margin + 85, yPosition + 5.5);
+          doc.text('Total HT', margin + 110, yPosition + 5.5);
+          doc.text('TVA', margin + 135, yPosition + 5.5);
+          doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
+          yPosition += 8;
+          doc.setTextColor(...textColor);
+          doc.setFont('helvetica', 'normal');
+        }
+
+        const lineHeight = 6;
+        if (index % 2 === 0) {
+          doc.setFillColor(...lightGray);
+          doc.rect(margin, yPosition - 2, contentWidth, lineHeight, 'F');
+        }
+
+        doc.setFontSize(8);
+        // Libellé (tronqué si trop long)
+        const labelText = doc.splitTextToSize(line.label || '', 50)[0];
+        doc.text(labelText, margin + 2, yPosition + 4);
+        // Unité
+        doc.text(line.unit || '-', margin + 60, yPosition + 4);
+        // Quantité
+        doc.text(line.quantity?.toString() || '-', margin + 75, yPosition + 4);
+        // Prix unitaire HT
+        doc.text(line.unit_price_ht ? formatCurrency(line.unit_price_ht) : '-', margin + 85, yPosition + 4);
+        // Total HT
+        doc.text(formatCurrency(line.total_ht), margin + 110, yPosition + 4);
+        // TVA
+        doc.text(`${(line.tva_rate * 100).toFixed(1)}%`, margin + 135, yPosition + 4);
+        // Total TTC
+        doc.text(formatCurrency(line.total_ttc), rightX, yPosition + 4, { align: 'right' });
+
+        totalHT += line.total_ht;
+        totalTVA += line.total_tva;
+        totalTTC += line.total_ttc;
+        yPosition += lineHeight;
+      });
+
+      // Totaux
+      if (yPosition > pageHeight - margin - 50) {
+        doc.addPage();
+        yPosition = margin;
+      }
+
+      yPosition += 2;
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(1);
+      doc.line(margin, yPosition, rightX, yPosition);
+      yPosition += 5;
+
+      // Utiliser les totaux fournis ou calculés
+      const finalSubtotalHT = subtotal_ht ?? totalHT;
+      const finalTotalTVA = total_tva ?? totalTVA;
+      const finalTotalTTC = total_ttc ?? totalTTC;
+
+      // Total HT
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalSubtotalHT), rightX, yPosition, { align: 'right' });
+      yPosition += 5;
+
+      // TVA
+      doc.text(`TVA (${(tvaRate * 100).toFixed(2)}%):`, rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalTotalTVA), rightX, yPosition, { align: 'right' });
+      yPosition += 5;
+
+      // Total TTC
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(...primaryColor);
+      doc.text('Total à payer (TTC):', rightX - 40, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalTotalTTC), rightX, yPosition, { align: 'right' });
+      doc.setTextColor(...textColor);
+      yPosition += 10;
+    }
+    // Mode simple : afficher workSteps (format existant)
+    else if (quoteMode === "simple" && result.workSteps && result.workSteps.length > 0) {
       if (yPosition > pageHeight - 80) {
         doc.addPage();
         yPosition = margin;
@@ -376,8 +520,8 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
         yPosition = margin;
       }
 
-      // ⚠️ MODE TTC FIRST : Calculer HT et TVA à partir du TTC
-      const prices = calculateFromTTC(totalTTC, 20);
+      // Calculer HT et TVA à partir du TTC
+      const prices = calculateFromTTC(totalTTC, tvaRate * 100);
       
       // Total TTC (EN PREMIER, GROS, EN COULEUR)
       yPosition += 2;
@@ -393,11 +537,11 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       doc.setTextColor(...textColor);
       yPosition += 8;
 
-      // TVA (20%)
+      // TVA
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
-      doc.text('dont TVA (20%):', rightX - 30, yPosition, { align: 'right' });
+      doc.text(`dont TVA (${(tvaRate * 100).toFixed(2)}%):`, rightX - 30, yPosition, { align: 'right' });
       doc.text(formatCurrency(prices.vat_amount), rightX, yPosition, { align: 'right' });
       yPosition += 5;
 

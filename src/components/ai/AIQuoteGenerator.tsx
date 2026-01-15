@@ -33,6 +33,9 @@ import {
 import { useClients, useCreateClient } from "@/hooks/useClients";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { getCurrentCompanyId } from "@/utils/companyHelpers";
 import { MultiImageUpload } from "@/components/MultiImageUpload";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -793,6 +796,7 @@ const Step3Recap = ({
 
 export const AIQuoteGenerator = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: companyInfo } = useUserSettings();
   const createClient = useCreateClient();
@@ -1072,6 +1076,26 @@ export const AIQuoteGenerator = () => {
   const handleExportPDF = async () => {
     try {
       const selectedClient = clients?.find((c) => c.id === selectedClientId);
+      
+      // Récupérer les lignes si mode detailed
+      let quoteLines: any[] | undefined = undefined;
+      if (quoteMode === "detailed" && quoteId && user) {
+        try {
+          const companyId = await getCurrentCompanyId(user.id);
+          if (companyId) {
+            const { data } = await supabase
+              .from("quote_lines")
+              .select("*")
+              .eq("quote_id", quoteId)
+              .eq("company_id", companyId)
+              .order("position", { ascending: true });
+            quoteLines = data || [];
+          }
+        } catch (error) {
+          console.warn("Error fetching quote lines for PDF:", error);
+        }
+      }
+
       await downloadQuotePDF({
         result,
         companyInfo,
@@ -1089,7 +1113,13 @@ export const AIQuoteGenerator = () => {
         signatureData: quoteSignature?.data,
         signedBy: quoteSignature?.signedBy,
         signedAt: quoteSignature?.signedAt,
-        quoteFormat: quoteFormat, // Pass format to PDF generator
+        quoteFormat: quoteFormat, // Compatibilité
+        mode: quoteMode, // Nouveau format
+        tvaRate: tvaRate, // Taux TVA
+        lines: quoteLines, // Lignes détaillées
+        subtotal_ht: result?.subtotal_ht,
+        total_tva: result?.total_tva,
+        total_ttc: result?.total_ttc,
       });
       toast({
         title: "PDF généré",
