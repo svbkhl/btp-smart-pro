@@ -221,7 +221,7 @@ const MessagingNew = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Envoyés</p>
-                <p className="text-2xl font-bold text-green-600">{stats.sent}</p>
+                <p className="text-2xl font-bold">{stats.sent}</p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
@@ -231,7 +231,7 @@ const MessagingNew = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Lus</p>
-                <p className="text-2xl font-bold text-emerald-600">{stats.opened}</p>
+                <p className="text-2xl font-bold">{stats.opened}</p>
               </div>
               <Eye className="w-8 h-8 text-emerald-500" />
             </div>
@@ -241,7 +241,7 @@ const MessagingNew = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Échecs</p>
-                <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
+                <p className="text-2xl font-bold">{stats.failed}</p>
               </div>
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
