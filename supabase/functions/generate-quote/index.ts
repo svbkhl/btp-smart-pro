@@ -63,7 +63,7 @@ serve(async (req) => {
 
     // Parser le body de la requête
     console.log("📥 Parsing request body...");
-    let requestData;
+    let requestData: any;
     try {
       const bodyText = await req.text();
       console.log("📥 Request body length:", bodyText?.length || 0);
@@ -96,8 +96,14 @@ serve(async (req) => {
       manualPrice,
       region,
       description,
-      quoteFormat
+      quoteFormat, // Ancien format (compatibilité)
+      mode, // Nouveau format: "simple" | "detailed"
+      tvaRate // Taux TVA personnalisable
     } = requestData;
+
+    // Déterminer le mode (nouveau format prioritaire)
+    const quoteMode = mode || (quoteFormat === "simplified" ? "simple" : "detailed") || "simple";
+    const finalTvaRate = tvaRate ?? 0.20;
 
     console.log("📥 Extracted data:", {
       clientName: !!clientName,
@@ -173,7 +179,7 @@ serve(async (req) => {
 
     // Créer le prompt pour OpenAI
     console.log("🤖 Creating OpenAI prompt...");
-    const isSimplified = quoteFormat === "simplified";
+    const isSimplified = quoteMode === "simple";
     const formatInstruction = isSimplified 
       ? "Génère un devis SIMPLIFIÉ avec uniquement le type de travaux et le prix total HT/TTC. Pas de détail des prestations ni des matériaux."
       : "Génère un devis DÉTAILLÉ avec toutes les prestations et matériaux listés avec leurs prix.";
@@ -213,7 +219,7 @@ Génère un devis professionnel avec:
 - Des recommandations
 - Une validation du prix
 
-Structure JSON détaillée:
+Structure JSON détaillée (OBLIGATOIRE pour mode detailed):
 {
   "estimatedCost": 0,
   "description": "Description détaillée basée sur la description fournie",
@@ -221,7 +227,25 @@ Structure JSON détaillée:
   "materials": [{"name": "", "quantity": "", "unitCost": 0}],
   "estimatedDuration": "",
   "recommendations": [""],
-  "priceValidation": {"isValid": true, "message": "", "warning": ""}
+  "priceValidation": {"isValid": true, "message": "", "warning": ""},
+  "lines": [
+    {
+      "label": "Nom de la ligne",
+      "description": "Description optionnelle",
+      "category": "labor" | "material" | "service",
+      "unit": "m2" | "ml" | "h" | "u" | "forfait",
+      "quantity": 0,
+      "unit_price_ht": 0
+    }
+  ]
+}
+
+IMPORTANT pour mode detailed:
+- Génère un tableau "lines" avec toutes les lignes détaillées
+- Chaque ligne doit avoir: label, unit, quantity, unit_price_ht
+- Les catégories possibles: "labor" (main d'œuvre), "material" (matériaux), "service" (prestation), "other"
+- Les unités possibles: "m2", "ml", "h" (heures), "u" (unité), "forfait"
+- Le total estimatedCost doit être la somme de toutes les lignes (quantity * unit_price_ht)
 }`}
 
 IMPORTANT: 
@@ -341,6 +365,8 @@ IMPORTANT:
       region: region || null,
       manualPrice: manualPrice || null,
       companyInfo: companyInfo,
+      mode: quoteMode,
+      tvaRate: finalTvaRate,
     };
 
     // Sauvegarder dans la base de données (optionnel, non-bloquant)
@@ -356,16 +382,72 @@ IMPORTANT:
         estimated_cost: aiResponse.estimatedCost || 0,
         details: aiResponse,
         status: 'draft',
+        mode: quoteMode, // Mode devis
+        tva_rate: finalTvaRate, // Taux TVA
+        // Totaux initiaux (seront recalculés par trigger si lignes existent)
+        subtotal_ht: aiResponse.estimatedCost || 0,
+        total_tva: (aiResponse.estimatedCost || 0) * finalTvaRate,
+        total_ttc: (aiResponse.estimatedCost || 0) * (1 + finalTvaRate),
+        currency: 'EUR',
       };
 
-      const { error: dbError } = await supabase
+      const { data: savedQuote, error: dbError } = await supabase
         .from('ai_quotes')
-        .insert(insertData);
+        .insert(insertData)
+        .select()
+        .single();
 
       if (dbError) {
         console.warn('⚠️ Error saving to database (non-blocking):', dbError.message);
       } else {
-        console.log("✅ Quote saved to database");
+        console.log("✅ Quote saved to database, ID:", savedQuote?.id);
+
+        // Si mode detailed et que l'IA a renvoyé des lignes, les créer
+        if (quoteMode === 'detailed' && savedQuote?.id && aiResponse.lines && Array.isArray(aiResponse.lines)) {
+          console.log("📝 Creating quote lines from AI response...");
+          try {
+            const linesToInsert = aiResponse.lines.map((line: any, index: number) => {
+              // Estimer le prix si manquant (via materials_price_catalog ou estimation)
+              let unitPrice = line.unit_price_ht;
+              if (!unitPrice && line.category === 'material' && line.unit) {
+                // Estimation basique (sera améliorée avec materials_price_catalog)
+                unitPrice = 20; // Prix par défaut
+              }
+
+              return {
+                quote_id: savedQuote.id,
+                company_id: companyId,
+                position: index,
+                label: line.label || 'Ligne sans nom',
+                description: line.description || null,
+                category: line.category || 'other',
+                unit: line.unit || null,
+                quantity: line.quantity || null,
+                unit_price_ht: unitPrice || null,
+                tva_rate: finalTvaRate,
+                price_source: unitPrice ? 'ai_estimate' : 'manual',
+                metadata: {
+                  ai_generated: true,
+                  original_line: line,
+                },
+              };
+            });
+
+            const { error: linesError } = await supabase
+              .from('quote_lines')
+              .insert(linesToInsert);
+
+            if (linesError) {
+              console.warn('⚠️ Error creating quote lines (non-blocking):', linesError.message);
+            } else {
+              console.log(`✅ Created ${linesToInsert.length} quote lines`);
+              // Recalculer les totaux du devis (trigger le fera automatiquement, mais on peut forcer)
+              await supabase.rpc('recompute_quote_totals', { p_quote_id: savedQuote.id });
+            }
+          } catch (linesError) {
+            console.warn('⚠️ Error processing quote lines (non-blocking):', linesError);
+          }
+        }
       }
     } catch (dbError) {
       console.warn('⚠️ Error saving to database (non-blocking):', dbError);

@@ -12,7 +12,9 @@ export interface GenerateQuoteParams {
   manualPrice?: number;
   region?: string;
   description?: string;
-  quoteFormat?: string;
+  quoteFormat?: string; // Ancien format (compatibilité)
+  mode?: "simple" | "detailed"; // Nouveau format
+  tvaRate?: number; // Taux TVA personnalisable
 }
 
 /**
@@ -91,7 +93,9 @@ export async function generateQuote(
       manualPrice: params.manualPrice,
       region: params.region,
       description: params.description,
-      quoteFormat: params.quoteFormat || 'standard',
+      quoteFormat: params.quoteFormat || (params.mode === "simple" ? "simplified" : "detailed") || 'standard', // Compatibilité
+      mode: params.mode || (params.quoteFormat === "simplified" ? "simple" : "detailed") || "simple", // Nouveau format
+      tvaRate: params.tvaRate ?? 0.20, // Taux TVA
     };
 
     // Appeler l'Edge Function generate-quote

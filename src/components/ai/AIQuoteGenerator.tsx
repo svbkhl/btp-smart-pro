@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useClients, useCreateClient } from "@/hooks/useClients";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { MultiImageUpload } from "@/components/MultiImageUpload";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -598,8 +599,10 @@ interface Step3RecapProps {
   region: string;
   materials: string[];
   imageUrls: string[];
-  quoteFormat: "detailed" | "simplified";
-  onQuoteFormatChange: (format: "detailed" | "simplified") => void;
+  quoteMode: "simple" | "detailed";
+  tvaRate: number;
+  onQuoteModeChange: (mode: "simple" | "detailed") => void;
+  onTvaRateChange: (rate: number) => void;
   onPrevious: () => void;
   onGenerate: () => void;
   loading: boolean;
@@ -617,8 +620,10 @@ const Step3Recap = ({
   region,
   materials,
   imageUrls,
-  quoteFormat,
-  onQuoteFormatChange,
+  quoteMode,
+  tvaRate,
+  onQuoteModeChange,
+  onTvaRateChange,
   onPrevious,
   onGenerate,
   loading,
@@ -636,33 +641,73 @@ const Step3Recap = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Quote Format Selection */}
+          {/* Quote Mode Selection */}
           <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-            <Label className="text-base font-semibold">Format du devis</Label>
+            <Label className="text-base font-semibold">Mode du devis</Label>
             <RadioGroup
-              value={quoteFormat}
-              onValueChange={(value) => onQuoteFormatChange(value as "detailed" | "simplified")}
+              value={quoteMode}
+              onValueChange={(value) => onQuoteModeChange(value as "simple" | "detailed")}
               className="space-y-3"
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="detailed" id="detailed" />
-                <Label htmlFor="detailed" className="cursor-pointer flex-1">
-                  <div className="font-medium">Devis détaillé</div>
-                  <div className="text-sm text-muted-foreground">
-                    Liste complète des prestations et matériaux avec prix détaillés
-                  </div>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="simplified" id="simplified" />
-                <Label htmlFor="simplified" className="cursor-pointer flex-1">
-                  <div className="font-medium">Devis simplifié</div>
+                <RadioGroupItem value="simple" id="simple" />
+                <Label htmlFor="simple" className="cursor-pointer flex-1">
+                  <div className="font-medium">Mode simplifié</div>
                   <div className="text-sm text-muted-foreground">
                     Format court avec prix global (ex: "Rénovation salle de bains – 4 500 € HT")
                   </div>
                 </Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="detailed" id="detailed" />
+                <Label htmlFor="detailed" className="cursor-pointer flex-1">
+                  <div className="font-medium">Mode détaillé</div>
+                  <div className="text-sm text-muted-foreground">
+                    Liste complète des prestations et matériaux avec prix détaillés, quantités, unités, TVA
+                  </div>
+                </Label>
+              </div>
             </RadioGroup>
+          </div>
+
+          {/* TVA Rate Selection */}
+          <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+            <Label className="text-base font-semibold">Taux de TVA</Label>
+            <div className="flex items-center gap-4">
+              <Select
+                value={tvaRate.toString()}
+                onValueChange={(value) => onTvaRateChange(parseFloat(value))}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">0%</SelectItem>
+                  <SelectItem value="0.055">5.5%</SelectItem>
+                  <SelectItem value="0.10">10%</SelectItem>
+                  <SelectItem value="0.20">20%</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={(tvaRate * 100).toFixed(2)}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  if (!isNaN(value) && value >= 0 && value <= 100) {
+                    onTvaRateChange(value / 100);
+                  }
+                }}
+                className="w-24"
+                placeholder="Taux personnalisé"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Le taux sélectionné sera utilisé pour ce devis et sauvegardé comme préférence pour les prochains devis
+            </p>
           </div>
 
           {/* Recap Sections */}
@@ -775,7 +820,17 @@ export const AIQuoteGenerator = () => {
   const [materialInput, setMaterialInput] = useState<string>("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [region, setRegion] = useState<string>("");
-  const [quoteFormat, setQuoteFormat] = useState<"detailed" | "simplified">("detailed");
+  // Charger les préférences company pour mode et TVA
+  const { data: companySettings } = useCompanySettings();
+  const updateCompanySettings = useUpdateCompanySettings();
+  const [quoteMode, setQuoteMode] = useState<"simple" | "detailed">(
+    companySettings?.default_quote_mode || "simple"
+  );
+  const [tvaRate, setTvaRate] = useState<number>(
+    companySettings?.default_quote_tva_rate || 0.20
+  );
+  // Compatibilité avec ancien format
+  const quoteFormat = quoteMode === "simple" ? "simplified" : "detailed";
 
   // Result state
   const [loading, setLoading] = useState(false);
@@ -852,6 +907,39 @@ export const AIQuoteGenerator = () => {
     }
   };
 
+  // Effet pour charger les préférences company au montage
+  useEffect(() => {
+    if (companySettings) {
+      setQuoteMode(companySettings.default_quote_mode);
+      setTvaRate(companySettings.default_quote_tva_rate);
+    }
+  }, [companySettings]);
+
+  // Persister les changements de mode et TVA
+  const handleModeChange = async (mode: "simple" | "detailed") => {
+    setQuoteMode(mode);
+    // Persister dans company_settings
+    try {
+      await updateCompanySettings.mutateAsync({
+        default_quote_mode: mode,
+      });
+    } catch (error) {
+      console.error("Error updating company settings:", error);
+    }
+  };
+
+  const handleTvaRateChange = async (rate: number) => {
+    setTvaRate(rate);
+    // Persister dans company_settings
+    try {
+      await updateCompanySettings.mutateAsync({
+        default_quote_tva_rate: rate,
+      });
+    } catch (error) {
+      console.error("Error updating company settings:", error);
+    }
+  };
+
   const handleGenerate = async () => {
     setLoading(true);
     setResult(null);
@@ -885,6 +973,8 @@ export const AIQuoteGenerator = () => {
         imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
         region: region.trim() || undefined,
         description: description.trim(), // Pass description to AI
+        mode: quoteMode, // Pass mode to AI
+        tvaRate: tvaRate, // Pass TVA rate
       });
 
       if (!response || !response.aiResponse) {
@@ -965,7 +1055,14 @@ export const AIQuoteGenerator = () => {
     setMaterialInput("");
     setImageUrls([]);
     setRegion("");
-    setQuoteFormat("detailed");
+    // Réinitialiser avec préférences company
+    if (companySettings) {
+      setQuoteMode(companySettings.default_quote_mode);
+      setTvaRate(companySettings.default_quote_tva_rate);
+    } else {
+      setQuoteMode("simple");
+      setTvaRate(0.20);
+    }
     setResult(null);
     setIsPreviewOpen(false); // Fermer l'aperçu via action utilisateur
     setQuoteId(null);
@@ -1145,8 +1242,10 @@ export const AIQuoteGenerator = () => {
               region={region}
               materials={materials}
               imageUrls={imageUrls}
-              quoteFormat={quoteFormat}
-              onQuoteFormatChange={setQuoteFormat}
+              quoteMode={quoteMode}
+              tvaRate={tvaRate}
+              onQuoteModeChange={handleModeChange}
+              onTvaRateChange={handleTvaRateChange}
               onPrevious={handlePrevious}
               onGenerate={handleGenerate}
               loading={loading}
