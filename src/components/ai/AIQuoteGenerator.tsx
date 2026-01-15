@@ -780,6 +780,9 @@ export const AIQuoteGenerator = () => {
   // Result state
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  // État explicite pour contrôler l'affichage de l'aperçu
+  // Ne se réinitialise QUE via action utilisateur (bouton "Réinitialiser" ou "Fermer l'aperçu")
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
   const [quoteSignature, setQuoteSignature] = useState<{
@@ -904,7 +907,9 @@ export const AIQuoteGenerator = () => {
         description: description, // Include original description
       };
 
+      // Décorréler la génération de l'affichage : générer ≠ fermer l'aperçu
       setResult(formattedResult);
+      setIsPreviewOpen(true); // Ouvrir explicitement l'aperçu
       setQuoteId(response.quote?.id || null);
 
       if (response.quote?.signature_data) {
@@ -944,6 +949,7 @@ export const AIQuoteGenerator = () => {
   };
 
   const handleReset = () => {
+    // Réinitialiser le formulaire ET fermer l'aperçu explicitement
     setCurrentStep(0);
     setDescription("");
     setSelectedClientId("");
@@ -961,6 +967,7 @@ export const AIQuoteGenerator = () => {
     setRegion("");
     setQuoteFormat("detailed");
     setResult(null);
+    setIsPreviewOpen(false); // Fermer l'aperçu via action utilisateur
     setQuoteId(null);
     setQuoteNumber(null);
   };
@@ -1017,7 +1024,7 @@ export const AIQuoteGenerator = () => {
             Créez un devis professionnel en quelques étapes avec l'intelligence artificielle
           </p>
         </div>
-        {result && (
+        {result && isPreviewOpen && (
           <Button variant="outline" onClick={handleReset} className="gap-2">
             <X className="h-4 w-4" />
             Nouveau devis
@@ -1025,7 +1032,7 @@ export const AIQuoteGenerator = () => {
         )}
       </div>
 
-      {!result ? (
+      {!result || !isPreviewOpen ? (
         <div className="space-y-6">
           {/* Stepper */}
           <Stepper currentStep={currentStep} steps={steps} />
@@ -1097,7 +1104,7 @@ export const AIQuoteGenerator = () => {
             />
           )}
         </div>
-      ) : (
+      ) : result && isPreviewOpen ? (
         <div ref={resultRef} className="space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
@@ -1139,8 +1146,14 @@ export const AIQuoteGenerator = () => {
               />
             </CardContent>
           </Card>
+          
+          {/* Bouton pour fermer l'aperçu */}
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)} className="gap-2">
+              Fermer l'aperçu
+            </Button>
+          </div>
         </div>
-      )}
-    </div>
-  );
-};
+      ) : (
+        // Formulaire de génération (affiché quand pas de résultat ou aperçu fermé)
+        <div className="space-y-6">

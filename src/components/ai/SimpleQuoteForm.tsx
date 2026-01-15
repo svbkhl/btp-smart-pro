@@ -35,7 +35,10 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   const [prix, setPrix] = useState("");
   const [clientId, setClientId] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  // État explicite pour contrôler l'affichage de l'aperçu
+  // Ne se réinitialise QUE via action utilisateur (bouton "Fermer" ou "Créer un nouveau devis")
   const [quote, setQuote] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const selectedClient = clients.find((c) => c.id === clientId);
 
@@ -118,11 +121,13 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
         }
       );
 
+      // Décorréler la génération de l'affichage : générer ≠ fermer l'aperçu
       setQuote(result);
+      setIsPreviewOpen(true); // Ouvrir explicitement l'aperçu
 
       toast({
         title: "✅ Devis généré !",
-        description: "Le devis a été créé avec succès. L'aperçu reste affiché jusqu'à ce que vous fermiez la fenêtre.",
+        description: "Le devis a été créé avec succès. L'aperçu reste affiché jusqu'à ce que vous le fermiez.",
       });
 
       // Ne pas appeler onSuccess automatiquement
@@ -177,18 +182,29 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
   };
 
   const handleReset = () => {
+    // Réinitialiser le formulaire ET fermer l'aperçu explicitement
     setPrestation("");
     setSurface("");
     setPrix("");
     setClientId("");
     setQuote(null);
+    setIsPreviewOpen(false); // Fermer l'aperçu via action utilisateur
+  };
+
+  const handleClosePreview = () => {
+    // Fermer l'aperçu explicitement via action utilisateur
+    setIsPreviewOpen(false);
+    // Ne pas réinitialiser quote pour permettre de le rouvrir si nécessaire
+    // L'utilisateur peut toujours créer un nouveau devis avec handleReset
   };
 
   const handleGoToFacturation = () => {
     navigate("/facturation");
   };
 
-  if (quote) {
+  // Afficher l'aperçu SEULEMENT si quote existe ET isPreviewOpen est true
+  // Cela garantit que l'aperçu ne disparaît pas après re-render ou invalidation de queries
+  if (quote && isPreviewOpen) {
     return (
       <div className="space-y-6">
         {/* Message de succès */}
@@ -245,8 +261,14 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
           <Button variant="outline" onClick={handleReset} className="gap-2">
             Créer un nouveau devis
           </Button>
+          <Button onClick={handleClosePreview} className="gap-2" variant="outline">
+            Fermer l'aperçu
+          </Button>
           {onSuccess && (
-            <Button onClick={() => onSuccess()} className="gap-2">
+            <Button onClick={() => {
+              handleClosePreview();
+              onSuccess();
+            }} className="gap-2">
               Fermer
             </Button>
           )}

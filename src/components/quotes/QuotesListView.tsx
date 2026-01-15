@@ -3,10 +3,12 @@
  * Utilise QuotesTable et redirige vers /quotes/:id
  */
 
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QuotesTable } from "@/components/billing/QuotesTable";
 import { Quote } from "@/hooks/useQuotes";
 import { useToast } from "@/components/ui/use-toast";
+import { EditQuoteDialog } from "@/components/quotes/EditQuoteDialog";
 
 interface QuotesListViewProps {
   quotes: Quote[];
@@ -16,6 +18,8 @@ interface QuotesListViewProps {
 export default function QuotesListView({ quotes, loading }: QuotesListViewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const handleView = (quote: Quote) => {
     navigate(`/quotes/${quote.id}`);
@@ -31,10 +35,9 @@ export default function QuotesListView({ quotes, loading }: QuotesListViewProps)
       return;
     }
     
-    toast({
-      title: "ℹ️ Modification",
-      description: "La modification des devis sera disponible prochainement",
-    });
+    // Ouvrir le dialog d'édition
+    setEditingQuote(quote);
+    setIsEditDialogOpen(true);
   };
 
   const handleSend = (quote: Quote) => {
@@ -73,15 +76,31 @@ export default function QuotesListView({ quotes, loading }: QuotesListViewProps)
   };
 
   return (
-    <QuotesTable
-      quotes={quotes}
-      onView={handleView}
-      onEdit={handleEdit}
-      onSend={handleSend}
-      onSign={handleSign}
-      onDelete={handleDelete}
-      loading={loading}
-    />
+    <>
+      <QuotesTable
+        quotes={quotes}
+        onView={handleView}
+        onEdit={handleEdit}
+        onSend={handleSend}
+        onSign={handleSign}
+        onDelete={handleDelete}
+        loading={loading}
+      />
+      
+      {/* Dialog d'édition */}
+      {editingQuote && (
+        <EditQuoteDialog
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) {
+              setEditingQuote(null);
+            }
+          }}
+          quote={editingQuote}
+        />
+      )}
+    </>
   );
 }
 
