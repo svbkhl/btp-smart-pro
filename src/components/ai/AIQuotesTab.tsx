@@ -50,7 +50,10 @@ export default function AIQuotesTab() {
                 Remplissez les informations et l'IA générera un devis professionnel
               </DialogDescription>
             </DialogHeader>
-            <SimpleQuoteForm onSuccess={() => setShowCreateForm(false)} />
+            <SimpleQuoteForm onSuccess={() => {
+              // Ne pas fermer automatiquement le dialog
+              // L'utilisateur fermera manuellement après avoir vu l'aperçu
+            }} />
           </DialogContent>
         </Dialog>
       </div>

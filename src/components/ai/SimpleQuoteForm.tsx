@@ -122,13 +122,12 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
 
       toast({
         title: "✅ Devis généré !",
-        description: "Le devis a été créé avec succès.",
+        description: "Le devis a été créé avec succès. L'aperçu reste affiché jusqu'à ce que vous fermiez la fenêtre.",
       });
 
-      // Callback de succès
-      if (onSuccess) {
-        setTimeout(() => onSuccess(), 500);
-      }
+      // Ne pas appeler onSuccess automatiquement
+      // L'aperçu reste affiché jusqu'à ce que l'utilisateur ferme manuellement
+      // Le callback onSuccess peut être appelé manuellement si nécessaire (ex: bouton "Fermer")
     } catch (error: any) {
       console.error("Error generating quote:", error);
       toast({
@@ -241,11 +240,16 @@ export const SimpleQuoteForm = ({ onSuccess }: SimpleQuoteFormProps = {}) => {
           />
         </GlassCard>
 
-        {/* Bouton pour créer un nouveau devis */}
-        <div className="flex justify-center">
+        {/* Boutons d'action */}
+        <div className="flex justify-center gap-3">
           <Button variant="outline" onClick={handleReset} className="gap-2">
             Créer un nouveau devis
           </Button>
+          {onSuccess && (
+            <Button onClick={() => onSuccess()} className="gap-2">
+              Fermer
+            </Button>
+          )}
         </div>
       </div>
     );
