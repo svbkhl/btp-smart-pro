@@ -389,12 +389,38 @@ serve(async (req) => {
         // Si companyId est fourni, lier l'utilisateur à l'entreprise
         if (companyId) {
           try {
+            // Récupérer le role_id correspondant au slug du rôle
+            // Mapping: owner -> 'owner', admin -> 'admin', member -> 'employee'
+            const roleSlugMapping: Record<'dirigeant' | 'administrateur' | 'salarie', 'owner' | 'admin' | 'employee'> = {
+              dirigeant: 'owner',
+              administrateur: 'admin',
+              salarie: 'employee',
+            };
+            
+            const targetRoleSlug = roleSlugMapping[dbRole];
+            
+            // Récupérer le role_id depuis la table roles
+            const { data: roleData, error: roleLookupError } = await supabase
+              .from('roles')
+              .select('id')
+              .eq('slug', targetRoleSlug)
+              .single();
+
+            if (roleLookupError || !roleData) {
+              logger.warn("Failed to find role_id for role slug", roleLookupError, { 
+                requestId,
+                dbRole,
+                targetRoleSlug
+              });
+              // Continuer sans role_id (sera NULL, mais l'utilisateur sera quand même lié)
+            }
+
             const { error: companyError } = await supabase
               .from('company_users')
               .upsert({
                 company_id: companyId,
                 user_id: userId,
-                role: dbRole,
+                role_id: roleData?.id || null, // Utiliser role_id au lieu de role
               }, {
                 onConflict: 'company_id,user_id'
               });
@@ -403,13 +429,16 @@ serve(async (req) => {
               logger.warn("Failed to link user to company", companyError, { 
                 requestId,
                 userId,
-                companyId
+                companyId,
+                role_id: roleData?.id || null
               });
             } else {
               logger.info("User linked to company successfully", { 
                 requestId,
                 userId,
-                companyId
+                companyId,
+                role_id: roleData?.id || null,
+                role_slug: targetRoleSlug
               });
             }
           } catch (companyErr) {
@@ -1041,24 +1070,61 @@ async function handleExistingUser(
 
         // Si companyId est fourni, lier l'utilisateur à l'entreprise
         if (companyId) {
-          const { error: companyError } = await supabase
-            .from('company_users')
-            .upsert({
-              company_id: companyId,
-              user_id: existingUser.id,
-              role: dbRole,
-            }, {
-              onConflict: 'company_id,user_id'
-            });
+          try {
+            // Récupérer le role_id correspondant au slug du rôle
+            // Mapping: owner -> 'owner', admin -> 'admin', member -> 'employee'
+            const roleSlugMapping: Record<'dirigeant' | 'administrateur' | 'salarie', 'owner' | 'admin' | 'employee'> = {
+              dirigeant: 'owner',
+              administrateur: 'admin',
+              salarie: 'employee',
+            };
+            
+            const targetRoleSlug = roleSlugMapping[dbRole];
+            
+            // Récupérer le role_id depuis la table roles
+            const { data: roleData, error: roleLookupError } = await supabase
+              .from('roles')
+              .select('id')
+              .eq('slug', targetRoleSlug)
+              .single();
 
-          if (companyError) {
-            logger.warn("Failed to link existing user to company", companyError, { 
-              requestId,
-              userId: existingUser.id,
-              companyId
-            });
-          } else {
-            logger.info("Existing user linked to company", { 
+            if (roleLookupError || !roleData) {
+              logger.warn("Failed to find role_id for role slug", roleLookupError, { 
+                requestId,
+                dbRole,
+                targetRoleSlug
+              });
+              // Continuer sans role_id (sera NULL, mais l'utilisateur sera quand même lié)
+            }
+
+            const { error: companyError } = await supabase
+              .from('company_users')
+              .upsert({
+                company_id: companyId,
+                user_id: existingUser.id,
+                role_id: roleData?.id || null, // Utiliser role_id au lieu de role
+              }, {
+                onConflict: 'company_id,user_id'
+              });
+
+            if (companyError) {
+              logger.warn("Failed to link existing user to company", companyError, { 
+                requestId,
+                userId: existingUser.id,
+                companyId,
+                role_id: roleData?.id || null
+              });
+            } else {
+              logger.info("Existing user linked to company", { 
+                requestId,
+                userId: existingUser.id,
+                companyId,
+                role_id: roleData?.id || null,
+                role_slug: targetRoleSlug
+              });
+            }
+          } catch (companyErr) {
+            logger.warn("Exception linking existing user to company", companyErr, { 
               requestId,
               userId: existingUser.id,
               companyId
