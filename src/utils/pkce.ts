@@ -4,6 +4,8 @@
 // Implémentation PKCE pour sécuriser le flux OAuth Google Calendar
 // ============================================================================
 
+import { safeSessionStorage } from "./isBrowser";
+
 /**
  * Génère un code verifier aléatoire (43-128 caractères)
  */
@@ -37,28 +39,21 @@ function base64URLEncode(array: Uint8Array): string {
  * Stocke le code verifier dans sessionStorage
  */
 export function storeCodeVerifier(verifier: string): void {
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem("google_oauth_code_verifier", verifier);
-  }
+  safeSessionStorage.setItem("google_oauth_code_verifier", verifier);
 }
 
 /**
  * Récupère le code verifier depuis sessionStorage
  */
 export function getCodeVerifier(): string | null {
-  if (typeof window !== "undefined") {
-    return sessionStorage.getItem("google_oauth_code_verifier");
-  }
-  return null;
+  return safeSessionStorage.getItem("google_oauth_code_verifier");
 }
 
 /**
  * Supprime le code verifier de sessionStorage
  */
 export function clearCodeVerifier(): void {
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem("google_oauth_code_verifier");
-  }
+  safeSessionStorage.removeItem("google_oauth_code_verifier");
 }
 
 

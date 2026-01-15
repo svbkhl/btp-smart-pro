@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { safeLocalStorage, isBrowser } from "@/utils/isBrowser";
 
 type Theme = "dark" | "light" | "system";
 
@@ -29,11 +30,11 @@ export function ThemeProvider({
   // Éviter les erreurs d'hydratation en initialisant avec undefined côté serveur
   const [theme, setTheme] = useState<Theme>(() => {
     // Vérifier si on est côté client
-    if (typeof window === "undefined") {
+    if (!isBrowser()) {
       return defaultTheme;
     }
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = safeLocalStorage.getItem(storageKey);
       return (stored as Theme) || defaultTheme;
     } catch (e) {
       return defaultTheme;
@@ -42,6 +43,8 @@ export function ThemeProvider({
 
   // Éviter les erreurs d'hydratation en appliquant le thème après le montage
   useEffect(() => {
+    if (!isBrowser()) return;
+    
     const root = window.document.documentElement;
 
     // Supprimer les classes existantes
@@ -77,11 +80,7 @@ export function ThemeProvider({
   const value = {
     theme,
     setTheme: (newTheme: Theme) => {
-      try {
-        localStorage.setItem(storageKey, newTheme);
-      } catch (e) {
-        console.warn("Impossible de sauvegarder le thème dans localStorage:", e);
-      }
+      safeLocalStorage.setItem(storageKey, newTheme);
       setTheme(newTheme);
     },
   };

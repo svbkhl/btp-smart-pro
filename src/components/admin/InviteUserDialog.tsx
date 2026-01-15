@@ -33,7 +33,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface InviteUserDialogProps {
   companyId: string;
   companyName: string;
-  defaultRole?: 'owner' | 'admin' | 'member';
+  defaultRole?: 'admin' | 'member'; // owner ne peut pas être invité
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
@@ -49,7 +49,7 @@ export const InviteUserDialog = ({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'owner' | 'admin' | 'member'>(defaultRole);
+  const [role, setRole] = useState<'admin' | 'member'>(defaultRole || 'member');
   const [success, setSuccess] = useState(false);
 
   // Vérifier que companyId est chargé avant de permettre l'ouverture du dialog
@@ -83,20 +83,31 @@ export const InviteUserDialog = ({
       }
 
       const emailToSend = email.trim().toLowerCase();
-      // Envoyer email + rôle + companyId
+      
+      // Validation du rôle (owner ne peut pas être invité)
+      if (role === 'owner') {
+        toast({
+          title: 'Erreur',
+          description: 'Le rôle "owner" ne peut pas être attribué via invitation',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Envoyer email + rôle + company_id (format attendu par create-company-invite)
       const requestBody = { 
+        company_id: companyId,
         email: emailToSend,
-        role: role,
-        companyId: companyId
+        role: role, // 'admin' ou 'member'
       };
       
       console.log("📤 Sending invitation request - Body:", JSON.stringify(requestBody));
       console.log("🔐 User session:", session.session?.user?.email);
 
-      // Utiliser supabase.functions.invoke qui gère automatiquement l'authentification
-      // et envoie correctement le body JSON
-      const { data, error } = await supabase.functions.invoke("send-invitation", {
-        body: requestBody, // { email: "..." } - supabase le sérialise automatiquement
+      // Utiliser create-company-invite Edge Function
+      const { data, error } = await supabase.functions.invoke("create-company-invite", {
+        body: requestBody,
       });
 
       console.log("📥 Response received:", { data, error });
@@ -132,23 +143,7 @@ export const InviteUserDialog = ({
         return;
       }
 
-      // Vérifier le format de réponse
-      // Format attendu : { success: boolean, message: string, ... }
-      
-      // Si l'utilisateur existe déjà (success: false avec message approprié)
-      if (data?.success === false && data?.message) {
-        toast({
-          title: 'Utilisateur existant',
-          description: data.message,
-          variant: 'default', // Pas destructif, juste informatif
-        });
-        setEmail('');
-        setOpen(false);
-        onSuccess?.(); // On considère que c'est un succès (l'utilisateur existe déjà)
-        return;
-      }
-
-      // Succès - invitation envoyée
+      // Format de réponse attendu : { success: true, message: string, invite_id: string, expires_at: string }
       if (data?.success === true) {
         setSuccess(true);
         toast({
@@ -166,7 +161,7 @@ export const InviteUserDialog = ({
         return;
       }
 
-      // Vérifier si data contient une erreur (ancien format)
+      // Vérifier si data contient une erreur
       if (data?.error) {
         console.error("❌ Function returned error:", data.error);
         toast({
@@ -174,6 +169,7 @@ export const InviteUserDialog = ({
           description: data.error + (data.details ? ` - ${data.details}` : ''),
           variant: 'destructive',
         });
+        setLoading(false);
         return;
       }
 
@@ -184,6 +180,7 @@ export const InviteUserDialog = ({
         description: 'Le serveur a retourné une réponse inattendue. Veuillez réessayer.',
         variant: 'destructive',
       });
+      setLoading(false);
 
     } catch (e: any) {
       console.error('❌ Error sending invitation:', e);
@@ -237,13 +234,11 @@ export const InviteUserDialog = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="owner">Propriétaire (Owner)</SelectItem>
                 <SelectItem value="admin">Administrateur (Admin)</SelectItem>
                 <SelectItem value="member">Membre (Member)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {role === 'owner' && 'Le propriétaire aura tous les droits sur l\'entreprise'}
               {role === 'admin' && 'L\'administrateur pourra gérer les utilisateurs et les paramètres'}
               {role === 'member' && 'Le membre aura un accès standard à l\'application'}
             </p>

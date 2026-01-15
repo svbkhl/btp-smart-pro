@@ -6,6 +6,7 @@ import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_PROJECTS } from "@/fakeData/projects";
 import type { Project } from "@/fakeData/projects";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
 export interface CreateProjectData {
   name: string;
@@ -45,10 +46,17 @@ export const useProjects = () => {
         async () => {
           if (!user) throw new Error("User not authenticated");
 
+          // Récupérer company_id pour filtrage multi-tenant
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            console.warn("User is not a member of any company");
+            return [];
+          }
+
           const { data, error } = await supabase
             .from("projects")
             .select("*, client:clients(id, name, email)")
-            .eq("user_id", user.id)
+            .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
           if (error) throw error;
@@ -77,12 +85,22 @@ export const useProject = (id: string | undefined) => {
         async () => {
           if (!user || !id) throw new Error("User not authenticated or no ID provided");
 
+          // Récupérer company_id pour vérification
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            throw new Error("User is not a member of any company");
+          }
+
           const { data, error } = await supabase
             .from("projects")
             .select("*, client:clients(id, name, email)")
             .eq("id", id)
-            .eq("user_id", user.id)
-            .single();
+            .eq("company_id", companyId)
+            .maybeSingle();
+
+          if (!data) {
+            throw new Error("Project not found");
+          }
 
           if (error) throw error;
           return data as Project;
@@ -108,9 +126,16 @@ export const useCreateProject = () => {
     mutationFn: async (projectData: CreateProjectData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer company_id
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise pour créer un projet");
+      }
+
       // Construire l'objet d'insertion en excluant les champs undefined
       const insertData: any = {
         user_id: user.id,
+        company_id: companyId,
         name: projectData.name,
         status: projectData.status || "planifié",
         progress: projectData.progress || 0,
@@ -163,6 +188,12 @@ export const useUpdateProject = () => {
     mutationFn: async ({ id, ...projectData }: UpdateProjectData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer company_id pour vérification
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise");
+      }
+
       // Construire l'objet de mise à jour en excluant les champs undefined
       const updateData: any = {};
       
@@ -183,7 +214,7 @@ export const useUpdateProject = () => {
         .from("projects")
         .update(updateData)
         .eq("id", id)
-        .eq("user_id", user.id)
+        .eq("company_id", companyId)
         .select()
         .single();
 
@@ -218,11 +249,17 @@ export const useDeleteProject = () => {
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer company_id pour vérification
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise");
+      }
+
       const { error } = await supabase
         .from("projects")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("company_id", companyId);
 
       if (error) throw error;
       return id;

@@ -242,16 +242,19 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
   console.log('[SimpleQuoteForm] Render check - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current, 'should show preview:', shouldShowPreview);
   
   // Si les états ont été réinitialisés mais que les refs ont encore les valeurs, restaurer les états
+  // IMPORTANT : Ce useEffect doit s'exécuter APRÈS chaque render pour restaurer immédiatement
   useEffect(() => {
+    // Restaurer quote si perdu
     if (!quote && quoteRef.current) {
-      console.log('[SimpleQuoteForm] Restoring quote from ref');
+      console.log('[SimpleQuoteForm] ⚠️ Quote perdu, restauration depuis ref');
       setQuote(quoteRef.current);
     }
+    // Restaurer isPreviewOpen si perdu
     if (!isPreviewOpen && isPreviewOpenRef.current) {
-      console.log('[SimpleQuoteForm] Restoring isPreviewOpen from ref');
+      console.log('[SimpleQuoteForm] ⚠️ isPreviewOpen perdu, restauration depuis ref');
       setIsPreviewOpen(true);
     }
-  }, [quote, isPreviewOpen]);
+  }); // Pas de dépendances = s'exécute après chaque render
   
   if (shouldShowPreview) {
     // Utiliser quote ou quoteRef.current pour l'affichage

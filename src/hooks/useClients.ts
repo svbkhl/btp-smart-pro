@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_CLIENTS } from "@/fakeData/clients";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
 export interface Client {
   id: string;
@@ -52,10 +53,17 @@ export const useClients = () => {
         async () => {
           if (!user) throw new Error("User not authenticated");
 
+          // Récupérer company_id pour filtrage multi-tenant
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            console.warn("User is not a member of any company");
+            return [];
+          }
+
           const { data, error } = await supabase
             .from("clients")
             .select("*")
-            .eq("user_id", user.id)
+            .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
           if (error) {
@@ -91,17 +99,28 @@ export const useClient = (id: string | undefined) => {
         async () => {
           if (!user || !id) throw new Error("User not authenticated or no ID provided");
 
+          // Récupérer company_id de l'utilisateur
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            throw new Error("User is not a member of any company");
+          }
+
           const { data, error } = await supabase
             .from("clients")
             .select("*")
             .eq("id", id)
-            .eq("user_id", user.id)
-            .single();
+            .eq("company_id", companyId)
+            .maybeSingle();
 
           if (error) {
             // En cas d'erreur, queryWithTimeout gère automatiquement le fallback
             throw error;
           }
+          
+          if (!data) {
+            throw new Error("Client not found");
+          }
+          
           return data as Client;
         },
         FAKE_CLIENTS[0] || null,
@@ -157,9 +176,16 @@ export const useCreateClient = () => {
         throw new Error(`User ID invalide: ${user.id}`);
       }
 
+      // Récupérer company_id
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise pour créer un client");
+      }
+
       // Construire l'objet d'insertion de manière explicite avec seulement les champs nécessaires
       const insertData: {
         user_id: string;
+        company_id: string;
         name: string;
         status: string;
         email?: string;
@@ -168,6 +194,7 @@ export const useCreateClient = () => {
         avatar_url?: string;
       } = {
         user_id: user.id,
+        company_id: companyId,
         name: clientData.name.trim(),
         status: clientData.status || "actif",
       };
@@ -194,6 +221,7 @@ export const useCreateClient = () => {
       // Cela évite les problèmes avec les triggers de validation qui vérifient email/phone
       const cleanInsertData: {
         user_id: string;
+        company_id: string;
         name: string;
         status: string;
         email?: string;
@@ -202,6 +230,7 @@ export const useCreateClient = () => {
         avatar_url?: string;
       } = {
         user_id: user.id,
+        company_id: insertData.company_id,
         name: insertData.name,
         status: insertData.status,
       };
@@ -275,11 +304,17 @@ export const useUpdateClient = () => {
     mutationFn: async ({ id, ...clientData }: UpdateClientData) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer company_id pour vérification
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise");
+      }
+
       const { data, error } = await supabase
         .from("clients")
         .update(clientData)
         .eq("id", id)
-        .eq("user_id", user.id)
+        .eq("company_id", companyId)
         .select()
         .single();
 
@@ -314,11 +349,17 @@ export const useDeleteClient = () => {
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer company_id pour vérification
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise");
+      }
+
       const { error } = await supabase
         .from("clients")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("company_id", companyId);
 
       if (error) throw error;
       return id;

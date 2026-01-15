@@ -14,6 +14,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { verifyCompanyMember } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,18 +64,28 @@ serve(async (req) => {
     // Create Supabase client
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get authenticated user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    // Vérifier l'authentification et l'appartenance à une company
+    const { verifyCompanyMember } = await import("../_shared/auth.ts");
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    
+    const authResult = await verifyCompanyMember(
+      req,
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
 
-    if (userError || !user) {
+    if (!authResult.success || !authResult.user || !authResult.companyId) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: authResult.error || 'Unauthorized' }),
         {
-          status: 401,
+          status: authResult.status || 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
+
+    const user = { id: authResult.user.id, email: authResult.user.email };
+    const companyId = authResult.companyId;
 
     // Parse request body
     const body = await req.json();
@@ -103,13 +114,24 @@ serve(async (req) => {
       );
     }
 
-    // Récupérer le devis
+    // Récupérer le devis (vérifier qu'il appartient à la company de l'user)
     const { data: quote, error: quoteError } = await supabaseClient
       .from('ai_quotes')
       .select('*')
       .eq('id', quote_id)
-      .eq('user_id', user.id)
-      .single();
+      .eq('company_id', companyId) // Multi-tenant: vérifier company_id au lieu de user_id
+      .maybeSingle();
+
+    if (!quote) {
+      console.error('❌ Devis non trouvé ou n\'appartient pas à votre entreprise');
+      return new Response(
+        JSON.stringify({ error: 'Quote not found or access denied' }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     if (quoteError || !quote) {
       console.error('❌ Devis non trouvé:', quoteError);
@@ -149,8 +171,8 @@ serve(async (req) => {
         .from('invoices')
         .select('*')
         .eq('quote_id', quote_id)
-        .eq('user_id', user.id)
-        .single();
+        .eq('company_id', companyId)
+        .maybeSingle();
 
       if (existingInvoice) {
         invoice = existingInvoice;
@@ -202,8 +224,8 @@ serve(async (req) => {
         .from('invoices')
         .select('*')
         .eq('id', invoiceId)
-        .eq('user_id', user.id)
-        .single();
+        .eq('company_id', companyId)
+        .maybeSingle();
 
       if (invoiceError || !existingInvoice) {
         console.error('❌ Facture non trouvée:', invoiceError);
@@ -284,11 +306,12 @@ serve(async (req) => {
     });
 
     // Récupérer le stripe_account_id de l'utilisateur (Stripe Connect)
+    // Note: user_settings n'a pas company_id, on utilise user_id
     const { data: userSettings } = await supabaseClient
       .from('user_settings')
       .select('stripe_account_id, stripe_connected')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     const stripeAccountId = userSettings?.stripe_account_id;
 

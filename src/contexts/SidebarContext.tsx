@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { safeLocalStorage } from "@/utils/isBrowser";
 
 interface SidebarContextType {
   isPinned: boolean;
@@ -13,14 +14,14 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   const [isPinned, setIsPinned] = useState(() => {
-    const saved = localStorage.getItem("sidebar-pinned");
+    const saved = safeLocalStorage.getItem("sidebar-pinned");
     return saved ? saved === "true" : true;
   });
   const [isVisible, setIsVisible] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem("sidebar-pinned", isPinned.toString());
+    safeLocalStorage.setItem("sidebar-pinned", isPinned.toString());
   }, [isPinned]);
 
   return (

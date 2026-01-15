@@ -11,6 +11,7 @@ import {
   storeCodeVerifier,
   clearCodeVerifier 
 } from "@/utils/pkce";
+import { safeSessionStorage } from "@/utils/isBrowser";
 
 // ============================================================================
 // TYPES
@@ -150,10 +151,8 @@ export const useExchangeGoogleCode = () => {
       }
 
       // Récupérer le code_verifier depuis sessionStorage (PKCE RFC 7636)
-      // Vérifier que nous sommes côté client
-      const codeVerifier = typeof window !== "undefined" 
-        ? sessionStorage.getItem("google_oauth_code_verifier")
-        : null;
+      // Utiliser safeSessionStorage pour éviter les erreurs SSR
+      const codeVerifier = safeSessionStorage.getItem("google_oauth_code_verifier");
 
       if (!codeVerifier) {
         throw new Error("code_verifier manquant. Le flow PKCE nécessite un code_verifier stocké dans sessionStorage.");

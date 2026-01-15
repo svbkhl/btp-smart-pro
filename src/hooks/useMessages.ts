@@ -27,12 +27,12 @@ const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 // Cache local pour améliorer les performances
 const getCachedMessages = (conversationId: string): AIMessage[] | null => {
   try {
-    const cached = localStorage.getItem(`${MESSAGES_CACHE_KEY}_${conversationId}`);
+    const cached = safeLocalStorage.getItem(`${MESSAGES_CACHE_KEY}_${conversationId}`);
     if (!cached) return null;
     
     const { data, timestamp } = JSON.parse(cached);
     if (Date.now() - timestamp > CACHE_EXPIRY) {
-      localStorage.removeItem(`${MESSAGES_CACHE_KEY}_${conversationId}`);
+      safeLocalStorage.removeItem(`${MESSAGES_CACHE_KEY}_${conversationId}`);
       return null;
     }
     
@@ -44,7 +44,7 @@ const getCachedMessages = (conversationId: string): AIMessage[] | null => {
 
 const setCachedMessages = (conversationId: string, messages: AIMessage[]) => {
   try {
-    localStorage.setItem(
+    safeLocalStorage.setItem(
       `${MESSAGES_CACHE_KEY}_${conversationId}`,
       JSON.stringify({ data: messages, timestamp: Date.now() })
     );

@@ -90,9 +90,9 @@ export async function verifyAdmin(
       .from("user_roles")
       .select("role")
       .eq("user_id", authResult.user.id)
-      .single();
+      .maybeSingle();
 
-    if (error || !roleData) {
+    if (error) {
       return {
         success: false,
         error: "Impossible de vérifier les permissions",
@@ -100,7 +100,7 @@ export async function verifyAdmin(
       };
     }
 
-    const isAdmin = roleData.role === "admin" || roleData.role === "dirigeant";
+    const isAdmin = roleData?.role === "admin" || roleData?.role === "dirigeant";
     
     if (!isAdmin) {
       return {
@@ -118,6 +118,128 @@ export async function verifyAdmin(
       status: 500,
     };
   }
+}
+
+/**
+ * Vérifie que l'utilisateur est membre d'une company
+ * Retourne le company_id si l'utilisateur est membre
+ */
+export interface CompanyAuthResult extends AuthResult {
+  companyId?: string;
+  userRole?: 'owner' | 'admin' | 'member';
+}
+
+export async function verifyCompanyMember(
+  req: Request,
+  supabaseUrl: string,
+  supabaseKey: string,
+  companyId?: string
+): Promise<CompanyAuthResult> {
+  const authResult = await verifyAuth(req, supabaseUrl, supabaseKey);
+  
+  if (!authResult.success || !authResult.user) {
+    return authResult;
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Si companyId fourni, vérifier que l'user est membre
+    if (companyId) {
+      const { data: membership, error } = await supabase
+        .from("company_users")
+        .select("company_id, role")
+        .eq("user_id", authResult.user.id)
+        .eq("company_id", companyId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (error) {
+        return {
+          success: false,
+          error: "Impossible de vérifier l'appartenance à l'entreprise",
+          status: 500,
+        };
+      }
+
+      if (!membership) {
+        return {
+          success: false,
+          error: "Vous n'êtes pas membre de cette entreprise",
+          status: 403,
+        };
+      }
+
+      return {
+        ...authResult,
+        companyId: membership.company_id,
+        userRole: membership.role as 'owner' | 'admin' | 'member',
+      };
+    }
+
+    // Sinon, récupérer la première company de l'user
+    const { data: membership, error } = await supabase
+      .from("company_users")
+      .select("company_id, role")
+      .eq("user_id", authResult.user.id)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      return {
+        success: false,
+        error: "Impossible de récupérer l'entreprise",
+        status: 500,
+      };
+    }
+
+    if (!membership) {
+      return {
+        success: false,
+        error: "Vous n'êtes membre d'aucune entreprise",
+        status: 403,
+      };
+    }
+
+    return {
+      ...authResult,
+      companyId: membership.company_id,
+      userRole: membership.role as 'owner' | 'admin' | 'member',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: "Erreur lors de la vérification de l'entreprise",
+      status: 500,
+    };
+  }
+}
+
+/**
+ * Vérifie que l'utilisateur est owner ou admin d'une company
+ */
+export async function verifyCompanyAdmin(
+  req: Request,
+  supabaseUrl: string,
+  supabaseKey: string,
+  companyId?: string
+): Promise<CompanyAuthResult> {
+  const companyResult = await verifyCompanyMember(req, supabaseUrl, supabaseKey, companyId);
+  
+  if (!companyResult.success || !companyResult.companyId) {
+    return companyResult;
+  }
+
+  if (companyResult.userRole !== 'owner' && companyResult.userRole !== 'admin') {
+    return {
+      success: false,
+      error: "Accès refusé : droits administrateur ou propriétaire requis",
+      status: 403,
+    };
+  }
+
+  return companyResult;
 }
 
 /**

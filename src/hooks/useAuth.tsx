@@ -66,36 +66,25 @@ export const useAuth = (): UseAuthReturn => {
           .from('user_roles')
           .select('role')
           .eq('user_id', currentUser.id)
-          .single();
+          .maybeSingle();
 
         // Gérer les différents types d'erreurs
         if (error) {
           // Erreur 406 Not Acceptable - table non exposée ou permissions manquantes
           if (error.code === "PGRST301" || error.message?.includes("Not Acceptable") || error.code === "406") {
             console.warn("⚠️ Table user_roles non accessible via API. Vérifiez les permissions RLS et l'exposition de la table.");
-          // Utiliser les métadonnées comme fallback
-          const finalRole = role || statut || 'member';
-          const determinedRole = getRoleFromString(finalRole);
-          setUserRole(determinedRole);
-          setIsAdmin(determinedRole === 'admin');
-          setIsEmployee(determinedRole === 'member');
-          return;
+            // Utiliser les métadonnées comme fallback
+            const finalRole = role || statut || 'member';
+            const determinedRole = getRoleFromString(finalRole);
+            setUserRole(determinedRole);
+            setIsAdmin(determinedRole === 'admin');
+            setIsEmployee(determinedRole === 'member');
+            return;
           }
           
           // Erreur 42P01 - table n'existe pas
           if (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("relation")) {
             console.warn("⚠️ Table user_roles n'existe pas encore. Utilisation des metadata utilisateur.");
-            const finalRole = role || statut || 'member';
-            const determinedRole = getRoleFromString(finalRole);
-            setUserRole(determinedRole);
-            setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
-            setIsEmployee(determinedRole === 'salarie');
-            return;
-          }
-          
-          // Erreur PGRST116 - aucune ligne trouvée (utilisateur n'a pas de rôle)
-          if (error.code === "PGRST116") {
-            // Utilisateur n'a pas de rôle dans la table, utiliser les métadonnées
             const finalRole = role || statut || 'member';
             const determinedRole = getRoleFromString(finalRole);
             setUserRole(determinedRole);
@@ -114,8 +103,19 @@ export const useAuth = (): UseAuthReturn => {
           return;
         }
 
+        // Avec maybeSingle(), si pas de données, data sera null (pas d'erreur PGRST116)
+        if (!data) {
+          // Utilisateur n'a pas de rôle dans la table, utiliser les métadonnées
+          const finalRole = role || statut || 'member';
+          const determinedRole = getRoleFromString(finalRole);
+          setUserRole(determinedRole);
+          setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
+          setIsEmployee(determinedRole === 'salarie');
+          return;
+        }
+
         // Succès - rôle trouvé dans la table
-        if (data && data.role) {
+        if (data.role) {
           const roleFromDb = data.role as string;
           const determinedRole = getRoleFromEnum(roleFromDb);
           setUserRole(determinedRole);
@@ -169,7 +169,7 @@ export const useAuth = (): UseAuthReturn => {
         .select('company_id')
         .eq('user_id', userId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         setCurrentCompanyId(null);

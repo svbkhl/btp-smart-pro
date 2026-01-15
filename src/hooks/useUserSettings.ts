@@ -49,11 +49,14 @@ export const useUserSettings = () => {
             .from("user_settings")
             .select("*")
             .eq("user_id", user.id)
-            .single();
+            .maybeSingle();
 
           if (error) {
-            // Si les settings n'existent pas, créer un enregistrement vide
-            if (error.code === "PGRST116") {
+            throw error;
+          }
+
+          // Si les settings n'existent pas, créer un enregistrement vide
+          if (!data) {
               const { data: newSettings, error: insertError } = await supabase
                 .from("user_settings")
                 .insert({ user_id: user.id })

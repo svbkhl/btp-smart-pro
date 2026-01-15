@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { verifyCompanyMember } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,18 +48,18 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
     
     console.log("🔍 SUPABASE_URL exists:", !!supabaseUrl);
-    console.log("🔍 SUPABASE_SERVICE_ROLE_KEY exists:", !!supabaseKey);
+    console.log("🔍 SUPABASE_SERVICE_ROLE_KEY exists:", !!serviceRoleKey);
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       console.error("❌ Supabase credentials not set");
       return createResponse(false, null, 'Supabase configuration error', 500);
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    console.log("✅ Supabase client created");
+    // Le client Supabase sera créé après vérification auth (voir plus bas)
 
     // Parser le body de la requête
     console.log("📥 Parsing request body...");
@@ -114,49 +115,57 @@ serve(async (req) => {
       return createResponse(false, null, 'Missing required fields: clientName, surface, workType, materials', 400);
     }
 
-    // Get user from authorization header
-    console.log("🔐 Checking authorization...");
-    const authHeader = req.headers.get('authorization');
-    console.log("🔐 Authorization header exists:", !!authHeader);
-    
-    if (!authHeader) {
-      console.error('❌ No authorization header');
-      return createResponse(false, null, 'No authorization header', 401);
-    }
-    
-    let user;
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      console.log("🔐 Token length:", token.length);
-      
-      const { data: userData, error: userError } = await supabase.auth.getUser(token);
-      
-      if (userError || !userData?.user) {
-        console.error('❌ User authentication error:', userError?.message);
-        return createResponse(false, null, 'Unauthorized: ' + (userError?.message || 'Invalid token'), 401);
-      }
-      user = userData.user;
-      console.log("✅ User authenticated:", user.id);
-    } catch (authError) {
-      console.error('❌ Auth error:', authError);
-      return createResponse(false, null, 'Authentication failed: ' + (authError instanceof Error ? authError.message : 'Unknown error'), 401);
+    // Vérifier l'authentification et l'appartenance à une company
+    const authResult = await verifyCompanyMember(
+      req,
+      supabaseUrl,
+      anonKey
+    );
+
+    if (!authResult.success || !authResult.user || !authResult.companyId) {
+      return createResponse(
+        false,
+        null,
+        authResult.error || "Unauthorized",
+        authResult.status || 401
+      );
     }
 
-    // Récupérer les informations de l'entreprise
+    const user = { id: authResult.user.id, email: authResult.user.email };
+    const companyId = authResult.companyId;
+    console.log("✅ User authenticated:", user.id, "Company:", companyId);
+
+    // Créer client Supabase avec service role pour opérations admin
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Récupérer les informations de l'entreprise depuis companies ou user_settings
     console.log("🏢 Fetching company info...");
     let companyInfo = null;
     try {
+      // Essayer d'abord depuis companies
       const { data: companyData, error: companyError } = await supabase
-        .from('user_settings')
-        .select('company_name, email, phone, address, city, postal_code, country, siret, vat_number, company_logo_url, terms_and_conditions')
-        .eq('user_id', user.id)
-        .single();
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .maybeSingle();
       
-      if (!companyError && companyData) {
-        companyInfo = companyData;
-        console.log("✅ Company info found");
+      if (companyData) {
+        companyInfo = { company_name: companyData.name };
+        console.log("✅ Company info found from companies table");
       } else {
-        console.warn('⚠️ Company info not found:', companyError?.message);
+        // Fallback sur user_settings
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('user_settings')
+          .select('company_name, email, phone, address, city, postal_code, country, siret, vat_number, company_logo_url, terms_and_conditions')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (!settingsError && settingsData) {
+          companyInfo = settingsData;
+          console.log("✅ Company info found from user_settings");
+        } else {
+          console.warn('⚠️ Company info not found:', settingsError?.message);
+        }
       }
     } catch (companyError) {
       console.warn('⚠️ Error fetching company info:', companyError);
@@ -337,17 +346,21 @@ IMPORTANT:
     // Sauvegarder dans la base de données (optionnel, non-bloquant)
     console.log("💾 Saving to database...");
     try {
+      // Préparer les données d'insertion avec company_id pour multi-tenant
+      const insertData: any = {
+        user_id: user.id,
+        company_id: companyId, // Multi-tenant
+        client_name: clientName,
+        work_type: workType,
+        surface: surface,
+        estimated_cost: aiResponse.estimatedCost || 0,
+        details: aiResponse,
+        status: 'draft',
+      };
+
       const { error: dbError } = await supabase
         .from('ai_quotes')
-        .insert({
-          user_id: user.id,
-          client_name: clientName,
-          work_type: workType,
-          surface: surface,
-          estimated_cost: aiResponse.estimatedCost || 0,
-          details: aiResponse,
-          status: 'draft',
-        });
+        .insert(insertData);
 
       if (dbError) {
         console.warn('⚠️ Error saving to database (non-blocking):', dbError.message);

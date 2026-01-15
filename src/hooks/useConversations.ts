@@ -50,12 +50,12 @@ const getCachedConversations = (userId: string, type: ConversationType = null): 
     const cacheKey = type 
       ? `${CONVERSATIONS_CACHE_KEY}_${userId}_${type}`
       : `${CONVERSATIONS_CACHE_KEY}_${userId}`;
-    const cached = localStorage.getItem(cacheKey);
+    const cached = safeLocalStorage.getItem(cacheKey);
     if (!cached) return null;
     
     const { data, timestamp } = JSON.parse(cached);
     if (Date.now() - timestamp > CACHE_EXPIRY) {
-      localStorage.removeItem(cacheKey);
+      safeLocalStorage.removeItem(cacheKey);
       return null;
     }
     
@@ -70,7 +70,7 @@ const setCachedConversations = (userId: string, conversations: AIConversation[],
     const cacheKey = type 
       ? `${CONVERSATIONS_CACHE_KEY}_${userId}_${type}`
       : `${CONVERSATIONS_CACHE_KEY}_${userId}`;
-    localStorage.setItem(
+    safeLocalStorage.setItem(
       cacheKey,
       JSON.stringify({ data: conversations, timestamp: Date.now() })
     );

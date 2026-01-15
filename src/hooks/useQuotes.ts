@@ -148,7 +148,11 @@ export const useQuote = (id: string | undefined) => {
             .select("*")
             .eq("id", validUuid) // Utiliser l'UUID extrait, pas l'ID complet
             .eq("user_id", user.id)
-            .single();
+            .maybeSingle();
+
+          if (!data) {
+            throw new Error("Quote not found");
+          }
 
           if (error) throw error;
           return data as Quote;
@@ -201,7 +205,7 @@ export const useCreateQuote = () => {
           .from("user_settings")
           .select("auto_send_email")
           .eq("user_id", user?.id)
-          .single();
+          .maybeSingle();
 
         if (settings?.auto_send_email && quote.client_email) {
           // Envoyer automatiquement le devis par email

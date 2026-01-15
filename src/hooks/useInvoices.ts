@@ -117,7 +117,11 @@ export const useInvoice = (id: string | undefined) => {
             .select("*")
             .eq("id", id)
             .eq("user_id", user.id)
-            .single();
+            .maybeSingle();
+
+          if (!data) {
+            throw new Error("Invoice not found");
+          }
 
           if (error) throw error;
           return data as Invoice;
@@ -152,7 +156,7 @@ export const useCreateInvoice = () => {
           .select("quote_number")
           .eq("id", data.quote_id)
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
         if (quoteError || !quote?.quote_number) {
           console.warn("⚠️ Impossible de récupérer le numéro du devis, génération d'un nouveau numéro");
@@ -217,7 +221,7 @@ export const useCreateInvoice = () => {
           .from("user_settings")
           .select("auto_send_email")
           .eq("user_id", user?.id)
-          .single();
+          .maybeSingle();
 
         if (settings?.auto_send_email && invoice.client_email) {
           // Envoyer automatiquement la facture par email
@@ -287,15 +291,15 @@ export const useUpdateInvoice = () => {
 
       // Recalculer les montants si amount_ht ou vat_rate changent
       if (updateData.amount_ht !== undefined || updateData.vat_rate !== undefined) {
-        const currentInvoice = await supabase
+        const { data: currentInvoiceData } = await supabase
           .from("invoices")
           .select("amount_ht, vat_rate")
           .eq("id", data.id)
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
-        const amountHt = updateData.amount_ht ?? currentInvoice.data?.amount_ht ?? 0;
-        const vatRate = updateData.vat_rate ?? currentInvoice.data?.vat_rate ?? 20;
+        const amountHt = updateData.amount_ht ?? currentInvoiceData?.amount_ht ?? 0;
+        const vatRate = updateData.vat_rate ?? currentInvoiceData?.vat_rate ?? 20;
         const vatAmount = (amountHt * vatRate) / 100;
         const amountTtc = amountHt + vatAmount;
 
@@ -309,7 +313,11 @@ export const useUpdateInvoice = () => {
         .eq("id", data.id)
         .eq("user_id", user.id)
         .select()
-        .single();
+        .maybeSingle();
+
+      if (!invoice) {
+        throw new Error("Invoice not found");
+      }
 
       if (error) throw error;
       return invoice as Invoice;
