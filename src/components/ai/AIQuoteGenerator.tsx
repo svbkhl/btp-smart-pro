@@ -1024,87 +1024,10 @@ export const AIQuoteGenerator = () => {
             Créez un devis professionnel en quelques étapes avec l'intelligence artificielle
           </p>
         </div>
-        {result && isPreviewOpen && (
-          <Button variant="outline" onClick={handleReset} className="gap-2">
-            <X className="h-4 w-4" />
-            Nouveau devis
-          </Button>
-        )}
+        {/* Le bouton "Nouveau devis" est maintenant dans l'aperçu */}
       </div>
 
-      {!result || !isPreviewOpen ? (
-        <div className="space-y-6">
-          {/* Stepper */}
-          <Stepper currentStep={currentStep} steps={steps} />
-
-          {/* Step Content */}
-          {currentStep === 0 && (
-            <Step1Description
-              description={description}
-              onDescriptionChange={setDescription}
-              onNext={handleNext}
-            />
-          )}
-
-          {currentStep === 1 && (
-            <Step2TechnicalData
-              selectedClientId={selectedClientId}
-              clientName={clientName}
-              clientEmail={clientEmail}
-              clientPhone={clientPhone}
-              clientAddress={clientAddress}
-              isNewClient={isNewClient}
-              clients={clients}
-              clientsLoading={clientsLoading}
-              onClientChange={handleClientChange}
-              onClientNameChange={setClientName}
-              onClientEmailChange={setClientEmail}
-              onClientPhoneChange={setClientPhone}
-              onClientAddressChange={setClientAddress}
-              onToggleNewClient={handleToggleNewClient}
-              surface={surface}
-              workType={workType}
-              customWorkType={customWorkType}
-              region={region}
-              materials={materials}
-              materialInput={materialInput}
-              imageUrls={imageUrls}
-              onSurfaceChange={setSurface}
-              onWorkTypeChange={setWorkType}
-              onCustomWorkTypeChange={setCustomWorkType}
-              onRegionChange={setRegion}
-              onMaterialInputChange={setMaterialInput}
-              onAddMaterial={handleAddMaterial}
-              onRemoveMaterial={handleRemoveMaterial}
-              onAddCommonMaterial={handleAddCommonMaterial}
-              onImagesChange={setImageUrls}
-              onPrevious={handlePrevious}
-              onNext={handleNext}
-            />
-          )}
-
-          {currentStep === 2 && (
-            <Step3Recap
-              description={description}
-              clientName={clientName}
-              clientEmail={clientEmail}
-              clientPhone={clientPhone}
-              clientAddress={clientAddress}
-              surface={surface}
-              workType={workType}
-              customWorkType={customWorkType}
-              region={region}
-              materials={materials}
-              imageUrls={imageUrls}
-              quoteFormat={quoteFormat}
-              onQuoteFormatChange={setQuoteFormat}
-              onPrevious={handlePrevious}
-              onGenerate={handleGenerate}
-              loading={loading}
-            />
-          )}
-        </div>
-      ) : result && isPreviewOpen ? (
+      {result && isPreviewOpen ? (
         <div ref={resultRef} className="space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
@@ -1154,6 +1077,7 @@ export const AIQuoteGenerator = () => {
             </Button>
           </div>
         </div>
-      ) : (
-        // Formulaire de génération (affiché quand pas de résultat ou aperçu fermé)
-        <div className="space-y-6">
+      ) : null}
+    </div>
+  );
+};
