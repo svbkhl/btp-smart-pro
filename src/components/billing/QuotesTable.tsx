@@ -17,17 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Quote } from "@/hooks/useQuotes";
 import { 
   Search, 
@@ -36,7 +25,6 @@ import {
   FileSignature, 
   Download, 
   Edit, 
-  Trash2,
   Euro,
   Calendar,
   User
@@ -71,32 +59,6 @@ export const QuotesTable = ({
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  const handleDeleteQuote = async (quoteId: string) => {
-    try {
-      const { error } = await supabase
-        .from('ai_quotes')  // ← Correction: table s'appelle ai_quotes
-        .delete()
-        .eq('id', quoteId);
-
-      if (error) throw error;
-
-      toast({
-        title: "✅ Devis supprimé",
-        description: "Le devis a été supprimé avec succès",
-      });
-
-      // Rafraîchir la page
-      window.location.reload();
-    } catch (error: any) {
-      console.error("Error deleting quote:", error);
-      toast({
-        title: "❌ Erreur",
-        description: error.message || "Impossible de supprimer le devis",
-        variant: "destructive",
-      });
-    }
-  };
 
   const getQuoteStatus = (quote: Quote): QuoteStatus => {
     // Vérifier d'abord si le devis est payé
@@ -237,50 +199,6 @@ export const QuotesTable = ({
                         onSend={onSend ? () => onSend(quote) : undefined}
                         onSign={onSign ? () => onSign(quote) : undefined}
                       />
-                      
-                      {/* Bouton Supprimer avec confirmation */}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Êtes-vous sûr de vouloir supprimer ce devis ?
-                              <br /><br />
-                              <strong>Numéro :</strong> {quote.quote_number || quote.id.substring(0, 8)}
-                              <br />
-                              <strong>Client :</strong> {quote.client_name}
-                              <br />
-                              <strong>Montant :</strong> {quote.estimated_cost?.toLocaleString("fr-FR", {
-                                style: "currency",
-                                currency: "EUR",
-                              })}
-                              <br />
-                              <strong>Statut :</strong> {getQuoteStatus(quote)}
-                              <br /><br />
-                              Cette action est <strong>irréversible</strong>.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteQuote(quote.id)}
-                              className="bg-destructive hover:bg-destructive/90"
-                            >
-                              Supprimer définitivement
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

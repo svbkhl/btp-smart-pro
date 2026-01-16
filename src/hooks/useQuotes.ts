@@ -77,6 +77,7 @@ export interface CreateQuoteData {
 
 export interface UpdateQuoteData extends Partial<CreateQuoteData> {
   id: string;
+  sent_at?: string;
 }
 
 // Hook pour récupérer tous les devis
@@ -218,7 +219,6 @@ export const useCreateQuote = () => {
       // Valeurs par défaut
       const mode = quoteData.mode || "simple";
       const tvaRate = quoteData.tva_rate ?? 0.20;
-      const currency = quoteData.currency || "EUR";
 
       // Calculer les totaux initiaux (sera recalculé par trigger si lignes existent)
       const initialTotals = {
@@ -227,21 +227,29 @@ export const useCreateQuote = () => {
         total_ttc: (quoteData.estimated_cost || 0) * (1 + tvaRate),
       };
 
+      // Préparer les données d'insertion (exclure currency si non présent en DB)
+      const insertData: any = {
+        ...quoteData,
+        user_id: user.id,
+        company_id: companyId,
+        quote_number: quoteNumber,
+        status: quoteData.status || "draft",
+        mode: mode,
+        tva_rate: tvaRate,
+        subtotal_ht: initialTotals.subtotal_ht,
+        total_tva: initialTotals.total_tva,
+        total_ttc: initialTotals.total_ttc,
+      };
+
+      // N'inclure currency que s'il est explicitement fourni (colonne peut ne pas exister en DB)
+      // Ne pas définir de valeur par défaut pour éviter les erreurs si la colonne n'existe pas
+      if (quoteData.currency) {
+        insertData.currency = quoteData.currency;
+      }
+
       const { data, error } = await supabase
         .from("ai_quotes")
-        .insert({
-          ...quoteData,
-          user_id: user.id,
-          company_id: companyId,
-          quote_number: quoteNumber,
-          status: quoteData.status || "draft",
-          mode: mode,
-          tva_rate: tvaRate,
-          currency: currency,
-          subtotal_ht: initialTotals.subtotal_ht,
-          total_tva: initialTotals.total_tva,
-          total_ttc: initialTotals.total_ttc,
-        })
+        .insert(insertData)
         .select()
         .single();
 

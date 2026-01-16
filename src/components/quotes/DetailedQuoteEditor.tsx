@@ -1,6 +1,7 @@
 /**
- * Éditeur direct de devis détaillé (sans wizard)
- * Permet de créer un devis avec sections et lignes directement
+ * Éditeur direct de devis détaillé (100% manuel, sans IA)
+ * Permet de saisir les lignes AVANT la création DB
+ * Crée le devis en DB uniquement lors de la sauvegarde
  */
 
 import { useState, useEffect } from "react";
@@ -18,26 +19,64 @@ import {
 } from "@/components/ui/select";
 import { useClients } from "@/hooks/useClients";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
-import { useCreateQuote } from "@/hooks/useQuotes";
+import { useCreateDetailedQuote, useUpdateDetailedQuote } from "@/hooks/useDetailedQuotes";
 import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Save, Sparkles } from "lucide-react";
+import { Loader2, Save, FileText, User, MapPin } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getCurrentCompanyId } from "@/utils/companyHelpers";
 import { supabase } from "@/integrations/supabase/client";
+import { useCreateQuoteSection } from "@/hooks/useQuoteSections";
+import { useCreateQuoteLine } from "@/hooks/useQuoteLines";
+import { useSearchQuoteSectionLibrary, useUpsertQuoteSectionLibrary } from "@/hooks/useQuoteSectionLibrary";
+import { useSearchQuoteLineLibrary, useUpsertQuoteLineLibrary } from "@/hooks/useQuoteLineLibrary";
+import { computeQuoteTotals, type QuoteLine } from "@/utils/quoteCalculations";
+import { SectionTitleInput } from "./SectionTitleInput";
+import { LineLabelInput } from "./LineLabelInput";
+import { QuoteDisplay } from "@/components/ai/QuoteDisplay";
+import { downloadQuotePDF } from "@/services/pdfService";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { useQuoteSections } from "@/hooks/useQuoteSections";
+import { useQuoteLines } from "@/hooks/useQuoteLines";
+import { useQuotes } from "@/hooks/useQuotes";
+import { CheckCircle2, Download, X } from "lucide-react";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 interface DetailedQuoteEditorProps {
   onSuccess?: (quoteId: string) => void;
   onCancel?: () => void;
+  onClose?: () => void; // Callback pour fermer complètement (fermer le dialog)
 }
 
-export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditorProps) => {
+// Types locaux pour sections et lignes en mémoire
+interface LocalSection {
+  id: string; // ID temporaire
+  title: string;
+  position: number;
+}
+
+interface LocalLine {
+  id: string; // ID temporaire
+  section_id: string; // Référence au section_id local
+  label: string;
+  unit: string;
+  quantity: number | null;
+  unit_price_ht: number | null;
+  position: number;
+}
+
+export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQuoteEditorProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: companySettings } = useCompanySettings();
   const updateCompanySettings = useUpdateCompanySettings();
-  const createQuote = useCreateQuote();
+  const createDetailedQuote = useCreateDetailedQuote();
+  const updateDetailedQuote = useUpdateDetailedQuote();
+  const createSection = useCreateQuoteSection();
+  const createLine = useCreateQuoteLine();
+  const upsertSectionLibrary = useUpsertQuoteSectionLibrary();
+  const upsertLineLibrary = useUpsertQuoteLineLibrary();
 
   // État du devis
   const [clientId, setClientId] = useState<string>("");
@@ -47,13 +86,30 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
   const [tva293b, setTva293b] = useState<boolean>(
     companySettings?.default_tva_293b || false
   );
+  const [tvaRateInput, setTvaRateInput] = useState<string>(
+    ((companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20) * 100).toFixed(2)
+  );
+  
+  // État local des sections et lignes (avant sauvegarde DB)
+  const [localSections, setLocalSections] = useState<LocalSection[]>([]);
+  const [localLines, setLocalLines] = useState<LocalLine[]>([]);
+  
+  // État après création DB
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [quoteTotals, setQuoteTotals] = useState({
     subtotal_ht: 0,
     total_tva: 0,
     total_ttc: 0,
   });
+
+  // Hooks pour l'aperçu
+  const { data: companyInfo } = useUserSettings();
+  const { data: sections = [] } = useQuoteSections(quoteId || undefined);
+  const { data: lines = [] } = useQuoteLines(quoteId || undefined);
+  const { data: quotes = [] } = useQuotes();
+  const previewQuote = quotes.find(q => q.id === quoteId);
 
   // Charger les préférences au montage
   useEffect(() => {
@@ -63,73 +119,80 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
     }
   }, [companySettings]);
 
-  // Créer le devis initial si pas encore créé
+  // Recalculer les totaux quand sections/lignes changent
   useEffect(() => {
-    const createInitialQuote = async () => {
-      if (!user || quoteId || !clientId) return;
+    const effectiveTvaRate = tva293b ? 0 : tvaRate;
+    const linesForCalc = localLines.map(line => ({
+      quantity: line.quantity ?? 0,
+      unit_price_ht: line.unit_price_ht ?? 0,
+      tva_rate: effectiveTvaRate,
+    }));
+    
+    const totals = computeQuoteTotals(linesForCalc, effectiveTvaRate, tva293b);
+    setQuoteTotals(totals);
+  }, [localLines, tvaRate, tva293b]);
 
-      try {
-        const companyId = await getCurrentCompanyId(user.id);
-        if (!companyId) {
-          toast({
-            title: "Erreur",
-            description: "Vous devez être membre d'une entreprise",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const selectedClient = clients.find((c) => c.id === clientId);
-        if (!selectedClient) {
-          // Client sélectionné mais pas trouvé, attendre
-          return;
-        }
-
-        // Créer un devis draft
-        const quoteData = {
-          client_name: selectedClient.name,
-          client_id: clientId,
-          estimated_cost: 0,
-          mode: "detailed" as const,
-          tva_rate: tva293b ? 0 : tvaRate,
-          tva_non_applicable_293b: tva293b,
-          subtotal_ht: 0,
-          total_tva: 0,
-          total_ttc: 0,
-        };
-
-        const newQuote = await createQuote.mutateAsync(quoteData);
-        setQuoteId(newQuote.id);
-        console.log("✅ Devis initial créé:", newQuote.id);
-      } catch (error: any) {
-        console.error("❌ Erreur création devis initial:", error);
-        toast({
-          title: "Erreur",
-          description: error.message || "Impossible de créer le devis",
-          variant: "destructive",
-        });
-      }
-    };
-
-    if (user && clientId && !quoteId) {
-      createInitialQuote();
-    }
-  }, [user, clientId, quoteId, createQuote, clients, tvaRate, tva293b, toast]);
-
-  // Gérer changement TVA/293B
-  const handleTvaRateChange = async (rate: number) => {
+  // Gérer changement TVA/293B (local seulement)
+  const handleTvaRateChange = (rate: number) => {
     setTvaRate(rate);
-    // Persister
-    try {
-      await updateCompanySettings.mutateAsync({
-        default_tva_rate: rate,
-      });
-    } catch (error) {
-      console.error("Error updating company settings:", error);
+    setTvaRateInput((rate * 100).toFixed(2));
+    // Sauvegarder préférence (mais pas en DB du devis tant qu'il n'est pas créé)
+    updateCompanySettings.mutateAsync({
+      default_tva_rate: rate,
+    }).catch((err: any) => {
+      // Gérer silencieusement les erreurs 404 (table n'existe pas)
+      if (err.code !== "PGRST204" && !err.message?.includes("Could not find") && !err.message?.includes("404")) {
+        console.error("Error updating company settings:", err);
+      }
+    });
+  };
+
+  const handleTvaRateInputChange = (value: string) => {
+    // Permettre la saisie libre sans reformater immédiatement
+    setTvaRateInput(value);
+    // Mettre à jour le taux seulement si c'est un nombre valide et complet
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100 && value.trim() !== "") {
+      setTvaRate(numValue / 100);
+      // Ne pas reformater l'input ici pour permettre la saisie libre
     }
   };
 
-  const handleTva293bChange = async (value: boolean) => {
+  const handleTvaRateBlur = () => {
+    const numValue = parseFloat(tvaRateInput);
+    if (isNaN(numValue) || numValue < 0) {
+      // Valeur invalide, restaurer la dernière valeur valide
+      setTvaRateInput((tvaRate * 100).toFixed(2));
+    } else if (numValue > 100) {
+      // Limiter à 100%
+      const finalRate = 1;
+      setTvaRateInput("100.00");
+      setTvaRate(finalRate);
+      // Sauvegarder préférence
+      updateCompanySettings.mutateAsync({
+        default_tva_rate: finalRate,
+      }).catch((err: any) => {
+        if (err.code !== "PGRST204" && !err.message?.includes("Could not find") && !err.message?.includes("404")) {
+          console.error("Error updating company settings:", err);
+        }
+      });
+    } else {
+      // Valeur valide, formater et sauvegarder
+      const finalRate = numValue / 100;
+      setTvaRateInput(numValue.toFixed(2));
+      setTvaRate(finalRate);
+      // Sauvegarder préférence
+      updateCompanySettings.mutateAsync({
+        default_tva_rate: finalRate,
+      }).catch((err: any) => {
+        if (err.code !== "PGRST204" && !err.message?.includes("Could not find") && !err.message?.includes("404")) {
+          console.error("Error updating company settings:", err);
+        }
+      });
+    }
+  };
+
+  const handleTva293bChange = (value: boolean) => {
     const newTva293b = value;
     const newTvaRate = newTva293b ? 0 : tvaRate;
     
@@ -138,55 +201,71 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
       setTvaRate(0);
     }
     
-    // Mettre à jour le devis si déjà créé et recalculer les totaux
-    if (quoteId && user) {
-      try {
-        const companyId = await getCurrentCompanyId(user.id);
-        if (companyId) {
-          // Mettre à jour TVA/293B
-          await supabase
-            .from("ai_quotes")
-            .update({
-              tva_rate: newTvaRate,
-              tva_non_applicable_293b: newTva293b,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", quoteId)
-            .eq("company_id", companyId);
-
-          // Recalculer les totaux via RPC (plus fiable)
-          const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
-            p_quote_id: quoteId,
-          });
-
-          if (rpcError) {
-            console.warn("⚠️ Erreur RPC recompute après changement 293B:", rpcError);
-          } else {
-            console.log("✅ Totaux recalculés après changement 293B");
-          }
-        }
-      } catch (error) {
-        console.error("Error updating quote TVA:", error);
-      }
-    }
-    
-    // Persister dans company_settings
-    try {
-      await updateCompanySettings.mutateAsync({
+    // Sauvegarder préférence
+    updateCompanySettings.mutateAsync({
         default_tva_293b: newTva293b,
         default_tva_rate: newTvaRate,
-      });
-    } catch (error) {
-      console.error("Error updating company settings:", error);
-    }
+    }).catch(err => console.error("Error updating company settings:", err));
   };
 
-  // Sauvegarder le devis (mettre à jour les totaux)
+  // Gérer sections locales
+  const handleAddSection = () => {
+    const newSection: LocalSection = {
+      id: `temp-section-${Date.now()}`,
+      title: "", // Vide pour que le placeholder s'affiche
+      position: localSections.length,
+    };
+    setLocalSections([...localSections, newSection]);
+  };
+
+  const handleUpdateSection = (sectionId: string, title: string) => {
+    setLocalSections(sections =>
+      sections.map(s => s.id === sectionId ? { ...s, title } : s)
+    );
+  };
+
+
+  const handleDeleteSection = (sectionId: string) => {
+    setLocalSections(sections => sections.filter(s => s.id !== sectionId));
+    // Supprimer aussi les lignes de cette section
+    setLocalLines(lines => lines.filter(l => l.section_id !== sectionId));
+  };
+
+  // Gérer lignes locales
+  const handleAddLine = (sectionId: string) => {
+    const section = localSections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    const sectionLines = localLines.filter(l => l.section_id === sectionId);
+    const newLine: LocalLine = {
+      id: `temp-line-${Date.now()}`,
+      section_id: sectionId,
+      label: "",
+      unit: "u",
+      quantity: 1,
+      unit_price_ht: 0,
+      position: sectionLines.length,
+    };
+    setLocalLines([...localLines, newLine]);
+  };
+
+  const handleUpdateLine = (lineId: string, updates: Partial<LocalLine>) => {
+    setLocalLines(lines =>
+      lines.map(l => l.id === lineId ? { ...l, ...updates } : l)
+    );
+  };
+
+
+  const handleDeleteLine = (lineId: string) => {
+    setLocalLines(lines => lines.filter(l => l.id !== lineId));
+  };
+
+  // Sauvegarder le devis (créer en DB + sauvegarder sections/lignes)
   const handleSave = async () => {
-    if (!quoteId || !user) {
+    if (!user || !clientId) {
       toast({
         title: "Erreur",
-        description: "Devis non créé ou utilisateur non connecté",
+        description: "Veuillez sélectionner un client",
         variant: "destructive",
       });
       return;
@@ -196,40 +275,221 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
     try {
       const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
-        throw new Error("User is not a member of any company");
+        throw new Error("Vous devez être membre d'une entreprise");
       }
 
-      // Utiliser la fonction SQL pour recalculer les totaux (plus fiable)
-      const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
-        p_quote_id: quoteId,
+      const selectedClient = clients.find((c) => c.id === clientId);
+      if (!selectedClient) {
+        throw new Error("Client introuvable");
+      }
+
+      console.log("🔧 [DetailedQuoteEditor] Sauvegarde devis détaillé:", {
+        client_id: clientId,
+        sections_count: localSections.length,
+        lines_count: localLines.length,
       });
 
-      if (rpcError) {
-        console.warn("⚠️ Erreur RPC recompute, fallback sur update manuel:", rpcError);
-        // Fallback : mise à jour manuelle
-        const { error } = await supabase
-          .from("ai_quotes")
-          .update({
-            subtotal_ht: quoteTotals.subtotal_ht,
-            total_tva: quoteTotals.total_tva,
-            total_ttc: quoteTotals.total_ttc,
+      // 1. Créer le devis en DB
+      const newQuote = await createDetailedQuote.mutateAsync({
+        client_id: clientId,
+        client_name: selectedClient.name,
             tva_rate: tva293b ? 0 : tvaRate,
             tva_non_applicable_293b: tva293b,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", quoteId)
-          .eq("company_id", companyId);
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Devis sauvegardé",
-        description: "Le devis a été sauvegardé avec succès",
       });
 
+      console.log("✅ [DetailedQuoteEditor] Devis créé:", newQuote.id);
+      setQuoteId(newQuote.id);
+
+
+      // 2. Créer les sections en DB (si table existe) + sauvegarder dans bibliothèque
+      const sectionMap = new Map<string, string>(); // temp_id -> real_id
+      
+      // D'abord sauvegarder tous les titres dans la bibliothèque (même si table sections n'existe pas)
+      for (const localSection of localSections) {
+        if (localSection.title.trim()) {
+          try {
+            await upsertSectionLibrary.mutateAsync({ title: localSection.title.trim() });
+          } catch (libError: any) {
+            // Gérer silencieusement les erreurs 404 (table n'existe pas)
+            if (libError.code === "PGRST204" || libError.message?.includes("Could not find") || libError.message?.includes("404")) {
+              // Table n'existe pas, ignorer silencieusement
+            } else {
+              console.warn("⚠️ Erreur sauvegarde bibliothèque section:", libError);
+            }
+          }
+        }
+      }
+      
+      // Ensuite créer les sections en DB (OBLIGATOIRE avant les lignes)
+      let sectionsCreated = false;
+      try {
+        for (let i = 0; i < localSections.length; i++) {
+          const localSection = localSections[i];
+          if (!localSection.title.trim()) {
+            console.warn(`⚠️ Section sans titre ignorée: ${localSection.id}`);
+            continue;
+          }
+          
+          const dbSection = await createSection.mutateAsync({
+            quote_id: newQuote.id,
+            title: localSection.title.trim(),
+            position: i,
+          });
+          sectionMap.set(localSection.id, dbSection.id);
+          sectionsCreated = true;
+          console.log(`✅ Section créée: ${localSection.title} (temp: ${localSection.id}) -> DB UUID: ${dbSection.id}`);
+        }
+      } catch (sectionError: any) {
+        console.error("❌ Erreur création sections:", sectionError);
+        // Si les sections ne peuvent pas être créées, on ne peut pas créer les lignes non plus
+        // (car les lignes ont besoin de section_id)
+        if (sectionError.message?.includes("Could not find") || sectionError.code === "PGRST204" || sectionError.message?.includes("404")) {
+      toast({
+            title: "⚠️ Tables manquantes",
+            description: "Les tables quote_sections et quote_lines ne sont pas disponibles. Veuillez exécuter la migration SQL dans Supabase.",
+        variant: "destructive",
+      });
+          // On continue quand même pour sauvegarder le quote de base
+        } else {
+          throw sectionError; // Propager les autres erreurs
+        }
+      }
+
+      // 3. Sauvegarder les prestations dans la bibliothèque + créer les lignes en DB (si table existe)
+      // D'abord sauvegarder toutes les prestations dans la bibliothèque (même si table lignes n'existe pas)
+      for (const localLine of localLines) {
+        if (localLine.label.trim() && localLine.unit) {
+          try {
+            await upsertLineLibrary.mutateAsync({
+              label: localLine.label.trim(),
+              default_unit: localLine.unit,
+              default_unit_price_ht: localLine.unit_price_ht || undefined,
+            });
+          } catch (libError: any) {
+            // Gérer silencieusement les erreurs 404 (table n'existe pas)
+            if (libError.code === "PGRST204" || libError.message?.includes("Could not find") || libError.message?.includes("404")) {
+              // Table n'existe pas, ignorer silencieusement
+            } else {
+              console.warn("⚠️ Erreur sauvegarde bibliothèque ligne:", libError);
+            }
+          }
+        }
+      }
+      
+      // Ensuite créer les lignes en DB (SEULEMENT si sections créées)
+      let linesCreated = false;
+      if (sectionsCreated && localLines.length > 0) {
+        try {
+          let linePosition = 0;
+          for (const localLine of localLines) {
+            // CRITIQUE : Utiliser le mapping temp_id -> real_uuid
+            const realSectionId = sectionMap.get(localLine.section_id);
+            if (!realSectionId) {
+              console.error(`❌ Section introuvable pour ligne ${localLine.id}: temp_id=${localLine.section_id}`);
+              console.error("   Mapping actuel:", Array.from(sectionMap.entries()));
+              console.error("   Sections locales:", localSections.map(s => ({ id: s.id, title: s.title })));
+              continue; // Skip cette ligne si section pas trouvée
+            }
+
+            if (!localLine.label.trim()) {
+              console.warn(`⚠️ Ligne sans label ignorée: ${localLine.id}`);
+              continue;
+            }
+
+            await createLine.mutateAsync({
+              quote_id: newQuote.id,
+              section_id: realSectionId, // UUID réel de la section créée en DB
+              label: localLine.label.trim(),
+              unit: localLine.unit || null,
+              quantity: localLine.quantity || null,
+              unit_price_ht: localLine.unit_price_ht || null,
+              position: linePosition++,
+            });
+            linesCreated = true;
+          }
+          console.log(`✅ ${localLines.length} ligne(s) créée(s) avec mapping sections correct`);
+        } catch (lineError: any) {
+          console.error("❌ Erreur création lignes:", lineError);
+          if (lineError.message?.includes("Could not find") || lineError.code === "PGRST204" || lineError.message?.includes("404")) {
+            toast({
+              title: "⚠️ Table quote_lines manquante",
+              description: "La table quote_lines n'est pas disponible. Veuillez exécuter la migration SQL.",
+              variant: "destructive",
+            });
+          }
+        }
+      } else if (localLines.length > 0 && !sectionsCreated) {
+        console.warn("⚠️ Impossible de créer les lignes : sections non créées");
+      }
+
+      // 4. Recalculer les totaux (sans RPC, calcul frontend + UPDATE)
+      // Si des lignes ont été créées, recalculer les totaux depuis les lignes
+      if (linesCreated && localLines.length > 0) {
+        try {
+          // Calculer les totaux depuis les lignes locales
+          const linesForCalc = localLines.map(line => ({
+            quantity: line.quantity ?? 0,
+            unit_price_ht: line.unit_price_ht ?? 0,
+            tva_rate: tva293b ? 0 : tvaRate,
+          }));
+          
+          const totals = computeQuoteTotals(linesForCalc, tvaRate, tva293b);
+          
+          // Mettre à jour le devis avec les totaux calculés
+          await updateDetailedQuote.mutateAsync({
+            id: newQuote.id,
+            subtotal_ht: totals.subtotal_ht,
+            total_tva: totals.total_tva,
+            total_ttc: totals.total_ttc,
+          });
+          
+          console.log("✅ Totaux recalculés et mis à jour:", totals);
+        } catch (calcError: any) {
+          console.warn("⚠️ Erreur recalcul totaux:", calcError);
+          // Essayer l'RPC en fallback si elle existe
+          try {
+            const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
+              p_quote_id: newQuote.id,
+            });
+            if (rpcError) {
+              console.warn("⚠️ RPC recompute aussi en erreur:", rpcError);
+            } else {
+              console.log("✅ Totaux recalculés via RPC");
+            }
+          } catch (rpcError: any) {
+            console.warn("⚠️ RPC n'existe pas ou erreur:", rpcError);
+          }
+        }
+      } else {
+        // Pas de lignes, totaux à 0
+        try {
+          await updateDetailedQuote.mutateAsync({
+            id: newQuote.id,
+            subtotal_ht: 0,
+            total_tva: 0,
+            total_ttc: 0,
+          });
+        } catch (updateError: any) {
+          console.warn("⚠️ Erreur mise à jour totaux vides:", updateError);
+        }
+      }
+
+      // 5. Sauvegarder les préférences
+      await updateCompanySettings.mutateAsync({
+        default_tva_rate: tvaRate,
+        default_tva_293b: tva293b,
+      });
+
+      toast({
+        title: "Devis créé",
+        description: "Le devis a été créé et sauvegardé avec succès",
+      });
+
+      // Ouvrir l'aperçu après création
+      setIsPreviewOpen(true);
+
       if (onSuccess) {
-        onSuccess(quoteId);
+        onSuccess(newQuote.id);
       }
     } catch (error: any) {
       console.error("❌ Erreur sauvegarde devis:", error);
@@ -245,6 +505,309 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const effectiveTvaRate = tva293b ? 0 : tvaRate;
+  const canEdit = !!clientId; // Peut éditer dès qu'un client est sélectionné
+  const hasContent = localSections.length > 0 || localLines.length > 0;
+
+  // Handler pour télécharger le PDF
+  const handleDownloadPDF = async () => {
+    if (!previewQuote || !selectedClient || !companyInfo) return;
+
+    try {
+      // Préparer les lignes pour le PDF
+      const pdfLines = lines.map(line => ({
+        label: line.label,
+        unit: line.unit || "",
+        quantity: line.quantity || 0,
+        unit_price_ht: line.unit_price_ht || 0,
+        total_ht: line.total_ht,
+            tva_rate: effectiveTvaRate,
+        total_tva: line.total_tva,
+        total_ttc: line.total_ttc,
+        section_id: line.section_id,
+      }));
+
+      // Préparer les sections pour le PDF
+      const pdfSections = sections.map(section => ({
+        id: section.id,
+        title: section.title,
+        position: section.position,
+      }));
+
+      await downloadQuotePDF({
+        result: {
+          estimatedCost: previewQuote.total_ttc || previewQuote.estimated_cost || 0,
+          quote_number: previewQuote.quote_number,
+        },
+        companyInfo,
+        clientInfo: {
+          name: selectedClient.name,
+          email: selectedClient.email,
+          phone: selectedClient.phone,
+          location: selectedClient.location,
+        },
+        quoteDate: new Date(previewQuote.created_at),
+        quoteNumber: previewQuote.quote_number,
+        mode: "detailed",
+        tvaRate: effectiveTvaRate,
+        tva293b: tva293b,
+        sections: pdfSections,
+        lines: pdfLines,
+        subtotal_ht: quoteTotals.subtotal_ht,
+        total_tva: quoteTotals.total_tva,
+        total_ttc: quoteTotals.total_ttc,
+      });
+
+      toast({
+        title: "PDF téléchargé",
+        description: "Le devis a été téléchargé avec succès",
+      });
+    } catch (error: any) {
+      console.error("Erreur téléchargement PDF:", error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de télécharger le PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Si l'aperçu est ouvert, afficher l'aperçu au lieu de l'éditeur
+  if (isPreviewOpen && previewQuote && selectedClient) {
+    return (
+      <div className="space-y-6">
+        {/* Message de succès */}
+        <GlassCard className="p-6 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-green-900 dark:text-green-100">
+                Devis créé avec succès !
+              </h3>
+              <p className="text-sm text-green-700 dark:text-green-300">
+                Le devis {previewQuote.quote_number} a été enregistré et est disponible dans la section Facturation.
+              </p>
+            </div>
+          </div>
+        </GlassCard>
+
+        {/* Affichage du devis */}
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Devis {previewQuote.quote_number}
+            </h2>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
+                <Download className="w-4 h-4" />
+                Télécharger PDF
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsPreviewOpen(false);
+                  if (onClose) {
+                    onClose();
+                  } else if (onCancel) {
+                    onCancel();
+                  }
+                }} 
+                variant="outline" 
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Fermer
+              </Button>
+            </div>
+          </div>
+
+          {/* Aperçu PDF complet */}
+          <div className="bg-white text-black p-6 rounded-lg max-w-4xl mx-auto quote-display" id="quote-to-export">
+            {/* En-tête */}
+            <div className="mb-6 pb-6 border-b-2 border-gray-300">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  {companyInfo?.company_logo_url && (
+                    <img 
+                      src={companyInfo.company_logo_url} 
+                      alt="Logo" 
+                      className="h-16 mb-4 object-contain"
+                    />
+                  )}
+                  <div className="space-y-1">
+                    <h1 className="text-2xl font-bold">{companyInfo?.company_name || 'Nom de l\'entreprise'}</h1>
+                    {companyInfo?.legal_form && (
+                      <p className="text-sm text-gray-600">{companyInfo.legal_form}</p>
+                    )}
+                    {(companyInfo?.address || companyInfo?.postal_code || companyInfo?.city) && (
+                      <p className="text-sm text-gray-600">
+                        {[companyInfo.address, companyInfo.postal_code && companyInfo.city ? `${companyInfo.postal_code} ${companyInfo.city}` : companyInfo.city || companyInfo.postal_code].filter(Boolean).join(', ')}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
+                      {companyInfo?.siret && <span>SIRET: {companyInfo.siret}</span>}
+                      {companyInfo?.vat_number && <span>TVA: {companyInfo.vat_number}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
+                      {companyInfo?.phone && <span>Tél: {companyInfo.phone}</span>}
+                      {companyInfo?.email && <span>Email: {companyInfo.email}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <h2 className="text-3xl font-bold mb-2">DEVIS</h2>
+                  {previewQuote.quote_number && (
+                    <p className="text-sm text-gray-600">N° {previewQuote.quote_number}</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-1">
+                    Date: {new Date(previewQuote.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Informations client */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Client
+              </h3>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="font-semibold text-lg">{selectedClient.name}</p>
+                {selectedClient.location && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    <MapPin className="h-4 w-4 inline mr-1" />
+                    {selectedClient.location}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
+                  {selectedClient.email && <span>Email: {selectedClient.email}</span>}
+                  {selectedClient.phone && <span>Tél: {selectedClient.phone}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Sections et lignes */}
+            {sections.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-base font-semibold mb-3">Détail des prestations</h3>
+                <div className="space-y-6">
+                  {sections
+                    .sort((a, b) => a.position - b.position)
+                    .map((section, sectionIdx) => {
+                      const sectionLines = lines
+                        .filter((line) => line.section_id === section.id)
+                        .sort((a, b) => a.position - b.position);
+                      
+                      if (sectionLines.length === 0) return null;
+
+                      return (
+                        <div key={section.id}>
+                          <h4 className="font-semibold text-base mb-3 text-primary">
+                            {sectionIdx + 1}. {section.title}
+                          </h4>
+                          <div className="overflow-x-auto border rounded-lg">
+                            <table className="w-full text-sm">
+                              <thead className="bg-primary text-white">
+                                <tr>
+                                  <th className="text-left p-3">Désignation</th>
+                                  <th className="text-center p-3">Unité</th>
+                                  <th className="text-right p-3">Qté</th>
+                                  <th className="text-right p-3">Prix unit. HT</th>
+                                  <th className="text-right p-3">Prix HT</th>
+                                  {!tva293b && <th className="text-right p-3">TVA</th>}
+                                  <th className="text-right p-3">Total TTC</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sectionLines.map((line) => {
+                                  const lineTva = !tva293b ? (line.total_ht * effectiveTvaRate) : 0;
+                                  const lineTtc = line.total_ht + lineTva;
+                                  return (
+                                    <tr key={line.id} className="border-b hover:bg-gray-50">
+                                      <td className="p-3">{line.label}</td>
+                                      <td className="text-center p-3">{line.unit || "-"}</td>
+                                      <td className="text-right p-3">{line.quantity?.toFixed(2) || "-"}</td>
+                                      <td className="text-right p-3">{(line.unit_price_ht || 0).toFixed(2)} €</td>
+                                      <td className="text-right p-3 font-medium">{(line.total_ht || 0).toFixed(2)} €</td>
+                                      {!tva293b && (
+                                        <td className="text-right p-3">{lineTva.toFixed(2)} €</td>
+                                      )}
+                                      <td className="text-right p-3 font-medium">{(lineTtc || line.total_ttc || 0).toFixed(2)} €</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Totaux */}
+            <div className="mb-6">
+              <div className="flex justify-end">
+                <div className="w-80">
+                  <table className="w-full border-collapse border">
+                    <tbody>
+                      <tr>
+                        <td className="border p-3 text-right">Total HT</td>
+                        <td className="border p-3 text-right font-medium">
+                          {quoteTotals.subtotal_ht.toFixed(2)} €
+                        </td>
+                      </tr>
+                      {!tva293b && (
+                        <tr>
+                          <td className="border p-3 text-right">
+                            TVA ({effectiveTvaRate * 100}%)
+                          </td>
+                          <td className="border p-3 text-right">
+                            {quoteTotals.total_tva.toFixed(2)} €
+                          </td>
+                        </tr>
+                      )}
+                      {tva293b && (
+                        <tr>
+                          <td className="border p-3 text-right text-sm text-muted-foreground">
+                            TVA non applicable (Art. 293 B du CGI)
+                          </td>
+                          <td className="border p-3 text-right">0,00 €</td>
+                        </tr>
+                      )}
+                      <tr className="bg-primary/10">
+                        <td className="border p-3 text-right font-bold text-lg">Total à payer (TTC)</td>
+                        <td className="border p-3 text-right font-bold text-lg text-primary">
+                          {quoteTotals.total_ttc.toFixed(2)} €
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Signature */}
+            <div className="mt-8 pt-4 border-t-2 border-gray-300">
+              <div className="flex justify-between items-end">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-600 mb-2">
+                    Devis reçu avant exécution des travaux, bon pour accord
+                  </p>
+                  <div className="mt-6">
+                    <p className="text-xs text-gray-600 border-t border-gray-300 pt-2 w-48">
+                      Signature et date
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -263,7 +826,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
             <Select
               value={clientId}
               onValueChange={setClientId}
-              disabled={clientsLoading}
+              disabled={clientsLoading || !!quoteId}
             >
               <SelectTrigger id="client">
                 <SelectValue placeholder="Sélectionner un client" />
@@ -278,7 +841,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
             </Select>
             {!clientId && (
               <p className="text-xs text-muted-foreground">
-                Vous devez sélectionner un client pour créer le devis
+                Sélectionnez un client pour commencer
               </p>
             )}
           </div>
@@ -300,79 +863,42 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
             </p>
           </div>
 
-          {/* Taux TVA (si pas 293B) */}
+          {/* Taux TVA (si pas 293B) - UNE SEULE CASE */}
           {!tva293b && (
             <div className="space-y-2">
-              <Label htmlFor="tva_rate">Taux de TVA</Label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={tvaRate.toString()}
-                  onValueChange={(value) => handleTvaRateChange(parseFloat(value))}
-                >
-                  <SelectTrigger className="w-32" id="tva_rate">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0%</SelectItem>
-                    <SelectItem value="0.055">5.5%</SelectItem>
-                    <SelectItem value="0.10">10%</SelectItem>
-                    <SelectItem value="0.20">20%</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Label htmlFor="tva_rate">Taux de TVA (%)</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={(tvaRate * 100).toFixed(2)}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!isNaN(value) && value >= 0 && value <= 100) {
-                      handleTvaRateChange(value / 100);
-                    }
-                  }}
-                  className="w-24"
-                  placeholder="Taux personnalisé"
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
+                id="tva_rate"
+                type="text"
+                inputMode="decimal"
+                value={tvaRateInput}
+                onChange={(e) => handleTvaRateInputChange(e.target.value)}
+                onBlur={handleTvaRateBlur}
+                placeholder="20"
+                className="w-32"
+              />
               <p className="text-xs text-muted-foreground">
-                Le taux sélectionné sera sauvegardé comme préférence pour les prochains devis
+                Le taux saisi sera sauvegardé comme préférence pour les prochains devis
               </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Éditeur sections/lignes */}
-      {quoteId ? (
+      {/* Éditeur sections/lignes (affiché dès qu'un client est sélectionné) */}
+      {canEdit ? (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Devis détaillé</CardTitle>
                 <CardDescription>
                   Ajoutez des sections (corps de métier) et des lignes (prestations) avec quantités et prix
                 </CardDescription>
-              </div>
-              {/* Bouton optionnel "Remplir avec l'IA" */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => {
-                  toast({
-                    title: "Fonctionnalité à venir",
-                    description: "Le remplissage automatique par IA sera disponible prochainement",
-                  });
-                }}
-              >
-                <Sparkles className="h-4 w-4" />
-                Remplir avec l'IA
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
+            {quoteId ? (
+              // Mode DB : utiliser QuoteSectionsEditor si devis déjà créé
             <QuoteSectionsEditor
               quoteId={quoteId}
               tvaRate={effectiveTvaRate}
@@ -380,27 +906,138 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
               onTotalsChange={setQuoteTotals}
               onTva293bChange={handleTva293bChange}
             />
+            ) : (
+              // Mode local : éditeur en mémoire
+              <div className="space-y-4">
+                {/* Bouton ajouter section */}
+                <Button onClick={handleAddSection} variant="outline" className="gap-2">
+                  <span>+</span> Ajouter un titre (corps de métier)
+                </Button>
+
+                {/* Sections */}
+                {localSections.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Aucune section pour le moment</p>
+                    <p className="text-sm mt-2">Cliquez sur "Ajouter un titre" pour commencer</p>
+              </div>
+                )}
+
+                {localSections.map((section, sectionIdx) => (
+                  <div key={section.id} className="border rounded-lg p-4 space-y-3">
+                    {/* En-tête section */}
+                    <div className="flex items-center justify-between gap-2">
+                      <SectionTitleInput
+                        value={section.title}
+                        onChange={(title) => handleUpdateSection(section.id, title)}
+                        placeholder="Titre de la section (ex: Plâtrerie - Isolation)"
+                        className="font-semibold flex-1"
+                      />
+              <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSection(section.id)}
+                      >
+                        Supprimer
+                      </Button>
+                    </div>
+
+                    {/* Lignes de la section */}
+                    <div className="space-y-2 pl-4 border-l-2">
+                      {localLines
+                        .filter(line => line.section_id === section.id)
+                        .map((line) => (
+                          <div key={line.id} className="grid grid-cols-12 gap-2 items-center">
+                            <LineLabelInput
+                              className="col-span-9"
+                              value={line.label}
+                              onChange={(label) => handleUpdateLine(line.id, { label })}
+                              onSelect={async (item) => {
+                                handleUpdateLine(line.id, {
+                                  label: item.label,
+                                  unit: item.unit || "u",
+                                  unit_price_ht: item.price || 0,
+                                });
+                                if (item.label.trim() && item.unit) {
+                                  await upsertLineLibrary.mutateAsync({
+                                    label: item.label.trim(),
+                                    default_unit: item.unit,
+                                    default_unit_price_ht: item.price,
+                                  });
+                                }
+                              }}
+                              placeholder="Prestation"
+                            />
+                            <Select
+                              value={line.unit}
+                              onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
+                            >
+                              <SelectTrigger className="col-span-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="m²">m²</SelectItem>
+                                <SelectItem value="ml">ml</SelectItem>
+                                <SelectItem value="h">h</SelectItem>
+                                <SelectItem value="u">u</SelectItem>
+                                <SelectItem value="forfait">forfait</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              className="col-span-1"
+                              value={line.quantity ?? ""}
+                              onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
+                              placeholder="Qté"
+                            />
+                            <Input
+                              type="number"
+                              className="col-span-1"
+                              value={line.unit_price_ht ?? ""}
+                              onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
+                              placeholder="Prix HT"
+                            />
+                            <div className="col-span-1 text-right font-medium">
+                              {((line.quantity ?? 0) * (line.unit_price_ht ?? 0)).toFixed(2)} €
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteLine(line.id)}
+                              className="col-span-1"
+                            >
+                              ×
+              </Button>
+                          </div>
+                        ))}
+
+              <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAddLine(section.id)}
+                        className="w-full"
+                      >
+                        + Ajouter une ligne
+              </Button>
+            </div>
+          </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            {clientId ? (
-              <div className="space-y-2">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                <p>Création du devis en cours...</p>
-              </div>
-            ) : (
               <p>Veuillez sélectionner un client pour commencer</p>
-            )}
           </CardContent>
         </Card>
       )}
 
       {/* Actions */}
+      {canEdit && (
       <div className="flex justify-between items-center pt-4 border-t">
         <div>
-          {quoteTotals.subtotal_ht > 0 && (
+            {(hasContent || quoteTotals.subtotal_ht > 0) && (
             <div className="text-sm space-y-1">
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Total HT:</span>
@@ -450,23 +1087,24 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
           )}
           <Button
             onClick={handleSave}
-            disabled={!quoteId || isSaving || !clientId}
+              disabled={!clientId || isSaving || (localSections.length === 0 && localLines.length === 0)}
             className="gap-2"
           >
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Sauvegarde...
+                  Création en cours...
               </>
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Sauvegarder le devis
+                  Créer le devis
               </>
             )}
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 };

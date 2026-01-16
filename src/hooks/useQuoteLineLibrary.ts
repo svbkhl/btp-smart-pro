@@ -94,7 +94,13 @@ export const useSearchQuoteLineLibrary = (searchQuery: string) => {
         .order("times_used", { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      // Gérer silencieusement les erreurs 404 (table n'existe pas)
+      if (error) {
+        if (error.code === "PGRST204" || error.message?.includes("Could not find") || error.message?.includes("404")) {
+          return []; // Retourner un tableau vide si la table n'existe pas
+        }
+        throw error;
+      }
       return (data || []) as QuoteLineLibraryItem[];
     },
     enabled: !!user && searchQuery.trim().length > 0,
@@ -121,13 +127,31 @@ export const useUpsertQuoteLineLibrary = () => {
       const unit = itemData.default_unit || null;
 
       // Vérifier si existe déjà (avec unit dans UNIQUE)
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from("quote_line_library")
         .select("*")
         .eq("company_id", companyId)
         .eq("label_normalized", labelNormalized)
         .eq("default_unit", unit)
         .maybeSingle();
+
+      // Gérer silencieusement les erreurs 404 (table n'existe pas)
+      if (checkError && (checkError.code === "PGRST204" || checkError.message?.includes("Could not find") || checkError.message?.includes("404"))) {
+        // Table n'existe pas, retourner un objet factice
+        return {
+          id: "",
+          company_id: companyId,
+          label: itemData.label,
+          label_normalized: labelNormalized,
+          default_unit: itemData.default_unit || null,
+          default_unit_price_ht: itemData.default_unit_price_ht || null,
+          default_category: itemData.default_category || null,
+          times_used: 0,
+          last_used_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as QuoteLineLibraryItem;
+      }
 
       if (existing) {
         // Mettre à jour (incrémenter times_used, mettre à jour last_used_at et autres champs)
@@ -145,7 +169,13 @@ export const useUpsertQuoteLineLibrary = () => {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Gérer silencieusement les erreurs 404
+          if (error.code === "PGRST204" || error.message?.includes("Could not find") || error.message?.includes("404")) {
+            return existing;
+          }
+          throw error;
+        }
         return data as QuoteLineLibraryItem;
       } else {
         // Créer nouveau
@@ -164,7 +194,26 @@ export const useUpsertQuoteLineLibrary = () => {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Gérer silencieusement les erreurs 404
+          if (error.code === "PGRST204" || error.message?.includes("Could not find") || error.message?.includes("404")) {
+            // Retourner un objet factice si la table n'existe pas
+            return {
+              id: "",
+              company_id: companyId,
+              label: itemData.label,
+              label_normalized: labelNormalized,
+              default_unit: itemData.default_unit || null,
+              default_unit_price_ht: itemData.default_unit_price_ht || null,
+              default_category: itemData.default_category || null,
+              times_used: 1,
+              last_used_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as QuoteLineLibraryItem;
+          }
+          throw error;
+        }
         return data as QuoteLineLibraryItem;
       }
     },

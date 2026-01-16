@@ -53,7 +53,20 @@ export const useCompanySettings = () => {
         .eq("company_id", companyId)
         .maybeSingle();
 
+      // Gérer silencieusement les erreurs 404 (table n'existe pas)
       if (error && error.code !== "PGRST116") {
+        if (error.code === "PGRST204" || error.message?.includes("Could not find") || error.message?.includes("404")) {
+          // Table n'existe pas, retourner valeurs par défaut
+          return {
+            company_id: companyId,
+            default_tva_rate: 0.20,
+            default_quote_tva_rate: 0.20,
+            default_quote_mode: "simple" as const,
+            default_tva_293b: false,
+            updated_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          };
+        }
         throw error;
       }
 

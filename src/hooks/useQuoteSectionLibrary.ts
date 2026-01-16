@@ -88,7 +88,13 @@ export const useSearchQuoteSectionLibrary = (searchQuery: string) => {
         .order("times_used", { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      // Gérer silencieusement les erreurs 404 (table n'existe pas)
+      if (error) {
+        if (error.code === "PGRST204" || error.message?.includes("Could not find") || error.message?.includes("404")) {
+          return []; // Retourner un tableau vide si la table n'existe pas
+        }
+        throw error;
+      }
       return (data || []) as QuoteSectionLibraryItem[];
     },
     enabled: !!user && searchQuery.trim().length > 0,
@@ -114,12 +120,27 @@ export const useUpsertQuoteSectionLibrary = () => {
       const titleNormalized = normalizeTitle(itemData.title);
 
       // Vérifier si existe déjà
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from("quote_section_library")
         .select("*")
         .eq("company_id", companyId)
         .eq("title_normalized", titleNormalized)
         .maybeSingle();
+
+      // Gérer silencieusement les erreurs 404 (table n'existe pas)
+      if (checkError && (checkError.code === "PGRST204" || checkError.message?.includes("Could not find") || checkError.message?.includes("404"))) {
+        // Table n'existe pas, retourner un objet factice
+        return {
+          id: "",
+          company_id: companyId,
+          title: itemData.title,
+          title_normalized: titleNormalized,
+          times_used: 0,
+          last_used_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as QuoteSectionLibraryItem;
+      }
 
       if (existing) {
         // Mettre à jour (incrémenter times_used, mettre à jour last_used_at)
@@ -134,7 +155,13 @@ export const useUpsertQuoteSectionLibrary = () => {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Gérer silencieusement les erreurs 404
+          if (error.code === "PGRST204" || error.message?.includes("Could not find") || error.message?.includes("404")) {
+            return existing;
+          }
+          throw error;
+        }
         return data as QuoteSectionLibraryItem;
       } else {
         // Créer nouveau

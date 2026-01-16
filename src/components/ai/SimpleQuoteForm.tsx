@@ -3,7 +3,9 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { calculateFromTTC } from "@/utils/priceCalculations";
+import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import {
   Select,
   SelectContent,
@@ -30,11 +32,22 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: companyInfo } = useUserSettings();
+  const { data: companySettings } = useCompanySettings();
+  const updateCompanySettings = useUpdateCompanySettings();
 
   const [prestation, setPrestation] = useState("");
   const [surface, setSurface] = useState("");
   const [prix, setPrix] = useState("");
   const [clientId, setClientId] = useState<string>("");
+  const [tvaRate, setTvaRate] = useState<number>(
+    companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20
+  );
+  const [tva293b, setTva293b] = useState<boolean>(
+    companySettings?.default_tva_293b || false
+  );
+  const [tvaRateInput, setTvaRateInput] = useState<string>(
+    ((companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20) * 100).toFixed(2)
+  );
   const [loading, setLoading] = useState(false);
   // État explicite pour contrôler l'affichage de l'aperçu
   // Ne se réinitialise QUE via action utilisateur (bouton "Fermer" ou "Créer un nouveau devis")
@@ -57,10 +70,84 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
     }
   }, [isPreviewOpen, onPreviewStateChange]);
   
-  // Debug: logger les changements d'état pour diagnostiquer
-  console.log('[SimpleQuoteForm] Render - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current);
+  // Charger les préférences au montage
+  useEffect(() => {
+    if (companySettings) {
+      const defaultRate = companySettings.default_tva_rate || companySettings.default_quote_tva_rate || 0.20;
+      setTvaRate(defaultRate);
+      setTvaRateInput((defaultRate * 100).toFixed(2));
+      setTva293b(companySettings.default_tva_293b || false);
+    } else {
+      setTvaRateInput("20.00");
+    }
+  }, [companySettings]);
+
+  // Gérer changement TVA/293B
+  const handleTvaRateChange = (rate: number) => {
+    setTvaRate(rate);
+    setTvaRateInput((rate * 100).toFixed(2));
+    updateCompanySettings.mutateAsync({
+      default_tva_rate: rate,
+    }).catch(err => console.error("Error updating company settings:", err));
+  };
+
+  const handleTvaRateInputChange = (value: string) => {
+    // Permettre la saisie libre sans reformater immédiatement
+    setTvaRateInput(value);
+    // Mettre à jour le taux seulement si c'est un nombre valide et complet
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100 && value.trim() !== "") {
+      setTvaRate(numValue / 100);
+      // Ne pas reformater l'input ici pour permettre la saisie libre
+    }
+  };
+
+  const handleTvaRateBlur = () => {
+    const numValue = parseFloat(tvaRateInput);
+    if (isNaN(numValue) || numValue < 0) {
+      // Valeur invalide, restaurer la dernière valeur valide
+      setTvaRateInput((tvaRate * 100).toFixed(2));
+    } else if (numValue > 100) {
+      // Limiter à 100%
+      const finalRate = 1;
+      setTvaRateInput("100.00");
+      setTvaRate(finalRate);
+      // Sauvegarder préférence
+      updateCompanySettings.mutateAsync({
+        default_tva_rate: finalRate,
+      }).catch(err => console.error("Error updating company settings:", err));
+    } else {
+      // Valeur valide, formater et sauvegarder
+      const finalRate = numValue / 100;
+      setTvaRateInput(numValue.toFixed(2));
+      setTvaRate(finalRate);
+      // Sauvegarder préférence
+      updateCompanySettings.mutateAsync({
+        default_tva_rate: finalRate,
+      }).catch(err => console.error("Error updating company settings:", err));
+    }
+  };
+
+  const handleTva293bChange = (value: boolean) => {
+    const newTva293b = value;
+    const newTvaRate = newTva293b ? 0 : tvaRate;
+    
+    setTva293b(newTva293b);
+    if (newTva293b) {
+      setTvaRate(0);
+    }
+    
+    updateCompanySettings.mutateAsync({
+      default_tva_293b: newTva293b,
+      default_tva_rate: newTvaRate,
+    }).catch(err => console.error("Error updating company settings:", err));
+  };
+
+  // Debug: logger les changements d'état pour diagnostiquer (désactivé pour éviter les logs en boucle)
+  // console.log('[SimpleQuoteForm] Render - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current);
 
   const selectedClient = clients.find((c) => c.id === clientId);
+  const effectiveTvaRate = tva293b ? 0 : tvaRate;
 
   const handleGenerate = async () => {
     // Validation
@@ -131,6 +218,8 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
           surface: surfaceNum,
           prix: prixTTC, // Envoyer le TTC directement
           clientId: clientId,
+          tvaRate: effectiveTvaRate,
+          tva293b: tva293b,
         },
         companyInfo,
         {
@@ -239,7 +328,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
   // Utiliser les refs comme fallback si les états sont réinitialisés par un re-render
   // Cela garantit que l'aperçu ne disparaît pas après re-render ou invalidation de queries
   const shouldShowPreview = (quote || quoteRef.current) && (isPreviewOpen || isPreviewOpenRef.current);
-  console.log('[SimpleQuoteForm] Render check - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current, 'should show preview:', shouldShowPreview);
+  // console.log('[SimpleQuoteForm] Render check - quote:', !!quote, 'isPreviewOpen:', isPreviewOpen, 'quoteRef:', !!quoteRef.current, 'isPreviewOpenRef:', isPreviewOpenRef.current, 'should show preview:', shouldShowPreview);
   
   // Si les états ont été réinitialisés mais que les refs ont encore les valeurs, restaurer les états
   // IMPORTANT : Ce useEffect doit s'exécuter APRÈS chaque render pour restaurer immédiatement
@@ -446,12 +535,51 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
             </p>
           </div>
 
+          {/* TVA 293B */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="tva_293b_simple"
+                checked={tva293b}
+                onCheckedChange={(checked) => handleTva293bChange(checked === true)}
+              />
+              <Label htmlFor="tva_293b_simple" className="cursor-pointer">
+                TVA non applicable - Article 293 B du CGI
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cocher si votre entreprise est exonérée de TVA selon l'article 293 B du Code Général des Impôts
+            </p>
+          </div>
+
+          {/* Taux TVA (si pas 293B) - UNE SEULE CASE */}
+          {!tva293b && (
+            <div className="space-y-2">
+              <Label htmlFor="tva_rate_simple">Taux de TVA (%)</Label>
+              <Input
+                id="tva_rate_simple"
+                type="text"
+                inputMode="decimal"
+                value={tvaRateInput}
+                onChange={(e) => handleTvaRateInputChange(e.target.value)}
+                onBlur={handleTvaRateBlur}
+                placeholder="20"
+                className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Le taux saisi sera sauvegardé comme préférence pour les prochains devis
+              </p>
+            </div>
+          )}
+
           {/* Aperçu du total - MODE TTC FIRST */}
           {prix && surface && (() => {
             const prixNum = parseFloat(prix);
             if (isNaN(prixNum) || prixNum <= 0) return null;
             
-            const prices = calculateFromTTC(prixNum, 20);
+            const tvaPercent = effectiveTvaRate * 100;
+            const prices = calculateFromTTC(prixNum, tvaPercent);
             
             return (
               <GlassCard className="p-4 bg-primary/5 dark:bg-primary/10 border-primary/20">
@@ -465,15 +593,22 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
                   </span>
                 </div>
                 <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">dont TVA (20%) :</span>
-                    <span className="font-medium">
-                      {prices.vat_amount.toLocaleString("fr-FR", {
-                        style: "currency",
-                        currency: "EUR",
-                      })}
-                    </span>
-                  </div>
+                  {!tva293b && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">dont TVA ({tvaPercent.toFixed(2)}%) :</span>
+                      <span className="font-medium">
+                        {prices.vat_amount.toLocaleString("fr-FR", {
+                          style: "currency",
+                          currency: "EUR",
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {tva293b && (
+                    <div className="text-xs text-muted-foreground italic">
+                      TVA non applicable - Article 293 B du CGI
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Total HT :</span>
                     <span className="font-medium">

@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QuotesTable } from "@/components/billing/QuotesTable";
-import { Quote } from "@/hooks/useQuotes";
+import { Quote, useUpdateQuote } from "@/hooks/useQuotes";
 import { useToast } from "@/components/ui/use-toast";
 import { EditQuoteDialog } from "@/components/quotes/EditQuoteDialog";
 
@@ -18,6 +18,7 @@ interface QuotesListViewProps {
 export default function QuotesListView({ quotes, loading }: QuotesListViewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const updateQuote = useUpdateQuote();
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -40,11 +41,34 @@ export default function QuotesListView({ quotes, loading }: QuotesListViewProps)
     setIsEditDialogOpen(true);
   };
 
-  const handleSend = (quote: Quote) => {
-    toast({
-      title: "📧 Envoi",
-      description: "L'envoi de devis sera disponible prochainement",
-    });
+  const handleSend = async (quote: Quote) => {
+    if (quote.status === "sent") {
+      toast({
+        title: "✅ Déjà envoyé",
+        description: "Ce devis a déjà été envoyé",
+      });
+      return;
+    }
+
+    try {
+      await updateQuote.mutateAsync({
+        id: quote.id,
+        status: "sent",
+        sent_at: new Date().toISOString(),
+      });
+      
+      toast({
+        title: "✅ Devis envoyé",
+        description: `Le devis ${quote.quote_number} a été marqué comme envoyé`,
+      });
+    } catch (error: any) {
+      console.error("Error sending quote:", error);
+      toast({
+        title: "❌ Erreur",
+        description: error.message || "Impossible d'envoyer le devis",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSign = (quote: Quote) => {

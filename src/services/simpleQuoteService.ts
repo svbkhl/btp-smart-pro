@@ -8,6 +8,8 @@ export interface SimpleQuoteData {
   surface: number; // Surface en m²
   prix: number; // Prix en €
   clientId: string; // ID du client sélectionné
+  tvaRate?: number; // Taux TVA (0-1)
+  tva293b?: boolean; // TVA non applicable 293B
 }
 
 export interface SimpleQuoteResult {
@@ -60,8 +62,11 @@ export async function generateSimpleQuote(
   }
   
   // ⚠️ RÈGLE MÉTIER: Le prix saisi est TOUJOURS un prix TTC
+  // Taux TVA : utiliser celui fourni ou 20% par défaut (sauf si 293B)
+  const tvaRate = data.tva293b ? 0 : (data.tvaRate ?? 0.20);
+  const tvaPercent = tvaRate * 100;
   // Utilisation de la fonction utilitaire pour les calculs précis
-  const prices = calculateFromTTC(prixSaisi, 20); // 20% TVA par défaut
+  const prices = calculateFromTTC(prixSaisi, tvaPercent);
   const { total_ttc, total_ht, vat_amount } = prices;
 
   // Construire la description avec la phrase standard

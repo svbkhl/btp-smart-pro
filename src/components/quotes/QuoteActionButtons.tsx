@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Download, Send, Edit, Trash2 } from "lucide-react";
-import { Quote } from "@/hooks/useQuotes";
-import { useDeleteQuote } from "@/hooks/useQuotes";
+import { Quote, useDeleteQuote } from "@/hooks/useQuotes";
 import { useToast } from "@/components/ui/use-toast";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { useUserSettings } from "@/hooks/useUserSettings";
