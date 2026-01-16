@@ -142,8 +142,20 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       signatureData,
       signedBy,
       signedAt,
-      quoteFormat,
+      quoteFormat, // Ancien format (compatibilité)
+      mode, // Nouveau format
+      tvaRate = 0.20,
+      tva293b = false, // TVA non applicable 293B
+      sections, // Sections (corps de métier)
+      lines, // Lignes détaillées (mode detailed)
+      subtotal_ht,
+      total_tva,
+      total_ttc,
     } = params;
+
+    // Déterminer le mode
+    const quoteMode = mode || (quoteFormat === "simplified" ? "simple" : "detailed") || "simple";
+    const effectiveTvaRate = tva293b ? 0 : tvaRate; // Forcer à 0 si 293B
 
     // Créer le document PDF en format A4 portrait
     const doc = new jsPDF({
@@ -478,55 +490,6 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
 
         // Espace entre sections
         yPosition += 3;
-      });
-        if (yPosition > pageHeight - 50) {
-          doc.addPage();
-          yPosition = margin;
-          // Réafficher l'en-tête
-          doc.setFillColor(...primaryColor);
-          doc.rect(margin, yPosition, contentWidth, 8, 'F');
-          doc.setTextColor(255, 255, 255);
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Libellé', margin + 2, yPosition + 5.5);
-          doc.text('Unité', margin + 60, yPosition + 5.5);
-          doc.text('Qté', margin + 75, yPosition + 5.5);
-          doc.text('Prix unit. HT', margin + 85, yPosition + 5.5);
-          doc.text('Total HT', margin + 110, yPosition + 5.5);
-          doc.text('TVA', margin + 135, yPosition + 5.5);
-          doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
-          yPosition += 8;
-          doc.setTextColor(...textColor);
-          doc.setFont('helvetica', 'normal');
-        }
-
-        const lineHeight = 6;
-        if (index % 2 === 0) {
-          doc.setFillColor(...lightGray);
-          doc.rect(margin, yPosition - 2, contentWidth, lineHeight, 'F');
-        }
-
-        doc.setFontSize(8);
-        // Libellé (tronqué si trop long)
-        const labelText = doc.splitTextToSize(line.label || '', 50)[0];
-        doc.text(labelText, margin + 2, yPosition + 4);
-        // Unité
-        doc.text(line.unit || '-', margin + 60, yPosition + 4);
-        // Quantité
-        doc.text(line.quantity?.toString() || '-', margin + 75, yPosition + 4);
-        // Prix unitaire HT
-        doc.text(line.unit_price_ht ? formatCurrency(line.unit_price_ht) : '-', margin + 85, yPosition + 4);
-        // Total HT
-        doc.text(formatCurrency(line.total_ht), margin + 110, yPosition + 4);
-        // TVA
-        doc.text(`${(line.tva_rate * 100).toFixed(1)}%`, margin + 135, yPosition + 4);
-        // Total TTC
-        doc.text(formatCurrency(line.total_ttc), rightX, yPosition + 4, { align: 'right' });
-
-        totalHT += line.total_ht;
-        totalTVA += line.total_tva;
-        totalTTC += line.total_ttc;
-        yPosition += lineHeight;
       });
 
       // Totaux

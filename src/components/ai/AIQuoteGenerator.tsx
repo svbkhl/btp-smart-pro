@@ -47,7 +47,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { QuoteDisplay } from "./QuoteDisplay";
+import QuoteDetailView from "@/components/quotes/QuoteDetailView";
+import { useQuotes } from "@/hooks/useQuotes";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -988,6 +989,14 @@ export const AIQuoteGenerator = () => {
   };
 
   const handleGenerate = async () => {
+    console.log("🚀 Génération devis démarrée:", {
+      quoteMode,
+      tvaRate: tva293b ? 0 : tvaRate,
+      tva293b,
+      clientName,
+      description: description?.substring(0, 50) + "...",
+    });
+
     setLoading(true);
     setResult(null);
     setQuoteId(null);
@@ -1047,8 +1056,15 @@ export const AIQuoteGenerator = () => {
 
       // Décorréler la génération de l'affichage : générer ≠ fermer l'aperçu
       setResult(formattedResult);
-      setIsPreviewOpen(true); // Ouvrir explicitement l'aperçu
-      setQuoteId(response.quote?.id || null);
+      setIsPreviewOpen(true); // Ouvrir explicitement l'aperçu (NE PAS FERMER AUTOMATIQUEMENT)
+      const newQuoteId = response.quote?.id || null;
+      setQuoteId(newQuoteId);
+      
+      console.log("✅ Quote créé avec succès:", {
+        quoteId: newQuoteId,
+        quoteNumber: currentQuoteNumber,
+        mode: quoteMode,
+      });
 
       if (response.quote?.signature_data) {
         setQuoteSignature({
@@ -1123,6 +1139,20 @@ export const AIQuoteGenerator = () => {
     try {
       const selectedClient = clients?.find((c) => c.id === selectedClientId);
       
+      // Logs pour debug
+      console.log("✅ Devis généré:", {
+        quoteId,
+        quoteMode,
+        quoteNumber: currentQuoteNumber,
+        tvaRate: tva293b ? 0 : tvaRate,
+        tva293b,
+        payload: {
+          mode: quoteMode,
+          tvaRate: tva293b ? 0 : tvaRate,
+          tva293b,
+        },
+      });
+
       // Récupérer les sections et lignes si mode detailed
       let quoteSections: any[] | undefined = undefined;
       let quoteLines: any[] | undefined = undefined;
@@ -1130,27 +1160,40 @@ export const AIQuoteGenerator = () => {
         try {
           const companyId = await getCurrentCompanyId(user.id);
           if (companyId) {
+            console.log("📋 Récupération sections/lignes pour quoteId:", quoteId);
             // Récupérer sections
-            const { data: sectionsData } = await supabase
+            const { data: sectionsData, error: sectionsError } = await supabase
               .from("quote_sections")
               .select("*")
               .eq("quote_id", quoteId)
               .eq("company_id", companyId)
               .order("position", { ascending: true });
-            quoteSections = sectionsData || [];
+            
+            if (sectionsError) {
+              console.error("❌ Erreur récupération sections:", sectionsError);
+            } else {
+              quoteSections = sectionsData || [];
+              console.log("✅ Sections récupérées:", quoteSections.length);
+            }
 
             // Récupérer lignes
-            const { data: linesData } = await supabase
+            const { data: linesData, error: linesError } = await supabase
               .from("quote_lines")
               .select("*")
               .eq("quote_id", quoteId)
               .eq("company_id", companyId)
               .order("section_id", { ascending: true, nullsFirst: false })
               .order("position", { ascending: true });
-            quoteLines = linesData || [];
+            
+            if (linesError) {
+              console.error("❌ Erreur récupération lignes:", linesError);
+            } else {
+              quoteLines = linesData || [];
+              console.log("✅ Lignes récupérées:", quoteLines.length);
+            }
           }
         } catch (error) {
-          console.warn("Error fetching quote sections/lines for PDF:", error);
+          console.error("❌ Erreur récupération sections/lignes:", error);
         }
       }
 
@@ -1235,25 +1278,17 @@ export const AIQuoteGenerator = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <QuoteDisplay
-                result={result}
-                companyInfo={companyInfo}
-                clientInfo={{
-                  name: clientName,
-                  email: isNewClient ? clientEmail : clients?.find((c) => c.id === selectedClientId)?.email,
-                  phone: isNewClient ? clientPhone : clients?.find((c) => c.id === selectedClientId)?.phone,
-                  location: isNewClient ? clientAddress : clients?.find((c) => c.id === selectedClientId)?.location,
-                }}
-                surface={surface}
-                workType={workType === "Autre" ? customWorkType : workType}
-                region={region}
-                quoteDate={new Date()}
-                quoteNumber={quoteNumber || result?.quote_number || undefined}
-                signatureData={quoteSignature?.data}
-                signedBy={quoteSignature?.signedBy}
-                signedAt={quoteSignature?.signedAt}
-                quoteFormat={quoteFormat}
-              />
+              {quoteId ? (
+                // Utiliser QuoteDetailView qui gère sections/lignes pour mode detailed
+                <QuoteDetailViewWrapper quoteId={quoteId} />
+              ) : (
+                // Fallback : message si pas de quoteId
+                <div className="p-4 border rounded-lg">
+                  <p className="text-muted-foreground text-center">
+                    Devis généré avec succès. Rechargez la page pour voir les détails complets.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
           
