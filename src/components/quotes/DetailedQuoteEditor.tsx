@@ -138,11 +138,12 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
       setTvaRate(0);
     }
     
-    // Mettre à jour le devis si déjà créé
+    // Mettre à jour le devis si déjà créé et recalculer les totaux
     if (quoteId && user) {
       try {
         const companyId = await getCurrentCompanyId(user.id);
         if (companyId) {
+          // Mettre à jour TVA/293B
           await supabase
             .from("ai_quotes")
             .update({
@@ -152,6 +153,17 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
             })
             .eq("id", quoteId)
             .eq("company_id", companyId);
+
+          // Recalculer les totaux via RPC (plus fiable)
+          const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
+            p_quote_id: quoteId,
+          });
+
+          if (rpcError) {
+            console.warn("⚠️ Erreur RPC recompute après changement 293B:", rpcError);
+          } else {
+            console.log("✅ Totaux recalculés après changement 293B");
+          }
         }
       } catch (error) {
         console.error("Error updating quote TVA:", error);
