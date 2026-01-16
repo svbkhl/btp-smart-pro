@@ -64,21 +64,26 @@ export function computeLineTotals(line: QuoteLine): {
  * Calcule les totaux d'un devis complet depuis ses lignes
  * @param lines - Tableau de lignes de devis
  * @param defaultTvaRate - Taux TVA par défaut si ligne n'a pas de taux
+ * @param tva293b - Si true, TVA non applicable (article 293B du CGI)
  * @returns Totaux du devis (subtotal_ht, total_tva, total_ttc)
  */
 export function computeQuoteTotals(
   lines: QuoteLine[],
-  defaultTvaRate: number = 0.20
+  defaultTvaRate: number = 0.20,
+  tva293b: boolean = false
 ): QuoteTotals {
   let subtotalHt = 0;
   let totalTva = 0;
   let totalTtc = 0;
 
+  // Si 293B est coché, forcer TVA à 0
+  const effectiveTvaRate = tva293b ? 0 : defaultTvaRate;
+
   for (const line of lines) {
-    // Utiliser le taux TVA de la ligne ou le taux par défaut
+    // Utiliser le taux TVA de la ligne ou le taux effectif (0 si 293B)
     const lineWithTva = {
       ...line,
-      tva_rate: line.tva_rate ?? defaultTvaRate,
+      tva_rate: tva293b ? 0 : (line.tva_rate ?? defaultTvaRate),
     };
 
     const lineTotals = computeLineTotals(lineWithTva);
@@ -86,6 +91,12 @@ export function computeQuoteTotals(
     subtotalHt += lineTotals.total_ht;
     totalTva += lineTotals.total_tva;
     totalTtc += lineTotals.total_ttc;
+  }
+
+  // Si 293B, forcer TVA à 0
+  if (tva293b) {
+    totalTva = 0;
+    totalTtc = subtotalHt;
   }
 
   // Arrondir les totaux finaux

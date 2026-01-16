@@ -12,6 +12,7 @@ export interface QuoteLine {
   id: string;
   quote_id: string;
   company_id: string;
+  section_id?: string | null; // Lien vers section (nullable)
   position: number;
   label: string;
   description?: string | null;
@@ -31,6 +32,7 @@ export interface QuoteLine {
 
 export interface CreateQuoteLineData {
   quote_id: string;
+  section_id?: string | null; // Lien vers section
   position?: number;
   label: string;
   description?: string;
@@ -68,6 +70,7 @@ export const useQuoteLines = (quoteId: string | undefined) => {
         .select("*")
         .eq("quote_id", quoteId)
         .eq("company_id", companyId)
+        .order("section_id", { ascending: true, nullsFirst: false })
         .order("position", { ascending: true });
 
       if (error) throw error;

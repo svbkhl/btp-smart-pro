@@ -24,7 +24,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useQuoteLines, useCreateQuoteLine, useUpdateQuoteLine, useDeleteQuoteLine, QuoteLine } from "@/hooks/useQuoteLines";
 import { useSearchQuoteLineLibrary, useUpsertQuoteLineLibrary } from "@/hooks/useQuoteLineLibrary";
-import { estimateMaterialPrice } from "@/hooks/useMaterialsPriceCatalog";
 import { useAuth } from "@/hooks/useAuth";
 import { computeLineTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
 import { Plus, Trash2, Edit2, Save, X, Search, Sparkles } from "lucide-react";

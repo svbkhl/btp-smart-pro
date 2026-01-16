@@ -26,7 +26,7 @@ import {
 import QuoteStatusBadge from "./QuoteStatusBadge";
 import QuoteTimeline from "./QuoteTimeline";
 import QuotePaymentSection from "./QuotePaymentSection";
-import { QuoteLinesEditor } from "./QuoteLinesEditor";
+import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuoteLines } from "@/hooks/useQuoteLines";
 import { computeQuoteTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
@@ -51,11 +51,12 @@ export default function QuoteDetailView({
   const [activeTab, setActiveTab] = useState("details");
   const quoteMode = quote.mode || "simple";
   const tvaRate = quote.tva_rate ?? 0.20;
+  const tva293b = quote.tva_non_applicable_293b ?? false;
   const { data: lines = [] } = useQuoteLines(quoteMode === "detailed" ? quote.id : undefined);
   const [quoteTotals, setQuoteTotals] = useState({
     subtotal_ht: quote.subtotal_ht ?? quote.estimated_cost ?? 0,
-    total_tva: quote.total_tva ?? (quote.estimated_cost ?? 0) * tvaRate,
-    total_ttc: quote.total_ttc ?? (quote.estimated_cost ?? 0) * (1 + tvaRate),
+    total_tva: tva293b ? 0 : (quote.total_tva ?? (quote.estimated_cost ?? 0) * tvaRate),
+    total_ttc: tva293b ? (quote.subtotal_ht ?? quote.estimated_cost ?? 0) : (quote.total_ttc ?? (quote.estimated_cost ?? 0) * (1 + tvaRate)),
   });
 
   const isReadOnly = quote.signed || quote.status === 'signed';
@@ -195,12 +196,19 @@ export default function QuoteDetailView({
                     {formatCurrency(quoteTotals.subtotal_ht || quote.estimated_cost || 0, quote.currency)}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">TVA ({formatTvaRate(tvaRate)})</span>
-                  <span className="font-medium">
-                    {formatCurrency(quoteTotals.total_tva || 0, quote.currency)}
-                  </span>
-                </div>
+                {!tva293b && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TVA ({formatTvaRate(tvaRate)})</span>
+                    <span className="font-medium">
+                      {formatCurrency(quoteTotals.total_tva || 0, quote.currency)}
+                    </span>
+                  </div>
+                )}
+                {tva293b && (
+                  <div className="text-xs text-muted-foreground italic">
+                    TVA non applicable - Article 293 B du CGI
+                  </div>
+                )}
                 {quoteMode === "detailed" && (
                   <div className="pt-2 border-t">
                     <Badge variant="outline" className="text-xs">
@@ -227,19 +235,20 @@ export default function QuoteDetailView({
             </Card>
           )}
 
-          {/* Lignes détaillées (mode detailed) */}
+          {/* Sections et lignes détaillées (mode detailed) */}
           {quoteMode === "detailed" && !isReadOnly && (
             <Card>
               <CardHeader>
-                <CardTitle>Lignes du devis</CardTitle>
+                <CardTitle>Sections et lignes du devis</CardTitle>
                 <CardDescription>
-                  Gérez les lignes détaillées du devis avec quantités, unités et prix
+                  Gérez les sections (corps de métier) et lignes détaillées avec quantités, unités et prix
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <QuoteLinesEditor
+                <QuoteSectionsEditor
                   quoteId={quote.id}
                   tvaRate={tvaRate}
+                  tva293b={tva293b}
                   onTotalsChange={setQuoteTotals}
                 />
               </CardContent>

@@ -15,6 +15,7 @@ export interface GenerateQuoteParams {
   quoteFormat?: string; // Ancien format (compatibilité)
   mode?: "simple" | "detailed"; // Nouveau format
   tvaRate?: number; // Taux TVA personnalisable
+  tva293b?: boolean; // TVA non applicable 293B
 }
 
 /**
@@ -95,7 +96,8 @@ export async function generateQuote(
       description: params.description,
       quoteFormat: params.quoteFormat || (params.mode === "simple" ? "simplified" : "detailed") || 'standard', // Compatibilité
       mode: params.mode || (params.quoteFormat === "simplified" ? "simple" : "detailed") || "simple", // Nouveau format
-      tvaRate: params.tvaRate ?? 0.20, // Taux TVA
+      tvaRate: params.tva293b ? 0 : (params.tvaRate ?? 0.20), // Taux TVA (0 si 293B)
+      tva293b: params.tva293b ?? false, // TVA non applicable 293B
     };
 
     // Appeler l'Edge Function generate-quote

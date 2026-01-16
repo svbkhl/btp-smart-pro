@@ -9,15 +9,19 @@ import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
 export interface CompanySettings {
   company_id: string;
-  default_quote_tva_rate: number;
+  default_tva_rate: number; // Renommé depuis default_quote_tva_rate
+  default_quote_tva_rate?: number; // Ancien nom (compatibilité)
   default_quote_mode: "simple" | "detailed";
+  default_tva_293b: boolean; // TVA non applicable 293B
   updated_at: string;
   created_at: string;
 }
 
 export interface UpdateCompanySettingsData {
-  default_quote_tva_rate?: number;
+  default_tva_rate?: number;
+  default_quote_tva_rate?: number; // Ancien nom (compatibilité)
   default_quote_mode?: "simple" | "detailed";
+  default_tva_293b?: boolean;
 }
 
 /**
@@ -57,14 +61,24 @@ export const useCompanySettings = () => {
       if (!data) {
         return {
           company_id: companyId,
-          default_quote_tva_rate: 0.20,
+          default_tva_rate: 0.20,
+          default_quote_tva_rate: 0.20, // Compatibilité
           default_quote_mode: "simple" as const,
+          default_tva_293b: false,
           updated_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
         };
       }
 
-      return data as CompanySettings;
+      // Normaliser les données (gérer ancien nom default_quote_tva_rate)
+      const normalizedData = {
+        ...data,
+        default_tva_rate: data.default_tva_rate ?? data.default_quote_tva_rate ?? 0.20,
+        default_quote_tva_rate: data.default_tva_rate ?? data.default_quote_tva_rate ?? 0.20,
+        default_tva_293b: data.default_tva_293b ?? false,
+      };
+
+      return normalizedData as CompanySettings;
     },
     enabled: !!user,
   });
@@ -86,19 +100,32 @@ export const useUpdateCompanySettings = () => {
         throw new Error("User is not a member of any company");
       }
 
+      // Normaliser les données (gérer ancien nom default_quote_tva_rate)
+      const normalizedData: any = {
+        company_id: companyId,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (settingsData.default_tva_rate !== undefined) {
+        normalizedData.default_tva_rate = settingsData.default_tva_rate;
+      } else if (settingsData.default_quote_tva_rate !== undefined) {
+        normalizedData.default_tva_rate = settingsData.default_quote_tva_rate;
+      }
+
+      if (settingsData.default_quote_mode !== undefined) {
+        normalizedData.default_quote_mode = settingsData.default_quote_mode;
+      }
+
+      if (settingsData.default_tva_293b !== undefined) {
+        normalizedData.default_tva_293b = settingsData.default_tva_293b;
+      }
+
       // Upsert (créer si n'existe pas, mettre à jour sinon)
       const { data, error } = await supabase
         .from("company_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            ...settingsData,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "company_id",
-          }
-        )
+        .upsert(normalizedData, {
+          onConflict: "company_id",
+        })
         .select()
         .single();
 

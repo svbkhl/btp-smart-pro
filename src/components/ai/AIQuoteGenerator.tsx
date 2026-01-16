@@ -604,8 +604,10 @@ interface Step3RecapProps {
   imageUrls: string[];
   quoteMode: "simple" | "detailed";
   tvaRate: number;
+  tva293b: boolean;
   onQuoteModeChange: (mode: "simple" | "detailed") => void;
   onTvaRateChange: (rate: number) => void;
+  onTva293bChange: (value: boolean) => void;
   onPrevious: () => void;
   onGenerate: () => void;
   loading: boolean;
@@ -625,8 +627,10 @@ const Step3Recap = ({
   imageUrls,
   quoteMode,
   tvaRate,
+  tva293b,
   onQuoteModeChange,
   onTvaRateChange,
+  onTva293bChange,
   onPrevious,
   onGenerate,
   loading,
@@ -673,45 +677,64 @@ const Step3Recap = ({
             </RadioGroup>
           </div>
 
-          {/* TVA Rate Selection */}
+          {/* TVA 293B Checkbox */}
           <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-            <Label className="text-base font-semibold">Taux de TVA</Label>
-            <div className="flex items-center gap-4">
-              <Select
-                value={tvaRate.toString()}
-                onValueChange={(value) => onTvaRateChange(parseFloat(value))}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">0%</SelectItem>
-                  <SelectItem value="0.055">5.5%</SelectItem>
-                  <SelectItem value="0.10">10%</SelectItem>
-                  <SelectItem value="0.20">20%</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={(tvaRate * 100).toFixed(2)}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) && value >= 0 && value <= 100) {
-                    onTvaRateChange(value / 100);
-                  }
-                }}
-                className="w-24"
-                placeholder="Taux personnalisé"
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="tva_293b"
+                checked={tva293b}
+                onCheckedChange={(checked) => onTva293bChange(checked === true)}
               />
-              <span className="text-sm text-muted-foreground">%</span>
+              <Label htmlFor="tva_293b" className="text-base font-semibold cursor-pointer">
+                TVA non applicable - Article 293 B du CGI
+              </Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              Le taux sélectionné sera utilisé pour ce devis et sauvegardé comme préférence pour les prochains devis
+              Cocher si votre entreprise est exonérée de TVA selon l'article 293 B du Code Général des Impôts
             </p>
           </div>
+
+          {/* TVA Rate Selection (désactivé si 293B) */}
+          {!tva293b && (
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <Label className="text-base font-semibold">Taux de TVA</Label>
+              <div className="flex items-center gap-4">
+                <Select
+                  value={tvaRate.toString()}
+                  onValueChange={(value) => onTvaRateChange(parseFloat(value))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0%</SelectItem>
+                    <SelectItem value="0.055">5.5%</SelectItem>
+                    <SelectItem value="0.10">10%</SelectItem>
+                    <SelectItem value="0.20">20%</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={(tvaRate * 100).toFixed(2)}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= 100) {
+                      onTvaRateChange(value / 100);
+                    }
+                  }}
+                  className="w-24"
+                  placeholder="Taux personnalisé"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Le taux sélectionné sera utilisé pour ce devis et sauvegardé comme préférence pour les prochains devis
+              </p>
+            </div>
+          )}
 
           {/* Recap Sections */}
           <div className="grid gap-4">
@@ -831,7 +854,10 @@ export const AIQuoteGenerator = () => {
     companySettings?.default_quote_mode || "simple"
   );
   const [tvaRate, setTvaRate] = useState<number>(
-    companySettings?.default_quote_tva_rate || 0.20
+    companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20
+  );
+  const [tva293b, setTva293b] = useState<boolean>(
+    companySettings?.default_tva_293b || false
   );
   // Compatibilité avec ancien format
   const quoteFormat = quoteMode === "simple" ? "simplified" : "detailed";
@@ -915,7 +941,8 @@ export const AIQuoteGenerator = () => {
   useEffect(() => {
     if (companySettings) {
       setQuoteMode(companySettings.default_quote_mode);
-      setTvaRate(companySettings.default_quote_tva_rate);
+      setTvaRate(companySettings.default_tva_rate || companySettings.default_quote_tva_rate || 0.20);
+      setTva293b(companySettings.default_tva_293b || false);
     }
   }, [companySettings]);
 
@@ -937,7 +964,23 @@ export const AIQuoteGenerator = () => {
     // Persister dans company_settings
     try {
       await updateCompanySettings.mutateAsync({
-        default_quote_tva_rate: rate,
+        default_tva_rate: rate,
+      });
+    } catch (error) {
+      console.error("Error updating company settings:", error);
+    }
+  };
+
+  const handleTva293bChange = async (value: boolean) => {
+    setTva293b(value);
+    if (value) {
+      setTvaRate(0); // Forcer TVA à 0 si 293B coché
+    }
+    // Persister dans company_settings
+    try {
+      await updateCompanySettings.mutateAsync({
+        default_tva_293b: value,
+        default_tva_rate: value ? 0 : tvaRate,
       });
     } catch (error) {
       console.error("Error updating company settings:", error);
@@ -978,7 +1021,8 @@ export const AIQuoteGenerator = () => {
         region: region.trim() || undefined,
         description: description.trim(), // Pass description to AI
         mode: quoteMode, // Pass mode to AI
-        tvaRate: tvaRate, // Pass TVA rate
+        tvaRate: tva293b ? 0 : tvaRate, // Pass TVA rate (0 si 293B)
+        tva293b: tva293b, // Pass 293B flag
       });
 
       if (!response || !response.aiResponse) {
@@ -1062,10 +1106,12 @@ export const AIQuoteGenerator = () => {
     // Réinitialiser avec préférences company
     if (companySettings) {
       setQuoteMode(companySettings.default_quote_mode);
-      setTvaRate(companySettings.default_quote_tva_rate);
+      setTvaRate(companySettings.default_tva_rate || companySettings.default_quote_tva_rate || 0.20);
+      setTva293b(companySettings.default_tva_293b || false);
     } else {
       setQuoteMode("simple");
       setTvaRate(0.20);
+      setTva293b(false);
     }
     setResult(null);
     setIsPreviewOpen(false); // Fermer l'aperçu via action utilisateur
@@ -1077,22 +1123,34 @@ export const AIQuoteGenerator = () => {
     try {
       const selectedClient = clients?.find((c) => c.id === selectedClientId);
       
-      // Récupérer les lignes si mode detailed
+      // Récupérer les sections et lignes si mode detailed
+      let quoteSections: any[] | undefined = undefined;
       let quoteLines: any[] | undefined = undefined;
       if (quoteMode === "detailed" && quoteId && user) {
         try {
           const companyId = await getCurrentCompanyId(user.id);
           if (companyId) {
-            const { data } = await supabase
-              .from("quote_lines")
+            // Récupérer sections
+            const { data: sectionsData } = await supabase
+              .from("quote_sections")
               .select("*")
               .eq("quote_id", quoteId)
               .eq("company_id", companyId)
               .order("position", { ascending: true });
-            quoteLines = data || [];
+            quoteSections = sectionsData || [];
+
+            // Récupérer lignes
+            const { data: linesData } = await supabase
+              .from("quote_lines")
+              .select("*")
+              .eq("quote_id", quoteId)
+              .eq("company_id", companyId)
+              .order("section_id", { ascending: true, nullsFirst: false })
+              .order("position", { ascending: true });
+            quoteLines = linesData || [];
           }
         } catch (error) {
-          console.warn("Error fetching quote lines for PDF:", error);
+          console.warn("Error fetching quote sections/lines for PDF:", error);
         }
       }
 
@@ -1115,11 +1173,13 @@ export const AIQuoteGenerator = () => {
         signedAt: quoteSignature?.signedAt,
         quoteFormat: quoteFormat, // Compatibilité
         mode: quoteMode, // Nouveau format
-        tvaRate: tvaRate, // Taux TVA
+        tvaRate: tva293b ? 0 : tvaRate, // Taux TVA (0 si 293B)
+        tva293b: tva293b, // TVA non applicable 293B
+        sections: quoteSections, // Sections
         lines: quoteLines, // Lignes détaillées
         subtotal_ht: result?.subtotal_ht,
-        total_tva: result?.total_tva,
-        total_ttc: result?.total_ttc,
+        total_tva: tva293b ? 0 : (result?.total_tva),
+        total_ttc: tva293b ? (result?.subtotal_ht ?? result?.estimated_cost ?? 0) : (result?.total_ttc),
       });
       toast({
         title: "PDF généré",
@@ -1274,8 +1334,10 @@ export const AIQuoteGenerator = () => {
               imageUrls={imageUrls}
               quoteMode={quoteMode}
               tvaRate={tvaRate}
+              tva293b={tva293b}
               onQuoteModeChange={handleModeChange}
               onTvaRateChange={handleTvaRateChange}
+              onTva293bChange={handleTva293bChange}
               onPrevious={handlePrevious}
               onGenerate={handleGenerate}
               loading={loading}

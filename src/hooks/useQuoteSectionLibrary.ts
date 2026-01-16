@@ -1,5 +1,5 @@
 /**
- * Hook pour gérer la bibliothèque de lignes réutilisables
+ * Hook pour gérer la bibliothèque de sections réutilisables
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,45 +7,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
-export interface QuoteLineLibraryItem {
+export interface QuoteSectionLibraryItem {
   id: string;
   company_id: string;
-  label: string;
-  label_normalized: string;
-  default_unit?: string | null;
-  default_unit_price_ht?: number | null;
-  default_category?: "labor" | "material" | "service" | "other" | null;
+  title: string;
+  title_normalized: string;
   times_used: number;
   last_used_at?: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface CreateLibraryItemData {
-  label: string;
-  default_unit?: string;
-  default_unit_price_ht?: number;
-  default_category?: "labor" | "material" | "service" | "other";
+export interface CreateSectionLibraryItemData {
+  title: string;
 }
 
 /**
- * Normalise un label pour déduplication
+ * Normalise un titre pour déduplication
  */
-function normalizeLabel(label: string): string {
-  return label
+function normalizeTitle(title: string): string {
+  return title
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ');
 }
 
 /**
- * Récupère toutes les lignes de la bibliothèque de l'entreprise
+ * Récupère toutes les sections de la bibliothèque de l'entreprise
  */
-export const useQuoteLineLibrary = () => {
+export const useQuoteSectionLibrary = () => {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["quote_line_library", user?.id],
+    queryKey: ["quote_section_library", user?.id],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
@@ -55,27 +49,27 @@ export const useQuoteLineLibrary = () => {
       }
 
       const { data, error } = await supabase
-        .from("quote_line_library")
+        .from("quote_section_library")
         .select("*")
         .eq("company_id", companyId)
         .order("times_used", { ascending: false })
         .order("last_used_at", { ascending: false, nullsLast: true });
 
       if (error) throw error;
-      return (data || []) as QuoteLineLibraryItem[];
+      return (data || []) as QuoteSectionLibraryItem[];
     },
     enabled: !!user,
   });
 };
 
 /**
- * Recherche dans la bibliothèque (autocomplete)
+ * Recherche dans la bibliothèque de sections (autocomplete)
  */
-export const useSearchQuoteLineLibrary = (searchQuery: string) => {
+export const useSearchQuoteSectionLibrary = (searchQuery: string) => {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["quote_line_library_search", user?.id, searchQuery],
+    queryKey: ["quote_section_library_search", user?.id, searchQuery],
     queryFn: async () => {
       if (!user || !searchQuery.trim()) return [];
 
@@ -84,32 +78,32 @@ export const useSearchQuoteLineLibrary = (searchQuery: string) => {
         return [];
       }
 
-      const normalizedQuery = normalizeLabel(searchQuery);
+      const normalizedQuery = normalizeTitle(searchQuery);
 
       const { data, error } = await supabase
-        .from("quote_line_library")
+        .from("quote_section_library")
         .select("*")
         .eq("company_id", companyId)
-        .ilike("label_normalized", `%${normalizedQuery}%`)
+        .ilike("title_normalized", `%${normalizedQuery}%`)
         .order("times_used", { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      return (data || []) as QuoteLineLibraryItem[];
+      return (data || []) as QuoteSectionLibraryItem[];
     },
     enabled: !!user && searchQuery.trim().length > 0,
   });
 };
 
 /**
- * Ajoute ou met à jour une ligne dans la bibliothèque (upsert)
+ * Ajoute ou met à jour une section dans la bibliothèque (upsert)
  */
-export const useUpsertQuoteLineLibrary = () => {
+export const useUpsertQuoteSectionLibrary = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (itemData: CreateLibraryItemData) => {
+    mutationFn: async (itemData: CreateSectionLibraryItemData) => {
       if (!user) throw new Error("User not authenticated");
 
       const companyId = await getCurrentCompanyId(user.id);
@@ -117,26 +111,21 @@ export const useUpsertQuoteLineLibrary = () => {
         throw new Error("User is not a member of any company");
       }
 
-      const labelNormalized = normalizeLabel(itemData.label);
-      const unit = itemData.default_unit || null;
+      const titleNormalized = normalizeTitle(itemData.title);
 
-      // Vérifier si existe déjà (avec unit dans UNIQUE)
+      // Vérifier si existe déjà
       const { data: existing } = await supabase
-        .from("quote_line_library")
+        .from("quote_section_library")
         .select("*")
         .eq("company_id", companyId)
-        .eq("label_normalized", labelNormalized)
-        .eq("default_unit", unit)
+        .eq("title_normalized", titleNormalized)
         .maybeSingle();
 
       if (existing) {
-        // Mettre à jour (incrémenter times_used, mettre à jour last_used_at et autres champs)
+        // Mettre à jour (incrémenter times_used, mettre à jour last_used_at)
         const { data, error } = await supabase
-          .from("quote_line_library")
+          .from("quote_section_library")
           .update({
-            default_unit: itemData.default_unit ?? existing.default_unit,
-            default_unit_price_ht: itemData.default_unit_price_ht ?? existing.default_unit_price_ht,
-            default_category: itemData.default_category ?? existing.default_category,
             times_used: (existing.times_used || 0) + 1,
             last_used_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -146,18 +135,15 @@ export const useUpsertQuoteLineLibrary = () => {
           .single();
 
         if (error) throw error;
-        return data as QuoteLineLibraryItem;
+        return data as QuoteSectionLibraryItem;
       } else {
         // Créer nouveau
         const { data, error } = await supabase
-          .from("quote_line_library")
+          .from("quote_section_library")
           .insert({
             company_id: companyId,
-            label: itemData.label,
-            label_normalized: labelNormalized,
-            default_unit: unit, // Obligatoire
-            default_unit_price_ht: itemData.default_unit_price_ht,
-            default_category: itemData.default_category,
+            title: itemData.title,
+            title_normalized: titleNormalized,
             times_used: 1,
             last_used_at: new Date().toISOString(),
           })
@@ -165,19 +151,19 @@ export const useUpsertQuoteLineLibrary = () => {
           .single();
 
         if (error) throw error;
-        return data as QuoteLineLibraryItem;
+        return data as QuoteSectionLibraryItem;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quote_line_library"] });
+      queryClient.invalidateQueries({ queryKey: ["quote_section_library"] });
     },
   });
 };
 
 /**
- * Supprime une ligne de la bibliothèque
+ * Supprime une section de la bibliothèque
  */
-export const useDeleteQuoteLineLibrary = () => {
+export const useDeleteQuoteSectionLibrary = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -191,7 +177,7 @@ export const useDeleteQuoteLineLibrary = () => {
       }
 
       const { error } = await supabase
-        .from("quote_line_library")
+        .from("quote_section_library")
         .delete()
         .eq("id", id)
         .eq("company_id", companyId);
@@ -200,7 +186,7 @@ export const useDeleteQuoteLineLibrary = () => {
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quote_line_library"] });
+      queryClient.invalidateQueries({ queryKey: ["quote_section_library"] });
     },
   });
 };

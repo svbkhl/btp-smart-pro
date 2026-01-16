@@ -45,6 +45,13 @@ interface QuoteLine {
   tva_rate: number;
   total_tva: number;
   total_ttc: number;
+  section_id?: string | null; // Lien vers section
+}
+
+interface QuoteSection {
+  id: string;
+  title: string;
+  position: number;
 }
 
 interface DownloadQuotePDFParams {
@@ -62,6 +69,8 @@ interface DownloadQuotePDFParams {
   quoteFormat?: string; // Ancien format (compatibilité)
   mode?: "simple" | "detailed"; // Nouveau format
   tvaRate?: number; // Taux TVA
+  tva293b?: boolean; // TVA non applicable 293B
+  sections?: QuoteSection[]; // Sections (corps de métier)
   lines?: QuoteLine[]; // Lignes détaillées (mode detailed)
   subtotal_ht?: number; // Total HT
   total_tva?: number; // Total TVA
@@ -312,40 +321,164 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
     // TABLEAU DES PRESTATIONS / LIGNES
     // ============================================
     
-    // Mode détaillé : afficher les lignes quote_lines
+    // Mode détaillé : afficher les sections + lignes quote_lines
     if (quoteMode === "detailed" && lines && lines.length > 0) {
       if (yPosition > pageHeight - 80) {
         doc.addPage();
         yPosition = margin;
       }
 
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Détail des prestations:', margin, yPosition);
-      yPosition += 7;
+      // Grouper lignes par section
+      const sectionsWithLines: Array<{ section: QuoteSection | null; lines: QuoteLine[] }> = [];
+      const linesWithoutSection: QuoteLine[] = [];
 
-      // En-tête du tableau détaillé
-      doc.setFillColor(...primaryColor);
-      doc.rect(margin, yPosition, contentWidth, 8, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Libellé', margin + 2, yPosition + 5.5);
-      doc.text('Unité', margin + 60, yPosition + 5.5);
-      doc.text('Qté', margin + 75, yPosition + 5.5);
-      doc.text('Prix unit. HT', margin + 85, yPosition + 5.5);
-      doc.text('Total HT', margin + 110, yPosition + 5.5);
-      doc.text('TVA', margin + 135, yPosition + 5.5);
-      doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
-      yPosition += 8;
+      if (sections && sections.length > 0) {
+        // Grouper par section
+        sections.sort((a, b) => a.position - b.position).forEach((section) => {
+          const sectionLines = lines
+            .filter((line) => line.section_id === section.id)
+            .sort((a, b) => {
+              // Trier par position si disponible, sinon par ordre d'apparition
+              return 0; // Les lignes sont déjà triées par position dans la requête
+            });
+          if (sectionLines.length > 0) {
+            sectionsWithLines.push({ section, lines: sectionLines });
+          }
+        });
+      }
 
-      doc.setTextColor(...textColor);
-      doc.setFont('helvetica', 'normal');
+      // Lignes sans section
+      lines.forEach((line) => {
+        if (!line.section_id) {
+          linesWithoutSection.push(line);
+        }
+      });
+
+      if (linesWithoutSection.length > 0) {
+        sectionsWithLines.push({
+          section: { id: "__no_section__", title: "Autres prestations", position: sections?.length || 0 },
+          lines: linesWithoutSection,
+        });
+      }
+
+      // Si pas de sections, créer une section virtuelle avec toutes les lignes
+      if (sectionsWithLines.length === 0 && lines.length > 0) {
+        sectionsWithLines.push({
+          section: null,
+          lines: lines,
+        });
+      }
+
       let totalHT = 0;
       let totalTVA = 0;
       let totalTTC = 0;
 
-      lines.forEach((line, index) => {
+      // Parcourir chaque section
+      sectionsWithLines.forEach(({ section, lines: sectionLines }, sectionIndex) => {
+        // Titre de section
+        if (section) {
+          if (yPosition > pageHeight - 60) {
+            doc.addPage();
+            yPosition = margin;
+          }
+
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...primaryColor);
+          doc.text(`${sectionIndex + 1}. ${section.title}`, margin, yPosition);
+          yPosition += 8;
+        }
+
+        // En-tête du tableau
+        if (yPosition > pageHeight - 50) {
+          doc.addPage();
+          yPosition = margin;
+        }
+
+        doc.setFillColor(...primaryColor);
+        doc.rect(margin, yPosition, contentWidth, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Réf', margin + 2, yPosition + 5.5);
+        doc.text('Désignation', margin + 15, yPosition + 5.5);
+        doc.text('Unité', margin + 80, yPosition + 5.5);
+        doc.text('Prix unit. HT', margin + 100, yPosition + 5.5);
+        doc.text('Qté', margin + 125, yPosition + 5.5);
+        doc.text('Prix HT', margin + 140, yPosition + 5.5);
+        if (!tva293b) {
+          doc.text('TVA', margin + 160, yPosition + 5.5);
+        }
+        doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
+        yPosition += 8;
+
+        doc.setTextColor(...textColor);
+        doc.setFont('helvetica', 'normal');
+
+        sectionLines.forEach((line, lineIndex) => {
+          // Numérotation (1.1, 1.2, etc.)
+          const lineNumber = section ? `${sectionIndex + 1}.${lineIndex + 1}` : `${lineIndex + 1}`;
+
+          if (yPosition > pageHeight - 50) {
+            doc.addPage();
+            yPosition = margin;
+            // Réafficher l'en-tête
+            doc.setFillColor(...primaryColor);
+            doc.rect(margin, yPosition, contentWidth, 8, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Réf', margin + 2, yPosition + 5.5);
+            doc.text('Désignation', margin + 15, yPosition + 5.5);
+            doc.text('Unité', margin + 80, yPosition + 5.5);
+            doc.text('Prix unit. HT', margin + 100, yPosition + 5.5);
+            doc.text('Qté', margin + 125, yPosition + 5.5);
+            doc.text('Prix HT', margin + 140, yPosition + 5.5);
+            if (!tva293b) {
+              doc.text('TVA', margin + 160, yPosition + 5.5);
+            }
+            doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
+            yPosition += 8;
+            doc.setTextColor(...textColor);
+            doc.setFont('helvetica', 'normal');
+          }
+
+          const lineHeight = 6;
+          if (lineIndex % 2 === 0) {
+            doc.setFillColor(...lightGray);
+            doc.rect(margin, yPosition - 2, contentWidth, lineHeight, 'F');
+          }
+
+          doc.setFontSize(8);
+          // Réf (numérotation)
+          doc.text(lineNumber, margin + 2, yPosition + 4);
+          // Désignation
+          const labelText = doc.splitTextToSize(line.label || '', 60)[0];
+          doc.text(labelText, margin + 15, yPosition + 4);
+          // Unité
+          doc.text(line.unit || '-', margin + 80, yPosition + 4);
+          // Prix unitaire HT
+          doc.text(line.unit_price_ht ? formatCurrency(line.unit_price_ht) : '-', margin + 100, yPosition + 4);
+          // Quantité
+          doc.text(line.quantity?.toString() || '-', margin + 125, yPosition + 4);
+          // Prix HT
+          doc.text(formatCurrency(line.total_ht), margin + 140, yPosition + 4);
+          // TVA (si pas 293B)
+          if (!tva293b) {
+            doc.text(`${(line.tva_rate * 100).toFixed(1)}%`, margin + 160, yPosition + 4);
+          }
+          // Total TTC
+          doc.text(formatCurrency(line.total_ttc), rightX, yPosition + 4, { align: 'right' });
+
+          totalHT += line.total_ht;
+          totalTVA += line.total_tva;
+          totalTTC += line.total_ttc;
+          yPosition += lineHeight;
+        });
+
+        // Espace entre sections
+        yPosition += 3;
+      });
         if (yPosition > pageHeight - 50) {
           doc.addPage();
           yPosition = margin;
@@ -421,10 +554,18 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       doc.text(formatCurrency(finalSubtotalHT), rightX, yPosition, { align: 'right' });
       yPosition += 5;
 
-      // TVA
-      doc.text(`TVA (${(tvaRate * 100).toFixed(2)}%):`, rightX - 30, yPosition, { align: 'right' });
-      doc.text(formatCurrency(finalTotalTVA), rightX, yPosition, { align: 'right' });
-      yPosition += 5;
+      // TVA (si pas 293B)
+      if (!tva293b) {
+        doc.text(`TVA (${(effectiveTvaRate * 100).toFixed(2)}%):`, rightX - 30, yPosition, { align: 'right' });
+        doc.text(formatCurrency(finalTotalTVA), rightX, yPosition, { align: 'right' });
+        yPosition += 5;
+      } else {
+        // Mention 293B
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.text('TVA non applicable - Article 293 B du CGI', rightX, yPosition, { align: 'right' });
+        yPosition += 5;
+      }
 
       // Total TTC
       doc.setFont('helvetica', 'bold');

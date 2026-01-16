@@ -98,12 +98,14 @@ serve(async (req) => {
       description,
       quoteFormat, // Ancien format (compatibilité)
       mode, // Nouveau format: "simple" | "detailed"
-      tvaRate // Taux TVA personnalisable
+      tvaRate, // Taux TVA personnalisable
+      tva293b // TVA non applicable 293B
     } = requestData;
 
     // Déterminer le mode (nouveau format prioritaire)
     const quoteMode = mode || (quoteFormat === "simplified" ? "simple" : "detailed") || "simple";
-    const finalTvaRate = tvaRate ?? 0.20;
+    const finalTva293b = tva293b ?? false;
+    const finalTvaRate = finalTva293b ? 0 : (tvaRate ?? 0.20); // Forcer à 0 si 293B
 
     console.log("📥 Extracted data:", {
       clientName: !!clientName,
@@ -383,11 +385,12 @@ IMPORTANT:
         details: aiResponse,
         status: 'draft',
         mode: quoteMode, // Mode devis
-        tva_rate: finalTvaRate, // Taux TVA
+        tva_rate: finalTvaRate, // Taux TVA (0 si 293B)
+        tva_non_applicable_293b: finalTva293b, // TVA non applicable 293B
         // Totaux initiaux (seront recalculés par trigger si lignes existent)
         subtotal_ht: aiResponse.estimatedCost || 0,
-        total_tva: (aiResponse.estimatedCost || 0) * finalTvaRate,
-        total_ttc: (aiResponse.estimatedCost || 0) * (1 + finalTvaRate),
+        total_tva: finalTva293b ? 0 : ((aiResponse.estimatedCost || 0) * finalTvaRate),
+        total_ttc: finalTva293b ? (aiResponse.estimatedCost || 0) : ((aiResponse.estimatedCost || 0) * (1 + finalTvaRate)),
         currency: 'EUR',
       };
 

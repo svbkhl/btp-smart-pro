@@ -24,6 +24,7 @@ export interface Quote {
   // Nouveaux champs refonte pro
   mode?: "simple" | "detailed"; // Mode devis
   tva_rate?: number; // Taux TVA personnalisable
+  tva_non_applicable_293b?: boolean; // TVA non applicable article 293B
   subtotal_ht?: number; // Total HT calculé
   total_tva?: number; // Total TVA calculé
   total_ttc?: number; // Total TTC calculé
@@ -61,6 +62,7 @@ export interface CreateQuoteData {
   // Nouveaux champs refonte pro
   mode?: "simple" | "detailed"; // Mode devis
   tva_rate?: number; // Taux TVA (défaut: 0.20)
+  tva_non_applicable_293b?: boolean; // TVA non applicable article 293B
   currency?: string; // Devise (défaut: EUR)
   // Ancien format (compatibilité)
   details?: {

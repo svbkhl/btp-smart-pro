@@ -25,7 +25,7 @@ import { useUpdateQuote, Quote } from "@/hooks/useQuotes";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { QuoteLinesEditor } from "./QuoteLinesEditor";
+import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 
 const quoteSchema = z.object({
   client_name: z.string().min(1, "Le nom du client est requis"),
@@ -33,6 +33,7 @@ const quoteSchema = z.object({
   status: z.enum(["draft", "sent", "accepted", "rejected", "expired"]),
   mode: z.enum(["simple", "detailed"]).optional(),
   tva_rate: z.number().min(0).max(1).optional(),
+  tva_non_applicable_293b: z.boolean().optional(),
 });
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
@@ -65,6 +66,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
       status: "draft",
       mode: "simple",
       tva_rate: 0.20,
+      tva_non_applicable_293b: false,
     },
   });
 
@@ -75,7 +77,8 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
         estimated_cost: quote.estimated_cost.toString(),
         status: quote.status,
         mode: quote.mode || "simple",
-        tva_rate: quote.tva_rate ?? companySettings?.default_quote_tva_rate ?? 0.20,
+        tva_rate: quote.tva_rate ?? companySettings?.default_tva_rate ?? companySettings?.default_quote_tva_rate ?? 0.20,
+        tva_non_applicable_293b: quote.tva_non_applicable_293b ?? companySettings?.default_tva_293b ?? false,
       });
     }
   }, [quote, reset, companySettings]);
@@ -89,21 +92,26 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
     console.log("Quote form submitted:", data);
     setIsSubmitting(true);
     try {
+      // Si 293B est coché, forcer TVA à 0
+      const finalTvaRate = data.tva_non_applicable_293b ? 0 : (data.tva_rate ?? 0.20);
+
       await updateQuote.mutateAsync({
         id: quote.id,
         client_name: data.client_name,
         estimated_cost: parseFloat(data.estimated_cost),
         status: data.status,
         mode: data.mode,
-        tva_rate: data.tva_rate,
+        tva_rate: finalTvaRate,
+        tva_non_applicable_293b: data.tva_non_applicable_293b ?? false,
       });
 
-      // Persister les préférences company si mode ou TVA changent
-      if (data.mode || data.tva_rate !== undefined) {
+      // Persister les préférences company
+      if (data.mode || data.tva_rate !== undefined || data.tva_non_applicable_293b !== undefined) {
         try {
           await updateCompanySettings.mutateAsync({
             default_quote_mode: data.mode,
-            default_quote_tva_rate: data.tva_rate,
+            default_tva_rate: finalTvaRate,
+            default_tva_293b: data.tva_non_applicable_293b ?? false,
           });
         } catch (error) {
           console.error("Error updating company settings:", error);
@@ -131,9 +139,9 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">Informations générales</TabsTrigger>
-            {quote?.mode === "detailed" && (
-              <TabsTrigger value="lines">Lignes détaillées</TabsTrigger>
-            )}
+          {quote?.mode === "detailed" && (
+            <TabsTrigger value="sections">Sections et lignes</TabsTrigger>
+          )}
           </TabsList>
 
           <TabsContent value="general">
@@ -204,40 +212,62 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tva_rate">Taux de TVA (%)</Label>
+            <Label htmlFor="tva_293b">TVA non applicable - Article 293 B du CGI</Label>
             <div className="flex items-center gap-2">
-              <Select
-                value={(watch("tva_rate") ?? 0.20).toString()}
-                onValueChange={(value) => setValue("tva_rate", parseFloat(value))}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">0%</SelectItem>
-                  <SelectItem value="0.055">5.5%</SelectItem>
-                  <SelectItem value="0.10">10%</SelectItem>
-                  <SelectItem value="0.20">20%</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={((watch("tva_rate") ?? 0.20) * 100).toFixed(2)}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) && value >= 0 && value <= 100) {
-                    setValue("tva_rate", value / 100);
+              <Checkbox
+                id="tva_293b"
+                checked={watch("tva_non_applicable_293b") ?? false}
+                onCheckedChange={(checked) => {
+                  const is293b = checked === true;
+                  setValue("tva_non_applicable_293b", is293b);
+                  if (is293b) {
+                    setValue("tva_rate", 0);
                   }
                 }}
-                className="w-24"
-                placeholder="Taux personnalisé"
               />
-              <span className="text-sm text-muted-foreground">%</span>
+              <Label htmlFor="tva_293b" className="text-sm cursor-pointer">
+                Cocher si TVA non applicable
+              </Label>
             </div>
           </div>
+
+          {!watch("tva_non_applicable_293b") && (
+            <div className="space-y-2">
+              <Label htmlFor="tva_rate">Taux de TVA (%)</Label>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={(watch("tva_rate") ?? 0.20).toString()}
+                  onValueChange={(value) => setValue("tva_rate", parseFloat(value))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0%</SelectItem>
+                    <SelectItem value="0.055">5.5%</SelectItem>
+                    <SelectItem value="0.10">10%</SelectItem>
+                    <SelectItem value="0.20">20%</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={((watch("tva_rate") ?? 0.20) * 100).toFixed(2)}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= 100) {
+                      setValue("tva_rate", value / 100);
+                    }
+                  }}
+                  className="w-24"
+                  placeholder="Taux personnalisé"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+          )}
 
           <DialogFooter>
             <Button
@@ -262,10 +292,17 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
           </TabsContent>
 
           {quote?.mode === "detailed" && (
-            <TabsContent value="lines">
-              <QuoteLinesEditor
+            <TabsContent value="sections">
+              <QuoteSectionsEditor
                 quoteId={quote.id}
                 tvaRate={watch("tva_rate") ?? quote.tva_rate ?? 0.20}
+                tva293b={watch("tva_non_applicable_293b") ?? quote.tva_non_applicable_293b ?? false}
+                onTva293bChange={(value) => {
+                  setValue("tva_non_applicable_293b", value);
+                  if (value) {
+                    setValue("tva_rate", 0);
+                  }
+                }}
               />
             </TabsContent>
           )}
