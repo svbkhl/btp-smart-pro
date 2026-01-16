@@ -48,7 +48,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import QuoteDetailView from "@/components/quotes/QuoteDetailView";
-import { useQuotes } from "@/hooks/useQuotes";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
