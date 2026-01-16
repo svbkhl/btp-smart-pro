@@ -5,8 +5,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Sparkles, Receipt } from "lucide-react";
 import { AIQuoteGenerator } from "./AIQuoteGenerator";
+import { SimpleQuoteForm } from "./SimpleQuoteForm";
 import QuotesListView from "@/components/quotes/QuotesListView";
 import { useAIQuotes } from "@/hooks/useAIQuotes";
 import {
@@ -17,9 +18,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+type QuoteKind = "simple" | "detailed" | null;
 
 export default function AIQuotesTab() {
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [quoteKind, setQuoteKind] = useState<QuoteKind>(null); // État pour le choix initial
   const [isPreviewOpen, setIsPreviewOpen] = useState(false); // État pour savoir si l'aperçu est ouvert
   const { data: quotes = [], isLoading } = useAIQuotes();
 
@@ -50,6 +55,10 @@ export default function AIQuotesTab() {
             // Ne fermer le dialog QUE si l'utilisateur le ferme explicitement
             // ET que l'aperçu n'est pas ouvert
             setShowCreateForm(open);
+            // Réinitialiser le choix si on ferme le dialog
+            if (!open) {
+              setQuoteKind(null);
+            }
           }}
         >
           <DialogTrigger asChild>
@@ -62,11 +71,110 @@ export default function AIQuotesTab() {
             <DialogHeader>
               <DialogTitle>Générer un devis avec l'IA</DialogTitle>
               <DialogDescription>
-                Remplissez les informations et l'IA générera un devis professionnel
+                {quoteKind === null
+                  ? "Choisissez le type de devis à générer"
+                  : quoteKind === "simple"
+                  ? "Génération d'un devis simple"
+                  : "Génération d'un devis détaillé avec sections et lignes"}
               </DialogDescription>
             </DialogHeader>
-            {/* Utiliser AIQuoteGenerator qui a le mode détaillé */}
-            <AIQuoteGenerator />
+
+            {/* Écran de choix initial (Step 0) */}
+            {quoteKind === null ? (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Option : Devis simple */}
+                  <Card
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => setQuoteKind("simple")}
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Receipt className="h-5 w-5 text-primary" />
+                        Devis simple
+                      </CardTitle>
+                      <CardDescription>
+                        Format court avec prix global
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Idéal pour des prestations simples avec un prix global.
+                        Exemple : "Rénovation salle de bains – 4 500 € HT"
+                      </p>
+                      <Button className="w-full mt-4" variant="outline">
+                        Choisir
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Option : Devis détaillé */}
+                  <Card
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => setQuoteKind("detailed")}
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        Devis détaillé
+                      </CardTitle>
+                      <CardDescription>
+                        Sections et lignes avec quantités et prix unitaires
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Parfait pour des devis professionnels avec plusieurs prestations,
+                        sections par corps de métier, quantités, unités et calculs détaillés.
+                      </p>
+                      <Button className="w-full mt-4" variant="outline">
+                        Choisir
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Bouton retour */}
+                <div className="flex justify-end pt-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setQuoteKind(null);
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            ) : quoteKind === "simple" ? (
+              // Flow simple : SimpleQuoteForm (inchangé)
+              <SimpleQuoteForm
+                key="simple-quote-form"
+                onSuccess={() => {
+                  // Ne pas fermer automatiquement
+                }}
+                onPreviewStateChange={(isOpen) => {
+                  setIsPreviewOpen(isOpen);
+                }}
+              />
+            ) : (
+              // Flow détaillé : AIQuoteGenerator
+              <div className="space-y-4">
+                {/* Bouton retour au choix */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setQuoteKind(null);
+                  }}
+                  className="mb-2"
+                >
+                  ← Changer de type de devis
+                </Button>
+                <AIQuoteGenerator />
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
