@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText } from "lucide-react";
-import { SimpleQuoteForm } from "./SimpleQuoteForm";
+import { AIQuoteGenerator } from "./AIQuoteGenerator";
 import QuotesListView from "@/components/quotes/QuotesListView";
 import { useAIQuotes } from "@/hooks/useAIQuotes";
 import {
@@ -65,19 +65,8 @@ export default function AIQuotesTab() {
                 Remplissez les informations et l'IA générera un devis professionnel
               </DialogDescription>
             </DialogHeader>
-            {/* Clé stable pour éviter le remount qui réinitialiserait l'état */}
-            <SimpleQuoteForm 
-              key="simple-quote-form-stable"
-              onSuccess={() => {
-                // Ne pas fermer automatiquement le dialog
-                // L'utilisateur fermera manuellement après avoir vu l'aperçu
-              }}
-              onPreviewStateChange={(isOpen) => {
-                // Mettre à jour l'état local pour protéger contre la fermeture du dialog
-                setIsPreviewOpen(isOpen);
-                console.log('[AIQuotesTab] Preview state changed:', isOpen);
-              }}
-            />
+            {/* Utiliser AIQuoteGenerator qui a le mode détaillé */}
+            <AIQuoteGenerator />
           </DialogContent>
         </Dialog>
       </div>
