@@ -815,6 +815,53 @@ const Step3Recap = ({
 };
 
 // ============================================
+// QUOTE DETAIL VIEW WRAPPER
+// ============================================
+
+// Wrapper pour QuoteDetailView qui charge le quote depuis la DB
+const QuoteDetailViewWrapper = ({ quoteId }: { quoteId: string }) => {
+  const { data: quote, isLoading, error } = useQuote(quoteId);
+
+  console.log("🔍 QuoteDetailViewWrapper:", { quoteId, isLoading, hasQuote: !!quote, error });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Chargement du devis...</span>
+      </div>
+    );
+  }
+
+  if (error || !quote) {
+    return (
+      <div className="p-4 border rounded-lg">
+        <p className="text-muted-foreground text-center mb-2">
+          {error?.message || "Devis introuvable"}
+        </p>
+        <p className="text-xs text-muted-foreground text-center">
+          Quote ID: {quoteId}
+        </p>
+      </div>
+    );
+  }
+
+  console.log("✅ Quote chargé:", { id: quote.id, mode: quote.mode, quote_number: quote.quote_number });
+
+  return (
+    <QuoteDetailView
+      quote={quote}
+      onEdit={() => {
+        console.log("Edit quote", quoteId);
+      }}
+      onDownloadPDF={() => {
+        console.log("Download PDF", quoteId);
+      }}
+    />
+  );
+};
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
