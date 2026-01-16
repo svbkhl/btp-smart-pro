@@ -6,10 +6,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Sparkles, Receipt } from "lucide-react";
-import { AIQuoteGenerator } from "./AIQuoteGenerator";
 import { SimpleQuoteForm } from "./SimpleQuoteForm";
+import { DetailedQuoteEditor } from "@/components/quotes/DetailedQuoteEditor";
 import QuotesListView from "@/components/quotes/QuotesListView";
 import { useAIQuotes } from "@/hooks/useAIQuotes";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 type QuoteKind = "simple" | "detailed" | null;
 
 export default function AIQuotesTab() {
+  const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [quoteKind, setQuoteKind] = useState<QuoteKind>(null); // État pour le choix initial
   const [isPreviewOpen, setIsPreviewOpen] = useState(false); // État pour savoir si l'aperçu est ouvert
@@ -159,7 +161,7 @@ export default function AIQuotesTab() {
                 }}
               />
             ) : (
-              // Flow détaillé : AIQuoteGenerator
+              // Flow détaillé : DetailedQuoteEditor (éditeur direct, sans wizard)
               <div className="space-y-4">
                 {/* Bouton retour au choix */}
                 <Button
@@ -172,7 +174,19 @@ export default function AIQuotesTab() {
                 >
                   ← Changer de type de devis
                 </Button>
-                <AIQuoteGenerator />
+                <DetailedQuoteEditor
+                  onSuccess={(quoteId) => {
+                    console.log("✅ Devis détaillé créé:", quoteId);
+                    toast({
+                      title: "Devis créé",
+                      description: "Le devis détaillé a été créé avec succès",
+                    });
+                    // Ne pas fermer automatiquement, l'utilisateur peut continuer à éditer
+                  }}
+                  onCancel={() => {
+                    setQuoteKind(null);
+                  }}
+                />
               </div>
             )}
           </DialogContent>
