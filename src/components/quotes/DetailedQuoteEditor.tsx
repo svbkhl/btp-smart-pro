@@ -187,21 +187,29 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel }: DetailedQuoteEditor
         throw new Error("User is not a member of any company");
       }
 
-      // Mettre à jour les totaux du devis
-      const { error } = await supabase
-        .from("ai_quotes")
-        .update({
-          subtotal_ht: quoteTotals.subtotal_ht,
-          total_tva: quoteTotals.total_tva,
-          total_ttc: quoteTotals.total_ttc,
-          tva_rate: tva293b ? 0 : tvaRate,
-          tva_non_applicable_293b: tva293b,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", quoteId)
-        .eq("company_id", companyId);
+      // Utiliser la fonction SQL pour recalculer les totaux (plus fiable)
+      const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
+        p_quote_id: quoteId,
+      });
 
-      if (error) throw error;
+      if (rpcError) {
+        console.warn("⚠️ Erreur RPC recompute, fallback sur update manuel:", rpcError);
+        // Fallback : mise à jour manuelle
+        const { error } = await supabase
+          .from("ai_quotes")
+          .update({
+            subtotal_ht: quoteTotals.subtotal_ht,
+            total_tva: quoteTotals.total_tva,
+            total_ttc: quoteTotals.total_ttc,
+            tva_rate: tva293b ? 0 : tvaRate,
+            tva_non_applicable_293b: tva293b,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", quoteId)
+          .eq("company_id", companyId);
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Devis sauvegardé",
