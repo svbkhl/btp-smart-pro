@@ -2,13 +2,13 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
-interface GlassCardProps {
+interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   className?: string;
   delay?: number;
 }
 
-export const GlassCard = ({ children, className, delay = 0 }: GlassCardProps) => {
+export const GlassCard = ({ children, className, delay = 0, ...props }: GlassCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -19,6 +19,7 @@ export const GlassCard = ({ children, className, delay = 0 }: GlassCardProps) =>
         "hover:shadow-xl transition-shadow duration-200",
         className
       )}
+      {...props}
     >
       {children}
     </motion.div>

@@ -17,6 +17,8 @@ import { Send, Loader2, Mail, FileText, FileSignature, CreditCard } from "lucide
 import { sendQuoteEmail, sendInvoiceEmail } from "@/services/emailAdapters"; // Nouveaux adapters centralisés
 import { supabase } from "@/integrations/supabase/client";
 import { useClients } from "@/hooks/useClients";
+import { useUserSettings } from "@/hooks/useUserSettings"; // ✅ Hook pour récupérer les paramètres entreprise
+import { generateInvoicePDFAsBase64 } from "@/services/invoicePdfService";
 
 interface SendToClientModalProps {
   open: boolean;
@@ -35,11 +37,12 @@ export const SendToClientModal = ({
 }: SendToClientModalProps) => {
   const { toast } = useToast();
   const { data: clients } = useClients();
+  const { data: companyInfo } = useUserSettings();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [includePDF, setIncludePDF] = useState(true);
-  const [includeSignatureLink, setIncludeSignatureLink] = useState(true);
+  const [includeSignatureLink, setIncludeSignatureLink] = useState(documentType === "quote"); // Seulement pour les devis
 
   // Pré-remplir l'email depuis les données du document ou du client associé
   useEffect(() => {
@@ -110,7 +113,7 @@ export const SendToClientModal = ({
   // Générer le message par défaut
   const defaultMessage = documentType === "quote"
     ? `Bonjour ${document?.client_name || "Client"},\n\nNous vous adressons le devis ${document?.quote_number || ""} en pièce jointe.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement`
-    : `Bonjour ${document?.client_name || "Client"},\n\nNous vous adressons la facture ${document?.invoice_number || ""} en pièce jointe.\n\nMerci de procéder au règlement dans les délais convenus.\n\nCordialement`;
+    : `Bonjour ${document?.client_name || "Client"},\n\nNous vous adressons la facture ${document?.invoice_number || ""} en pièce jointe.\n\nCette facture fait suite au devis signé et constitue votre justificatif pour vos paiements.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement`;
 
   const [message, setMessage] = useState(defaultMessage);
 
@@ -132,8 +135,8 @@ export const SendToClientModal = ({
 
       let signatureUrl: string | undefined;
 
-      // Créer automatiquement une session de signature si demandé
-      if (includeSignatureLink) {
+      // Créer automatiquement une session de signature si demandé (seulement pour les devis)
+      if (documentType === "quote" && includeSignatureLink) {
         // Vérifier si le lien existant est valide (pas localhost)
         const existingUrl = document?.signature_url;
         const isValidUrl = existingUrl && 
@@ -204,6 +207,27 @@ export const SendToClientModal = ({
           throw new Error(result.error || "Erreur lors de l'envoi du devis");
         }
       } else {
+        // Générer le PDF si demandé
+        let pdfBase64: string | undefined;
+        if (includePDF && companyInfo) {
+          try {
+            console.log("📄 [SendToClientModal] Génération du PDF pour facture:", document.id);
+            pdfBase64 = await generateInvoicePDFAsBase64({
+              invoice: document,
+              companyInfo: companyInfo,
+            });
+            console.log("✅ [SendToClientModal] PDF généré, taille:", pdfBase64?.length || 0);
+          } catch (error: any) {
+            console.error("❌ [SendToClientModal] Erreur génération PDF:", error);
+            toast({
+              title: "Avertissement",
+              description: "Le PDF n'a pas pu être généré, mais l'email sera envoyé sans pièce jointe.",
+              variant: "destructive",
+            });
+            // Continuer l'envoi sans PDF
+          }
+        }
+
         const result = await sendInvoiceEmail({
           to: email,
           invoiceId: document.id,
@@ -211,9 +235,10 @@ export const SendToClientModal = ({
           clientName: document.client_name || "Client",
           clientId: document.client_id,
           includePDF,
-          includeSignatureLink: includeSignatureLink && !!signatureUrl,
-          signatureUrl,
+          includeSignatureLink: false, // Pas de signature pour les factures
+          signatureUrl: undefined,
           customMessage: message !== defaultMessage ? message : undefined,
+          pdfBase64: pdfBase64, // Passer le PDF en base64
         });
 
         if (!result.success) {
@@ -323,22 +348,25 @@ export const SendToClientModal = ({
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
-              <Checkbox
-                id="includeSignatureLink"
-                checked={includeSignatureLink}
-                onCheckedChange={(checked) => setIncludeSignatureLink(checked === true)}
-              />
-              <div className="flex-1">
-                <Label htmlFor="includeSignatureLink" className="flex items-center gap-2 cursor-pointer">
-                  <FileSignature className="w-4 h-4" />
-                  Inclure le lien de signature électronique
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Le client pourra signer directement depuis l'email. Un lien de signature unique sera automatiquement créé si nécessaire.
-                </p>
+            {/* Option de signature électronique - Seulement pour les devis */}
+            {documentType === "quote" && (
+              <div className="flex items-center space-x-2 p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                <Checkbox
+                  id="includeSignatureLink"
+                  checked={includeSignatureLink}
+                  onCheckedChange={(checked) => setIncludeSignatureLink(checked === true)}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="includeSignatureLink" className="flex items-center gap-2 cursor-pointer">
+                    <FileSignature className="w-4 h-4" />
+                    Inclure le lien de signature électronique
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Le client pourra signer directement depuis l'email. Un lien de signature unique sera automatiquement créé si nécessaire.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

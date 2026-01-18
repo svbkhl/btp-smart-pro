@@ -50,7 +50,7 @@ export const PaymentButton = ({
           body: {
             invoice_id: invoice.id,
             payment_type: paymentType,
-            amount: paymentType === "invoice" ? invoice.amount_ttc : undefined,
+            amount: paymentType === "invoice" ? (invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0) : undefined,
             deposit_percentage: depositPercentage,
             deposit_fixed_amount: depositFixedAmount,
           },
@@ -92,7 +92,7 @@ export const PaymentButton = ({
   const buttonText =
     paymentType === "deposit"
       ? `Payer l'acompte (${depositPercentage ? `${depositPercentage}%` : depositFixedAmount ? `${depositFixedAmount}€` : "30%"})`
-      : `Payer ${invoice.amount_ttc?.toLocaleString("fr-FR", {
+      : `Payer ${(invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0)?.toLocaleString("fr-FR", {
           style: "currency",
           currency: "EUR",
         })}`;

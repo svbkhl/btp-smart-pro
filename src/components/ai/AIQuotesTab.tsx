@@ -1,15 +1,13 @@
 /**
  * Onglet Devis dans la page IA
- * Affiche le formulaire de création + la liste des devis générés
+ * Affiche les boutons pour créer un nouveau devis
  */
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Sparkles } from "lucide-react";
 import { SimpleQuoteForm } from "./SimpleQuoteForm";
 import { DetailedQuoteEditor } from "@/components/quotes/DetailedQuoteEditor";
-import QuotesListView from "@/components/quotes/QuotesListView";
-import { useAIQuotes } from "@/hooks/useAIQuotes";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -17,58 +15,97 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { QuoteTypeSelectorModal } from "@/components/quotes/QuoteTypeSelectorModal";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 type QuoteKind = "simple" | "detailed" | null;
 
 export default function AIQuotesTab() {
   const { toast } = useToast();
-  const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [quoteKind, setQuoteKind] = useState<QuoteKind>(null); // État pour le choix initial
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false); // État pour savoir si l'aperçu est ouvert
-  const { data: quotes = [], isLoading } = useAIQuotes();
-
-  // Gérer la sélection du type de devis
-  const handleQuoteTypeSelect = (type: "simple" | "detailed") => {
-    setQuoteKind(type);
-    setShowTypeSelector(false);
-    setShowCreateForm(true);
-  };
+  const [quoteKind, setQuoteKind] = useState<QuoteKind>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   return (
     <div className="space-y-6">
-      {/* Header avec bouton créer */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-semibold flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Mes devis IA
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            {quotes.length} devis généré{quotes.length > 1 ? 's' : ''}
-          </p>
-        </div>
+      {/* Header */}
+      <div>
+        <h3 className="text-xl font-semibold flex items-center gap-2 mb-2">
+          <FileText className="h-5 w-5 text-primary" />
+          Créer un devis
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Générez rapidement des devis professionnels pour vos clients
+        </p>
+      </div>
 
-        {/* Modal de sélection du type de devis */}
-        <QuoteTypeSelectorModal
-          open={showTypeSelector}
-          onOpenChange={setShowTypeSelector}
-          onSelect={handleQuoteTypeSelect}
-        />
-
-        <Button 
-          className="gap-2"
+      {/* Boutons de création */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Bouton Devis Simple */}
+        <GlassCard className="p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group" 
           onClick={() => {
-            // Ouvrir le modal de sélection au lieu du dialog directement
-            setShowTypeSelector(true);
+            setQuoteKind("simple");
+            setShowCreateForm(true);
           }}
         >
-          <Plus className="h-4 w-4" />
-          Nouveau devis
-        </Button>
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <FileText className="h-12 w-12 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-xl font-semibold">Devis simple</h4>
+              <p className="text-sm text-muted-foreground">
+                Créez rapidement un devis avec un montant global. Idéal pour les prestations simples et rapides.
+              </p>
+            </div>
+            <Button 
+              size="lg" 
+              className="w-full mt-4 group-hover:scale-105 transition-transform"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQuoteKind("simple");
+                setShowCreateForm(true);
+              }}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Créer un devis simple
+            </Button>
+          </div>
+        </GlassCard>
+
+        {/* Bouton Devis Détaillé */}
+        <GlassCard className="p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+          onClick={() => {
+            setQuoteKind("detailed");
+            setShowCreateForm(true);
+          }}
+        >
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <Sparkles className="h-12 w-12 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-xl font-semibold">Devis détaillé</h4>
+              <p className="text-sm text-muted-foreground">
+                Créez un devis complet avec sections et lignes détaillées. Parfait pour les projets complexes.
+              </p>
+            </div>
+            <Button 
+              size="lg" 
+              className="w-full mt-4 group-hover:scale-105 transition-transform"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQuoteKind("detailed");
+                setShowCreateForm(true);
+              }}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Créer un devis détaillé
+            </Button>
+          </div>
+        </GlassCard>
+      </div>
+
 
         <Dialog 
           open={showCreateForm} 
@@ -138,10 +175,6 @@ export default function AIQuotesTab() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Liste des devis */}
-      <QuotesListView quotes={quotes} loading={isLoading} />
     </div>
   );
 }

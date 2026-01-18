@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { useCreateProject, useUpdateProject, CreateProjectData } from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
-import { ImageUpload } from "@/components/ImageUpload";
 import { Loader2, Plus } from "lucide-react";
 import type { Project } from "@/fakeData/projects";
 
@@ -35,7 +34,6 @@ const projectSchema = z.object({
   budget: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
   costs: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
   actual_revenue: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
-  location: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
   description: z.string().optional(),
@@ -72,14 +70,11 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
       budget: "",
       costs: "",
       actual_revenue: "",
-      location: "",
       start_date: "",
       end_date: "",
       description: "",
     },
   });
-
-  const [imageUrl, setImageUrl] = useState<string>("");
 
   useEffect(() => {
     if (project) {
@@ -90,12 +85,10 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
         budget: project.budget?.toString() || "",
         costs: project.costs?.toString() || "",
         actual_revenue: project.actual_revenue?.toString() || "",
-        location: project.location || "",
         start_date: project.start_date || "",
         end_date: project.end_date || "",
         description: project.description || "",
       });
-      setImageUrl(project.image_url || "");
     } else {
       reset({
         name: "",
@@ -104,12 +97,10 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
         budget: "",
         costs: "",
         actual_revenue: "",
-        location: "",
         start_date: "",
         end_date: "",
         description: "",
       });
-      setImageUrl("");
     }
   }, [project, open, reset]);
 
@@ -117,18 +108,22 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
     console.log("Project form submitted:", data);
     setIsSubmitting(true);
     try {
+      // Valider et normaliser le statut
+      const validStatuses = ["planifié", "en_attente", "en_cours", "terminé", "annulé"] as const;
+      const status = (data.status && validStatuses.includes(data.status as any)) 
+        ? data.status 
+        : "planifié";
+
       const projectData: CreateProjectData = {
         name: data.name.trim(),
         client_id: (data.client_id && data.client_id !== "none") ? data.client_id : undefined,
-        status: data.status || "planifié",
+        status: status,
         budget: data.budget ? parseFloat(data.budget.toString()) : undefined,
         costs: data.costs ? parseFloat(data.costs.toString()) : undefined,
         actual_revenue: data.actual_revenue ? parseFloat(data.actual_revenue.toString()) : undefined,
-        location: data.location?.trim() || undefined,
         start_date: data.start_date || undefined,
         end_date: data.end_date || undefined,
         description: data.description?.trim() || undefined,
-        image_url: imageUrl?.trim() || undefined,
       };
 
       if (project) {
@@ -138,7 +133,6 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
       }
       onOpenChange(false);
       reset();
-      setImageUrl("");
     } catch (error: any) {
       console.error("Error saving project:", error);
       const errorMessage = error?.message || error?.error?.message || "Impossible de sauvegarder le chantier";
@@ -265,15 +259,6 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="location">Lieu</Label>
-            <Input
-              id="location"
-              {...register("location")}
-              placeholder="Adresse du chantier"
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_date">Date de début</Label>
@@ -301,15 +286,6 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
               {...register("description")}
               placeholder="Description du chantier..."
               rows={4}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Image du chantier</Label>
-            <ImageUpload
-              value={imageUrl}
-              onChange={setImageUrl}
-              folder="projects"
             />
           </div>
 

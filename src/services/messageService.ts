@@ -157,11 +157,20 @@ export async function sendMessage(params: SendMessageParams): Promise<{
 
     // Ajouter les pièces jointes si fournies
     if (params.attachments && params.attachments.length > 0) {
-      emailPayload.attachments = params.attachments.map(att => ({
-        filename: att.name,
-        content: att.url, // ou base64 si nécessaire
-        type: att.type,
-      }));
+      emailPayload.attachments = params.attachments.map(att => {
+        // Si url est déjà en base64 (sans data: prefix), l'utiliser directement
+        // Sinon, extraire le base64 depuis data URL si présent
+        let content = att.url;
+        if (att.url.startsWith('data:')) {
+          // Extraire la partie base64 après la virgule
+          content = att.url.split(',')[1];
+        }
+        return {
+          filename: att.name,
+          content: content, // Base64 pour Resend
+          type: att.type,
+        };
+      });
     }
 
     console.log("📤 [MessageService] Appel Edge Function send-email");

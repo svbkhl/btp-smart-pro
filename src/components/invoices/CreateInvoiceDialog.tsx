@@ -101,7 +101,16 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         setValue("quote_id", quoteId);
         setValue("client_name", quote.client_name);
         setValue("description", `Facture pour ${quote.client_name}`);
-        setValue("amount_ttc", quote.estimated_cost.toString());
+        
+        // Utiliser total_ttc en priorité, sinon estimated_cost
+        // Si les deux sont 0 ou undefined, ne pas mettre 0 mais laisser l'utilisateur entrer le montant
+        const quoteAmount = quote.total_ttc || quote.estimated_cost;
+        if (quoteAmount && quoteAmount > 0) {
+          console.log("💰 [CreateInvoiceDialog] Montant du devis chargé:", quoteAmount, "depuis:", { total_ttc: quote.total_ttc, estimated_cost: quote.estimated_cost });
+          setValue("amount_ttc", quoteAmount.toString());
+        } else {
+          console.warn("⚠️ [CreateInvoiceDialog] Le devis n'a pas de montant valide:", { total_ttc: quote.total_ttc, estimated_cost: quote.estimated_cost });
+        }
       }
     }
   }, [quoteId, quotes, setValue]);
@@ -147,6 +156,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
       const prices = calculateFromTTC(ttcAmount, 20);
 
       // Préparer les données de la facture
+      // ✅ CORRECTION: Passer amount_ttc pour que useCreateInvoice puisse l'utiliser comme source de vérité
       const invoiceData: CreateInvoiceData = {
         client_id: finalClientId || undefined,
         client_name: data.client_name,
@@ -155,9 +165,12 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         quote_id: data.quote_id || undefined,
         description: data.description,
         amount_ht: prices.total_ht,  // HT calculé à partir du TTC
+        amount_ttc: parseFloat(data.amount_ttc),  // ✅ TTC saisi directement (source de vérité)
         vat_rate: 20,  // TVA fixe à 20%
         due_date: data.due_date || undefined,
       };
+      
+      console.log("💰 [CreateInvoiceDialog] Données facture:", invoiceData);
 
       await createInvoice.mutateAsync(invoiceData);
       
@@ -228,7 +241,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                     }
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
                     <SelectValue placeholder="Sélectionner un client" />
                   </SelectTrigger>
                   <SelectContent>
@@ -261,6 +274,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                     id="client_name"
                     {...register("client_name")}
                     placeholder="M. Martin"
+                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
                   />
                   {errors.client_name && (
                     <p className="text-sm text-red-500">{errors.client_name.message}</p>
@@ -273,6 +287,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                     type="email"
                     {...register("client_email")}
                     placeholder="client@example.com"
+                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
                   />
                 </div>
               </div>
@@ -285,6 +300,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                   id="client_address"
                   {...register("client_address")}
                   placeholder="123 Rue Example, 75001 Paris"
+                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
                 />
               </div>
             )}
@@ -298,7 +314,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                 value={selectedQuoteId || ""}
                 onValueChange={(value) => setValue("quote_id", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
                   <SelectValue placeholder="Sélectionner un devis" />
                 </SelectTrigger>
                 <SelectContent>
@@ -322,6 +338,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
               {...register("description")}
               placeholder="Décrivez les travaux effectués..."
               rows={3}
+              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
             />
             {errors.description && (
               <p className="text-sm text-red-500">{errors.description.message}</p>
@@ -339,7 +356,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
               step="0.01"
               {...register("amount_ttc")}
               placeholder="0.00"
-              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             {errors.amount_ttc && (
               <p className="text-sm text-red-500">{errors.amount_ttc.message}</p>
@@ -353,6 +370,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
               id="due_date"
               type="date"
               {...register("due_date")}
+              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
             />
           </div>
 

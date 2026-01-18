@@ -16,11 +16,9 @@ export interface CreateProjectData {
   budget?: number;
   costs?: number;
   actual_revenue?: number;
-  location?: string;
   start_date?: string;
   end_date?: string;
   description?: string;
-  image_url?: string;
 }
 
 export interface UpdateProjectData extends Partial<CreateProjectData> {
@@ -55,7 +53,7 @@ export const useProjects = () => {
 
           const { data, error } = await supabase
             .from("projects")
-            .select("*, client:clients(id, name, email)")
+            .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at, client:clients(id, name, email)")
             .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
@@ -93,7 +91,7 @@ export const useProject = (id: string | undefined) => {
 
           const { data, error } = await supabase
             .from("projects")
-            .select("*, client:clients(id, name, email)")
+            .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at, client:clients(id, name, email)")
             .eq("id", id)
             .eq("company_id", companyId)
             .maybeSingle();
@@ -132,30 +130,34 @@ export const useCreateProject = () => {
         throw new Error("Vous devez être membre d'une entreprise pour créer un projet");
       }
 
+      // Valider et normaliser le statut
+      const validStatuses = ["planifié", "en_attente", "en_cours", "terminé", "annulé"] as const;
+      const status = (projectData.status && validStatuses.includes(projectData.status)) 
+        ? projectData.status 
+        : "planifié";
+
       // Construire l'objet d'insertion en excluant les champs undefined
       const insertData: any = {
         user_id: user.id,
         company_id: companyId,
         name: projectData.name,
-        status: projectData.status || "planifié",
-        progress: projectData.progress || 0,
+        status: status,
       };
 
       // Ajouter les champs optionnels seulement s'ils sont définis
+      // Note: progress est retiré car cette colonne n'existe pas dans toutes les versions de la table
+      // if (projectData.progress !== undefined) insertData.progress = projectData.progress;
       if (projectData.client_id) insertData.client_id = projectData.client_id;
       if (projectData.budget !== undefined) insertData.budget = projectData.budget;
       if (projectData.costs !== undefined) insertData.costs = projectData.costs;
       if (projectData.actual_revenue !== undefined) insertData.actual_revenue = projectData.actual_revenue;
-      if (projectData.location) insertData.location = projectData.location;
       if (projectData.start_date) insertData.start_date = projectData.start_date;
       if (projectData.end_date) insertData.end_date = projectData.end_date;
       if (projectData.description) insertData.description = projectData.description;
-      if (projectData.image_url) insertData.image_url = projectData.image_url;
-
       const { data, error } = await supabase
         .from("projects")
         .insert(insertData)
-        .select()
+        .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at")
         .single();
 
       if (error) throw error;
@@ -199,23 +201,27 @@ export const useUpdateProject = () => {
       
       if (projectData.name !== undefined) updateData.name = projectData.name;
       if (projectData.client_id !== undefined) updateData.client_id = projectData.client_id;
-      if (projectData.status !== undefined) updateData.status = projectData.status;
-      if (projectData.progress !== undefined) updateData.progress = projectData.progress;
+      if (projectData.status !== undefined) {
+        // Valider et normaliser le statut
+        const validStatuses = ["planifié", "en_attente", "en_cours", "terminé", "annulé"] as const;
+        updateData.status = validStatuses.includes(projectData.status) 
+          ? projectData.status 
+          : "planifié";
+      }
+      // Note: progress est retiré car cette colonne n'existe pas dans toutes les versions de la table
+      // if (projectData.progress !== undefined) updateData.progress = projectData.progress;
       if (projectData.budget !== undefined) updateData.budget = projectData.budget;
       if (projectData.costs !== undefined) updateData.costs = projectData.costs;
       if (projectData.actual_revenue !== undefined) updateData.actual_revenue = projectData.actual_revenue;
-      if (projectData.location !== undefined) updateData.location = projectData.location;
       if (projectData.start_date !== undefined) updateData.start_date = projectData.start_date;
       if (projectData.end_date !== undefined) updateData.end_date = projectData.end_date;
       if (projectData.description !== undefined) updateData.description = projectData.description;
-      if (projectData.image_url !== undefined) updateData.image_url = projectData.image_url;
-
       const { data, error } = await supabase
         .from("projects")
         .update(updateData)
         .eq("id", id)
         .eq("company_id", companyId)
-        .select()
+        .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at")
         .single();
 
       if (error) throw error;

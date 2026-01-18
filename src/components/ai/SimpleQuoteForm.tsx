@@ -3,6 +3,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { calculateFromTTC } from "@/utils/priceCalculations";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
@@ -48,6 +49,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
   const [tvaRateInput, setTvaRateInput] = useState<string>(
     ((companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20) * 100).toFixed(2)
   );
+  const [customPhrase, setCustomPhrase] = useState<string>(STANDARD_PHRASE);
   const [loading, setLoading] = useState(false);
   // État explicite pour contrôler l'affichage de l'aperçu
   // Ne se réinitialise QUE via action utilisateur (bouton "Fermer" ou "Créer un nouveau devis")
@@ -220,6 +222,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
           clientId: clientId,
           tvaRate: effectiveTvaRate,
           tva293b: tva293b,
+          customPhrase: customPhrase.trim() || STANDARD_PHRASE,
         },
         companyInfo,
         {
@@ -643,13 +646,20 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
             )}
           </Button>
 
-          {/* Info phrase standard */}
-          <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+          {/* Phrase personnalisée */}
+          <div className="space-y-2">
+            <Label htmlFor="customPhrase" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Phrase à inclure dans le devis (modifiable)
+            </Label>
+            <Textarea
+              id="customPhrase"
+              value={customPhrase}
+              onChange={(e) => setCustomPhrase(e.target.value)}
+              placeholder={STANDARD_PHRASE}
+            />
             <p className="text-xs text-muted-foreground">
-              <strong>Note :</strong> La phrase standard suivante sera automatiquement ajoutée au devis :
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 italic">
-              "{STANDARD_PHRASE}"
+              Cette phrase sera ajoutée à la description du devis. Vous pouvez la modifier (ex: "matériel déjà payé" pour la sous-traitance).
             </p>
           </div>
         </div>

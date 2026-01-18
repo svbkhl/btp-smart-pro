@@ -51,6 +51,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface PaymentsTabProps {
   payments: any[];
@@ -63,6 +64,8 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
 
   // Dédupliquer les paiements en attente (ne garder que le plus récent par devis)
   const deduplicatedPayments = useMemo(() => {
@@ -130,6 +133,41 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
     
     return matchesSearch && matchesStatus;
   });
+
+  const handleSelect = (id: string) => {
+    setSelectionMode(true);
+    const newSelected = new Set(selectedIds);
+    newSelected.add(id);
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    setSelectionMode(true);
+    // Ne sélectionne pas tout, juste active le mode sélection
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    
+    for (const id of Array.from(selectedIds)) {
+      await handleDeletePayment(id);
+    }
+    
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const allSelected = filteredPayments.length > 0 && selectedIds.size === filteredPayments.length;
 
   const copyLink = async (link: string) => {
     await navigator.clipboard.writeText(link);
@@ -294,29 +332,67 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
 
       {/* Filtres et recherche */}
       <GlassCard className="p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un paiement (référence, méthode, ID Stripe)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher un paiement (référence, méthode, ID Stripe)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full md:w-[200px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filtrer par statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="succeeded">✓ Payés</SelectItem>
+                <SelectItem value="pending">⏳ En attente</SelectItem>
+                <SelectItem value="failed">✗ Échoués</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-[200px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filtrer par statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="succeeded">✓ Payés</SelectItem>
-              <SelectItem value="pending">⏳ En attente</SelectItem>
-              <SelectItem value="failed">✗ Échoués</SelectItem>
-            </SelectContent>
-          </Select>
+
+          {/* Barre d'actions de sélection */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between p-3 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20">
+              <span className="text-sm font-medium">
+                {selectedIds.size} paiement{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
+              </span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer ({selectedIds.size})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Êtes-vous sûr de vouloir supprimer {selectedIds.size} paiement{selectedIds.size > 1 ? 's' : ''} ?
+                      <br /><br />
+                      Cette action est <strong>irréversible</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setSelectedIds(new Set())}>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteSelected}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Supprimer {selectedIds.size} paiement{selectedIds.size > 1 ? 's' : ''}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
       </GlassCard>
 
@@ -335,9 +411,36 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
         </GlassCard>
       ) : (
         <div className="space-y-4">
+          {/* Bouton Tout sélectionner - visible seulement en mode sélection */}
+          {selectionMode && (
+            <GlassCard className="p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Mode sélection activé - {selectedIds.size} paiement{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                >
+                  Activer la sélection pour tous
+                </Button>
+              </div>
+            </GlassCard>
+          )}
+
           {filteredPayments.map((payment) => (
             <GlassCard key={payment.id} className="p-6 hover:border-primary/30 transition-colors">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                {selectionMode && (
+                  <Checkbox
+                    checked={selectedIds.has(payment.id)}
+                    onCheckedChange={(checked) => handleSelectOne(payment.id, checked as boolean)}
+                    aria-label={`Sélectionner le paiement ${payment.id}`}
+                    className="mt-1"
+                  />
+                )}
+                <div className={`flex items-start justify-between ${selectionMode ? 'flex-1' : 'w-full'}`}>
                 <div className="flex-1">
                   {/* En-tête */}
                   <div className="flex items-center gap-3 mb-3">
@@ -510,6 +613,7 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
                     </AlertDialog>
                   </div>
                 </div>
+              </div>
               </div>
             </GlassCard>
           ))}

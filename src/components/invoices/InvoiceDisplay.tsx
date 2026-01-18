@@ -1,5 +1,5 @@
 import { Invoice } from "@/hooks/useInvoices";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -94,24 +94,24 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
   };
 
   return (
-    <Card className="w-full max-w-4xl">
-      <CardHeader>
+    <GlassCard className="w-full max-w-4xl p-6">
+      <div className="mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
               <FileText className="w-5 h-5" />
               Facture {invoice.invoice_number}
-            </CardTitle>
-            <CardDescription className="mt-2">
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2">
               Créée le {format(new Date(invoice.created_at), "d MMMM yyyy", { locale: fr })}
-            </CardDescription>
+            </p>
           </div>
           <Badge variant={getStatusColor(invoice.status)}>
             {getStatusLabel(invoice.status)}
           </Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      </div>
+      <div className="space-y-6">
         {/* Informations client */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-3">
@@ -178,9 +178,9 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
         {invoice.service_lines && invoice.service_lines.length > 0 && (
           <div>
             <h3 className="font-semibold mb-3">Détail des prestations</h3>
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border border-white/20 dark:border-white/10 rounded-lg overflow-hidden bg-white/5 dark:bg-black/5 backdrop-blur-sm">
               <table className="w-full text-sm">
-                <thead className="bg-muted">
+                <thead className="bg-primary/10 dark:bg-primary/20">
                   <tr>
                     <th className="text-left p-3">Description</th>
                     <th className="text-right p-3">Quantité</th>
@@ -210,18 +210,25 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
           <div className="w-full md:w-80 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Montant HT:</span>
-              <span className="font-medium">{(invoice.amount_ht || 0).toFixed(2)}€</span>
+              {/* ✅ CORRECTION P0: Lire total_ht (colonne réelle) avec fallback */}
+              <span className="font-medium">
+                {(invoice.total_ht ?? invoice.amount_ht ?? 0).toFixed(2)}€
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">TVA ({invoice.vat_rate || 20}%):</span>
-              <span className="font-medium">{(invoice.vat_amount || 0).toFixed(2)}€</span>
+              {/* ✅ CORRECTION P0: Lire tva (colonne réelle) avec fallback */}
+              <span className="font-medium">
+                {(invoice.tva ?? invoice.vat_amount ?? 0).toFixed(2)}€
+              </span>
             </div>
             <Separator />
             <div className="flex justify-between text-lg font-bold">
               <span>Total TTC:</span>
               <span className="flex items-center gap-2">
                 <Euro className="w-5 h-5" />
-                {(invoice.amount_ttc || 0).toFixed(2)}€
+                {/* ✅ CORRECTION P0: Lire total_ttc (colonne réelle) avec fallback */}
+                {(invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0).toFixed(2)}€
               </span>
             </div>
           </div>
@@ -229,7 +236,7 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
 
         {/* Signature */}
         {invoice.signature_data && (
-          <div className="p-4 bg-muted/50 rounded-lg">
+          <div className="p-4 bg-white/10 dark:bg-black/20 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
               <span className="font-semibold">Facture signée</span>
@@ -283,8 +290,8 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 };
 

@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateDevisNumber } from "@/utils/generateDevisNumber";
 import { useCreateQuote } from "@/hooks/useQuotes";
 import { calculateFromTTC } from "@/utils/priceCalculations";
+import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
 export interface SimpleQuoteData {
   prestation: string; // Nom de la prestation
@@ -10,6 +11,7 @@ export interface SimpleQuoteData {
   clientId: string; // ID du client sélectionné
   tvaRate?: number; // Taux TVA (0-1)
   tva293b?: boolean; // TVA non applicable 293B
+  customPhrase?: string; // Phrase personnalisée (remplace STANDARD_PHRASE si fournie)
 }
 
 export interface SimpleQuoteResult {
@@ -69,8 +71,9 @@ export async function generateSimpleQuote(
   const prices = calculateFromTTC(prixSaisi, tvaPercent);
   const { total_ttc, total_ht, vat_amount } = prices;
 
-  // Construire la description avec la phrase standard
-  const description = `${data.prestation}\n\n${STANDARD_PHRASE}`;
+  // Construire la description avec la phrase standard ou personnalisée
+  const phrase = data.customPhrase || STANDARD_PHRASE;
+  const description = `${data.prestation}\n\n${phrase}`;
 
   // Créer les détails du devis - MODE TTC FIRST
   const details = {
@@ -82,22 +85,36 @@ export async function generateSimpleQuote(
     workSteps: [
       {
         step: data.prestation,
-        description: `${data.prestation} - Surface: ${data.surface} m²\n\n${STANDARD_PHRASE}`,
+        description: `${data.prestation} - Surface: ${data.surface} m²\n\n${phrase}`,
         cost: total_ttc, // TTC
       },
     ],
     materials: [],
   };
 
+  // Récupérer company_id
+  const companyId = await getCurrentCompanyId(session.user.id);
+  if (!companyId) {
+    throw new Error("Vous devez être membre d'une entreprise pour créer un devis");
+  }
+
   // Créer le devis en base de données (table ai_quotes pour compatibilité)
+  // ✅ CORRECTION: Inclure total_ttc, subtotal_ht, total_tva, tva_rate, et tva_non_applicable_293b
   const { data: quote, error } = await supabase
     .from("ai_quotes")
     .insert({
       user_id: session.user.id,
+      company_id: companyId, // ✅ Ajouter company_id
       client_name: clientInfo.name,
       quote_number: quoteNumber,
       status: "draft",
-      estimated_cost: total_ttc, // ⚠️ TTC = source de vérité
+      mode: "simple",
+      estimated_cost: total_ttc, // ⚠️ TTC = source de vérité (compatibilité)
+      subtotal_ht: total_ht, // ✅ Total HT calculé
+      total_tva: vat_amount, // ✅ TVA calculée
+      total_ttc: total_ttc, // ✅ Total TTC (source de vérité)
+      tva_rate: tvaRate, // ✅ Taux TVA
+      tva_non_applicable_293b: data.tva293b || false, // ✅ TVA 293B
       details: details,
     })
     .select()

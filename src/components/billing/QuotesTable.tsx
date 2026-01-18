@@ -27,7 +27,8 @@ import {
   Edit, 
   Euro,
   Calendar,
-  User
+  User,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -36,6 +37,19 @@ import QuoteStatusBadge, { QuoteStatus } from "@/components/quotes/QuoteStatusBa
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDeleteQuotesBulk } from "@/hooks/useQuotes";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface QuotesTableProps {
   quotes: Quote[];
@@ -59,6 +73,9 @@ export const QuotesTable = ({
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const deleteBulk = useDeleteQuotesBulk();
 
   const getQuoteStatus = (quote: Quote): QuoteStatus => {
     // Vérifier d'abord si le devis est payé
@@ -89,6 +106,37 @@ export const QuotesTable = ({
     return matchesSearch && matchesStatus;
   });
 
+  const handleSelect = (id: string) => {
+    setSelectionMode(true);
+    const newSelected = new Set(selectedIds);
+    newSelected.add(id);
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    setSelectionMode(true);
+    // Ne sélectionne pas tout, juste active le mode sélection
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    await deleteBulk.mutateAsync(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const allSelected = filteredQuotes.length > 0 && selectedIds.size === filteredQuotes.length;
+
   if (loading) {
     return (
       <GlassCard className="p-6">
@@ -101,48 +149,147 @@ export const QuotesTable = ({
 
   return (
     <div className="space-y-4">
-      {/* Filtres */}
+      {/* Filtres et Actions */}
       <GlassCard className="p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un devis..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
-            />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher un devis..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-48 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                <SelectValue placeholder="Tous les statuts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="draft">Brouillon</SelectItem>
+                <SelectItem value="sent">Envoyé</SelectItem>
+                <SelectItem value="accepted">Accepté</SelectItem>
+                <SelectItem value="rejected">Refusé</SelectItem>
+                <SelectItem value="expired">Expiré</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-48 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
-              <SelectValue placeholder="Tous les statuts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="draft">Brouillon</SelectItem>
-              <SelectItem value="sent">Envoyé</SelectItem>
-              <SelectItem value="accepted">Accepté</SelectItem>
-              <SelectItem value="rejected">Refusé</SelectItem>
-              <SelectItem value="expired">Expiré</SelectItem>
-            </SelectContent>
-          </Select>
+          
+          {/* Barre d'actions de sélection */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between p-3 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20">
+              <span className="text-sm font-medium">
+                {selectedIds.size} devis sélectionné{selectedIds.size > 1 ? 's' : ''}
+              </span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer ({selectedIds.size})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Êtes-vous sûr de vouloir supprimer {selectedIds.size} devis ?
+                      <br /><br />
+                      Cette action est <strong>irréversible</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => {
+                      setSelectedIds(new Set());
+                      setSelectionMode(false);
+                    }}>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteSelected}
+                      className="bg-destructive hover:bg-destructive/90"
+                      disabled={deleteBulk.isPending}
+                    >
+                      {deleteBulk.isPending ? "Suppression..." : `Supprimer ${selectedIds.size} devis`}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
       </GlassCard>
+
+      {/* Bouton unique pour activer le mode sélection */}
+      {!selectionMode && filteredQuotes.length > 0 && (
+        <GlassCard className="p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {filteredQuotes.length} devis disponible{filteredQuotes.length > 1 ? 's' : ''}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectionMode(true)}
+              className="gap-2"
+            >
+              Sélectionner
+            </Button>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Bandeau mode sélection activé */}
+      {selectionMode && (
+        <GlassCard className="p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Mode sélection activé - {selectedIds.size} devis sélectionné{selectedIds.size > 1 ? 's' : ''}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedIds(new Set());
+                }}
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Tableau */}
       <GlassCard className="p-4 sm:p-6 overflow-x-auto">
         {filteredQuotes.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              {searchQuery || statusFilter !== "all" 
-                ? "Aucun devis ne correspond aux filtres" 
-                : "Aucun devis"}
-            </p>
+            {searchQuery || statusFilter !== "all" ? (
+              <div>
+                <p className="text-muted-foreground mb-2">
+                  Aucun devis ne correspond aux filtres
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Essayez de modifier vos critères de recherche
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-lg font-medium text-muted-foreground">
+                  Aucun devis
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Commencez par créer votre premier devis.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[120px]">{selectionMode ? "Sélection" : "Action"}</TableHead>
                 <TableHead className="w-[120px]">Numéro</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead className="text-right">Montant</TableHead>
@@ -154,6 +301,16 @@ export const QuotesTable = ({
             <TableBody>
               {filteredQuotes.map((quote) => (
                 <TableRow key={quote.id}>
+                  {selectionMode && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(quote.id)}
+                        onCheckedChange={(checked) => handleSelectOne(quote.id, checked as boolean)}
+                        aria-label={`Sélectionner ${quote.quote_number}`}
+                      />
+                    </TableCell>
+                  )}
+                  {!selectionMode && <TableCell></TableCell>}
                   <TableCell className="font-medium">
                     {quote.quote_number || quote.id.substring(0, 8)}
                   </TableCell>
@@ -164,7 +321,7 @@ export const QuotesTable = ({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {quote.estimated_cost?.toLocaleString("fr-FR", {
+                    {(quote.total_ttc ?? quote.estimated_cost ?? 0).toLocaleString("fr-FR", {
                       style: "currency",
                       currency: "EUR",
                     })}

@@ -8,7 +8,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 // Lazy loading des composants lourds (chargés seulement quand l'onglet est activé)
 const AIAssistant = lazy(() => import("@/components/ai/AIAssistant").then(m => ({ default: m.AIAssistant })));
 const AIQuotesTab = lazy(() => import("@/components/ai/AIQuotesTab"));
-const SimpleInvoiceForm = lazy(() => import("@/components/ai/SimpleInvoiceForm").then(m => ({ default: m.SimpleInvoiceForm })));
+const AIInvoicesTab = lazy(() => import("@/components/ai/AIInvoicesTab"));
 
 // Composant de loading
 const TabLoader = () => (
@@ -38,7 +38,7 @@ const AI = () => {
             IA
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Utilisez l'intelligence artificielle pour générer des devis, analyser des images et obtenir des conseils
+            Créez des devis et des factures intelligemment, obtenez des conseils et automatisez vos processus métier
           </p>
         </div>
 
@@ -73,7 +73,7 @@ const AI = () => {
 
             <TabsContent value="invoices" className="mt-0">
               <Suspense fallback={<TabLoader />}>
-                <SimpleInvoiceForm />
+                <AIInvoicesTab />
               </Suspense>
             </TabsContent>
           </Tabs>

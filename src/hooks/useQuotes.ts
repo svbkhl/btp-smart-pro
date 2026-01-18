@@ -99,23 +99,19 @@ export const useQuotes = () => {
         async () => {
           if (!user) throw new Error("User not authenticated");
 
-          // Récupérer company_id pour filtrage multi-tenant
-          const companyId = await getCurrentCompanyId(user.id);
-          if (!companyId) {
-            console.warn("User is not a member of any company");
-            return [];
-          }
-
+          // Construire la requête : filtrer par user_id (comme useAIQuotes mais avec sécurité)
+          // On filtre par user_id pour la sécurité, pas par company_id pour voir tous les devis de l'utilisateur
           const { data, error } = await supabase
             .from("ai_quotes")
             .select("*")
-            .eq("company_id", companyId)
+            .eq("user_id", user.id) // Filtrer par user_id pour la sécurité
             .order("created_at", { ascending: false });
 
           if (error) throw error;
           
           // ⚠️ SÉCURITÉ : S'assurer que tous les IDs sont des UUID purs (sans suffixe)
           // Si un ID contient un suffixe, l'extraire
+          // ⚠️ CALCUL DES TOTAUX : S'assurer que total_ttc est calculé si manquant
           const cleanedData = (data || []).map((quote: any) => {
             if (quote.id && quote.id.length > 36) {
               const validId = extractUUID(quote.id);
@@ -124,9 +120,30 @@ export const useQuotes = () => {
                   originalId: quote.id, 
                   cleanedId: validId 
                 });
-                return { ...quote, id: validId };
+                quote = { ...quote, id: validId };
               }
             }
+            
+            // Si total_ttc n'existe pas ou est 0, mais que estimated_cost existe, utiliser estimated_cost
+            if ((!quote.total_ttc || quote.total_ttc === 0) && quote.estimated_cost && quote.estimated_cost > 0) {
+              console.log("💰 [useQuotes] Correction du total_ttc manquant:", {
+                quote_number: quote.quote_number,
+                estimated_cost: quote.estimated_cost,
+                total_ttc_avant: quote.total_ttc,
+                total_ttc_après: quote.estimated_cost
+              });
+              quote.total_ttc = quote.estimated_cost;
+            }
+            
+            // Si total_ttc et estimated_cost sont tous les deux 0 ou manquants, logger un avertissement
+            if ((!quote.total_ttc || quote.total_ttc === 0) && (!quote.estimated_cost || quote.estimated_cost === 0)) {
+              console.warn("⚠️ [useQuotes] Quote sans montant valide:", {
+                quote_number: quote.quote_number,
+                total_ttc: quote.total_ttc,
+                estimated_cost: quote.estimated_cost
+              });
+            }
+            
             return quote;
           });
           
@@ -259,6 +276,48 @@ export const useCreateQuote = () => {
     onSuccess: async (quote) => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       
+      // Générer automatiquement le PDF après la création
+      try {
+        const { downloadQuotePDF } = await import("@/services/pdfService");
+        const { data: companyInfo } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", quote.company_id)
+          .maybeSingle();
+
+        await downloadQuotePDF({
+          result: quote.details || {},
+          companyInfo: companyInfo || undefined,
+          clientInfo: {
+            name: quote.client_name || "",
+            email: quote.client_email,
+            phone: quote.client_phone,
+            location: quote.client_address,
+          },
+          surface: "",
+          workType: "",
+          region: "",
+          quoteDate: new Date(quote.created_at),
+          quoteNumber: quote.quote_number || quote.id.substring(0, 8),
+          mode: quote.mode || "simple",
+          tvaRate: quote.tva_rate || 0.20,
+          tva293b: quote.tva_non_applicable_293b || false,
+          sections: quote.sections || [],
+          lines: quote.lines || [],
+          subtotal_ht: quote.subtotal_ht || quote.estimated_cost || 0,
+          total_tva: quote.total_tva || 0,
+          total_ttc: quote.total_ttc || quote.estimated_cost || 0,
+        });
+
+        toast({
+          title: "PDF généré",
+          description: "Le devis a été téléchargé en PDF automatiquement.",
+        });
+      } catch (pdfError: any) {
+        console.warn("⚠️ Erreur génération PDF automatique:", pdfError);
+        // Ne pas bloquer la création si le PDF échoue
+      }
+      
       // Vérifier si l'envoi automatique est activé
       try {
         const { data: settings } = await supabase
@@ -374,6 +433,7 @@ export const useDeleteQuote = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { fakeDataEnabled } = useFakeDataStore();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -392,13 +452,141 @@ export const useDeleteQuote = () => {
         .eq("user_id", user.id);
 
       if (error) throw error;
+      
+      // Attendre un peu pour s'assurer que la suppression est complète
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       return id;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    onSuccess: async (_, deletedQuoteId: string) => {
+      console.log("🔄 [useDeleteQuote] Suppression du devis:", deletedQuoteId);
+      
+      // ✅ SUPPRESSION IMMÉDIATE DU CACHE - Mise à jour optimiste
+      // Mettre à jour toutes les variantes de la query ["quotes"]
+      const queryKeysToUpdate = [
+        ["quotes", user?.id, fakeDataEnabled],
+        ["quotes", user?.id, true],
+        ["quotes", user?.id, false],
+        ["quotes"],
+      ];
+      
+      queryKeysToUpdate.forEach(queryKey => {
+        queryClient.setQueriesData(
+          { queryKey, exact: false }, 
+          (oldData: Quote[] | undefined | any) => {
+            // Vérifier que oldData est un tableau valide
+            if (!oldData || !Array.isArray(oldData)) {
+              return oldData;
+            }
+            // Filtrer le devis supprimé (comparer avec l'ID original ou l'UUID extrait)
+            const filtered = oldData.filter((quote: Quote) => {
+              const quoteId = quote.id || "";
+              const validUuid = extractUUID(quoteId);
+              const deletedUuid = extractUUID(deletedQuoteId);
+              return validUuid !== deletedUuid && quoteId !== deletedQuoteId;
+            });
+            if (filtered.length !== oldData.length) {
+              console.log("🗑️ [useDeleteQuote] Cache mis à jour pour", queryKey, "- Avant:", oldData.length, "Après:", filtered.length);
+            }
+            return filtered;
+          }
+        );
+      });
+      
+      // Invalider toutes les queries quotes (sans refetch automatique pour éviter qu'il revienne)
+      queryClient.invalidateQueries({ queryKey: ["quotes"], exact: false, refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: ["quote", deletedQuoteId], exact: false, refetchType: "none" });
+      
+      // Supprimer explicitement la query du devis supprimé
+      queryClient.removeQueries({ queryKey: ["quote", deletedQuoteId], exact: false });
+      
+      console.log("✅ [useDeleteQuote] Devis supprimé du cache (sans refetch)");
       toast({
         title: "Devis supprimé",
-        description: "Le devis a été supprimé avec succès.",
+        description: "Le devis a été supprimé définitivement.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer le devis",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+// Hook pour supprimer plusieurs devis en masse
+export const useDeleteQuotesBulk = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { fakeDataEnabled } = useFakeDataStore();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!user) throw new Error("User not authenticated");
+      if (ids.length === 0) return;
+
+      // Extraire les UUIDs valides
+      const validUuids = ids.map(id => extractUUID(id)).filter(Boolean) as string[];
+      if (validUuids.length === 0) {
+        throw new Error("Aucun ID valide");
+      }
+
+      const { error } = await supabase
+        .from("ai_quotes")
+        .delete()
+        .in("id", validUuids)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      
+      // Attendre un peu pour s'assurer que la suppression est complète
+      await new Promise(resolve => setTimeout(resolve, 100));
+    },
+    onSuccess: async (_, deletedQuoteIds: string[]) => {
+      console.log("🔄 [useDeleteQuotesBulk] Suppression de", deletedQuoteIds.length, "devis");
+      
+      // Extraire les UUIDs pour la comparaison
+      const deletedUuids = deletedQuoteIds.map(id => extractUUID(id)).filter(Boolean) as string[];
+      
+      // Mettre à jour le cache pour supprimer tous les devis supprimés
+      const queryKeysToUpdate = [
+        ["quotes", user?.id, fakeDataEnabled],
+        ["quotes", user?.id, true],
+        ["quotes", user?.id, false],
+        ["quotes"],
+      ];
+      
+      queryKeysToUpdate.forEach(queryKey => {
+        queryClient.setQueriesData(
+          { queryKey, exact: false }, 
+          (oldData: Quote[] | undefined | any) => {
+            if (!oldData || !Array.isArray(oldData)) {
+              return oldData;
+            }
+            const filtered = oldData.filter((quote: Quote) => {
+              const quoteId = quote.id || "";
+              const validUuid = extractUUID(quoteId);
+              return !deletedUuids.includes(validUuid) && !deletedQuoteIds.includes(quoteId);
+            });
+            if (filtered.length !== oldData.length) {
+              console.log("🗑️ [useDeleteQuotesBulk] Cache mis à jour - Avant:", oldData.length, "Après:", filtered.length);
+            }
+            return filtered;
+          }
+        );
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["quotes"], exact: false, refetchType: "none" });
+      deletedQuoteIds.forEach(id => {
+        queryClient.removeQueries({ queryKey: ["quote", id], exact: false });
+      });
+      
+      toast({
+        title: "Devis supprimés",
+        description: `${deletedQuoteIds.length} devis supprimé${deletedQuoteIds.length > 1 ? 's' : ''} définitivement.`,
       });
     },
     onError: (error: Error) => {
@@ -410,6 +598,4 @@ export const useDeleteQuote = () => {
     },
   });
 };
-
-
 

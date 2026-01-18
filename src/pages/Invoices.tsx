@@ -17,6 +17,9 @@ import { InvoiceDisplay } from "@/components/invoices/InvoiceDisplay";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -209,7 +212,8 @@ const Invoices = () => {
                   <div className="flex items-center gap-2 text-sm">
                     <Euro className="w-4 h-4 text-muted-foreground" />
                     <span className="font-semibold">
-                      {invoice.amount_ttc.toLocaleString("fr-FR", {
+                      {/* ✅ CORRECTION P0: Lire total_ttc (colonne réelle) avec fallback */}
+                      {(invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0).toLocaleString("fr-FR", {
                         style: "currency",
                         currency: "EUR",
                       })}
@@ -269,6 +273,12 @@ const Invoices = () => {
         {/* Dialog de visualisation */}
         <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Détails de la facture</DialogTitle>
+              <DialogDescription>
+                {viewingInvoice ? `Visualisation complète de la facture ${viewingInvoice.invoice_number}` : ""}
+              </DialogDescription>
+            </DialogHeader>
             {viewingInvoice && (
               <InvoiceDisplay
                 invoice={viewingInvoice}

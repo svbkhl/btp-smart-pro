@@ -78,7 +78,7 @@ export const LineLabelInput = ({
           setTimeout(() => setPopoverOpen(false), 200);
         }}
         placeholder={placeholder}
-        className={className}
+        className={`bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 ${className || ""}`}
       />
       {popoverOpen && libraryResults.length > 0 && (
         <div className="absolute z-50 w-full mt-1 border rounded-md bg-popover shadow-md max-h-[300px] overflow-auto">

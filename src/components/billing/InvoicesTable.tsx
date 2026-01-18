@@ -17,18 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Invoice } from "@/hooks/useInvoices";
+import { InvoiceActionButtons } from "@/components/invoices/InvoiceActionButtons";
 import { 
   Search, 
   Eye, 
@@ -44,8 +34,19 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDeleteInvoicesBulk } from "@/hooks/useInvoices";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface InvoicesTableProps {
   invoices: Invoice[];
@@ -53,6 +54,7 @@ interface InvoicesTableProps {
   onSend?: (invoice: Invoice) => void;
   onSign?: (invoice: Invoice) => void;
   onPay?: (invoice: Invoice) => void;
+  onDelete?: (invoiceId: string) => void;
   loading?: boolean;
 }
 
@@ -62,37 +64,14 @@ export const InvoicesTable = ({
   onSend,
   onSign,
   onPay,
+  onDelete,
   loading = false,
 }: InvoicesTableProps) => {
-  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  const handleDeleteInvoice = async (invoiceId: string) => {
-    try {
-      const { error } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', invoiceId);
-
-      if (error) throw error;
-
-      toast({
-        title: "✅ Facture supprimée",
-        description: "La facture a été supprimée avec succès",
-      });
-
-      // Rafraîchir la page
-      window.location.reload();
-    } catch (error: any) {
-      console.error("Error deleting invoice:", error);
-      toast({
-        title: "❌ Erreur",
-        description: error.message || "Impossible de supprimer la facture",
-        variant: "destructive",
-      });
-    }
-  };
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const deleteBulk = useDeleteInvoicesBulk();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -142,6 +121,38 @@ export const InvoicesTable = ({
     return matchesSearch && matchesStatus;
   });
 
+  const handleSelect = (id: string) => {
+    setSelectionMode(true);
+    const newSelected = new Set(selectedIds);
+    newSelected.add(id);
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    setSelectionMode(true);
+    // Ne sélectionne pas tout, juste active le mode sélection
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    await deleteBulk.mutateAsync(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const allSelected = filteredInvoices.length > 0 && selectedIds.size === filteredInvoices.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < filteredInvoices.length;
+
   if (loading) {
     return (
       <GlassCard className="p-6">
@@ -154,32 +165,74 @@ export const InvoicesTable = ({
 
   return (
     <div className="space-y-4">
-      {/* Filtres */}
+      {/* Filtres et Actions */}
       <GlassCard className="p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher une facture..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
-            />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une facture..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-48 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                <SelectValue placeholder="Tous les statuts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="draft">Brouillon</SelectItem>
+                <SelectItem value="sent">Envoyée</SelectItem>
+                <SelectItem value="signed">Signée</SelectItem>
+                <SelectItem value="paid">Payée</SelectItem>
+                <SelectItem value="overdue">En retard</SelectItem>
+                <SelectItem value="cancelled">Annulée</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-48 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
-              <SelectValue placeholder="Tous les statuts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="draft">Brouillon</SelectItem>
-              <SelectItem value="sent">Envoyée</SelectItem>
-              <SelectItem value="signed">Signée</SelectItem>
-              <SelectItem value="paid">Payée</SelectItem>
-              <SelectItem value="overdue">En retard</SelectItem>
-              <SelectItem value="cancelled">Annulée</SelectItem>
-            </SelectContent>
-          </Select>
+          
+          {/* Barre d'actions de sélection */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between p-3 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20">
+              <span className="text-sm font-medium">
+                {selectedIds.size} facture{selectedIds.size > 1 ? 's' : ''} sélectionnée{selectedIds.size > 1 ? 's' : ''}
+              </span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer ({selectedIds.size})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Êtes-vous sûr de vouloir supprimer {selectedIds.size} facture{selectedIds.size > 1 ? 's' : ''} ?
+                      <br /><br />
+                      Cette action est <strong>irréversible</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => {
+                      setSelectedIds(new Set());
+                      setSelectionMode(false);
+                    }}>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteSelected}
+                      className="bg-destructive hover:bg-destructive/90"
+                      disabled={deleteBulk.isPending}
+                    >
+                      {deleteBulk.isPending ? "Suppression..." : `Supprimer ${selectedIds.size} facture${selectedIds.size > 1 ? 's' : ''}`}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
       </GlassCard>
 
@@ -197,18 +250,28 @@ export const InvoicesTable = ({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[120px]">{selectionMode ? "Sélection" : "Action"}</TableHead>
                 <TableHead className="w-[120px]">Numéro</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead className="text-right">Montant TTC</TableHead>
+                <TableHead className="text-right">Montant</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Échéance</TableHead>
-                <TableHead>Paiement</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
+                  {selectionMode && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(invoice.id)}
+                        onCheckedChange={(checked) => handleSelectOne(invoice.id, checked as boolean)}
+                        aria-label={`Sélectionner ${invoice.invoice_number}`}
+                      />
+                    </TableCell>
+                  )}
+                  {!selectionMode && <TableCell></TableCell>}
                   <TableCell className="font-medium">
                     {invoice.invoice_number || invoice.id.substring(0, 8)}
                   </TableCell>
@@ -219,7 +282,8 @@ export const InvoicesTable = ({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {invoice.amount_ttc?.toLocaleString("fr-FR", {
+                    {/* ✅ CORRECTION P0: Lire total_ttc (colonne réelle) avec fallback */}
+                    {(invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? invoice.total_amount ?? 0).toLocaleString("fr-FR", {
                       style: "currency",
                       currency: "EUR",
                     })}
@@ -230,23 +294,10 @@ export const InvoicesTable = ({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {invoice.due_date ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        {format(new Date(invoice.due_date), "d MMM yyyy", { locale: fr })}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Non définie</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {invoice.paid_at ? (
-                      <div className="text-sm text-green-600 dark:text-green-400">
-                        Payé le {format(new Date(invoice.paid_at), "d MMM yyyy", { locale: fr })}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">En attente</span>
-                    )}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      {format(new Date(invoice.created_at), "d MMM yyyy", { locale: fr })}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -260,70 +311,10 @@ export const InvoicesTable = ({
                           <Eye className="w-4 h-4" />
                         </Button>
                       )}
-                      {invoice.status === "draft" && onSend && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onSend(invoice)}
-                          className="h-8 w-8"
-                          title="Envoyer au client"
-                        >
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {invoice.status === "signed" && onPay && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onPay(invoice)}
-                          className="h-8 w-8"
-                          title="Payer"
-                        >
-                          <CreditCard className="w-4 h-4" />
-                        </Button>
-                      )}
-                      
-                      {/* Bouton Supprimer avec confirmation */}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>⚠️ Confirmer la suppression</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Êtes-vous sûr de vouloir supprimer cette facture ?
-                              <br /><br />
-                              <strong>Numéro :</strong> {invoice.invoice_number || invoice.id.substring(0, 8)}
-                              <br />
-                              <strong>Client :</strong> {invoice.client_name}
-                              <br />
-                              <strong>Montant :</strong> {invoice.amount_ttc?.toLocaleString("fr-FR", {
-                                style: "currency",
-                                currency: "EUR",
-                              })}
-                              <br /><br />
-                              Cette action est <strong>irréversible</strong>.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteInvoice(invoice.id)}
-                              className="bg-destructive hover:bg-destructive/90"
-                            >
-                              Supprimer définitivement
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <InvoiceActionButtons
+                        invoice={invoice}
+                        onDelete={onDelete ? () => onDelete(invoice.id) : undefined}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

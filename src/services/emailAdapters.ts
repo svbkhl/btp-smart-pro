@@ -11,6 +11,8 @@
 
 import { sendMessage, SendMessageParams } from "./messageService";
 import { supabase } from "@/integrations/supabase/client";
+import { generateInvoicePDFAsBase64 } from "./invoicePdfService";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 // =====================================================
 // ADAPTER: Envoi de devis
@@ -38,7 +40,7 @@ export async function sendQuoteEmail(params: SendQuoteParams) {
     `Bonjour ${params.clientName},\n\nVeuillez trouver ci-joint votre devis ${params.quoteNumber}.\n\nCordialement.`;
 
   const bodyHtml = `
-    <div style="font-family: Arial, sans-serif;">
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <p>Bonjour <strong>${params.clientName}</strong>,</p>
       <p>Veuillez trouver ci-joint votre devis <strong>${params.quoteNumber}</strong>.</p>
       ${params.includeSignatureLink && params.signatureUrl ? 
@@ -48,6 +50,7 @@ export async function sendQuoteEmail(params: SendQuoteParams) {
           </a>
         </div>` 
         : ''}
+      <p>N'hésitez pas à nous contacter pour toute question.</p>
       <p>Cordialement.</p>
     </div>
   `;
@@ -98,6 +101,7 @@ export interface SendInvoiceParams {
   includeSignatureLink?: boolean;
   signatureUrl?: string;
   customMessage?: string;
+  pdfBase64?: string; // PDF en base64 pour l'inclusion dans l'email
 }
 
 export async function sendInvoiceEmail(params: SendInvoiceParams) {
@@ -105,14 +109,56 @@ export async function sendInvoiceEmail(params: SendInvoiceParams) {
 
   const subject = `Facture ${params.invoiceNumber} - ${params.clientName}`;
   
-  const bodyText = params.customMessage || 
-    `Bonjour ${params.clientName},\n\nVeuillez trouver ci-joint votre facture ${params.invoiceNumber}.\n\nCordialement.`;
+  const defaultMessage = `Bonjour ${params.clientName},\n\nNous vous adressons la facture ${params.invoiceNumber} en pièce jointe.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement.`;
+  
+  const bodyText = params.customMessage || defaultMessage;
+
+  // Convertir le message texte en HTML (en préservant les sauts de ligne)
+  // Échapper les caractères HTML spéciaux pour éviter les injections
+  const escapeHtml = (text: string) => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+  
+  const messageText = escapeHtml(params.customMessage || defaultMessage);
+  const messageHtml = messageText
+    .split('\n\n')
+    .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('');
 
   const bodyHtml = `
-    <p>Bonjour <strong>${params.clientName}</strong>,</p>
-    <p>Veuillez trouver ci-joint votre facture <strong>${params.invoiceNumber}</strong>.</p>
-    <p>Cordialement.</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      ${messageHtml}
+    </div>
   `;
+
+  // Préparer les pièces jointes si PDF demandé
+  const attachments: any[] = [];
+  if (params.includePDF && params.pdfBase64) {
+    console.log("📎 [EmailAdapter] Ajout du PDF en pièce jointe:", {
+      filename: `Facture-${params.invoiceNumber}.pdf`,
+      size: params.pdfBase64.length,
+      hasDataPrefix: params.pdfBase64.startsWith('data:'),
+    });
+    
+    // Format correct pour Resend: data URL ou base64 pur
+    // messageService extraira automatiquement si data: prefix présent
+    attachments.push({
+      name: `Facture-${params.invoiceNumber}.pdf`,
+      url: params.pdfBase64.startsWith('data:') ? params.pdfBase64 : `data:application/pdf;base64,${params.pdfBase64}`,
+      type: 'application/pdf',
+      size: params.pdfBase64.length, // Taille approximative
+    });
+  } else {
+    console.warn("⚠️ [EmailAdapter] PDF non inclus:", {
+      includePDF: params.includePDF,
+      hasPdfBase64: !!params.pdfBase64,
+    });
+  }
 
   const result = await sendMessage({
     messageType: params.includeSignatureLink ? 'signature' : 'invoice',
@@ -129,6 +175,7 @@ export async function sendInvoiceEmail(params: SendInvoiceParams) {
     includePDF: params.includePDF,
     includeSignatureLink: params.includeSignatureLink,
     signatureUrl: params.signatureUrl,
+    attachments: attachments.length > 0 ? attachments : undefined,
   });
 
   if (result.success) {

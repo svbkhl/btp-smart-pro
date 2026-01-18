@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -705,7 +704,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                           <h4 className="font-semibold text-base mb-3 text-primary">
                             {sectionIdx + 1}. {section.title}
                           </h4>
-                          <div className="overflow-x-auto border rounded-lg">
+                          <div className="overflow-x-auto border border-white/20 dark:border-white/10 rounded-lg bg-white/5 dark:bg-black/5 backdrop-blur-sm">
                             <table className="w-full text-sm">
                               <thead className="bg-primary text-white">
                                 <tr>
@@ -812,14 +811,14 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
   return (
     <div className="space-y-6">
       {/* Paramètres devis */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Paramètres du devis</CardTitle>
-          <CardDescription>
+      <GlassCard className="p-6">
+        <div className="space-y-4 mb-4">
+          <h3 className="text-lg font-semibold">Paramètres du devis</h3>
+          <p className="text-sm text-muted-foreground">
             Configurez le client et les options de TVA
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           {/* Sélection client */}
           <div className="space-y-2">
             <Label htmlFor="client">Client *</Label>
@@ -828,7 +827,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
               onValueChange={setClientId}
               disabled={clientsLoading || !!quoteId}
             >
-              <SelectTrigger id="client">
+              <SelectTrigger id="client" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
                 <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
               <SelectContent>
@@ -875,28 +874,26 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                 onChange={(e) => handleTvaRateInputChange(e.target.value)}
                 onBlur={handleTvaRateBlur}
                 placeholder="20"
-                className="w-32"
+                className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
               <p className="text-xs text-muted-foreground">
                 Le taux saisi sera sauvegardé comme préférence pour les prochains devis
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
 
       {/* Éditeur sections/lignes (affiché dès qu'un client est sélectionné) */}
       {canEdit ? (
-        <Card>
-          <CardHeader>
-              <div>
-                <CardTitle>Devis détaillé</CardTitle>
-                <CardDescription>
-                  Ajoutez des sections (corps de métier) et des lignes (prestations) avec quantités et prix
-                </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <GlassCard className="p-6">
+          <div className="space-y-4 mb-4">
+            <h3 className="text-lg font-semibold">Devis détaillé</h3>
+            <p className="text-sm text-muted-foreground">
+              Ajoutez des sections (corps de métier) et des lignes (prestations) avec quantités et prix
+            </p>
+          </div>
+          <div>
             {quoteId ? (
               // Mode DB : utiliser QuoteSectionsEditor si devis déjà créé
             <QuoteSectionsEditor
@@ -923,7 +920,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                 )}
 
                 {localSections.map((section, sectionIdx) => (
-                  <div key={section.id} className="border rounded-lg p-4 space-y-3">
+                  <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
                     {/* En-tête section */}
                     <div className="flex items-center justify-between gap-2">
                       <SectionTitleInput
@@ -942,95 +939,105 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                     </div>
 
                     {/* Lignes de la section */}
-                    <div className="space-y-2 pl-4 border-l-2">
+                    <div className="space-y-3 pl-4 border-l-2">
                       {localLines
                         .filter(line => line.section_id === section.id)
-                        .map((line) => (
-                          <div key={line.id} className="grid grid-cols-12 gap-2 items-center">
-                            <LineLabelInput
-                              className="col-span-9"
-                              value={line.label}
-                              onChange={(label) => handleUpdateLine(line.id, { label })}
-                              onSelect={async (item) => {
-                                handleUpdateLine(line.id, {
-                                  label: item.label,
-                                  unit: item.unit || "u",
-                                  unit_price_ht: item.price || 0,
-                                });
-                                if (item.label.trim() && item.unit) {
-                                  await upsertLineLibrary.mutateAsync({
-                                    label: item.label.trim(),
-                                    default_unit: item.unit,
-                                    default_unit_price_ht: item.price,
+                        .map((line) => {
+                          const lineTotal = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
+                          return (
+                            <div key={line.id} className="space-y-3 p-3 rounded-lg border border-border/50 bg-background/50">
+                              {/* Ligne 1: Champ Prestation (pleine largeur) */}
+                              <LineLabelInput
+                                className="w-full text-base min-h-[48px] px-4 py-3"
+                                value={line.label}
+                                onChange={(label) => handleUpdateLine(line.id, { label })}
+                                onSelect={async (item) => {
+                                  handleUpdateLine(line.id, {
+                                    label: item.label,
+                                    unit: item.unit || "u",
+                                    unit_price_ht: item.price || 0,
                                   });
-                                }
-                              }}
-                              placeholder="Prestation"
-                            />
-                            <Select
-                              value={line.unit}
-                              onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
-                            >
-                              <SelectTrigger className="col-span-1">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="m²">m²</SelectItem>
-                                <SelectItem value="ml">ml</SelectItem>
-                                <SelectItem value="h">h</SelectItem>
-                                <SelectItem value="u">u</SelectItem>
-                                <SelectItem value="forfait">forfait</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              type="number"
-                              className="col-span-1"
-                              value={line.quantity ?? ""}
-                              onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
-                              placeholder="Qté"
-                            />
-                            <Input
-                              type="number"
-                              className="col-span-1"
-                              value={line.unit_price_ht ?? ""}
-                              onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
-                              placeholder="Prix HT"
-                            />
-                            <div className="col-span-1 text-right font-medium">
-                              {((line.quantity ?? 0) * (line.unit_price_ht ?? 0)).toFixed(2)} €
+                                  if (item.label.trim() && item.unit) {
+                                    try {
+                                      await upsertLineLibrary.mutateAsync({
+                                        label: item.label.trim(),
+                                        default_unit: item.unit,
+                                        default_unit_price_ht: item.price,
+                                      });
+                                    } catch (error) {
+                                      console.warn("⚠️ Erreur sauvegarde bibliothèque ligne:", error);
+                                    }
+                                  }
+                                }}
+                                placeholder="Prestation (description complète)"
+                              />
+                              
+                              {/* Ligne 2: Unité, Quantité, Prix HT, Total, Supprimer */}
+                              <div className="flex gap-4 items-center w-full">
+                                <Select
+                                  value={line.unit}
+                                  onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
+                                >
+                                  <SelectTrigger className="w-[140px] text-base min-h-[48px] px-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="m²">m²</SelectItem>
+                                    <SelectItem value="ml">ml</SelectItem>
+                                    <SelectItem value="h">h</SelectItem>
+                                    <SelectItem value="u">u</SelectItem>
+                                    <SelectItem value="forfait">forfait</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="number"
+                                  className="w-[140px] text-base min-h-[48px] px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                  value={line.quantity ?? ""}
+                                  onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
+                                  placeholder="Quantité"
+                                />
+                                <Input
+                                  type="number"
+                                  className="w-[160px] text-base min-h-[48px] px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                  value={line.unit_price_ht ?? ""}
+                                  onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
+                                  placeholder="Prix HT"
+                                />
+                                <div className="w-[140px] text-right font-semibold text-base min-h-[48px] flex items-center justify-end whitespace-nowrap">
+                                  {lineTotal.toFixed(2)} €
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="default"
+                                  onClick={() => handleDeleteLine(line.id)}
+                                  className="min-h-[48px] min-w-[48px] text-xl font-bold flex-shrink-0"
+                                >
+                                  ×
+                                </Button>
+                              </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteLine(line.id)}
-                              className="col-span-1"
-                            >
-                              ×
-              </Button>
-                          </div>
-                        ))}
+                          );
+                        })}
 
-              <Button
+                      <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleAddLine(section.id)}
-                        className="w-full"
+                        className="mt-2"
                       >
                         + Ajouter une ligne
-              </Button>
+                      </Button>
             </div>
           </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
       ) : (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-              <p>Veuillez sélectionner un client pour commencer</p>
-          </CardContent>
-        </Card>
+        <GlassCard className="p-8 text-center text-muted-foreground">
+          <p>Veuillez sélectionner un client pour commencer</p>
+        </GlassCard>
       )}
 
       {/* Actions */}
