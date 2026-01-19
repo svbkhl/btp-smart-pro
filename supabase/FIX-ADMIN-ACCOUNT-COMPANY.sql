@@ -6,6 +6,23 @@
 -- données existantes à cette entreprise
 -- =====================================================
 
+-- Corriger la fonction trigger pour qu'elle vérifie si updated_at existe
+CREATE OR REPLACE FUNCTION update_company_users_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Vérifier si la colonne updated_at existe avant de la mettre à jour
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'company_users'
+    AND column_name = 'updated_at'
+  ) THEN
+    NEW.updated_at = now();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DO $$
 DECLARE
   v_admin_user_id UUID;
