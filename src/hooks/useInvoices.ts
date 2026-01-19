@@ -116,6 +116,13 @@ export const useInvoices = () => {
         async () => {
           if (!user) throw new Error("User not authenticated");
 
+          // Récupérer company_id pour filtrage multi-tenant
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            console.warn("User is not a member of any company");
+            return [];
+          }
+
           // ✅ CORRECTION P0: Sélectionner uniquement les colonnes qui existent réellement
           const { data, error } = await supabase
             .from("invoices")
@@ -125,7 +132,7 @@ export const useInvoices = () => {
               client_name, client_email,
               total_ht, total_ttc, tva
             `)
-            .eq("user_id", user.id)
+            .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
           if (error) {
@@ -218,6 +225,12 @@ export const useInvoice = (id: string | undefined) => {
 
           // ✅ CORRECTION P0: Sélectionner uniquement les colonnes qui existent réellement
           // ✅ Récupérer aussi les invoice_lines (lignes détaillées)
+          // Récupérer company_id pour vérification multi-tenant
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            throw new Error("User is not a member of any company");
+          }
+
           const { data, error } = await supabase
             .from("invoices")
             .select(`
@@ -231,7 +244,7 @@ export const useInvoice = (id: string | undefined) => {
               )
             `)
             .eq("id", id)
-            .eq("user_id", user.id)
+            .eq("company_id", companyId) // ✅ Multi-tenant: filtrer par company_id
             .maybeSingle();
 
           if (error) {
@@ -311,12 +324,27 @@ export const useCreateInvoice = () => {
       if (data.quote_id) {
         console.log("🔄 [useCreateInvoice] Récupération du devis:", data.quote_id);
         
+        // Récupérer company_id pour filtrer le devis (multi-tenant)
+        const currentCompanyId = await getCurrentCompanyId(user.id);
+        
         // 🎯 ÉTAPE 1: Charger le devis complet avec ses totaux
+        let quoteQuery = supabase
+          .from("ai_quotes")
+          .select("id, client_id, client_name, company_id, tva_rate, tva_non_applicable_293b, subtotal_ht, total_tva, total_ttc, mode, estimated_cost")
+          .eq("id", data.quote_id);
+        
+        // Filtrer par company_id si disponible (multi-tenant)
+        if (currentCompanyId) {
+          quoteQuery = quoteQuery.eq("company_id", currentCompanyId);
+        }
+        
+        const { data: quote, error: quoteError } = await quoteQuery.maybeSingle();
+        
         const { data: quote, error: quoteError } = await supabase
           .from("ai_quotes")
           .select("id, client_id, client_name, company_id, tva_rate, tva_non_applicable_293b, subtotal_ht, total_tva, total_ttc, mode, estimated_cost")
           .eq("id", data.quote_id)
-          .eq("user_id", user.id)
+          .eq("company_id", currentCompanyId || "")
           .maybeSingle();
         
         if (quoteError) {
@@ -555,11 +583,20 @@ export const useCreateInvoice = () => {
         dataVatRate: data.vat_rate
       });
 
+      // Récupérer company_id si pas déjà défini (depuis quote ou user)
+      if (!companyId) {
+        companyId = await getCurrentCompanyId(user.id);
+      }
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise pour créer une facture");
+      }
+
       // Préparer les données d'insertion
       // Commencer avec SEULEMENT les colonnes de base qui existent TOUJOURS
       // D'après le schéma, la table de base a: id, user_id, company_id, client_id, quote_id, invoice_number, amount (NOT NULL), status, due_date, paid_date, created_at, updated_at
       const insertData: any = {
         user_id: user.id,
+        company_id: companyId, // ✅ Multi-tenant: inclure company_id
         invoice_number: invoiceNumber,
         status: "draft",
         amount: finalAmountTtc || 0, // NOT NULL, obligatoire dans le schéma de base

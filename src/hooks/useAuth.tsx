@@ -20,6 +20,12 @@ export const useAuth = (): UseAuthReturn => {
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Vérifier localStorage au démarrage
+    const storedCompanyId = localStorage.getItem('currentCompanyId');
+    if (storedCompanyId) {
+      setCurrentCompanyId(storedCompanyId);
+    }
+
     // Récupérer la session initiale
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -31,6 +37,7 @@ export const useAuth = (): UseAuthReturn => {
         fetchCurrentCompanyId(session.user.id);
       } else {
         setCurrentCompanyId(null);
+        localStorage.removeItem('currentCompanyId');
       }
     });
 
@@ -43,8 +50,11 @@ export const useAuth = (): UseAuthReturn => {
       
       if (session?.user) {
         checkAdminStatus(session.user);
+        fetchCurrentCompanyId(session.user.id);
       } else {
         setIsAdmin(false);
+        setCurrentCompanyId(null);
+        localStorage.removeItem('currentCompanyId');
       }
     });
 
