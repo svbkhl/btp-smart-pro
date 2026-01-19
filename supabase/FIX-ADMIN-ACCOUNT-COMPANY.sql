@@ -109,9 +109,13 @@ BEGIN
     RAISE NOTICE '✅ Rôle admin mis à jour (owner)';
   END IF;
   
-  -- 7. NE PAS réactiver le trigger updated_at pour company_users
-  -- car cette table n'a pas de colonne updated_at
-  -- Le trigger reste supprimé (désactivé en début de script)
+  -- 7. RÉACTIVER les triggers sur company_users (après les opérations)
+  -- Mais d'abord, supprimer définitivement le trigger updated_at qui n'a pas de sens
+  DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
+  
+  -- Réactiver tous les autres triggers
+  ALTER TABLE public.company_users ENABLE TRIGGER ALL;
+  RAISE NOTICE '✅ Triggers sur company_users réactivés (sauf updated_at)';
   
   -- 8. Backfill toutes les données existantes de l'admin avec cette entreprise
   -- Clients
