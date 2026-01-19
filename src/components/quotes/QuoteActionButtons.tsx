@@ -130,14 +130,15 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
 
   return (
     <div className="flex flex-wrap gap-2">
+      {/* Bouton Modifier - toujours visible si onEdit est fourni */}
+      {onEdit && (
+        <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
+          <Edit className="w-4 h-4" />
+          Modifier
+        </Button>
+      )}
       {quote.status === "draft" && (
         <>
-          {onEdit && (
-            <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
-              <Edit className="w-4 h-4" />
-              Modifier
-            </Button>
-          )}
           {onSend && (
             <Button variant="outline" size="sm" onClick={onSend} className="gap-2">
               <Send className="w-4 h-4" />
