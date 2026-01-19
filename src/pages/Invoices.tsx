@@ -270,21 +270,23 @@ const Invoices = () => {
           onOpenChange={setIsFormOpen}
         />
 
-        {/* Dialog de visualisation */}
+        {/* Dialog de visualisation - Aperçu en grand */}
         <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Détails de la facture</DialogTitle>
+          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+              <DialogTitle className="text-2xl">Détails de la facture</DialogTitle>
               <DialogDescription>
                 {viewingInvoice ? `Visualisation complète de la facture ${viewingInvoice.invoice_number}` : ""}
               </DialogDescription>
             </DialogHeader>
-            {viewingInvoice && (
-              <InvoiceDisplay
-                invoice={viewingInvoice}
-                onClose={() => setViewingInvoice(null)}
-              />
-            )}
+            <div className="px-6 py-4">
+              {viewingInvoice && (
+                <InvoiceDisplay
+                  invoice={viewingInvoice}
+                  onClose={() => setViewingInvoice(null)}
+                />
+              )}
+            </div>
           </DialogContent>
         </Dialog>
 

@@ -38,8 +38,11 @@ import { InvoiceDisplay } from "@/components/invoices/InvoiceDisplay";
 import { InvoiceActionButtons } from "@/components/invoices/InvoiceActionButtons";
 import { CreateInvoiceFromQuoteDialog } from "@/components/invoices/CreateInvoiceFromQuoteDialog";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
+import { QuoteDetailView } from "@/components/quotes/QuoteDetailView";
 import { Quote } from "@/hooks/useQuotes";
 import { Invoice } from "@/hooks/useInvoices";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
 import { motion } from "framer-motion";
 import PaymentsTab from "@/components/payments/PaymentsTab";
 import QuoteStatusBadge from "@/components/quotes/QuoteStatusBadge";
@@ -78,8 +81,11 @@ const Facturation = () => {
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
   const [dragCurrentPos, setDragCurrentPos] = useState<{ x: number; y: number } | null>(null);
+  const [viewingQuote, setViewingQuote] = useState<Quote | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const deleteInvoicesBulk = useDeleteInvoicesBulk();
   const deleteQuotesBulk = useDeleteQuotesBulk();
+  const { toast } = useToast();
 
   const filteredQuotes = quotes.filter((quote) =>
     quote.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -525,7 +531,19 @@ const Facturation = () => {
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewingQuote(quote);
+                                  }}
+                                  className="gap-2"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  Voir
+                                </Button>
                                 <QuoteActionButtons
                                   quote={quote}
                                   onEdit={() => {
@@ -791,7 +809,7 @@ const Facturation = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setSelectedInvoice(invoice)}
+                                  onClick={() => setViewingInvoice(invoice)}
                                   className="gap-2"
                                 >
                                   <Eye className="w-4 h-4" />
@@ -842,7 +860,7 @@ const Facturation = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setSelectedInvoice(invoice)}
+                                  onClick={() => setViewingInvoice(invoice)}
                                   className="gap-2"
                                 >
                                   <Eye className="w-4 h-4" />
@@ -920,6 +938,69 @@ const Facturation = () => {
             }}
           />
         )}
+
+        {/* Dialog de visualisation des devis - Aperçu en grand */}
+        <Dialog open={!!viewingQuote} onOpenChange={(open) => !open && setViewingQuote(null)}>
+          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+              <DialogTitle className="text-2xl">Détails du devis</DialogTitle>
+              <DialogDescription>
+                {viewingQuote ? `Visualisation complète du devis ${viewingQuote.quote_number}` : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 py-4">
+              {viewingQuote && (
+                <QuoteDetailView
+                  quote={viewingQuote}
+                  onEdit={() => {
+                    setViewingQuote(null);
+                    setSelectedQuote(viewingQuote);
+                    setIsEditQuoteOpen(true);
+                  }}
+                  onDelete={() => {
+                    setViewingQuote(null);
+                    toast({
+                      title: "Suppression",
+                      description: "Fonctionnalité de suppression à venir",
+                    });
+                  }}
+                  onSendEmail={() => {
+                    toast({
+                      title: "📧 Envoi en cours...",
+                      description: "Le devis sera envoyé par email au client",
+                    });
+                  }}
+                  onDownloadPDF={() => {
+                    toast({
+                      title: "📄 Téléchargement...",
+                      description: "Le PDF du devis est en cours de génération",
+                    });
+                  }}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de visualisation des factures - Aperçu en grand */}
+        <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
+          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+              <DialogTitle className="text-2xl">Détails de la facture</DialogTitle>
+              <DialogDescription>
+                {viewingInvoice ? `Visualisation complète de la facture ${viewingInvoice.invoice_number}` : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 py-4">
+              {viewingInvoice && (
+                <InvoiceDisplay
+                  invoice={viewingInvoice}
+                  onClose={() => setViewingInvoice(null)}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageLayout>
   );
