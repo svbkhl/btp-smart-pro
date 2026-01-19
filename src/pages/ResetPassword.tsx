@@ -200,10 +200,10 @@ const ResetPassword = () => {
       // Nettoyer le flag
       window.__IS_PASSWORD_RESET_PAGE__ = false;
       
-      // Rediriger vers la page de connexion après 2 secondes avec paramètre de succès dans l'URL
+      // Rediriger vers la page de connexion après 5 secondes avec paramètre de succès dans l'URL
       setTimeout(() => {
         navigate('/auth?reset=success', { replace: true });
-      }, 2000);
+      }, 5000);
     } catch (err: any) {
       console.error('❌ [ResetPassword] Error updating password:', err);
       setError(err.message || 'Erreur lors de la réinitialisation du mot de passe.');
