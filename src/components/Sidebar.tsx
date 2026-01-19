@@ -139,6 +139,18 @@ export default function Sidebar() {
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
+
+  // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
+  const handleNavigation = (path: string, e?: React.MouseEvent) => {
+    // Si l'utilisateur n'est pas connecté et qu'on est en mode démo, rediriger vers le formulaire
+    if (!user && fakeDataEnabled) {
+      e?.preventDefault();
+      navigate("/?openTrialForm=true");
+      return;
+    }
+    // Sinon, navigation normale
+    navigate(path);
+  };
   const isMobile = useIsMobile();
   const { isPinned, isVisible, setIsPinned, setIsVisible, setIsHovered: setGlobalIsHovered } = useSidebar();
   const [isOpen, setIsOpen] = useState(!isMobile);
@@ -355,17 +367,34 @@ export default function Sidebar() {
           transition={{ duration: 0.3 }}
           className="p-6 border-b border-white/20 dark:border-gray-700/30"
         >
-          <Link to="/dashboard" className="flex items-center gap-3 group">
-            <motion.div
-              whileHover={{ scale: 1.05, rotate: 5 }}
-              className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+          {(user || !fakeDataEnabled) ? (
+            <Link to="/dashboard" className="flex items-center gap-3 group">
+              <motion.div
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+              >
+                <span className="text-primary-foreground font-bold text-xl">B</span>
+              </motion.div>
+              <div>
+                <h2 className="text-lg font-bold text-foreground">BTP Smart Pro</h2>
+              </div>
+            </Link>
+          ) : (
+            <button 
+              onClick={(e) => handleNavigation("/dashboard", e)}
+              className="flex items-center gap-3 group w-full text-left"
             >
-              <span className="text-primary-foreground font-bold text-xl">B</span>
-            </motion.div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">BTP Smart Pro</h2>
-            </div>
-          </Link>
+              <motion.div
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+              >
+                <span className="text-primary-foreground font-bold text-xl">B</span>
+              </motion.div>
+              <div>
+                <h2 className="text-lg font-bold text-foreground">BTP Smart Pro</h2>
+              </div>
+            </button>
+          )}
         </motion.div>
 
         {/* Pin/Unpin Button (Desktop) */}
@@ -478,7 +507,7 @@ export default function Sidebar() {
                                   <div className="ml-8 mt-1 space-y-1 pb-1">
                                     {item.subItems.map((subItem) => {
                                       const subActive = isActive(subItem.path);
-                                      return (
+                                      return (user || !fakeDataEnabled) ? (
                                         <Link
                                           key={subItem.path}
                                           to={subItem.path}
@@ -492,6 +521,20 @@ export default function Sidebar() {
                                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
                                           {subItem.label}
                                         </Link>
+                                      ) : (
+                                        <button
+                                          key={subItem.path}
+                                          onClick={(e) => handleNavigation(subItem.path, e)}
+                                          className={cn(
+                                            "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 w-full text-left",
+                                            subActive
+                                              ? "bg-primary/10 text-primary font-medium"
+                                              : "text-muted-foreground hover:text-foreground hover:bg-white/40 dark:hover:bg-gray-800/40"
+                                          )}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
+                                          {subItem.label}
+                                        </button>
                                       );
                                     })}
                                   </div>
@@ -500,16 +543,29 @@ export default function Sidebar() {
                             </AnimatePresence>
                           </div>
                         ) : (
-                          <Link
-                            to={item.path}
-                            className={cn(
-                              "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                              "relative hover:shadow-lg hover:shadow-primary/20",
-                              active
-                                ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
-                                : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
-                            )}
-                          >
+                          (user || !fakeDataEnabled) ? (
+                            <Link
+                              to={item.path}
+                              className={cn(
+                                "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                                "relative hover:shadow-lg hover:shadow-primary/20",
+                                active
+                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                              )}
+                            >
+                          ) : (
+                            <button
+                              onClick={(e) => handleNavigation(item.path, e)}
+                              className={cn(
+                                "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full text-left",
+                                "relative hover:shadow-lg hover:shadow-primary/20",
+                                active
+                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                              )}
+                            >
+                          )}
                             {active && (
                               <motion.div
                                 layoutId="activeTab"
@@ -527,7 +583,11 @@ export default function Sidebar() {
                               )} />
                             </motion.div>
                             <span className="relative z-10">{item.label}</span>
-                          </Link>
+                          {(user || !fakeDataEnabled) ? (
+                            </Link>
+                          ) : (
+                            </button>
+                          )}
                         )}
                       </motion.div>
                     </div>
@@ -555,16 +615,29 @@ export default function Sidebar() {
                 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Link
-                  to={item.path}
-                  className={cn(
-                    "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
-                    "hover:shadow-lg hover:shadow-primary/20",
-                    active
-                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
-                  )}
-                >
+                {(user || !fakeDataEnabled) ? (
+                  <Link
+                    to={item.path}
+                    className={cn(
+                      "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
+                      "hover:shadow-lg hover:shadow-primary/20",
+                      active
+                        ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                    )}
+                  >
+                ) : (
+                  <button
+                    onClick={(e) => handleNavigation(item.path, e)}
+                    className={cn(
+                      "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative w-full text-left",
+                      "hover:shadow-lg hover:shadow-primary/20",
+                      active
+                        ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                    )}
+                  >
+                )}
                   {active && (
                     <motion.div
                       layoutId="activeTabSettings"
@@ -582,7 +655,11 @@ export default function Sidebar() {
                     )} />
                   </motion.div>
                   <span className="relative z-10">{item.label}</span>
-                </Link>
+                {(user || !fakeDataEnabled) ? (
+                  </Link>
+                ) : (
+                  </button>
+                )}
               </motion.div>
             );
           })}
