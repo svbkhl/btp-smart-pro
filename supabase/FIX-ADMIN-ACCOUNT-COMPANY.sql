@@ -6,20 +6,16 @@
 -- données existantes à cette entreprise
 -- =====================================================
 
--- Corriger la fonction trigger pour company_users
--- Si updated_at n'existe pas, créer une fonction qui ne fait rien
+-- Supprimer complètement le trigger updated_at pour company_users
+-- car la colonne updated_at n'existe pas dans cette table
+DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
+
+-- Créer une fonction trigger "vide" qui ne fait rien
+-- (au cas où un autre script essaierait de créer le trigger)
 CREATE OR REPLACE FUNCTION update_company_users_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Ne rien faire si la colonne updated_at n'existe pas
-  -- (On ne peut pas vérifier dynamiquement dans un trigger, donc on essaie simplement)
-  BEGIN
-    NEW.updated_at := now();
-  EXCEPTION
-    WHEN undefined_column THEN
-      -- La colonne n'existe pas, on ignore
-      NULL;
-  END;
+  -- Fonction vide car la colonne updated_at n'existe pas dans company_users
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
