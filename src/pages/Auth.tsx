@@ -31,10 +31,12 @@ const Auth = () => {
   };
 
   useEffect(() => {
+    // Déclarer searchParams une seule fois pour tout le useEffect
+    const searchParams = new URLSearchParams(window.location.search);
+    
     // Afficher le message de succès si on vient de réinitialiser le mot de passe
     // Vérifier à la fois l'état de navigation (legacy) et les paramètres URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const resetSuccess = urlParams.get('reset') === 'success';
+    const resetSuccess = searchParams.get('reset') === 'success';
     
     if (resetSuccess) {
       toast({
@@ -57,20 +59,19 @@ const Auth = () => {
     }
 
     // Rediriger les anciennes routes d'inscription vers la connexion
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('signup') || window.location.pathname.includes('signup')) {
+    if (searchParams.has('signup') || window.location.pathname.includes('signup')) {
       navigate('/auth', { replace: true });
       return;
     }
 
     // Pré-remplir l'email depuis l'URL (pour les comptes créés via invitation)
     // Note: Le paramètre reset=success est déjà géré ci-dessus
-    if (urlParams.has('email')) {
-      const emailParam = urlParams.get('email');
+    if (searchParams.has('email')) {
+      const emailParam = searchParams.get('email');
       if (emailParam) {
         setEmail(emailParam);
         // Afficher un message si c'est pour un compte créé
-        if (urlParams.has('message') && urlParams.get('message') === 'account-created') {
+        if (searchParams.has('message') && searchParams.get('message') === 'account-created') {
           toast({
             title: "Compte créé avec succès !",
             description: `Votre compte a été créé avec l'email ${emailParam}. Veuillez vous connecter avec votre mot de passe.`,
@@ -91,21 +92,21 @@ const Auth = () => {
     const handleAuthCallback = async () => {
       // Vérifier si on est sur la route /auth/callback avec des paramètres
       const isCallbackRoute = window.location.pathname === '/auth/callback';
-      const hasAuthParams = urlParams.has('code') || urlParams.has('token') || urlParams.has('access_token') || urlParams.has('error');
+      const hasAuthParams = searchParams.has('code') || searchParams.has('token') || searchParams.has('access_token') || searchParams.has('error');
       
       if (isCallbackRoute && hasAuthParams) {
         setLoading(true);
         console.log('[Auth] Processing callback with params:', {
-          code: urlParams.has('code'),
-          token: urlParams.has('token'),
-          access_token: urlParams.has('access_token'),
-          error: urlParams.get('error'),
-          error_description: urlParams.get('error_description')
+          code: searchParams.has('code'),
+          token: searchParams.has('token'),
+          access_token: searchParams.has('access_token'),
+          error: searchParams.get('error'),
+          error_description: searchParams.get('error_description')
         });
 
         // Vérifier s'il y a une erreur dans l'URL
-        if (urlParams.has('error')) {
-          const errorMsg = urlParams.get('error_description') || urlParams.get('error') || 'Erreur lors de la connexion';
+        if (searchParams.has('error')) {
+          const errorMsg = searchParams.get('error_description') || searchParams.get('error') || 'Erreur lors de la connexion';
           setError(errorMsg);
           toast({
             title: "Erreur de connexion",
@@ -188,8 +189,8 @@ const Auth = () => {
           const isResetPasswordPage = window.location.pathname === '/reset-password' || 
                                      window.location.pathname.startsWith('/reset-password');
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const urlParams = new URLSearchParams(window.location.search);
-          const type = hashParams.get('type') || urlParams.get('type');
+          const callbackSearchParams = new URLSearchParams(window.location.search);
+          const type = hashParams.get('type') || callbackSearchParams.get('type');
           const isRecoveryToken = type === 'recovery' || 
                                   window.__IS_PASSWORD_RESET_PAGE__ === true ||
                                   window.location.href.includes('type=recovery');
