@@ -47,20 +47,77 @@ BEGIN
     RAISE NOTICE '✅ Entreprise créée pour admin: %', v_company_id;
     
     -- 5. Ajouter l'admin comme owner de l'entreprise
-    INSERT INTO public.company_users (company_id, user_id, role, status)
-    VALUES (v_company_id, v_admin_user_id, 'owner', 'active')
-    ON CONFLICT (company_id, user_id) DO UPDATE
-    SET role = 'owner', status = 'active';
+    -- Désactiver temporairement le trigger updated_at s'il existe
+    DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
+    
+    -- Vérifier si la colonne status existe
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'company_users'
+      AND column_name = 'status'
+    ) THEN
+      INSERT INTO public.company_users (company_id, user_id, role, status)
+      VALUES (v_company_id, v_admin_user_id, 'owner', 'active')
+      ON CONFLICT (company_id, user_id) DO UPDATE
+      SET role = 'owner', status = 'active';
+    ELSE
+      INSERT INTO public.company_users (company_id, user_id, role)
+      VALUES (v_company_id, v_admin_user_id, 'owner')
+      ON CONFLICT (company_id, user_id) DO UPDATE
+      SET role = 'owner';
+    END IF;
+    
+    -- Réactiver le trigger si la colonne updated_at existe
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'company_users'
+      AND column_name = 'updated_at'
+    ) THEN
+      CREATE TRIGGER update_company_users_updated_at
+      BEFORE UPDATE ON public.company_users
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    END IF;
     
     RAISE NOTICE '✅ Admin ajouté comme owner de l''entreprise';
   ELSE
     RAISE NOTICE '✅ L''utilisateur admin a déjà une entreprise: %', v_company_id;
     
-    -- S'assurer qu'il est owner
-    UPDATE public.company_users
-    SET role = 'owner', status = 'active'
-    WHERE company_id = v_company_id
-    AND user_id = v_admin_user_id;
+    -- Désactiver temporairement le trigger updated_at s'il existe
+    DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
+    
+    -- S'assurer qu'il est owner (gérer le cas où status existe ou non)
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'company_users'
+      AND column_name = 'status'
+    ) THEN
+      UPDATE public.company_users
+      SET role = 'owner', status = 'active'
+      WHERE company_id = v_company_id
+      AND user_id = v_admin_user_id;
+    ELSE
+      UPDATE public.company_users
+      SET role = 'owner'
+      WHERE company_id = v_company_id
+      AND user_id = v_admin_user_id;
+    END IF;
+    
+    -- Réactiver le trigger si la colonne updated_at existe
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'company_users'
+      AND column_name = 'updated_at'
+    ) THEN
+      CREATE TRIGGER update_company_users_updated_at
+      BEFORE UPDATE ON public.company_users
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    END IF;
   END IF;
   
   -- 6. Backfill toutes les données existantes de l'admin avec cette entreprise
