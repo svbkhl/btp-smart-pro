@@ -107,24 +107,9 @@ BEGIN
     RAISE NOTICE '✅ Rôle admin mis à jour (owner)';
   END IF;
   
-  -- 7. Réactiver le trigger si la colonne updated_at existe (après toutes les opérations)
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'company_users'
-    AND column_name = 'updated_at'
-  ) THEN
-    BEGIN
-      CREATE TRIGGER update_company_users_updated_at
-      BEFORE UPDATE ON public.company_users
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
-    EXCEPTION
-      WHEN duplicate_object THEN
-        -- Trigger existe déjà, on ignore
-        NULL;
-    END;
-  END IF;
+  -- 7. NE PAS réactiver le trigger updated_at pour company_users
+  -- car cette table n'a pas de colonne updated_at
+  -- Le trigger reste supprimé (désactivé en début de script)
   
   -- 8. Backfill toutes les données existantes de l'admin avec cette entreprise
   -- Clients
