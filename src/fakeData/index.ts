@@ -9,6 +9,7 @@ export { FAKE_PROJECTS } from "./projects";
 export { FAKE_EVENTS } from "./calendar";
 export { FAKE_QUOTES } from "./quotes";
 export { FAKE_INVOICES } from "./invoices";
+export { FAKE_PAYMENTS } from "./payments";
 export { FAKE_EMPLOYEES } from "./employees";
 export { 
   FAKE_EMPLOYEES_RH, 

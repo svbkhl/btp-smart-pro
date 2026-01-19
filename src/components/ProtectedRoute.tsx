@@ -54,8 +54,20 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     }
 
     // Timeout de sécurité : si le chargement dépasse 5 secondes, rediriger vers auth ou page d'accueil
+    // MAIS jamais si on est sur /reset-password (déjà vérifié ci-dessus avec return early)
     const timeoutId = setTimeout(() => {
       if (loading && !user) {
+        // Double vérification : ne jamais rediriger depuis /reset-password
+        const isResetPasswordPage = window.location.pathname === '/reset-password' || 
+                                    window.location.pathname.startsWith('/reset-password');
+        const hashParamsCheck = new URLSearchParams(window.location.hash.substring(1));
+        const isRecoveryTokenCheck = hashParamsCheck.get('type') === 'recovery' || 
+                                     window.__IS_PASSWORD_RESET_PAGE__ === true;
+        
+        if (isResetPasswordPage || isRecoveryTokenCheck) {
+          return; // Ne pas rediriger si on est en mode reset password
+        }
+        
         // Si on est en mode démo, rediriger vers la page d'accueil avec le formulaire
         if (fakeDataEnabled) {
           navigate("/?openTrialForm=true", { replace: true });
@@ -98,7 +110,17 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
   // En mode démo (fakeDataEnabled), permettre l'accès SEULEMENT si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
   // 2. OU l'utilisateur est administrateur (démo dans l'app)
+  // EXCEPTION : Bloquer l'accès à Settings en mode démo
   if (fakeDataEnabled) {
+    // Bloquer Settings en mode démo
+    const isSettingsPage = window.location.pathname === '/settings' || 
+                          window.location.pathname.startsWith('/settings');
+    if (isSettingsPage) {
+      console.log("🚫 [ProtectedRoute] Accès à Settings bloqué en mode démo");
+      navigate("/dashboard", { replace: true });
+      return null;
+    }
+    
     // Si l'utilisateur n'est pas connecté, permettre l'accès (démo publique depuis landing page)
     if (!user) {
       return <>{children}</>;

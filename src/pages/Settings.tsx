@@ -163,7 +163,13 @@ const Settings = () => {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/auth");
+    // Si on est en mode démo, rediriger vers le formulaire d'essai
+    const { fakeDataEnabled } = useFakeDataStore();
+    if (fakeDataEnabled) {
+      navigate("/?openTrialForm=true");
+    } else {
+      navigate("/auth");
+    }
   };
 
   return (

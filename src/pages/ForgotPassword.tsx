@@ -57,11 +57,11 @@ const ForgotPassword = () => {
       // Le template d'email doit être configuré dans Supabase Dashboard :
       // Authentication > Email Templates > Reset Password
       // Pour personnaliser le sujet et le contenu de l'email avec le branding BTP Smart Pro
-      // IMPORTANT: Le redirectTo doit utiliser l'URL absolue de production
-      // pour garantir que le lien fonctionne depuis l'email
-      const redirectUrl = import.meta.env.PROD 
-        ? 'https://www.btpsmartpro.com/reset-password'
-        : `${window.location.origin}/reset-password`;
+      // CRITIQUE: Le redirectTo doit TOUJOURS utiliser l'URL absolue avec le domaine canonique www
+      // pour garantir que Supabase redirige vers /reset-password et non vers la home
+      // Si redirectTo n'est pas spécifié ou pointe vers un domaine non configuré,
+      // Supabase utilise la Site URL par défaut (qui peut être la home)
+      const redirectUrl = 'https://www.btpsmartpro.com/reset-password';
       
       console.log('📧 [ForgotPassword] Sending reset email with redirectTo:', redirectUrl);
       

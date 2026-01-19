@@ -28,7 +28,13 @@ export const TopBar = () => {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/auth");
+    // Si on est en mode démo, rediriger vers le formulaire d'essai
+    const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
+    if (fakeDataEnabled) {
+      navigate("/?openTrialForm=true");
+    } else {
+      navigate("/auth");
+    }
   };
 
   const userInitials = user?.user_metadata?.prenom?.[0] && user?.user_metadata?.nom?.[0]

@@ -32,6 +32,20 @@ const Auth = () => {
 
   useEffect(() => {
     // Afficher le message de succès si on vient de réinitialiser le mot de passe
+    // Vérifier à la fois l'état de navigation (legacy) et les paramètres URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const resetSuccess = urlParams.get('reset') === 'success';
+    
+    if (resetSuccess) {
+      toast({
+        title: "Mot de passe mis à jour",
+        description: "Votre mot de passe a été réinitialisé avec succès. Veuillez vous connecter.",
+      });
+      // Nettoyer l'URL pour éviter de réafficher le message
+      window.history.replaceState({}, '', '/auth');
+    }
+    
+    // Legacy: Vérifier aussi l'état de navigation (pour compatibilité)
     const locationState = (window.history.state && window.history.state.usr) || {};
     if (locationState.message && locationState.type === 'success') {
       toast({
@@ -50,6 +64,7 @@ const Auth = () => {
     }
 
     // Pré-remplir l'email depuis l'URL (pour les comptes créés via invitation)
+    // Note: Le paramètre reset=success est déjà géré ci-dessus
     if (urlParams.has('email')) {
       const emailParam = urlParams.get('email');
       if (emailParam) {
