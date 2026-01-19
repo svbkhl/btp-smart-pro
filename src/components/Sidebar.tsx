@@ -242,7 +242,12 @@ export default function Sidebar() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/auth");
+    // Si on est en mode démo et pas connecté, rediriger vers le formulaire d'essai
+    if (!user && fakeDataEnabled) {
+      navigate("/?openTrialForm=true");
+    } else {
+      navigate("/auth");
+    }
   };
 
   // Ouvrir automatiquement les groupes avec des pages actives
@@ -542,30 +547,17 @@ export default function Sidebar() {
                               )}
                             </AnimatePresence>
                           </div>
-                        ) : (
-                          (user || !fakeDataEnabled) ? (
-                            <Link
-                              to={item.path}
-                              className={cn(
-                                "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                                "relative hover:shadow-lg hover:shadow-primary/20",
-                                active
-                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
-                              )}
-                            >
-                          ) : (
-                            <button
-                              onClick={(e) => handleNavigation(item.path, e)}
-                              className={cn(
-                                "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full text-left",
-                                "relative hover:shadow-lg hover:shadow-primary/20",
-                                active
-                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
-                              )}
-                            >
-                          )}
+                        ) : (user || !fakeDataEnabled) ? (
+                          <Link
+                            to={item.path}
+                            className={cn(
+                              "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                              "relative hover:shadow-lg hover:shadow-primary/20",
+                              active
+                                ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                                : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                            )}
+                          >
                             {active && (
                               <motion.div
                                 layoutId="activeTab"
@@ -583,11 +575,36 @@ export default function Sidebar() {
                               )} />
                             </motion.div>
                             <span className="relative z-10">{item.label}</span>
-                          {(user || !fakeDataEnabled) ? (
-                            </Link>
-                          ) : (
-                            </button>
-                          )}
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={(e) => handleNavigation(item.path, e)}
+                            className={cn(
+                              "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full text-left",
+                              "relative hover:shadow-lg hover:shadow-primary/20",
+                              active
+                                ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                                : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                            )}
+                          >
+                            {active && (
+                              <motion.div
+                                layoutId="activeTab"
+                                className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                              />
+                            )}
+                            <motion.div
+                              whileHover={{ scale: 1.1 }}
+                              className="relative z-10"
+                            >
+                              <Icon className={cn(
+                                "w-5 h-5 transition-colors",
+                                active && "text-primary"
+                              )} />
+                            </motion.div>
+                            <span className="relative z-10">{item.label}</span>
+                          </button>
                         )}
                       </motion.div>
                     </div>
@@ -626,6 +643,24 @@ export default function Sidebar() {
                         : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
                     )}
                   >
+                    {active && (
+                      <motion.div
+                        layoutId="activeTabSettings"
+                        className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      />
+                    )}
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      className="relative z-10"
+                    >
+                      <Icon className={cn(
+                        "w-5 h-5 transition-colors",
+                        active && "text-primary"
+                      )} />
+                    </motion.div>
+                    <span className="relative z-10">{item.label}</span>
+                  </Link>
                 ) : (
                   <button
                     onClick={(e) => handleNavigation(item.path, e)}
@@ -637,27 +672,23 @@ export default function Sidebar() {
                         : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
                     )}
                   >
-                )}
-                  {active && (
+                    {active && (
+                      <motion.div
+                        layoutId="activeTabSettings"
+                        className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      />
+                    )}
                     <motion.div
-                      layoutId="activeTabSettings"
-                      className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className="relative z-10"
-                  >
-                    <Icon className={cn(
-                      "w-5 h-5 transition-colors",
-                      active && "text-primary"
-                    )} />
-                  </motion.div>
-                  <span className="relative z-10">{item.label}</span>
-                {(user || !fakeDataEnabled) ? (
-                  </Link>
-                ) : (
+                      whileHover={{ scale: 1.1 }}
+                      className="relative z-10"
+                    >
+                      <Icon className={cn(
+                        "w-5 h-5 transition-colors",
+                        active && "text-primary"
+                      )} />
+                    </motion.div>
+                    <span className="relative z-10">{item.label}</span>
                   </button>
                 )}
               </motion.div>

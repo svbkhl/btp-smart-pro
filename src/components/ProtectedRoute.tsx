@@ -72,12 +72,13 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     if (!user && !showContent) {
       // Si on est en mode démo (fakeDataEnabled), rediriger vers la page d'accueil avec le formulaire d'essai
       if (fakeDataEnabled) {
-        console.log("🎮 Mode démo actif - Redirection vers page d'accueil avec formulaire d'essai");
+        console.log("🎮 [ProtectedRoute] Mode démo actif - Redirection vers page d'accueil avec formulaire d'essai");
         navigate("/?openTrialForm=true", { replace: true });
         return () => clearTimeout(timeoutId);
       }
-      // Sinon, rediriger vers /auth normalement
-      if (window.location.pathname !== "/auth") {
+      // Sinon, rediriger vers /auth normalement (uniquement si on n'est pas déjà sur /auth)
+      if (window.location.pathname !== "/auth" && !fakeDataEnabled) {
+        console.log("🔒 [ProtectedRoute] Redirection vers /auth (mode normal)");
         window.location.replace("/auth");
       }
       return () => clearTimeout(timeoutId);
@@ -92,7 +93,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     }
     
     return () => clearTimeout(timeoutId);
-  }, [user, loading, isAdmin, requireAdmin, navigate, showContent]);
+  }, [user, loading, isAdmin, requireAdmin, navigate, showContent, fakeDataEnabled]);
 
   // En mode démo (fakeDataEnabled), permettre l'accès SEULEMENT si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
@@ -124,6 +125,11 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
 
   // Si pas d'utilisateur après timeout, rediriger
   if (!user && showContent) {
+    // Si on est en mode démo, rediriger vers le formulaire d'essai
+    if (fakeDataEnabled) {
+      console.log("🎮 [ProtectedRoute] Timeout - Mode démo actif, redirection vers formulaire d'essai");
+      navigate("/?openTrialForm=true", { replace: true });
+    }
     return null; // Le useEffect gère la redirection
   }
   
