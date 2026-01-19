@@ -38,7 +38,7 @@ import { InvoiceDisplay } from "@/components/invoices/InvoiceDisplay";
 import { InvoiceActionButtons } from "@/components/invoices/InvoiceActionButtons";
 import { CreateInvoiceFromQuoteDialog } from "@/components/invoices/CreateInvoiceFromQuoteDialog";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
-import { QuoteDetailView } from "@/components/quotes/QuoteDetailView";
+import QuoteDetailView from "@/components/quotes/QuoteDetailView";
 import { Quote } from "@/hooks/useQuotes";
 import { Invoice } from "@/hooks/useInvoices";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
