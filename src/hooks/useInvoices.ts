@@ -340,13 +340,6 @@ export const useCreateInvoice = () => {
         
         const { data: quote, error: quoteError } = await quoteQuery.maybeSingle();
         
-        const { data: quote, error: quoteError } = await supabase
-          .from("ai_quotes")
-          .select("id, client_id, client_name, company_id, tva_rate, tva_non_applicable_293b, subtotal_ht, total_tva, total_ttc, mode, estimated_cost")
-          .eq("id", data.quote_id)
-          .eq("company_id", currentCompanyId || "")
-          .maybeSingle();
-        
         if (quoteError) {
           console.error("❌ [useCreateInvoice] Erreur récupération devis:", quoteError);
         } else if (quote) {
