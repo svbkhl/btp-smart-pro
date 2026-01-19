@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useEmployeesRH, useEmployeeRH } from "@/hooks/useRH";
-import { Search, User, Mail, Phone, Calendar, AlertTriangle, Loader2, Plus } from "lucide-react";
+import { Search, User, Mail, Phone, Calendar, AlertTriangle, Loader2, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -25,13 +25,25 @@ import { useToast } from "@/components/ui/use-toast";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useCompany } from "@/hooks/useCompany";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
+import { useDeleteEmployee } from "@/hooks/useEmployees";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const RHEmployees = () => {
   const { user } = useAuth();
@@ -42,6 +54,8 @@ const RHEmployees = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const { data: selectedEmployee, isLoading: selectedLoading } = useEmployeeRH(selectedEmployeeId || "");
+  const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
+  const deleteEmployee = useDeleteEmployee();
   const isMobile = useIsMobile();
   const [employeeForm, setEmployeeForm] = useState({
     email: "",
@@ -93,6 +107,22 @@ const RHEmployees = () => {
       }
     }
     return alerts;
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+    
+    try {
+      await deleteEmployee.mutateAsync(employeeToDelete);
+      setEmployeeToDelete(null);
+      // Si l'employé supprimé était celui sélectionné, fermer le dialog
+      if (selectedEmployeeId === employeeToDelete) {
+        setSelectedEmployeeId(null);
+      }
+    } catch (error) {
+      // L'erreur est déjà gérée par le hook
+      console.error("Error deleting employee:", error);
+    }
   };
 
   const displayEmployees = employees || [];
@@ -247,14 +277,23 @@ const RHEmployees = () => {
                         </div>
 
                         {/* Actions */}
-                        <div className="pt-2 border-t border-border/50">
+                        <div className="pt-2 border-t border-border/50 flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full"
+                            className="flex-1"
                             onClick={() => setSelectedEmployeeId(employee.id)}
                           >
                             Voir détails
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setEmployeeToDelete(employee.id)}
+                            disabled={deleteEmployee.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -341,14 +380,25 @@ const RHEmployees = () => {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setSelectedEmployeeId(employee.id)}
-                                  className="rounded-lg"
-                                >
-                                  Voir détails
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setSelectedEmployeeId(employee.id)}
+                                    className="rounded-lg"
+                                  >
+                                    Voir détails
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEmployeeToDelete(employee.id)}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                    disabled={deleteEmployee.isPending}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -362,6 +412,37 @@ const RHEmployees = () => {
           </>
         )}
       </div>
+
+      {/* Dialog de confirmation de suppression */}
+      <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer cet employé ? Cette action est irréversible et supprimera également son compte utilisateur.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteEmployee.isPending}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEmployee}
+              disabled={deleteEmployee.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteEmployee.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Suppression...
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog détails employé */}
       <Dialog open={!!selectedEmployeeId} onOpenChange={() => setSelectedEmployeeId(null)}>

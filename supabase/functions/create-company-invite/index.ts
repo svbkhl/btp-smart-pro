@@ -20,6 +20,8 @@ import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "3600",
 };
 
 interface CreateInviteRequest {
@@ -29,9 +31,12 @@ interface CreateInviteRequest {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   if (req.method !== "POST") {
@@ -83,19 +88,86 @@ serve(async (req) => {
     }
 
     // Parser le body
-    const body: CreateInviteRequest = await req.json();
+    let body: CreateInviteRequest;
+    try {
+      const bodyText = await req.text();
+      console.log("📥 Raw request body:", bodyText);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        return new Response(
+          JSON.stringify({ 
+            error: "Empty request body",
+            message: "Le corps de la requête est vide",
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      body = JSON.parse(bodyText);
+    } catch (parseError: any) {
+      console.error("❌ Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid JSON in request body",
+          message: "Format de données invalide",
+          details: parseError.message 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { company_id, email, role } = body;
 
-    if (!company_id || !email || !role) {
+    console.log("📥 Received invite request:", { 
+      company_id: company_id || null, 
+      email: email || null, 
+      role: role || null,
+      company_id_type: typeof company_id,
+      company_id_length: company_id?.length || 0,
+      has_company_id: !!company_id
+    });
+
+    // Validation des champs requis avec messages détaillés
+    if (!company_id || (typeof company_id === 'string' && company_id.trim() === '')) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: company_id, email, role" }),
+        JSON.stringify({ 
+          error: "Missing required field: company_id",
+          message: "L'ID de l'entreprise est requis",
+          details: `company_id reçu: ${company_id} (type: ${typeof company_id})`
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!email || (typeof email === 'string' && email.trim() === '')) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing required field: email",
+          message: "L'email est requis",
+          details: `email reçu: ${email}`
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!role || (typeof role === 'string' && role.trim() === '')) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing required field: role",
+          message: "Le rôle est requis",
+          details: `role reçu: ${role}`
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (!['admin', 'member'].includes(role)) {
       return new Response(
-        JSON.stringify({ error: "Invalid role. Must be 'admin' or 'member'" }),
+        JSON.stringify({ 
+          error: "Invalid role. Must be 'admin' or 'member'",
+          message: `Le rôle "${role}" n'est pas valide. Les rôles valides sont: admin, member`,
+          details: `role reçu: ${role}`
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

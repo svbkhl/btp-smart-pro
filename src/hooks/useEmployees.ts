@@ -206,6 +206,8 @@ export const useDeleteEmployee = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employees-rh"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-rh"] });
       toast({
         title: "Employé supprimé",
         description: "L'employé et son compte ont été supprimés.",

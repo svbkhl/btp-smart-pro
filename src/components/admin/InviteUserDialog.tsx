@@ -70,126 +70,199 @@ export const InviteUserDialog = ({
 
     setLoading(true);
 
-    try {
-      // Vérifier que l'utilisateur est connecté
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session) {
-        toast({
-          title: 'Erreur',
-          description: 'Vous devez être connecté pour envoyer une invitation',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const emailToSend = email.trim().toLowerCase();
-      
-      // Validation du rôle (owner ne peut pas être invité)
-      if (role === 'owner') {
-        toast({
-          title: 'Erreur',
-          description: 'Le rôle "owner" ne peut pas être attribué via invitation',
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Envoyer email + rôle + company_id (format attendu par create-company-invite)
-      const requestBody = { 
-        company_id: companyId,
-        email: emailToSend,
-        role: role, // 'admin' ou 'member'
-      };
-      
-      console.log("📤 Sending invitation request - Body:", JSON.stringify(requestBody));
-      console.log("🔐 User session:", session.session?.user?.email);
-
-      // Utiliser create-company-invite Edge Function
-      const { data, error } = await supabase.functions.invoke("create-company-invite", {
-        body: requestBody,
-      });
-
-      console.log("📥 Response received:", { data, error });
-
-      if (error) {
-        console.error("❌ Supabase function error:", error);
-        // Extraire le message d'erreur
-        let errorMessage = error.message || 'Impossible d\'envoyer l\'invitation';
-        
-        // Si l'erreur contient un body JSON avec un message d'erreur
-        if (error.context?.body) {
-          try {
-            const errorBody = typeof error.context.body === 'string' 
-              ? JSON.parse(error.context.body) 
-              : error.context.body;
-            console.log("📋 Error body:", errorBody);
-            if (errorBody?.error) {
-              errorMessage = errorBody.error;
-            }
-            if (errorBody?.details) {
-              errorMessage += ` - ${errorBody.details}`;
-            }
-          } catch (e) {
-            console.error("❌ Error parsing error body:", e);
-          }
-        }
-        
-        toast({
-          title: 'Erreur',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Format de réponse attendu : { success: true, message: string, invite_id: string, expires_at: string }
-      if (data?.success === true) {
-        setSuccess(true);
-        toast({
-          title: 'Invitation envoyée avec succès !',
-          description: data?.message || `Une invitation a été envoyée à ${emailToSend}`,
-        });
-        
-        // Réinitialiser après 2 secondes pour permettre de voir le message
-        setTimeout(() => {
-          setEmail('');
-          setSuccess(false);
-          setOpen(false);
-          onSuccess?.();
-        }, 2000);
-        return;
-      }
-
-      // Vérifier si data contient une erreur
-      if (data?.error) {
-        console.error("❌ Function returned error:", data.error);
-        toast({
-          title: 'Erreur',
-          description: data.error + (data.details ? ` - ${data.details}` : ''),
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Réponse inattendue
-      console.warn("⚠️ Unexpected response format:", data);
+    // Vérifier que l'utilisateur est connecté
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session) {
       toast({
-        title: 'Réponse inattendue',
-        description: 'Le serveur a retourné une réponse inattendue. Veuillez réessayer.',
+        title: 'Erreur',
+        description: 'Vous devez être connecté pour envoyer une invitation',
         variant: 'destructive',
       });
       setLoading(false);
+      return;
+    }
 
+    const emailToSend = email.trim().toLowerCase();
+    
+    // Validation du rôle (owner ne peut pas être invité)
+    if (role === 'owner') {
+      toast({
+        title: 'Erreur',
+        description: 'Le rôle "owner" ne peut pas être attribué via invitation',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Vérifier que companyId est défini
+    if (!companyId || companyId.trim() === '') {
+      toast({
+        title: 'Erreur',
+        description: 'L\'ID de l\'entreprise n\'est pas défini. Veuillez réessayer.',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Vérifier que le rôle est valide
+    if (role !== 'admin' && role !== 'member') {
+      toast({
+        title: 'Erreur',
+        description: 'Le rôle doit être "admin" ou "member"',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Envoyer email + rôle + company_id (format attendu par create-company-invite)
+    const requestBody = { 
+      company_id: companyId.trim(),
+      email: emailToSend,
+      role: role, // 'admin' ou 'member'
+    };
+    
+    console.log("📤 Sending invitation request - Body:", JSON.stringify(requestBody));
+    console.log("🔐 User session:", session.session?.user?.email);
+    console.log("🏢 Company ID:", companyId);
+
+    // Utiliser fetch directement pour avoir plus de contrôle sur la gestion d'erreur
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const accessToken = session.session?.access_token;
+
+    if (!accessToken) {
+      toast({
+        title: 'Erreur',
+        description: 'Session expirée. Veuillez vous reconnecter.',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!supabaseUrl) {
+      toast({
+        title: 'Erreur',
+        description: 'Configuration manquante. Veuillez contacter le support.',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-company-invite`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log("📥 Response status:", response.status);
+        console.log("📥 Response ok:", response.ok);
+
+        // Lire le corps de la réponse
+        const responseText = await response.text();
+        console.log("📥 Response text:", responseText);
+
+        let responseData: any = null;
+        try {
+          responseData = responseText ? JSON.parse(responseText) : null;
+        } catch (e) {
+          console.error("❌ Error parsing response:", e);
+        }
+
+        console.log("📥 Response data:", responseData);
+
+        // Si la réponse n'est pas OK, extraire l'erreur
+        if (!response.ok) {
+          const errorMessage = responseData?.message || responseData?.error || `Erreur ${response.status}: ${response.statusText}`;
+          
+          // Gérer les erreurs spécifiques
+          let userMessage = errorMessage;
+          if (errorMessage.includes('Missing required field: company_id') || errorMessage.includes('company_id')) {
+            userMessage = 'L\'ID de l\'entreprise est manquant. Veuillez réessayer.';
+          } else if (errorMessage.includes('Missing required fields')) {
+            userMessage = 'Champs manquants: vérifiez que l\'entreprise, l\'email et le rôle sont définis';
+          } else if (errorMessage.includes('Invalid role')) {
+            userMessage = 'Rôle invalide. Le rôle doit être "admin" ou "member"';
+          } else if (errorMessage.includes('Company not found')) {
+            userMessage = 'Entreprise non trouvée. Vérifiez que vous avez sélectionné une entreprise valide';
+          } else if (errorMessage.includes('already pending')) {
+            userMessage = 'Une invitation est déjà en attente pour cet email';
+          } else if (errorMessage.includes('already a member')) {
+            userMessage = 'Cet utilisateur est déjà membre de cette entreprise';
+          } else if (errorMessage.includes('Unauthorized') || response.status === 401) {
+            userMessage = 'Non autorisé. Veuillez vous reconnecter.';
+          } else if (errorMessage.includes('Invalid JSON') || errorMessage.includes('parsing')) {
+            userMessage = 'Erreur de format de données. Veuillez réessayer.';
+          } else if (response.status === 400) {
+            userMessage = responseData?.message || responseData?.error || 'Requête invalide. Vérifiez que tous les champs sont correctement remplis.';
+          } else if (response.status === 403) {
+            userMessage = 'Vous n\'avez pas les permissions nécessaires pour inviter des utilisateurs.';
+          }
+
+          toast({
+            title: 'Erreur',
+            description: userMessage,
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Traiter la réponse de succès
+        // Format de réponse attendu : { success: true, message: string, invite_id: string, expires_at: string }
+        if (responseData?.success === true) {
+          setSuccess(true);
+          toast({
+            title: 'Invitation envoyée avec succès !',
+            description: responseData?.message || `Une invitation a été envoyée à ${emailToSend}`,
+          });
+          
+          // Réinitialiser après 2 secondes pour permettre de voir le message
+          setTimeout(() => {
+            setEmail('');
+            setSuccess(false);
+            setOpen(false);
+            onSuccess?.();
+          }, 2000);
+          setLoading(false);
+          return;
+        }
+
+        // Vérifier si responseData contient une erreur (même si status est OK)
+        if (responseData?.error) {
+          console.error("❌ Function returned error:", responseData.error);
+          toast({
+            title: 'Erreur',
+            description: responseData.error + (responseData.details ? ` - ${responseData.details}` : ''),
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Réponse inattendue
+        console.warn("⚠️ Unexpected response format:", responseData);
+        toast({
+          title: 'Réponse inattendue',
+          description: 'Le serveur a retourné une réponse inattendue. Veuillez réessayer.',
+          variant: 'destructive',
+        });
+        setLoading(false);
     } catch (e: any) {
       console.error('❌ Error sending invitation:', e);
       toast({
         title: 'Erreur',
-        description: e.message || 'Erreur inconnue',
+        description: e.message || 'Erreur inconnue lors de l\'envoi de l\'invitation',
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };

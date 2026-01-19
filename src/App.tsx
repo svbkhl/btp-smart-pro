@@ -53,6 +53,8 @@ import AdminCompanies from './pages/AdminCompanies';
 import AcceptInvitation from './pages/AcceptInvitation';
 import InviteAccept from './pages/InviteAccept';
 import StripeCallback from './pages/StripeCallback';
+import ResetPassword from './pages/ResetPassword';
+import ForgotPassword from './pages/ForgotPassword';
 import NotFound from './pages/NotFound';
 
 // Pages RBAC (Gestion des rôles et utilisateurs)
@@ -70,7 +72,9 @@ function App() {
     location.pathname.startsWith('/signature/') ||
     location.pathname.startsWith('/payment/') ||
     location.pathname.startsWith('/candidature/') ||
-    location.pathname.startsWith('/quote/');
+    location.pathname.startsWith('/quote/') ||
+    location.pathname.startsWith('/reset-password') ||
+    location.pathname.startsWith('/forgot-password');
   
   return (
     <ErrorBoundary>
@@ -84,6 +88,8 @@ function App() {
         {/* Route callback DOIT être AVANT /auth pour éviter les conflits de matching */}
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/invite/accept" element={<InviteAccept />} />
         <Route path="/stripe-callback" element={<StripeCallback />} />

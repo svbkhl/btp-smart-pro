@@ -262,106 +262,108 @@ export const QuotesTable = ({
       )}
 
       {/* Tableau */}
-      <GlassCard className="p-4 sm:p-6 overflow-x-auto">
+      <GlassCard className="p-2 sm:p-4 md:p-6">
         {filteredQuotes.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-8 sm:py-12">
             {searchQuery || statusFilter !== "all" ? (
               <div>
-                <p className="text-muted-foreground mb-2">
+                <p className="text-sm sm:text-base text-muted-foreground mb-2">
                   Aucun devis ne correspond aux filtres
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Essayez de modifier vos critères de recherche
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <p className="text-lg font-medium text-muted-foreground">
+              <div className="space-y-2 sm:space-y-4">
+                <p className="text-base sm:text-lg font-medium text-muted-foreground">
                   Aucun devis
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Commencez par créer votre premier devis.
                 </p>
               </div>
             )}
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">{selectionMode ? "Sélection" : "Action"}</TableHead>
-                <TableHead className="w-[120px]">Numéro</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Montant</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredQuotes.map((quote) => (
-                <TableRow key={quote.id}>
-                  {selectionMode && (
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(quote.id)}
-                        onCheckedChange={(checked) => handleSelectOne(quote.id, checked as boolean)}
-                        aria-label={`Sélectionner ${quote.quote_number}`}
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <Table className="min-w-[800px] sm:min-w-0">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[60px] sm:w-[120px]">{selectionMode ? "Sélection" : "Action"}</TableHead>
+                  <TableHead className="w-[100px] sm:w-[120px]">Numéro</TableHead>
+                  <TableHead className="min-w-[120px]">Client</TableHead>
+                  <TableHead className="text-right w-[100px]">Montant</TableHead>
+                  <TableHead className="hidden sm:table-cell">Statut</TableHead>
+                  <TableHead className="hidden md:table-cell w-[100px]">Date</TableHead>
+                  <TableHead className="text-right w-[100px] sm:w-auto">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredQuotes.map((quote) => (
+                  <TableRow key={quote.id}>
+                    {selectionMode && (
+                      <TableCell className="w-[60px] sm:w-[120px]">
+                        <Checkbox
+                          checked={selectedIds.has(quote.id)}
+                          onCheckedChange={(checked) => handleSelectOne(quote.id, checked as boolean)}
+                          aria-label={`Sélectionner ${quote.quote_number}`}
+                        />
+                      </TableCell>
+                    )}
+                    {!selectionMode && <TableCell className="w-[60px] sm:w-[120px]"></TableCell>}
+                    <TableCell className="font-medium text-sm sm:text-base">
+                      {quote.quote_number || quote.id.substring(0, 8)}
+                    </TableCell>
+                    <TableCell className="min-w-[120px]">
+                      <div className="flex items-center gap-2">
+                        <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="truncate">{quote.client_name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-sm sm:text-base whitespace-nowrap">
+                      {(quote.total_ttc ?? quote.estimated_cost ?? 0).toLocaleString("fr-FR", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <QuoteStatusBadge 
+                        status={getQuoteStatus(quote)} 
+                        signedAt={quote.signed_at}
                       />
                     </TableCell>
-                  )}
-                  {!selectionMode && <TableCell></TableCell>}
-                  <TableCell className="font-medium">
-                    {quote.quote_number || quote.id.substring(0, 8)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                      {quote.client_name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {(quote.total_ttc ?? quote.estimated_cost ?? 0).toLocaleString("fr-FR", {
-                      style: "currency",
-                      currency: "EUR",
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <QuoteStatusBadge 
-                      status={getQuoteStatus(quote)} 
-                      signedAt={quote.signed_at}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      {format(new Date(quote.created_at), "d MMM yyyy", { locale: fr })}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {onView && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onView(quote)}
-                          className="h-8 w-8"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <QuoteActionButtons
-                        quote={quote}
-                        onEdit={onEdit ? () => onEdit(quote) : undefined}
-                        onSend={onSend ? () => onSend(quote) : undefined}
-                        onSign={onSign ? () => onSign(quote) : undefined}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                        {format(new Date(quote.created_at), "d MMM yyyy", { locale: fr })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
+                        {onView && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onView(quote)}
+                            className="h-7 w-7 sm:h-8 sm:w-8"
+                          >
+                            <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </Button>
+                        )}
+                        <QuoteActionButtons
+                          quote={quote}
+                          onEdit={onEdit ? () => onEdit(quote) : undefined}
+                          onSend={onSend ? () => onSend(quote) : undefined}
+                          onSign={onSign ? () => onSign(quote) : undefined}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </GlassCard>
     </div>

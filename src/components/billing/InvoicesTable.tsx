@@ -237,90 +237,92 @@ export const InvoicesTable = ({
       </GlassCard>
 
       {/* Tableau */}
-      <GlassCard className="p-4 sm:p-6 overflow-x-auto">
+      <GlassCard className="p-2 sm:p-4 md:p-6">
         {filteredInvoices.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
+          <div className="text-center py-8 sm:py-12">
+            <p className="text-sm sm:text-base text-muted-foreground">
               {searchQuery || statusFilter !== "all" 
                 ? "Aucune facture ne correspond aux filtres" 
                 : "Aucune facture"}
             </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">{selectionMode ? "Sélection" : "Action"}</TableHead>
-                <TableHead className="w-[120px]">Numéro</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Montant</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInvoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  {selectionMode && (
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(invoice.id)}
-                        onCheckedChange={(checked) => handleSelectOne(invoice.id, checked as boolean)}
-                        aria-label={`Sélectionner ${invoice.invoice_number}`}
-                      />
-                    </TableCell>
-                  )}
-                  {!selectionMode && <TableCell></TableCell>}
-                  <TableCell className="font-medium">
-                    {invoice.invoice_number || invoice.id.substring(0, 8)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                      {invoice.client_name || "Non spécifié"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {/* ✅ CORRECTION P0: Lire total_ttc (colonne réelle) avec fallback */}
-                    {(invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? invoice.total_amount ?? 0).toLocaleString("fr-FR", {
-                      style: "currency",
-                      currency: "EUR",
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusColor(invoice.status) as any}>
-                      {getStatusLabel(invoice.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      {format(new Date(invoice.created_at), "d MMM yyyy", { locale: fr })}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {onView && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onView(invoice)}
-                          className="h-8 w-8"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <InvoiceActionButtons
-                        invoice={invoice}
-                        onDelete={onDelete ? () => onDelete(invoice.id) : undefined}
-                      />
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <Table className="min-w-[800px] sm:min-w-0">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[60px] sm:w-[120px]">{selectionMode ? "Sélection" : "Action"}</TableHead>
+                  <TableHead className="w-[100px] sm:w-[120px]">Numéro</TableHead>
+                  <TableHead className="min-w-[120px]">Client</TableHead>
+                  <TableHead className="text-right w-[100px]">Montant</TableHead>
+                  <TableHead className="hidden sm:table-cell">Statut</TableHead>
+                  <TableHead className="hidden md:table-cell w-[100px]">Date</TableHead>
+                  <TableHead className="text-right w-[100px] sm:w-auto">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredInvoices.map((invoice) => (
+                  <TableRow key={invoice.id}>
+                    {selectionMode && (
+                      <TableCell className="w-[60px] sm:w-[120px]">
+                        <Checkbox
+                          checked={selectedIds.has(invoice.id)}
+                          onCheckedChange={(checked) => handleSelectOne(invoice.id, checked as boolean)}
+                          aria-label={`Sélectionner ${invoice.invoice_number}`}
+                        />
+                      </TableCell>
+                    )}
+                    {!selectionMode && <TableCell className="w-[60px] sm:w-[120px]"></TableCell>}
+                    <TableCell className="font-medium text-sm sm:text-base">
+                      {invoice.invoice_number || invoice.id.substring(0, 8)}
+                    </TableCell>
+                    <TableCell className="min-w-[120px]">
+                      <div className="flex items-center gap-2">
+                        <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="truncate">{invoice.client_name || "Non spécifié"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-sm sm:text-base whitespace-nowrap">
+                      {/* ✅ CORRECTION P0: Lire total_ttc (colonne réelle) avec fallback */}
+                      {(invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? invoice.total_amount ?? 0).toLocaleString("fr-FR", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Badge variant={getStatusColor(invoice.status) as any}>
+                        {getStatusLabel(invoice.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                        {format(new Date(invoice.created_at), "d MMM yyyy", { locale: fr })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
+                        {onView && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onView(invoice)}
+                            className="h-7 w-7 sm:h-8 sm:w-8"
+                          >
+                            <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </Button>
+                        )}
+                        <InvoiceActionButtons
+                          invoice={invoice}
+                          onDelete={onDelete ? () => onDelete(invoice.id) : undefined}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </GlassCard>
     </div>

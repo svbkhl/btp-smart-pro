@@ -336,10 +336,10 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
   return (
     <div className="space-y-6">
       {/* Paramètres facture */}
-      <GlassCard className="p-6">
-        <div className="space-y-4 mb-4">
-          <h3 className="text-lg font-semibold">Paramètres de la facture</h3>
-          <p className="text-sm text-muted-foreground">
+      <GlassCard className="p-4 sm:p-6">
+        <div className="space-y-2 sm:space-y-4 mb-4">
+          <h3 className="text-base sm:text-lg font-semibold">Paramètres de la facture</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Configurez le client et les options de TVA
           </p>
         </div>
@@ -400,10 +400,10 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
 
       {/* Éditeur sections/lignes */}
       {canEdit && (
-        <GlassCard className="p-6">
-          <div className="space-y-4 mb-4">
-            <h3 className="text-lg font-semibold">Facture détaillée</h3>
-            <p className="text-sm text-muted-foreground">
+        <GlassCard className="p-4 sm:p-6">
+          <div className="space-y-2 sm:space-y-4 mb-4">
+            <h3 className="text-base sm:text-lg font-semibold">Facture détaillée</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Ajoutez des sections (corps de métier) et des lignes (prestations) avec quantités et prix
             </p>
           </div>
@@ -421,18 +421,19 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
               )}
 
               {localSections.map((section) => (
-                <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
-                  <div className="flex items-center justify-between gap-2">
+                <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                     <SectionTitleInput
                       value={section.title}
                       onChange={(title) => handleUpdateSection(section.id, title)}
                       placeholder="Titre de la section (ex: Plâtrerie - Isolation)"
-                      className="font-semibold flex-1"
+                      className="font-semibold flex-1 text-sm sm:text-base"
                     />
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteSection(section.id)}
+                      className="w-full sm:w-auto"
                     >
                       Supprimer
                     </Button>
@@ -473,47 +474,51 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
                             />
                             
                             {/* Ligne 2: Unité, Quantité, Prix HT, Total, Supprimer */}
-                            <div className="flex gap-4 items-center w-full">
-                              <Select
-                                value={line.unit}
-                                onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
-                              >
-                                <SelectTrigger className="w-[140px] text-base min-h-[48px] px-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="m²">m²</SelectItem>
-                                  <SelectItem value="ml">ml</SelectItem>
-                                  <SelectItem value="h">h</SelectItem>
-                                  <SelectItem value="u">u</SelectItem>
-                                  <SelectItem value="forfait">forfait</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <Input
-                                type="number"
-                                className="w-[140px] text-base min-h-[48px] px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
-                                value={line.quantity ?? ""}
-                                onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
-                                placeholder="Quantité"
-                              />
-                              <Input
-                                type="number"
-                                className="w-[160px] text-base min-h-[48px] px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
-                                value={line.unit_price_ht ?? ""}
-                                onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
-                                placeholder="Prix HT"
-                              />
-                              <div className="w-[140px] text-right font-semibold text-base min-h-[48px] flex items-center justify-end whitespace-nowrap">
-                                {lineTotal.toFixed(2)} €
+                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center w-full">
+                              <div className="flex gap-2 flex-1">
+                                <Select
+                                  value={line.unit}
+                                  onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
+                                >
+                                  <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="m²">m²</SelectItem>
+                                    <SelectItem value="ml">ml</SelectItem>
+                                    <SelectItem value="h">h</SelectItem>
+                                    <SelectItem value="u">u</SelectItem>
+                                    <SelectItem value="forfait">forfait</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="number"
+                                  className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                  value={line.quantity ?? ""}
+                                  onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
+                                  placeholder="Qté"
+                                />
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="default"
-                                onClick={() => handleDeleteLine(line.id)}
-                                className="min-h-[48px] min-w-[48px] text-xl font-bold flex-shrink-0"
-                              >
-                                ×
-                              </Button>
+                              <div className="flex gap-2 items-center flex-1 sm:flex-initial">
+                                <Input
+                                  type="number"
+                                  className="flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                  value={line.unit_price_ht ?? ""}
+                                  onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
+                                  placeholder="Prix HT"
+                                />
+                                <div className="min-w-[80px] sm:w-[140px] text-right font-semibold text-sm sm:text-base min-h-[48px] flex items-center justify-end whitespace-nowrap">
+                                  {lineTotal.toFixed(2)} €
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="default"
+                                  onClick={() => handleDeleteLine(line.id)}
+                                  className="min-h-[48px] min-w-[48px] text-xl font-bold flex-shrink-0"
+                                >
+                                  ×
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         );

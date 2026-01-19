@@ -6,17 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+
+// Déclaration de type pour la propriété globale window
+declare global {
+  interface Window {
+    __IS_PASSWORD_RESET_PAGE__?: boolean;
+  }
+}
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -25,11 +24,6 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [resettingPassword, setResettingPassword] = useState(false);
-  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   const requiresProfileCompletion = (user?: User | null) => {
     const metadata = user?.user_metadata || {};
@@ -42,6 +36,21 @@ const Auth = () => {
     if (urlParams.has('signup') || window.location.pathname.includes('signup')) {
       navigate('/auth', { replace: true });
       return;
+    }
+
+    // Pré-remplir l'email depuis l'URL (pour les comptes créés via invitation)
+    if (urlParams.has('email')) {
+      const emailParam = urlParams.get('email');
+      if (emailParam) {
+        setEmail(emailParam);
+        // Afficher un message si c'est pour un compte créé
+        if (urlParams.has('message') && urlParams.get('message') === 'account-created') {
+          toast({
+            title: "Compte créé avec succès !",
+            description: `Votre compte a été créé avec l'email ${emailParam}. Veuillez vous connecter avec votre mot de passe.`,
+          });
+        }
+      }
     }
 
     const handlePostAuthNavigation = (sessionUser: User) => {
@@ -129,13 +138,26 @@ const Auth = () => {
       console.log('[Auth] Auth state changed:', { event, hasSession: !!session, hasUser: !!session?.user });
       
       if (event === "PASSWORD_RECOVERY") {
-        setIsResetDialogOpen(true);
+        // Rediriger vers la page de réinitialisation professionnelle
+        navigate('/reset-password', { replace: true });
         setLoading(false);
         return;
       }
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (session?.user) {
+          // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
+          // ou si c'est une session de réinitialisation
+          const isResetPasswordPage = window.location.pathname === '/reset-password';
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const isRecoveryToken = hashParams.get('type') === 'recovery' || 
+                                  window.__IS_PASSWORD_RESET_PAGE__ === true;
+          
+          if (isResetPasswordPage || isRecoveryToken) {
+            console.log('[Auth] Ignoring SIGNED_IN event on reset password page');
+            return;
+          }
+          
           handlePostAuthNavigation(session.user);
           // Nettoyer l'URL si on est sur /auth/callback
           if (window.location.pathname === '/auth/callback') {
@@ -145,6 +167,17 @@ const Auth = () => {
       }
 
       if (session?.user) {
+        // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
+        const isResetPasswordPage = window.location.pathname === '/reset-password';
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const isRecoveryToken = hashParams.get('type') === 'recovery' || 
+                                window.__IS_PASSWORD_RESET_PAGE__ === true;
+        
+        if (isResetPasswordPage || isRecoveryToken) {
+          console.log('[Auth] Ignoring session user on reset password page');
+          return;
+        }
+        
         handlePostAuthNavigation(session.user);
       }
     });
@@ -158,63 +191,183 @@ const Auth = () => {
     setLoading(true);
     setError(null);
 
+    // Normaliser l'email (lowercase, trim)
+    const normalizedEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    // Logger les informations de la requête (sans le mot de passe en clair)
+    console.log('🔐 [handleSignIn] Starting login attempt:', {
+      email: normalizedEmail,
+      passwordLength: cleanPassword.length,
+      hasPassword: cleanPassword.length > 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Vérifier les variables d'environnement
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    console.log('🔧 [handleSignIn] Configuration check:', {
+      hasSupabaseUrl: !!supabaseUrl,
+      supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING',
+      hasAnonKey: !!supabaseAnonKey,
+      anonKeyPreview: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING',
+    });
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Intercepter la requête pour logger les détails
+      const startTime = Date.now();
+      
+      // Faire la requête avec interception
+      const signInPromise = supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: cleanPassword,
       });
 
-      if (error) {
-        // Gérer les erreurs spécifiques de Supabase
+      const result = await signInPromise;
+      const duration = Date.now() - startTime;
+
+      console.log('📥 [handleSignIn] Response received:', {
+        duration: `${duration}ms`,
+        hasError: !!result.error,
+        hasData: !!result.data,
+        hasUser: !!result.data?.user,
+        errorStatus: result.error?.status,
+        errorName: result.error?.name,
+      });
+
+      if (result.error) {
+        // Logger les détails complets de l'erreur
+        const errorDetails = {
+          message: result.error.message,
+          status: result.error.status,
+          name: result.error.name,
+          // Essayer d'extraire plus d'informations de l'erreur
+          errorString: JSON.stringify(result.error, Object.getOwnPropertyNames(result.error)),
+        };
+
+        console.error('❌ [handleSignIn] Login error details:', errorDetails);
+
+        // Déterminer le type d'erreur et le message approprié
         let errorMessage = "Identifiant ou mot de passe incorrect.";
+        let errorType = 'credentials';
         
-        // Vérifier les différents types d'erreurs
-        if (error.message) {
-          const errorLower = error.message.toLowerCase();
-          
-          // Erreurs d'identifiants incorrects
-          if (
-            errorLower.includes("invalid login credentials") ||
-            errorLower.includes("invalid credentials") ||
-            errorLower.includes("email not confirmed") ||
-            errorLower.includes("wrong password") ||
-            errorLower.includes("user not found")
-          ) {
+        // Vérifier le message d'erreur et le code d'abord
+        // Supabase peut retourner 400 pour "Invalid login credentials" au lieu de 401
+        const errorMessageLower = result.error.message?.toLowerCase() || '';
+        const errorCode = (result.error as any).code || '';
+        const isInvalidCredentials = 
+          errorMessageLower.includes('invalid login credentials') ||
+          errorMessageLower.includes('invalid credentials') ||
+          errorMessageLower.includes('wrong password') ||
+          errorMessageLower.includes('user not found') ||
+          errorCode === 'invalid_credentials';
+        
+        console.log('🔍 [handleSignIn] Error analysis:', {
+          status: result.error.status,
+          message: result.error.message,
+          code: errorCode,
+          isInvalidCredentials,
+        });
+        
+        if (result.error.status === 400) {
+          // Erreur 400 = Bad Request
+          // Mais Supabase retourne parfois 400 pour "Invalid login credentials" au lieu de 401
+          if (isInvalidCredentials) {
+            // C'est en fait une erreur d'identifiants, pas technique
+            errorType = 'credentials';
             errorMessage = "Identifiant ou mot de passe incorrect.";
+          } else {
+            // Vraie erreur technique 400
+            errorType = 'technical';
+            
+            if (result.error.message) {
+              const errorLower = result.error.message.toLowerCase();
+              
+              // Vérifier les causes spécifiques d'erreur 400 technique
+              if (errorLower.includes('invalid request') || errorLower.includes('bad request')) {
+                errorMessage = "Requête invalide. Vérifiez que votre email et mot de passe sont correctement formatés.";
+              } else if (errorLower.includes('email') && errorLower.includes('invalid') && !errorLower.includes('login')) {
+                errorMessage = "Format d'email invalide. Vérifiez votre adresse email.";
+              } else if (errorLower.includes('password') && (errorLower.includes('required') || errorLower.includes('empty'))) {
+                errorMessage = "Le mot de passe est requis.";
+              } else {
+                // Message technique générique pour 400
+                errorMessage = `Erreur technique (${result.error.status}): ${result.error.message || 'Requête invalide'}`;
+              }
+            } else {
+              errorMessage = `Erreur technique (400): La requête de connexion est invalide.`;
+            }
           }
-          // Erreurs de compte non confirmé
-          else if (errorLower.includes("email not confirmed") || errorLower.includes("signup_disabled")) {
-            errorMessage = "Votre compte n'a pas été confirmé. Vérifiez votre email.";
+        } else if (result.error.status === 401) {
+          // Erreur 401 = Unauthorized = identifiants incorrects
+          errorType = 'credentials';
+          if (result.error.message) {
+            const errorLower = result.error.message.toLowerCase();
+            if (errorLower.includes('invalid login credentials') || errorLower.includes('invalid credentials')) {
+              errorMessage = "Identifiant ou mot de passe incorrect.";
+            } else if (errorLower.includes('email not confirmed')) {
+              errorMessage = "Votre compte n'a pas été confirmé. Vérifiez votre email.";
+            } else {
+              errorMessage = result.error.message;
+            }
           }
+        } else if (result.error.status === 422) {
+          // Erreur 422 = Validation error
+          errorType = 'validation';
+          errorMessage = "Les données fournies sont invalides. Vérifiez votre email et mot de passe.";
+        } else if (result.error.status === 429) {
+          // Erreur 429 = Too Many Requests
+          errorType = 'rate_limit';
+          errorMessage = "Trop de tentatives de connexion. Veuillez patienter quelques instants.";
+        } else if (result.error.message) {
+          const errorLower = result.error.message.toLowerCase();
+          
           // Erreurs de réseau
-          else if (errorLower.includes("network") || errorLower.includes("fetch")) {
-            errorMessage = "Erreur de connexion. Vérifiez votre connexion internet.";
+          if (errorLower.includes('network') || errorLower.includes('fetch') || errorLower.includes('failed to fetch')) {
+            errorType = 'network';
+            errorMessage = "Erreur de connexion au serveur. Vérifiez votre connexion internet.";
           }
-          // Autres erreurs
+          // Autres erreurs avec message
           else {
-            errorMessage = error.message;
+            errorMessage = result.error.message;
           }
         }
-        
+
+        console.error(`❌ [handleSignIn] Error type: ${errorType}, Final message: ${errorMessage}`);
+
         // Afficher l'erreur dans l'interface
         setError(errorMessage);
         
         toast({
-          title: "Erreur de connexion",
+          title: errorType === 'technical' ? "Erreur technique" : errorType === 'network' ? "Erreur de connexion" : "Erreur de connexion",
           description: errorMessage,
           variant: "destructive",
         });
         return;
       }
 
+      // Succès
+      console.log('✅ [handleSignIn] Login successful:', {
+        userId: result.data?.user?.id,
+        email: result.data?.user?.email,
+        duration: `${duration}ms`,
+      });
+
       // La navigation se fait automatiquement via useEffect
     } catch (error: any) {
-      // Erreur inattendue
+      // Erreur inattendue (pas de réponse de Supabase)
+      console.error('💥 [handleSignIn] Unexpected exception:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack?.substring(0, 200),
+      });
+
       const errorMessage = error?.message || "Une erreur inattendue s'est produite. Veuillez réessayer.";
       setError(errorMessage);
       
       toast({
-        title: "Erreur de connexion",
+        title: "Erreur inattendue",
         description: errorMessage,
         variant: "destructive",
       });
@@ -223,126 +376,16 @@ const Auth = () => {
     }
   };
 
-  const handlePasswordReset = async (e?: React.MouseEvent) => {
+  const handlePasswordReset = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
     
-    // Si l'email n'est pas rempli, ouvrir un dialog pour demander l'email
-    if (!email || email.trim() === "") {
-      const emailInput = document.getElementById("signin-email") as HTMLInputElement;
-      if (emailInput && emailInput.value) {
-        setEmail(emailInput.value);
-        // Réessayer avec l'email du champ
-        const emailToUse = emailInput.value;
-        setResettingPassword(true);
-        try {
-          const { error } = await supabase.auth.resetPasswordForEmail(emailToUse, {
-            redirectTo: `${window.location.origin}/auth`,
-          });
-
-          if (error) {
-            throw error;
-          }
-
-          toast({
-            title: "Email envoyé",
-            description: "Un lien de réinitialisation a été envoyé à votre adresse email.",
-          });
-        } catch (error: any) {
-          toast({
-            title: "Erreur d'envoi",
-            description: error.message || "Impossible d'envoyer l'email de réinitialisation.",
-            variant: "destructive",
-          });
-        } finally {
-          setResettingPassword(false);
-        }
-        return;
-      }
-      
-      toast({
-        title: "Email requis",
-        description: "Veuillez saisir votre email dans le champ ci-dessus avant de demander une réinitialisation.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setResettingPassword(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Email envoyé",
-        description: "Un lien de réinitialisation a été envoyé à votre adresse email.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erreur d'envoi",
-        description: error.message || "Impossible d'envoyer l'email de réinitialisation.",
-        variant: "destructive",
-      });
-    } finally {
-      setResettingPassword(false);
-    }
+    // Rediriger vers la page dédiée de réinitialisation
+    // Si l'email est déjà rempli, le passer en paramètre
+    const emailParam = email.trim() ? `?email=${encodeURIComponent(email.trim())}` : '';
+    navigate(`/forgot-password${emailParam}`);
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!newPassword || newPassword.length < 6) {
-      toast({
-        title: "Mot de passe trop court",
-        description: "Veuillez saisir un mot de passe d'au moins 6 caractères.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Confirmation différente",
-        description: "Les deux mots de passe doivent être identiques.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUpdatingPassword(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Mot de passe mis à jour",
-        description: "Vous pouvez poursuivre votre navigation.",
-      });
-
-      setIsResetDialogOpen(false);
-      setNewPassword("");
-      setConfirmPassword("");
-      navigate("/dashboard");
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible de mettre à jour le mot de passe.",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingPassword(false);
-    }
-  };
 
   // Connexion avec Google - Nécessite une invitation
   const handleGoogleSignIn = async () => {
@@ -520,9 +563,9 @@ const Auth = () => {
                         variant="link"
                         className="px-0 text-sm font-normal"
                         onClick={handlePasswordReset}
-                        disabled={loading || resettingPassword}
+                        disabled={loading}
                       >
-                        {resettingPassword ? "Envoi en cours..." : "Mot de passe oublié ?"}
+                        Mot de passe oublié ?
                       </Button>
                     </div>
                   </div>
@@ -591,51 +634,6 @@ const Auth = () => {
         </Card>
       </div>
 
-      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Réinitialiser votre mot de passe</DialogTitle>
-            <DialogDescription>
-              Entrez un nouveau mot de passe pour sécuriser votre compte.
-            </DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={handleUpdatePassword}>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">Nouveau mot de passe</Label>
-              <Input
-                id="new-password"
-                type="password"
-                minLength={6}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                minLength={6}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)} disabled={updatingPassword}>
-                Annuler
-              </Button>
-              <Button type="submit" disabled={updatingPassword}>
-                {updatingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Mettre à jour
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

@@ -21,6 +21,8 @@ import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "3600",
 };
 
 interface AcceptInviteRequest {
@@ -32,8 +34,12 @@ interface AcceptInviteRequest {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   if (req.method !== "POST") {
@@ -55,7 +61,21 @@ serve(async (req) => {
     }
 
     const body: AcceptInviteRequest = await req.json();
-    const { invite_id, token, first_name, last_name, password } = body;
+    let { invite_id, token, first_name, last_name, password } = body;
+
+    // Normaliser les données d'entrée
+    first_name = first_name?.trim() || '';
+    last_name = last_name?.trim() || '';
+    password = password?.trim() || '';
+
+    console.log("📥 [accept-invite] Received request:", {
+      invite_id: invite_id || null,
+      token_length: token?.length || 0,
+      first_name: first_name || null,
+      last_name: last_name || null,
+      password_length: password?.length || 0,
+      has_password: !!password,
+    });
 
     if (!invite_id || !token || !first_name || !last_name) {
       return new Response(
@@ -185,11 +205,22 @@ serve(async (req) => {
     } else {
       // Nouveau compte - créer l'utilisateur
       if (!password || password.length < 8) {
+        console.error("❌ [accept-invite] Password validation failed:", {
+          has_password: !!password,
+          password_length: password?.length || 0,
+        });
         return new Response(
           JSON.stringify({ error: "Password required and must be at least 8 characters" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("🔐 [accept-invite] Creating new user:", {
+        email: normalizedEmail,
+        password_length: password.length,
+        first_name,
+        last_name,
+      });
 
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: normalizedEmail,
@@ -203,12 +234,18 @@ serve(async (req) => {
       });
 
       if (createError || !newUser.user) {
-        console.error("Error creating user:", createError);
+        console.error("❌ [accept-invite] Error creating user:", createError);
         return new Response(
           JSON.stringify({ error: "Failed to create user", details: createError?.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("✅ [accept-invite] User created successfully:", {
+        user_id: newUser.user.id,
+        email: newUser.user.email,
+        email_confirmed: newUser.user.email_confirmed_at ? true : false,
+      });
 
       userId = newUser.user.id;
       isNewUser = true;
@@ -267,21 +304,32 @@ serve(async (req) => {
       // Ne pas échouer, l'utilisateur est déjà ajouté
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Invitation acceptée avec succès",
-        user_id: userId,
-        is_new_user: isNewUser,
-        company_id: invite.company_id,
-        company_name: (invite.companies as any)?.name,
-        role: invite.role,
-        // Pour nouveau user, retourner les infos pour connexion
-        ...(isNewUser && {
-          email: normalizedEmail,
-          // Le frontend devra appeler signInWithPassword avec email + password
-        }),
+    const responseData = {
+      success: true,
+      message: "Invitation acceptée avec succès",
+      user_id: userId,
+      is_new_user: isNewUser,
+      company_id: invite.company_id,
+      company_name: (invite.companies as any)?.name,
+      role: invite.role,
+      // Pour nouveau user, retourner les infos pour connexion
+      ...(isNewUser && {
+        email: normalizedEmail,
+        // Important: Ne jamais retourner le mot de passe dans la réponse
+        // Le frontend devra utiliser le mot de passe qu'il a envoyé dans la requête
+        password_saved: true, // Confirmation que le mot de passe a été enregistré
       }),
+    };
+
+    console.log("✅ [accept-invite] Invitation acceptée avec succès:", {
+      user_id: userId,
+      is_new_user: isNewUser,
+      email: isNewUser ? normalizedEmail : 'existing_user',
+      company_name: (invite.companies as any)?.name,
+    });
+
+    return new Response(
+      JSON.stringify(responseData),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

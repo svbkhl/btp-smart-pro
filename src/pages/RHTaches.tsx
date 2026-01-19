@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useTachesRH, useEmployeesRH } from "@/hooks/useRH";
+import { useTachesRH, useEmployeesRH, useCreateTacheRH } from "@/hooks/useRH";
 import { Search, CheckSquare, Calendar, Clock, Loader2, Plus, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -45,6 +45,7 @@ const RHTaches = () => {
   const { fakeDataEnabled } = useFakeDataStore();
   const { data: taches, isLoading } = useTachesRH();
   const { data: employees } = useEmployeesRH();
+  const createTache = useCreateTacheRH();
   const [searchQuery, setSearchQuery] = useState("");
   const isMobile = useIsMobile();
   const [createDialog, setCreateDialog] = useState(false);
@@ -86,21 +87,26 @@ const RHTaches = () => {
   };
 
   const getPriorite = (priorite: string) => {
+    // Normaliser "moyenne" en "normale" pour l'affichage (l'UI utilise "normale")
+    const displayPriorite = priorite === "moyenne" ? "normale" : priorite;
+    
     const colors: Record<string, string> = {
       basse: "text-green-600 dark:text-green-400",
       normale: "text-blue-600 dark:text-blue-400",
+      moyenne: "text-blue-600 dark:text-blue-400",
       haute: "text-orange-600 dark:text-orange-400",
       urgente: "text-red-600 dark:text-red-400",
     };
     const labels: Record<string, string> = {
       basse: "Basse",
       normale: "Normale",
+      moyenne: "Normale",
       haute: "Haute",
       urgente: "Urgente",
     };
     return (
-      <span className={`text-sm font-medium ${colors[priorite] || colors.normale}`}>
-        {labels[priorite] || priorite}
+      <span className={`text-sm font-medium ${colors[displayPriorite] || colors.normale}`}>
+        {labels[displayPriorite] || priorite}
       </span>
     );
   };
@@ -453,7 +459,7 @@ const RHTaches = () => {
               </Button>
               <Button
                 onClick={async () => {
-                  if (!tacheForm.titre) {
+                  if (!tacheForm.titre || tacheForm.titre.trim() === "") {
                     toast({
                       title: "Champ requis",
                       description: "Veuillez saisir un titre pour la tâche",
@@ -463,36 +469,21 @@ const RHTaches = () => {
                   }
 
                   try {
-                    if (fakeDataEnabled) {
-                      // Mode démo : simuler l'ajout
-                      toast({
-                        title: "Tâche créée",
-                        description: `La tâche "${tacheForm.titre}" a été créée avec succès`,
-                      });
-                    } else {
-                      // Mode production : sauvegarder dans Supabase
-                      const { error } = await supabase
-                        .from("taches_rh")
-                        .insert([
-                          {
-                            user_id: user?.id,
-                            titre: tacheForm.titre,
-                            description: tacheForm.description,
-                            priorite: tacheForm.priorite,
-                            statut: tacheForm.statut,
-                            date_echeance: tacheForm.date_echeance || null,
-                            employe_id: tacheForm.employe_id || null,
-                          },
-                        ]);
+                    // Convertir "normale" en "moyenne" pour correspondre à l'interface
+                    const priorite = tacheForm.priorite === "normale" ? "moyenne" : tacheForm.priorite;
+                    
+                    await createTache.mutateAsync({
+                      titre: tacheForm.titre.trim(),
+                      description: tacheForm.description.trim() || undefined,
+                      type_tache: "autre" as const,
+                      priorite: priorite as "basse" | "moyenne" | "haute" | "urgente",
+                      statut: tacheForm.statut as "en_attente" | "en_cours" | "termine" | "annule",
+                      date_echeance: tacheForm.date_echeance || undefined,
+                      assigne_a: tacheForm.employe_id || undefined,
+                      employee_id: tacheForm.employe_id || undefined,
+                    });
 
-                      if (error) throw error;
-
-                      toast({
-                        title: "Tâche créée",
-                        description: `La tâche "${tacheForm.titre}" a été créée avec succès`,
-                      });
-                    }
-
+                    // Réinitialiser le formulaire et fermer le dialog
                     setCreateDialog(false);
                     setTacheForm({
                       titre: "",
@@ -502,22 +493,25 @@ const RHTaches = () => {
                       date_echeance: "",
                       employe_id: "",
                     });
-                    
-                    // Rafraîchir la page (ou invalider le cache)
-                    window.location.reload();
-                  } catch (error) {
+                  } catch (error: any) {
+                    // L'erreur est déjà gérée par le hook
                     console.error("Error creating task:", error);
-                    toast({
-                      title: "Erreur",
-                      description: "Impossible de créer la tâche",
-                      variant: "destructive",
-                    });
                   }
                 }}
+                disabled={createTache.isPending}
                 className="rounded-xl"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Créer la tâche
+                {createTache.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Création...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Créer la tâche
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

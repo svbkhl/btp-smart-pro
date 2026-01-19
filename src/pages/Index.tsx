@@ -5,6 +5,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { useAuth } from "@/hooks/useAuth";
 import { ContactForm } from "@/components/ContactForm";
+
+// Déclaration de type pour la propriété globale window
+declare global {
+  interface Window {
+    __IS_PASSWORD_RESET_PAGE__?: boolean;
+  }
+}
 import {
   Carousel,
   CarouselContent,
@@ -35,6 +42,10 @@ const Index = () => {
   // Si l'utilisateur est connecté, rediriger vers le dashboard
   useEffect(() => {
     if (user) {
+      // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
+      if (window.location.pathname === '/reset-password' || window.__IS_PASSWORD_RESET_PAGE__ === true) {
+        return;
+      }
       navigate("/dashboard", { replace: true });
     }
   }, [user, navigate]);

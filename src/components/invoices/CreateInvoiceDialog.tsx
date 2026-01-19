@@ -196,14 +196,14 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nouvelle facture</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-base sm:text-lg">Nouvelle facture</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Créez une nouvelle facture pour votre client
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
           {/* Client */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -265,29 +265,29 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="client_name">
+                  <Label htmlFor="client_name" className="text-sm sm:text-base">
                     Nom du client <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="client_name"
                     {...register("client_name")}
                     placeholder="M. Martin"
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
                   />
                   {errors.client_name && (
-                    <p className="text-sm text-red-500">{errors.client_name.message}</p>
+                    <p className="text-xs sm:text-sm text-red-500">{errors.client_name.message}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="client_email">Email</Label>
+                  <Label htmlFor="client_email" className="text-sm sm:text-base">Email</Label>
                   <Input
                     id="client_email"
                     type="email"
                     {...register("client_email")}
                     placeholder="client@example.com"
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
                   />
                 </div>
               </div>

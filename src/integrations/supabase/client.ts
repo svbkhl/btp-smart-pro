@@ -13,7 +13,125 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    // Intercepter les requêtes pour logging en développement
+    fetch: async (url, options = {}) => {
+      const startTime = Date.now();
+      const requestInfo = {
+        url: typeof url === 'string' ? url : url.toString(),
+        method: options.method || 'GET',
+        headers: options.headers ? { ...options.headers as any } : {},
+      };
+
+      // Logger la requête (sans le mot de passe)
+      if (requestInfo.url.includes('/auth/v1/token') || requestInfo.url.includes('/auth/v1/')) {
+        console.log('🌐 [Supabase Auth Request]', {
+          url: requestInfo.url,
+          method: requestInfo.method,
+          hasBody: !!options.body,
+          bodyType: options.body ? typeof options.body : 'none',
+          contentType: requestInfo.headers['content-type'] || requestInfo.headers['Content-Type'] || 'none',
+          hasApikey: !!(requestInfo.headers['apikey'] || requestInfo.headers['Apikey']),
+          timestamp: new Date().toISOString(),
+        });
+
+        // Logger le body sans le mot de passe si c'est une requête de login
+        if (options.body && requestInfo.method === 'POST') {
+          try {
+            const bodyStr = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+            const bodyObj = JSON.parse(bodyStr);
+            if (bodyObj.password) {
+              // Masquer le mot de passe
+              const safeBody = { ...bodyObj, password: '***HIDDEN***' };
+              console.log('📤 [Supabase Auth Request Body]', safeBody);
+            } else {
+              console.log('📤 [Supabase Auth Request Body]', bodyObj);
+            }
+          } catch (e) {
+            // Pas JSON, logger comme string (mais vérifier s'il contient password)
+            const bodyStr = String(options.body);
+            if (bodyStr.includes('password')) {
+              console.log('📤 [Supabase Auth Request Body]', bodyStr.replace(/password[=:]["'][^"']*["']/gi, 'password="***HIDDEN***"'));
+            } else {
+              console.log('📤 [Supabase Auth Request Body]', bodyStr.substring(0, 200));
+            }
+          }
+        }
+      }
+
+      try {
+        const response = await fetch(url, options);
+        const duration = Date.now() - startTime;
+
+        // Logger la réponse
+        if (requestInfo.url.includes('/auth/v1/token') || requestInfo.url.includes('/auth/v1/')) {
+          const responseClone = response.clone();
+          let responseBody = null;
+          
+          try {
+            const responseText = await responseClone.text();
+            responseBody = responseText;
+            
+            // Essayer de parser en JSON
+            try {
+              const jsonBody = JSON.parse(responseText);
+              console.log('📥 [Supabase Auth Response]', {
+                url: requestInfo.url,
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok,
+                duration: `${duration}ms`,
+                body: jsonBody,
+              });
+            } catch {
+              // Pas JSON
+              console.log('📥 [Supabase Auth Response]', {
+                url: requestInfo.url,
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok,
+                duration: `${duration}ms`,
+                bodyPreview: responseText.substring(0, 200),
+              });
+            }
+          } catch (e) {
+            console.log('📥 [Supabase Auth Response]', {
+              url: requestInfo.url,
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok,
+              duration: `${duration}ms`,
+              bodyError: 'Could not read response body',
+            });
+          }
+
+          // Logger les erreurs 400 spécifiquement
+          if (response.status === 400) {
+            console.error('❌ [Supabase Auth 400 Error]', {
+              url: requestInfo.url,
+              status: response.status,
+              statusText: response.statusText,
+              responseBody: responseBody,
+              requestUrl: requestInfo.url,
+              requestMethod: requestInfo.method,
+            });
+          }
+        }
+
+        return response;
+      } catch (error: any) {
+        const duration = Date.now() - startTime;
+        console.error('💥 [Supabase Auth Network Error]', {
+          url: requestInfo.url,
+          method: requestInfo.method,
+          duration: `${duration}ms`,
+          error: error?.message || String(error),
+        });
+        throw error;
+      }
+    },
+  },
 });
 
 // Exposer supabase dans window pour le debug (uniquement en développement)

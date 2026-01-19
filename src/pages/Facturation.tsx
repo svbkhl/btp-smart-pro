@@ -327,22 +327,23 @@ const Facturation = () => {
 
           <TabsContent value="quotes" className="mt-0 space-y-6">
             {/* Recherche et Actions */}
-            <GlassCard className="p-6">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col md:flex-row gap-4">
+            <GlassCard className="p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Rechercher un devis..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
                     />
                   </div>
-                  <Link to="/ai?tab=quotes">
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nouveau devis
+                  <Link to="/ai?tab=quotes" className="w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto gap-2">
+                      <Plus className="w-4 h-4" />
+                      <span className="hidden sm:inline">Nouveau devis</span>
+                      <span className="sm:hidden">Nouveau</span>
                     </Button>
                   </Link>
                 </div>
@@ -415,15 +416,15 @@ const Facturation = () => {
                 {/* Bouton unique pour activer le mode sélection */}
                 {!selectionModeQuotes && filteredQuotes.length > 0 && (
                   <GlassCard className="p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+                      <span className="text-xs sm:text-sm text-muted-foreground">
                         {filteredQuotes.length} devis disponible{filteredQuotes.length > 1 ? 's' : ''}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectionModeQuotes(true)}
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                       >
                         Sélectionner
                       </Button>
@@ -434,8 +435,8 @@ const Facturation = () => {
                 {/* Bandeau mode sélection activé */}
                 {selectionModeQuotes && (
                   <GlassCard className="p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+                      <span className="text-xs sm:text-sm text-muted-foreground">
                         Mode sélection activé - {selectedQuoteIds.size} devis sélectionné{selectedQuoteIds.size > 1 ? 's' : ''}
                       </span>
                       <div className="flex gap-2">
@@ -446,6 +447,7 @@ const Facturation = () => {
                             setSelectionModeQuotes(false);
                             setSelectedQuoteIds(new Set());
                           }}
+                          className="flex-1 sm:flex-initial"
                         >
                           Annuler
                         </Button>
@@ -454,12 +456,12 @@ const Facturation = () => {
                   </GlassCard>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {filteredQuotes.map((quote) => (
                     <GlassCard 
                       key={quote.id}
                       data-quotes-card-id={quote.id}
-                      className={`p-6 hover:border-primary/30 transition-colors ${selectionModeQuotes ? 'cursor-pointer select-none' : ''} ${selectedQuoteIds.has(quote.id) ? 'ring-2 ring-primary border-primary' : ''}`}
+                      className={`p-3 sm:p-4 md:p-6 hover:border-primary/30 transition-colors ${selectionModeQuotes ? 'cursor-pointer select-none' : ''} ${selectedQuoteIds.has(quote.id) ? 'ring-2 ring-primary border-primary' : ''}`}
                       onClick={(e) => handleQuoteCardClick(quote.id, e)}
                       onMouseDown={(e) => handleMouseDown(e, 'quotes')}
                       onMouseMove={(e) => handleMouseMove(e, 'quotes')}
@@ -523,7 +525,7 @@ const Facturation = () => {
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                              <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 pt-2 border-t border-border/50">
                                 <QuoteActionButtons
                                   quote={quote}
                                   onEdit={() => {
@@ -608,21 +610,22 @@ const Facturation = () => {
 
           <TabsContent value="invoices" className="mt-0 space-y-6">
             {/* Recherche et Actions */}
-            <GlassCard className="p-6">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col md:flex-row gap-4">
+            <GlassCard className="p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Rechercher une facture..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
                     />
                   </div>
-                  <Button onClick={() => navigate("/ai?tab=invoices")}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nouvelle facture
+                  <Button onClick={() => navigate("/ai?tab=invoices")} className="w-full sm:w-auto gap-2">
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Nouvelle facture</span>
+                    <span className="sm:hidden">Nouvelle</span>
                   </Button>
                 </div>
                 
@@ -692,15 +695,15 @@ const Facturation = () => {
                 {/* Bouton unique pour activer le mode sélection */}
                 {!selectionModeInvoices && filteredInvoices.length > 0 && (
                   <GlassCard className="p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+                      <span className="text-xs sm:text-sm text-muted-foreground">
                         {filteredInvoices.length} facture{filteredInvoices.length > 1 ? 's' : ''} disponible{filteredInvoices.length > 1 ? 's' : ''}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectionModeInvoices(true)}
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                       >
                         Sélectionner
                       </Button>
@@ -711,8 +714,8 @@ const Facturation = () => {
                 {/* Bandeau mode sélection activé */}
                 {selectionModeInvoices && (
                   <GlassCard className="p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+                      <span className="text-xs sm:text-sm text-muted-foreground">
                         Mode sélection activé - {selectedInvoiceIds.size} facture{selectedInvoiceIds.size > 1 ? 's' : ''} sélectionnée{selectedInvoiceIds.size > 1 ? 's' : ''}
                       </span>
                       <div className="flex gap-2">
@@ -723,6 +726,7 @@ const Facturation = () => {
                             setSelectionModeInvoices(false);
                             setSelectedInvoiceIds(new Set());
                           }}
+                          className="flex-1 sm:flex-initial"
                         >
                           Annuler
                         </Button>
@@ -731,12 +735,12 @@ const Facturation = () => {
                   </GlassCard>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {filteredInvoices.map((invoice) => (
                     <GlassCard 
                       key={invoice.id}
                       data-invoices-card-id={invoice.id}
-                      className={`p-6 ${selectionModeInvoices ? 'cursor-pointer select-none' : ''} ${selectedInvoiceIds.has(invoice.id) ? 'ring-2 ring-primary border-primary' : ''}`}
+                      className={`p-3 sm:p-4 md:p-6 ${selectionModeInvoices ? 'cursor-pointer select-none' : ''} ${selectedInvoiceIds.has(invoice.id) ? 'ring-2 ring-primary border-primary' : ''}`}
                       onClick={(e) => handleInvoiceCardClick(invoice.id, e)}
                       onMouseDown={(e) => handleMouseDown(e, 'invoices')}
                       onMouseMove={(e) => handleMouseMove(e, 'invoices')}

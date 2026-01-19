@@ -7,6 +7,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { User } from "@supabase/supabase-js";
 
+// Déclaration de type pour la propriété globale window
+declare global {
+  interface Window {
+    __IS_PASSWORD_RESET_PAGE__?: boolean;
+  }
+}
+
 /**
  * Page de callback pour Supabase Auth
  * 
@@ -171,6 +178,17 @@ const AuthCallback = () => {
 
           if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
             if (session?.user) {
+              // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
+              const isResetPasswordPage = window.location.pathname === '/reset-password';
+              const hashParams = new URLSearchParams(window.location.hash.substring(1));
+              const isRecoveryToken = hashParams.get('type') === 'recovery' || 
+                                      window.__IS_PASSWORD_RESET_PAGE__ === true;
+              
+              if (isResetPasswordPage || isRecoveryToken) {
+                console.log('[AuthCallback] Ignoring SIGNED_IN event on reset password page');
+                return;
+              }
+              
               timeoutCleared = true;
               clearTimeout(timeoutId);
               setStatus("success");
