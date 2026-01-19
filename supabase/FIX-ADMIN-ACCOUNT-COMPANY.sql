@@ -35,8 +35,8 @@ BEGIN
   WHERE user_id = v_admin_user_id
   LIMIT 1;
   
+  -- 4. Créer une entreprise pour l'admin si nécessaire
   IF v_company_id IS NULL THEN
-    -- 4. Créer une entreprise pour l'admin
     INSERT INTO public.companies (name, owner_id)
     VALUES (
       'BTP Smart Pro - Admin',
@@ -45,11 +45,19 @@ BEGIN
     RETURNING id INTO v_company_id;
     
     RAISE NOTICE '✅ Entreprise créée pour admin: %', v_company_id;
-    
-    -- 5. Ajouter l'admin comme owner de l'entreprise
-    -- Désactiver temporairement le trigger updated_at s'il existe
-    DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
-    
+  ELSE
+    RAISE NOTICE '✅ L''utilisateur admin a déjà une entreprise: %', v_company_id;
+  END IF;
+  
+  -- 5. Désactiver temporairement le trigger updated_at s'il existe (AVANT toute opération)
+  DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
+  
+  -- 6. Ajouter/mettre à jour l'admin comme owner de l'entreprise
+  IF NOT EXISTS (
+    SELECT 1 FROM public.company_users
+    WHERE company_id = v_company_id
+    AND user_id = v_admin_user_id
+  ) THEN
     -- Vérifier si la colonne status existe
     IF EXISTS (
       SELECT 1 FROM information_schema.columns 
@@ -58,37 +66,14 @@ BEGIN
       AND column_name = 'status'
     ) THEN
       INSERT INTO public.company_users (company_id, user_id, role, status)
-      VALUES (v_company_id, v_admin_user_id, 'owner', 'active')
-      ON CONFLICT (company_id, user_id) DO UPDATE
-      SET role = 'owner', status = 'active';
+      VALUES (v_company_id, v_admin_user_id, 'owner', 'active');
     ELSE
       INSERT INTO public.company_users (company_id, user_id, role)
-      VALUES (v_company_id, v_admin_user_id, 'owner')
-      ON CONFLICT (company_id, user_id) DO UPDATE
-      SET role = 'owner';
+      VALUES (v_company_id, v_admin_user_id, 'owner');
     END IF;
-    
-    -- Réactiver le trigger si la colonne updated_at existe
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_schema = 'public' 
-      AND table_name = 'company_users'
-      AND column_name = 'updated_at'
-    ) THEN
-      CREATE TRIGGER update_company_users_updated_at
-      BEFORE UPDATE ON public.company_users
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
-    END IF;
-    
     RAISE NOTICE '✅ Admin ajouté comme owner de l''entreprise';
   ELSE
-    RAISE NOTICE '✅ L''utilisateur admin a déjà une entreprise: %', v_company_id;
-    
-    -- Désactiver temporairement le trigger updated_at s'il existe
-    DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
-    
-    -- S'assurer qu'il est owner (gérer le cas où status existe ou non)
+    -- S'assurer qu'il est owner (mise à jour sans trigger)
     IF EXISTS (
       SELECT 1 FROM information_schema.columns 
       WHERE table_schema = 'public' 
@@ -105,22 +90,29 @@ BEGIN
       WHERE company_id = v_company_id
       AND user_id = v_admin_user_id;
     END IF;
-    
-    -- Réactiver le trigger si la colonne updated_at existe
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_schema = 'public' 
-      AND table_name = 'company_users'
-      AND column_name = 'updated_at'
-    ) THEN
+    RAISE NOTICE '✅ Rôle admin mis à jour (owner)';
+  END IF;
+  
+  -- 7. Réactiver le trigger si la colonne updated_at existe (après toutes les opérations)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'company_users'
+    AND column_name = 'updated_at'
+  ) THEN
+    BEGIN
       CREATE TRIGGER update_company_users_updated_at
       BEFORE UPDATE ON public.company_users
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
-    END IF;
+    EXCEPTION
+      WHEN duplicate_object THEN
+        -- Trigger existe déjà, on ignore
+        NULL;
+    END;
   END IF;
   
-  -- 6. Backfill toutes les données existantes de l'admin avec cette entreprise
+  -- 8. Backfill toutes les données existantes de l'admin avec cette entreprise
   -- Clients
   UPDATE public.clients
   SET company_id = v_company_id
