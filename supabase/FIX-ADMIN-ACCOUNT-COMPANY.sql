@@ -63,22 +63,10 @@ BEGIN
     RAISE NOTICE '✅ L''utilisateur admin a déjà une entreprise: %', v_company_id;
   END IF;
   
-  -- 5. Supprimer COMPLÈTEMENT le trigger et la fonction updated_at (AVANT toute opération)
-  -- Supprimer le trigger d'abord
-  DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
-  
-  -- Supprimer aussi la fonction générique si elle est utilisée par erreur
-  -- (cette commande échouera silencieusement si le trigger utilise une autre fonction)
-  -- Vérifier s'il existe un trigger qui utilise update_updated_at_column()
-  DO $$
-  BEGIN
-    -- Supprimer tous les triggers sur company_users qui pourraient causer problème
-    DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
-  EXCEPTION
-    WHEN OTHERS THEN
-      -- Ignorer les erreurs
-      NULL;
-  END $$;
+  -- 5. DÉSACTIVER TOUS LES TRIGGERS sur company_users (AVANT toute opération)
+  -- Utiliser ALTER TABLE ... DISABLE TRIGGER ALL pour être sûr qu'aucun trigger ne s'exécute
+  ALTER TABLE public.company_users DISABLE TRIGGER ALL;
+  RAISE NOTICE '✅ Tous les triggers sur company_users désactivés';
   
   -- 6. Ajouter/mettre à jour l'admin comme owner de l'entreprise
   IF NOT EXISTS (
