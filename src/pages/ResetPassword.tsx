@@ -41,14 +41,19 @@ const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Empêcher toute redirection automatique pendant la vérification
-    // Marquer cette page comme étant en mode réinitialisation
+    // CRITIQUE : Définir le flag IMMÉDIATEMENT pour empêcher les redirections automatiques
+    // Ce flag doit être défini avant toute vérification de session
     window.__IS_PASSWORD_RESET_PAGE__ = true;
 
     // Vérifier si on a un token de réinitialisation dans l'URL
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type') || searchParams.get('type');
+    
+    // Vérifier aussi dans l'URL complète pour détecter les redirections Supabase
+    const fullUrl = window.location.href;
+    const isRecoveryInUrl = fullUrl.includes('type=recovery') || 
+                            fullUrl.includes('#access_token') && (fullUrl.includes('type=recovery') || hashParams.get('type') === 'recovery');
     
     console.log('🔐 [ResetPassword] Checking recovery token:', {
       hasAccessToken: !!accessToken,

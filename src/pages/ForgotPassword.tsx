@@ -54,6 +54,9 @@ const ForgotPassword = () => {
       console.log('📧 [ForgotPassword] Sending password reset email to:', normalizedEmail);
 
       // Envoyer l'email de réinitialisation
+      // Le template d'email doit être configuré dans Supabase Dashboard :
+      // Authentication > Email Templates > Reset Password
+      // Pour personnaliser le sujet et le contenu de l'email avec le branding BTP Smart Pro
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -177,23 +180,20 @@ const ForgotPassword = () => {
               <Label htmlFor="email" className="text-xs sm:text-sm font-medium">
                 Adresse email <span className="text-destructive">*</span>
               </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="votre@email.com"
-                  required
-                  disabled={loading}
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pl-11 pr-4 text-sm sm:text-base h-9 sm:h-10"
-                  autoFocus
-                />
-              </div>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+                placeholder="votre@email.com"
+                required
+                disabled={loading}
+                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 px-4 text-sm sm:text-base h-9 sm:h-10"
+                autoFocus
+              />
             </div>
 
             {/* Erreur */}

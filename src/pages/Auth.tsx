@@ -137,24 +137,46 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[Auth] Auth state changed:', { event, hasSession: !!session, hasUser: !!session?.user });
       
+      // CRITIQUE : Gérer l'événement PASSWORD_RECOVERY en premier
       if (event === "PASSWORD_RECOVERY") {
+        console.log('[Auth] PASSWORD_RECOVERY event detected');
+        window.__IS_PASSWORD_RESET_PAGE__ = true;
         // Rediriger vers la page de réinitialisation professionnelle
-        navigate('/reset-password', { replace: true });
+        // Ne pas rediriger si on est déjà sur la page de réinitialisation
+        if (window.location.pathname !== '/reset-password' && !window.location.pathname.startsWith('/reset-password')) {
+          navigate('/reset-password', { replace: true });
+        }
         setLoading(false);
+        subscription.unsubscribe();
         return;
       }
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (session?.user) {
-          // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
-          // ou si c'est une session de réinitialisation
-          const isResetPasswordPage = window.location.pathname === '/reset-password';
+          // Vérifications multiples pour détecter une session de réinitialisation
+          const isResetPasswordPage = window.location.pathname === '/reset-password' || 
+                                     window.location.pathname.startsWith('/reset-password');
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const isRecoveryToken = hashParams.get('type') === 'recovery' || 
-                                  window.__IS_PASSWORD_RESET_PAGE__ === true;
+          const urlParams = new URLSearchParams(window.location.search);
+          const type = hashParams.get('type') || urlParams.get('type');
+          const isRecoveryToken = type === 'recovery' || 
+                                  window.__IS_PASSWORD_RESET_PAGE__ === true ||
+                                  window.location.href.includes('type=recovery');
           
           if (isResetPasswordPage || isRecoveryToken) {
-            console.log('[Auth] Ignoring SIGNED_IN event on reset password page');
+            console.log('[Auth] Ignoring SIGNED_IN event - recovery session detected:', {
+              isResetPasswordPage,
+              isRecoveryToken,
+              type,
+              pathname: window.location.pathname,
+              flag: window.__IS_PASSWORD_RESET_PAGE__
+            });
+            window.__IS_PASSWORD_RESET_PAGE__ = true;
+            // Rediriger vers /reset-password si on n'y est pas déjà
+            if (!isResetPasswordPage) {
+              navigate('/reset-password', { replace: true });
+            }
+            subscription.unsubscribe();
             return;
           }
           

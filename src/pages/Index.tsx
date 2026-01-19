@@ -43,7 +43,23 @@ const Index = () => {
   useEffect(() => {
     if (user) {
       // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
-      if (window.location.pathname === '/reset-password' || window.__IS_PASSWORD_RESET_PAGE__ === true) {
+      // Vérifier le pathname, le flag global, et le hash/query params pour type=recovery
+      const isResetPasswordPage = window.location.pathname === '/reset-password' || 
+                                  window.location.pathname.startsWith('/reset-password');
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const urlParams = new URLSearchParams(window.location.search);
+      const isRecoveryToken = hashParams.get('type') === 'recovery' || 
+                              urlParams.get('type') === 'recovery' ||
+                              window.__IS_PASSWORD_RESET_PAGE__ === true ||
+                              window.location.href.includes('type=recovery');
+      
+      if (isResetPasswordPage || isRecoveryToken) {
+        console.log('[Index] Ignoring redirect - recovery session detected:', {
+          isResetPasswordPage,
+          isRecoveryToken,
+          pathname: window.location.pathname,
+          flag: window.__IS_PASSWORD_RESET_PAGE__
+        });
         return;
       }
       navigate("/dashboard", { replace: true });

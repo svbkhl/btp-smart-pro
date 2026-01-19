@@ -38,6 +38,21 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
   }, []);
 
   useEffect(() => {
+    // CRITIQUE : Ne pas rediriger si on est en mode réinitialisation de mot de passe
+    const isResetPasswordPage = window.location.pathname === '/reset-password' || 
+                                window.location.pathname.startsWith('/reset-password');
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const urlParams = new URLSearchParams(window.location.search);
+    const isRecoveryToken = hashParams.get('type') === 'recovery' || 
+                            urlParams.get('type') === 'recovery' ||
+                            window.__IS_PASSWORD_RESET_PAGE__ === true ||
+                            window.location.href.includes('type=recovery');
+    
+    if (isResetPasswordPage || isRecoveryToken) {
+      // Laisser la page /reset-password gérer elle-même la redirection
+      return;
+    }
+
     // Timeout de sécurité : si le chargement dépasse 5 secondes, rediriger vers auth
     const timeoutId = setTimeout(() => {
       if (loading && !user) {
