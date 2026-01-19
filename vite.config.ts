@@ -6,8 +6,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vitejs.dev/config/
-// Note: Vite charge automatiquement les fichiers .env s'ils existent
-// Sur Vercel, les variables d'environnement sont fournies via le processus
+// Sur Vercel, les variables d'environnement sont fournies via process.env
 // et n'ont pas besoin d'un fichier .env physique
 export default defineConfig({
   plugins: [react()],
@@ -21,8 +20,10 @@ export default defineConfig({
     host: true,
     strictPort: true, // Le port ne changera JAMAIS, erreur si occupé
   },
-  // Vite charge automatiquement les variables d'environnement
-  // Si .env n'existe pas, il utilise les variables du processus (Vercel)
+  // Préfixe pour les variables d'environnement accessibles côté client
   envPrefix: 'VITE_',
+  // Désactiver le chargement automatique des fichiers .env
+  // Vercel fournit les variables via process.env
+  envDir: undefined,
 });
 
