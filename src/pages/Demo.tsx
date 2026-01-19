@@ -279,13 +279,24 @@ const Demo = () => {
               Bienvenue ! Voici un aperçu de votre activité (données fictives)
             </p>
           </div>
-          <Link to="/projects">
-            <Button className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
+          {user ? (
+            <Link to="/projects">
+              <Button className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Nouveau chantier</span>
+                <span className="sm:hidden">Nouveau</span>
+              </Button>
+            </Link>
+          ) : (
+            <Button 
+              onClick={() => navigate("/?openTrialForm=true")}
+              className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all"
+            >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Nouveau chantier</span>
               <span className="sm:hidden">Nouveau</span>
             </Button>
-          </Link>
+          )}
         </div>
 
         {/* KPI Blocks - exactement comme Dashboard */}
@@ -401,7 +412,12 @@ const Demo = () => {
                     }`}
                     onClick={() => {
                       if (alert.action) {
-                        navigate(alert.action);
+                        // Si l'utilisateur n'est pas connecté en mode démo, rediriger vers la page d'accueil avec le formulaire
+                        if (!user) {
+                          navigate("/?openTrialForm=true", { replace: true });
+                        } else {
+                          navigate(alert.action);
+                        }
                       }
                     }}
                   >

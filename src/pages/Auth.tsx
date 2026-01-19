@@ -31,6 +31,17 @@ const Auth = () => {
   };
 
   useEffect(() => {
+    // Afficher le message de succès si on vient de réinitialiser le mot de passe
+    const locationState = (window.history.state && window.history.state.usr) || {};
+    if (locationState.message && locationState.type === 'success') {
+      toast({
+        title: "Mot de passe mis à jour",
+        description: locationState.message,
+      });
+      // Nettoyer l'état pour éviter de réafficher le message
+      window.history.replaceState({ ...window.history.state, usr: {} }, '');
+    }
+
     // Rediriger les anciennes routes d'inscription vers la connexion
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('signup') || window.location.pathname.includes('signup')) {
@@ -139,15 +150,20 @@ const Auth = () => {
       
       // CRITIQUE : Gérer l'événement PASSWORD_RECOVERY en premier
       if (event === "PASSWORD_RECOVERY") {
-        console.log('[Auth] PASSWORD_RECOVERY event detected');
+        console.log('[Auth] PASSWORD_RECOVERY event detected - preventing auto-login');
+        // Définir le flag immédiatement pour bloquer toutes les redirections
         window.__IS_PASSWORD_RESET_PAGE__ = true;
         // Rediriger vers la page de réinitialisation professionnelle
         // Ne pas rediriger si on est déjà sur la page de réinitialisation
         if (window.location.pathname !== '/reset-password' && !window.location.pathname.startsWith('/reset-password')) {
+          console.log('[Auth] Redirecting to /reset-password');
           navigate('/reset-password', { replace: true });
+        } else {
+          console.log('[Auth] Already on /reset-password page');
         }
         setLoading(false);
         subscription.unsubscribe();
+        // IMPORTANT: Ne PAS continuer le traitement pour éviter toute redirection vers dashboard
         return;
       }
 

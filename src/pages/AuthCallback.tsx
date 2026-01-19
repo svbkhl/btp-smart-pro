@@ -111,10 +111,25 @@ const AuthCallback = () => {
         }
 
         // CRITIQUE : Vérifier si c'est un token de réinitialisation AVANT de créer la session
-        if (type === 'recovery' || window.location.href.includes('type=recovery')) {
-          console.log("[AuthCallback] Recovery token detected, redirecting to /reset-password");
+        // Vérifier à la fois dans les paramètres de requête et dans le hash
+        const hashParamsCheck = new URLSearchParams(window.location.hash.substring(1));
+        const typeFromHash = hashParamsCheck.get('type');
+        const isRecoveryFromHash = typeFromHash === 'recovery';
+        const isRecoveryFromQuery = type === 'recovery';
+        const isRecoveryFromUrl = window.location.href.includes('type=recovery');
+        
+        if (isRecoveryFromQuery || isRecoveryFromHash || isRecoveryFromUrl) {
+          console.log("[AuthCallback] Recovery token detected, redirecting to /reset-password", {
+            isRecoveryFromQuery,
+            isRecoveryFromHash,
+            isRecoveryFromUrl,
+            type,
+            typeFromHash,
+            href: window.location.href.substring(0, 150)
+          });
           window.__IS_PASSWORD_RESET_PAGE__ = true;
           navigate('/reset-password', { replace: true });
+          setLoading(false);
           return;
         }
 

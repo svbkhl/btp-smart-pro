@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
@@ -65,6 +66,26 @@ import DelegationsManagement from './pages/DelegationsManagement';
 function App() {
   const { user } = useAuth();
   const location = useLocation();
+  
+  // FALLBACK GLOBAL : Détecter type=recovery dans l'URL et rediriger vers /reset-password
+  // Ceci garantit que même si l'utilisateur arrive sur une autre page avec le token,
+  // il sera redirigé vers la page de réinitialisation
+  useEffect(() => {
+    // Vérifier uniquement si on n'est pas déjà sur /reset-password
+    if (location.pathname !== '/reset-password' && !location.pathname.startsWith('/reset-password')) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const urlParams = new URLSearchParams(window.location.search);
+      const type = hashParams.get('type') || urlParams.get('type');
+      
+      // Si on détecte type=recovery dans l'URL mais qu'on n'est pas sur /reset-password
+      if (type === 'recovery' || window.location.href.includes('type=recovery')) {
+        console.log('[App] Global fallback: type=recovery detected, redirecting to /reset-password');
+        window.__IS_PASSWORD_RESET_PAGE__ = true;
+        window.location.href = '/reset-password' + window.location.search + window.location.hash;
+        return;
+      }
+    }
+  }, [location.pathname, location.search, location.hash]);
   
   // Pages publiques où l'agent IA ne doit PAS être visible
   const isPublicPage = 

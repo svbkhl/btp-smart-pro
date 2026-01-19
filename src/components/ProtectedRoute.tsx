@@ -53,10 +53,15 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
       return;
     }
 
-    // Timeout de sécurité : si le chargement dépasse 5 secondes, rediriger vers auth
+    // Timeout de sécurité : si le chargement dépasse 5 secondes, rediriger vers auth ou page d'accueil
     const timeoutId = setTimeout(() => {
       if (loading && !user) {
-        window.location.replace("/auth");
+        // Si on est en mode démo, rediriger vers la page d'accueil avec le formulaire
+        if (fakeDataEnabled) {
+          navigate("/?openTrialForm=true", { replace: true });
+        } else {
+          window.location.replace("/auth");
+        }
       }
     }, 5000);
 
@@ -65,6 +70,13 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     }
     
     if (!user && !showContent) {
+      // Si on est en mode démo (fakeDataEnabled), rediriger vers la page d'accueil avec le formulaire d'essai
+      if (fakeDataEnabled) {
+        console.log("🎮 Mode démo actif - Redirection vers page d'accueil avec formulaire d'essai");
+        navigate("/?openTrialForm=true", { replace: true });
+        return () => clearTimeout(timeoutId);
+      }
+      // Sinon, rediriger vers /auth normalement
       if (window.location.pathname !== "/auth") {
         window.location.replace("/auth");
       }

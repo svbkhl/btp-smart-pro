@@ -26,6 +26,13 @@ declare global {
 }
 
 const ResetPassword = () => {
+  // CRITIQUE : Définir le flag IMMÉDIATEMENT au montage du composant (AVANT useState)
+  // Cette ligne s'exécute synchronement au moment du rendu initial, avant tout useEffect
+  // Cela empêche les autres composants (Index, Auth, ProtectedRoute) de rediriger vers dashboard
+  if (typeof window !== 'undefined') {
+    window.__IS_PASSWORD_RESET_PAGE__ = true;
+  }
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -41,9 +48,10 @@ const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // CRITIQUE : Définir le flag IMMÉDIATEMENT pour empêcher les redirections automatiques
-    // Ce flag doit être défini avant toute vérification de session
+    // CRITIQUE : Définir le flag IMMÉDIATEMENT au montage du composant
+    // Ce flag doit être défini AVANT toute autre opération pour empêcher les redirections automatiques
     window.__IS_PASSWORD_RESET_PAGE__ = true;
+    console.log('🔒 [ResetPassword] Flag __IS_PASSWORD_RESET_PAGE__ set to true');
 
     // Vérifier si on a un token de réinitialisation dans l'URL
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -106,12 +114,21 @@ const ResetPassword = () => {
 
         // Si on a une session mais pas de type=recovery dans l'URL,
         // c'est probablement une session normale (utilisateur déjà connecté)
-        // On ne devrait pas être sur cette page
-        if (session && !isRecoveryToken) {
-          console.warn('⚠️ [ResetPassword] User has session but no recovery token - redirecting');
+        // MAIS si le flag global est défini, on reste sur la page pour permettre le reset
+        if (session && !isRecoveryToken && !window.__IS_PASSWORD_RESET_PAGE__) {
+          console.warn('⚠️ [ResetPassword] User has session but no recovery token - redirecting to dashboard');
           // Nettoyer et rediriger vers dashboard
           window.__IS_PASSWORD_RESET_PAGE__ = false;
           navigate('/dashboard');
+          return;
+        }
+        
+        // Si le flag est défini mais qu'on n'a pas de token recovery explicite,
+        // on reste sur la page pour permettre à l'utilisateur de réinitialiser son mot de passe
+        if (window.__IS_PASSWORD_RESET_PAGE__ && session) {
+          console.log('✅ [ResetPassword] Recovery session detected via flag, allowing password reset');
+          setValidToken(true);
+          setVerifying(false);
           return;
         }
 
@@ -176,16 +193,21 @@ const ResetPassword = () => {
       
       setSuccess(true);
       toast({
-        title: 'Mot de passe réinitialisé avec succès !',
-        description: 'Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.',
+        title: 'Mot de passe mis à jour',
+        description: 'Votre mot de passe a été réinitialisé avec succès. Veuillez vous connecter.',
       });
 
       // Nettoyer le flag
       window.__IS_PASSWORD_RESET_PAGE__ = false;
       
-      // Rediriger vers la page de connexion après 2 secondes
+      // Rediriger vers la page de connexion après 2 secondes avec message de succès
       setTimeout(() => {
-        navigate('/auth');
+        navigate('/auth', { 
+          state: { 
+            message: 'Mot de passe mis à jour avec succès. Veuillez vous connecter.',
+            type: 'success'
+          } 
+        });
       }, 2000);
     } catch (err: any) {
       console.error('❌ [ResetPassword] Error updating password:', err);

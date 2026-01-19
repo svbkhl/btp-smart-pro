@@ -25,6 +25,16 @@ const Index = () => {
   const { user } = useAuth();
   const [contactFormOpen, setContactFormOpen] = useState(false);
   
+  // Vérifier si on doit ouvrir le formulaire d'essai depuis l'URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('openTrialForm') === 'true') {
+      setContactFormOpen(true);
+      // Nettoyer l'URL pour ne pas réouvrir le formulaire à chaque rechargement
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
+  
   // Les sections sont visibles par défaut, puis animées au scroll
   const [heroRef, heroVisible] = useScrollAnimation(0.2);
   const [aiRef, aiVisible] = useScrollAnimation(0.1);
