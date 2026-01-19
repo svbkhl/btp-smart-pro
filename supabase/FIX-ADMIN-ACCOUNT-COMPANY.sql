@@ -63,10 +63,11 @@ BEGIN
     RAISE NOTICE '✅ L''utilisateur admin a déjà une entreprise: %', v_company_id;
   END IF;
   
-  -- 5. DÉSACTIVER TOUS LES TRIGGERS sur company_users (AVANT toute opération)
-  -- Utiliser ALTER TABLE ... DISABLE TRIGGER ALL pour être sûr qu'aucun trigger ne s'exécute
-  ALTER TABLE public.company_users DISABLE TRIGGER ALL;
-  RAISE NOTICE '✅ Tous les triggers sur company_users désactivés';
+  -- 5. SUPPRIMER le trigger updated_at problématique (AVANT toute opération)
+  -- On ne peut pas utiliser DISABLE TRIGGER ALL car certains triggers sont système
+  -- On supprime donc uniquement le trigger spécifique qui cause problème
+  DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
+  RAISE NOTICE '✅ Trigger updated_at supprimé sur company_users';
   
   -- 6. Ajouter/mettre à jour l'admin comme owner de l'entreprise
   IF NOT EXISTS (
@@ -109,13 +110,10 @@ BEGIN
     RAISE NOTICE '✅ Rôle admin mis à jour (owner)';
   END IF;
   
-  -- 7. RÉACTIVER les triggers sur company_users (après les opérations)
-  -- Mais d'abord, supprimer définitivement le trigger updated_at qui n'a pas de sens
+  -- 7. S'assurer que le trigger updated_at reste supprimé (après les opérations)
+  -- Le trigger a déjà été supprimé en étape 5, mais on le supprime à nouveau par précaution
   DROP TRIGGER IF EXISTS update_company_users_updated_at ON public.company_users;
-  
-  -- Réactiver tous les autres triggers
-  ALTER TABLE public.company_users ENABLE TRIGGER ALL;
-  RAISE NOTICE '✅ Triggers sur company_users réactivés (sauf updated_at)';
+  RAISE NOTICE '✅ Trigger updated_at confirmé supprimé (colonne n''existe pas)';
   
   -- 8. Backfill toutes les données existantes de l'admin avec cette entreprise
   -- Clients
