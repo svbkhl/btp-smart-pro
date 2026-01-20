@@ -226,24 +226,15 @@ BEGIN
     -- 3.9 Activer RLS
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', v_table);
     
-    -- 3.10 Supprimer toutes les anciennes policies
-    EXECUTE format('
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;
-      DROP POLICY IF EXISTS %I ON public.%I;',
-      v_table || '_select_policy', v_table,
-      v_table || '_insert_policy', v_table,
-      v_table || '_update_policy', v_table,
-      v_table || '_delete_policy', v_table,
-      'Users can view their own ' || v_table, v_table,
-      'Users can create their own ' || v_table, v_table,
-      'Users can update their own ' || v_table, v_table,
-      'Users can delete their own ' || v_table, v_table);
+    -- 3.10 Supprimer toutes les anciennes policies (individuellement)
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_select_policy', v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_insert_policy', v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_update_policy', v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_delete_policy', v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can view their own ' || v_table, v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can create their own ' || v_table, v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can update their own ' || v_table, v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can delete their own ' || v_table, v_table);
     
     -- 3.11 Créer les policies RLS strictes
     EXECUTE format('
