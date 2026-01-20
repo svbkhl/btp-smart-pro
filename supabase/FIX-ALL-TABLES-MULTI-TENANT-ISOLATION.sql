@@ -165,29 +165,80 @@ BEGIN
     EXECUTE format('CREATE INDEX IF NOT EXISTS idx_%I_company_id ON public.%I(company_id)', 
       v_table, v_table);
     
-    -- 3.4 Migrer les données existantes
-    EXECUTE format('
-      UPDATE public.%I t
-      SET company_id = (
-        SELECT cu.company_id
-        FROM public.company_users cu
-        WHERE cu.user_id = t.user_id
-        ORDER BY CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM information_schema.columns 
-            WHERE table_schema = ''public'' 
-            AND table_name = ''company_users'' 
-            AND column_name = ''status''
-          ) AND cu.status = ''active'' THEN 0
-          ELSE 1
-        END
-        LIMIT 1
-      )
-      WHERE t.company_id IS NULL
-      AND EXISTS (
-        SELECT 1 FROM public.company_users cu
-        WHERE cu.user_id = t.user_id
-      )', v_table);
+    -- 3.4 Migrer les données existantes (seulement si user_id existe)
+    DECLARE
+      v_has_user_id BOOLEAN;
+      v_has_recruteur_id BOOLEAN;
+      v_has_created_by BOOLEAN;
+      v_user_column TEXT;
+    BEGIN
+      -- Vérifier quelle colonne existe pour lier à l'utilisateur
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = v_table 
+        AND column_name = 'user_id'
+      ) INTO v_has_user_id;
+      
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = v_table 
+        AND column_name = 'recruteur_id'
+      ) INTO v_has_recruteur_id;
+      
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = v_table 
+        AND column_name = 'created_by'
+      ) INTO v_has_created_by;
+      
+      -- Déterminer la colonne à utiliser
+      IF v_has_user_id THEN
+        v_user_column := 'user_id';
+      ELSIF v_has_recruteur_id THEN
+        v_user_column := 'recruteur_id';
+      ELSIF v_has_created_by THEN
+        v_user_column := 'created_by';
+      ELSE
+        v_user_column := NULL;
+      END IF;
+      
+      -- Migrer seulement si une colonne utilisateur existe
+      IF v_user_column IS NOT NULL THEN
+        EXECUTE format('
+          UPDATE public.%I t
+          SET company_id = (
+            SELECT cu.company_id
+            FROM public.company_users cu
+            WHERE cu.user_id = t.%I
+            ORDER BY CASE 
+              WHEN EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = ''public'' 
+                AND table_name = ''company_users'' 
+                AND column_name = ''status''
+              ) AND cu.status = ''active'' THEN 0
+              ELSE 1
+            END
+            LIMIT 1
+          )
+          WHERE t.company_id IS NULL
+          AND t.%I IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM public.company_users cu
+            WHERE cu.user_id = t.%I
+          )', v_table, v_user_column, v_user_column, v_user_column);
+        
+        GET DIAGNOSTICS v_migrated_count = ROW_COUNT;
+        IF v_migrated_count > 0 THEN
+          RAISE NOTICE '✅ % ligne(s) migrée(s) via %', v_migrated_count, v_user_column;
+        END IF;
+      ELSE
+        RAISE NOTICE 'ℹ️ Aucune colonne user_id/recruteur_id/created_by trouvée - migration ignorée';
+      END IF;
+    END;
     
     GET DIAGNOSTICS v_migrated_count = ROW_COUNT;
     IF v_migrated_count > 0 THEN
