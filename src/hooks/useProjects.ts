@@ -124,11 +124,15 @@ export const useCreateProject = () => {
     mutationFn: async (projectData: CreateProjectData) => {
       if (!user) throw new Error("User not authenticated");
 
-      // Récupérer company_id
+      // Vérifier que l'utilisateur est membre d'une entreprise
+      // ⚠️ SÉCURITÉ : On vérifie mais on ne passe JAMAIS company_id au backend
+      // Le trigger backend force company_id depuis le JWT pour sécurité maximale
       const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise pour créer un projet");
       }
+      // ⚠️ companyId récupéré uniquement pour validation frontend
+      // Le backend ignore toute valeur company_id venant du frontend
 
       // Valider et normaliser le statut
       const validStatuses = ["planifié", "en_attente", "en_cours", "terminé", "annulé"] as const;
@@ -137,9 +141,10 @@ export const useCreateProject = () => {
         : "planifié";
 
       // Construire l'objet d'insertion en excluant les champs undefined
+      // ⚠️ SÉCURITÉ : Ne JAMAIS envoyer company_id - le trigger backend le force depuis JWT
       const insertData: any = {
         user_id: user.id,
-        company_id: companyId,
+        // company_id: IGNORÉ volontairement - le trigger backend le force depuis JWT
         name: projectData.name,
         status: status,
       };

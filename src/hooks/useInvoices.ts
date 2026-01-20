@@ -587,9 +587,10 @@ export const useCreateInvoice = () => {
       // Préparer les données d'insertion
       // Commencer avec SEULEMENT les colonnes de base qui existent TOUJOURS
       // D'après le schéma, la table de base a: id, user_id, company_id, client_id, quote_id, invoice_number, amount (NOT NULL), status, due_date, paid_date, created_at, updated_at
+      // ⚠️ SÉCURITÉ : Ne JAMAIS envoyer company_id - le trigger backend le force depuis JWT
       const insertData: any = {
         user_id: user.id,
-        company_id: companyId, // ✅ Multi-tenant: inclure company_id
+        // company_id: IGNORÉ volontairement - le trigger backend le force depuis JWT
         invoice_number: invoiceNumber,
         status: "draft",
         amount: finalAmountTtc || 0, // NOT NULL, obligatoire dans le schéma de base
