@@ -275,7 +275,7 @@ export default function DevisGenerator() {
               clientInfo={{
                 name: client ? (() => {
                   const selectedClient = clients?.find((c) => c.id === client);
-                  return selectedClient ? (selectedClient.titre ? `${selectedClient.titre} ` : "") + (selectedClient.prenom ? `${selectedClient.prenom} ` : "") + selectedClient.name : newClient.nom;
+                  return selectedClient ? getClientFullName(selectedClient) : newClient.nom;
                 })() : newClient.nom,
                 email: client ? (clients?.find((c) => c.id === client)?.email || newClient.email) : newClient.email,
                 phone: client ? (clients?.find((c) => c.id === client)?.phone || newClient.tel) : newClient.tel,
