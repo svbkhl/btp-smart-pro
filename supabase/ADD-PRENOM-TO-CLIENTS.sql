@@ -37,7 +37,25 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Modifier le CHECK constraint pour retirer VIP du statut
+-- 3. Mettre à jour les clients existants avec status = 'VIP' vers 'actif' (AVANT de modifier la contrainte)
+UPDATE public.clients 
+SET status = 'actif' 
+WHERE status = 'VIP';
+
+-- Afficher le résultat de la mise à jour
+DO $$
+DECLARE
+  v_updated_count INTEGER;
+BEGIN
+  GET DIAGNOSTICS v_updated_count = ROW_COUNT;
+  IF v_updated_count > 0 THEN
+    RAISE NOTICE '✅ % client(s) avec statut VIP mis à jour vers actif', v_updated_count;
+  ELSE
+    RAISE NOTICE 'ℹ️ Aucun client avec statut VIP trouvé';
+  END IF;
+END $$;
+
+-- 4. Modifier le CHECK constraint pour retirer VIP du statut (APRÈS la mise à jour)
 DO $$
 BEGIN
   -- Supprimer l'ancienne contrainte si elle existe
@@ -50,25 +68,12 @@ BEGIN
     CHECK (status IS NULL OR status IN ('actif', 'terminé', 'planifié'));
   
   RAISE NOTICE '✅ Contrainte de statut mise à jour (VIP retiré)';
+EXCEPTION
+  WHEN others THEN
+    RAISE NOTICE '⚠️ Erreur lors de la modification de la contrainte: %', SQLERRM;
+    RAISE;
 END $$;
 
--- 4. Mettre à jour les clients existants avec status = 'VIP' vers 'actif'
-UPDATE public.clients 
-SET status = 'actif' 
-WHERE status = 'VIP';
-
--- Afficher le résultat
-DO $$
-DECLARE
-  v_updated_count INTEGER;
-BEGIN
-  GET DIAGNOSTICS v_updated_count = ROW_COUNT;
-  IF v_updated_count > 0 THEN
-    RAISE NOTICE '✅ % client(s) avec statut VIP mis à jour vers actif', v_updated_count;
-  ELSE
-    RAISE NOTICE 'ℹ️ Aucun client avec statut VIP trouvé';
-  END IF;
-END $$;
 
 -- =====================================================
 -- VÉRIFICATION
