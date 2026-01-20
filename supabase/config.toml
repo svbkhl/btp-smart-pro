@@ -158,6 +158,12 @@ verify_jwt = false
 [functions.send-invitation]
 verify_jwt = false
 
+[functions.verify-invite]
+verify_jwt = false
+
+[functions.accept-invite]
+verify_jwt = false
+
 [functions.create-public-payment-session]
 verify_jwt = false
 
