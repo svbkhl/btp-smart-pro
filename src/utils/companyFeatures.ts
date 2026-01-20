@@ -55,19 +55,9 @@ export const ALL_FEATURES: Array<{
     description: "Gestion des factures et paiements",
   },
   {
-    key: "devis",
-    label: "Devis",
-    description: "Création et gestion des devis",
-  },
-  {
     key: "projets",
     label: "Projets",
     description: "Gestion des projets et chantiers",
-  },
-  {
-    key: "documents",
-    label: "Documents",
-    description: "Gestion des documents",
   },
   {
     key: "messagerie",
