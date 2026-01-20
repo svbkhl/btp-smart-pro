@@ -1,11 +1,13 @@
 /**
  * Edge Function pour supprimer un utilisateur Auth
  * 
+ * Permet à un utilisateur de supprimer son propre compte ou à un admin de supprimer n'importe quel compte
+ * 
  * Usage:
  * POST /functions/v1/delete-user
- * Body: { "email": "user@example.com" }
+ * Body: { "email": "user@example.com" } (optionnel si utilisateur supprime son propre compte)
  * 
- * Headers: Authorization: Bearer <service_role_key> (ou admin)
+ * Headers: Authorization: Bearer <user_token> ou <service_role_key>
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -42,21 +44,44 @@ serve(async (req) => {
       );
     }
 
-    // Parser le body
-    const { email } = await req.json();
+    // Créer le client Supabase avec le token de l'utilisateur
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    if (!email) {
+    const userToken = authHeader.replace("Bearer ", "");
+    const supabaseUser = createClient(supabaseUrl, userToken);
+
+    // Vérifier l'authentification de l'utilisateur
+    const { data: { user: authenticatedUser }, error: authError } = await supabaseUser.auth.getUser();
+    
+    if (authError || !authenticatedUser) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Créer le client Supabase Admin pour les opérations admin
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    // Parser le body (email optionnel)
+    const { email } = await req.json();
+    const targetEmail = email || authenticatedUser.email;
+
+    if (!targetEmail) {
       return new Response(
         JSON.stringify({ error: "Email is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Créer le client Supabase Admin
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    // Récupérer l'utilisateur par email
-    const { data: users, error: listError } = await supabase.auth.admin.listUsers();
+    // Récupérer l'utilisateur cible
+    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
     
     if (listError) {
       return new Response(
@@ -65,17 +90,33 @@ serve(async (req) => {
       );
     }
 
-    const user = users.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+    const targetUser = users.users.find((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase());
 
-    if (!user) {
+    if (!targetUser) {
       return new Response(
-        JSON.stringify({ error: "User not found", email }),
+        JSON.stringify({ error: "User not found", email: targetEmail }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Supprimer l'utilisateur
-    const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
+    // Vérifier que l'utilisateur authentifié peut supprimer ce compte
+    // Soit il supprime son propre compte, soit c'est un admin
+    const isOwnAccount = authenticatedUser.id === targetUser.id;
+    const isAdmin = authenticatedUser.email?.toLowerCase() === 'sabri.khalfallah6@gmail.com' || 
+                    authenticatedUser.user_metadata?.role === 'admin';
+
+    if (!isOwnAccount && !isAdmin) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: You can only delete your own account" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Supprimer les données associées (via RLS, les suppressions en cascade s'occupent du reste)
+    // Les données seront supprimées automatiquement via les contraintes CASCADE
+
+    // Supprimer l'utilisateur Auth
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUser.id);
 
     if (deleteError) {
       return new Response(
@@ -89,8 +130,8 @@ serve(async (req) => {
         success: true, 
         message: "User deleted successfully",
         user: {
-          id: user.id,
-          email: user.email
+          id: targetUser.id,
+          email: targetUser.email
         }
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
