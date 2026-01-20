@@ -241,19 +241,6 @@ const MessagingNew = () => {
               </SelectContent>
             </Select>
 
-            {/* Filtre statut */}
-            <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as FilterStatus)}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="sent">Envoyé</SelectItem>
-                <SelectItem value="delivered">Délivré</SelectItem>
-                <SelectItem value="opened">Lu</SelectItem>
-                <SelectItem value="failed">Échec</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </GlassCard>
 
