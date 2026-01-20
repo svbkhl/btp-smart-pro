@@ -228,16 +228,22 @@ BEGIN
     
     -- 3.10 Supprimer toutes les anciennes policies
     EXECUTE format('
-      DROP POLICY IF EXISTS "%I_select_policy" ON public.%I;
-      DROP POLICY IF EXISTS "%I_insert_policy" ON public.%I;
-      DROP POLICY IF EXISTS "%I_update_policy" ON public.%I;
-      DROP POLICY IF EXISTS "%I_delete_policy" ON public.%I;
-      DROP POLICY IF EXISTS "Users can view their own %I" ON public.%I;
-      DROP POLICY IF EXISTS "Users can create their own %I" ON public.%I;
-      DROP POLICY IF EXISTS "Users can update their own %I" ON public.%I;
-      DROP POLICY IF EXISTS "Users can delete their own %I" ON public.%I;',
-      v_table, v_table, v_table, v_table, v_table, v_table,
-      v_table, v_table, v_table, v_table, v_table, v_table);
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;
+      DROP POLICY IF EXISTS %I ON public.%I;',
+      v_table || '_select_policy', v_table,
+      v_table || '_insert_policy', v_table,
+      v_table || '_update_policy', v_table,
+      v_table || '_delete_policy', v_table,
+      'Users can view their own ' || v_table, v_table,
+      'Users can create their own ' || v_table, v_table,
+      'Users can update their own ' || v_table, v_table,
+      'Users can delete their own ' || v_table, v_table);
     
     -- 3.11 Créer les policies RLS strictes
     EXECUTE format('
