@@ -78,10 +78,37 @@ export const useEmployees = () => {
             (adminRoles || []).map((r: any) => r.user_id)
           );
 
-          // Filtrer pour exclure les admins
-          const filteredEmployees = (employeesData || []).filter(
-            (emp: Employee) => !adminUserIds.has(emp.user_id)
+          // Récupérer les emails des admins pour filtrage supplémentaire
+          const adminEmails = new Set<string>([
+            'sabri.khalfallah6@gmail.com' // Email admin explicite
+          ]);
+
+          // Récupérer les utilisateurs qui ne sont membres d'aucune entreprise (admins globaux)
+          const { data: companyUsers } = await supabase
+            .from("company_users")
+            .select("user_id");
+
+          const usersWithCompany = new Set(
+            (companyUsers || []).map((cu: any) => cu.user_id)
           );
+
+          // Filtrer pour exclure les admins (par user_id, email ET membre d'entreprise)
+          const filteredEmployees = (employeesData || []).filter((emp: Employee) => {
+            // Exclure si admin par rôle
+            if (adminUserIds.has(emp.user_id)) {
+              return false;
+            }
+            // Exclure si email admin
+            const empEmail = emp.user?.email?.toLowerCase() || '';
+            if (empEmail && adminEmails.has(empEmail)) {
+              return false;
+            }
+            // Exclure si l'utilisateur n'est membre d'aucune entreprise (admin global)
+            if (!usersWithCompany.has(emp.user_id)) {
+              return false;
+            }
+            return true;
+          });
 
           return filteredEmployees as Employee[];
         },
