@@ -54,7 +54,8 @@ export const useEmployees = () => {
       // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
-          const { data, error } = await supabase
+          // Récupérer tous les employés
+          const { data: employeesData, error: employeesError } = await supabase
             .from("employees" as any)
             .select(`
               *,
@@ -65,8 +66,24 @@ export const useEmployees = () => {
             `)
             .order("nom", { ascending: true });
 
-          if (error) throw error;
-          return (data || []) as Employee[];
+          if (employeesError) throw employeesError;
+
+          // Récupérer tous les admins (utilisateurs avec rôle administrateur)
+          const { data: adminRoles } = await supabase
+            .from("user_roles")
+            .select("user_id")
+            .eq("role", "administrateur");
+
+          const adminUserIds = new Set(
+            (adminRoles || []).map((r: any) => r.user_id)
+          );
+
+          // Filtrer pour exclure les admins
+          const filteredEmployees = (employeesData || []).filter(
+            (emp: Employee) => !adminUserIds.has(emp.user_id)
+          );
+
+          return filteredEmployees as Employee[];
         },
         [],
         "useEmployees"

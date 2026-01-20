@@ -124,8 +124,23 @@ export const useEmployeesRH = () => {
               throw error;
             }
             
+            // Récupérer tous les admins (utilisateurs avec rôle administrateur)
+            const { data: adminRoles } = await supabase
+              .from("user_roles")
+              .select("user_id")
+              .eq("role", "administrateur");
+
+            const adminUserIds = new Set(
+              (adminRoles || []).map((r: any) => r.user_id)
+            );
+
+            // Filtrer pour exclure les admins
+            const filteredData = (data || []).filter(
+              (emp: any) => !adminUserIds.has(emp.user_id)
+            );
+            
             // Mapper les données avec les valeurs par défaut pour les colonnes RH
-            const mapped = (data || []).map((emp: any) => ({
+            const mapped = filteredData.map((emp: any) => ({
               ...emp,
               statut: emp.statut || "actif",
               team_id: emp.team_id || null,
