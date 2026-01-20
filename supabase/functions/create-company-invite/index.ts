@@ -27,7 +27,7 @@ const corsHeaders = {
 interface CreateInviteRequest {
   company_id: string;
   email: string;
-  role: 'admin' | 'member';
+  role: 'owner' | 'admin' | 'member';
 }
 
 serve(async (req) => {
@@ -161,11 +161,11 @@ serve(async (req) => {
       );
     }
 
-    if (!['admin', 'member'].includes(role)) {
+    if (!['owner', 'admin', 'member'].includes(role)) {
       return new Response(
         JSON.stringify({ 
-          error: "Invalid role. Must be 'admin' or 'member'",
-          message: `Le rôle "${role}" n'est pas valide. Les rôles valides sont: admin, member`,
+          error: "Invalid role. Must be 'owner', 'admin' or 'member'",
+          message: `Le rôle "${role}" n'est pas valide. Les rôles valides sont: owner, admin, member`,
           details: `role reçu: ${role}`
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -322,7 +322,7 @@ serve(async (req) => {
               </p>
               
               <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
-                Rôle proposé : <strong>${role === 'admin' ? 'Administrateur' : 'Membre'}</strong>
+                Rôle proposé : <strong>${role === 'owner' ? 'Dirigeant' : role === 'admin' ? 'Administrateur' : 'Membre'}</strong>
               </p>
               
               <p style="margin: 0 0 30px 0; font-size: 16px; color: #333;">
