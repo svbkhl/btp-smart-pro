@@ -32,6 +32,7 @@ import {
   Calendar,
   User,
   AlertCircle,
+  Send,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -176,14 +177,17 @@ const MessagingNew = () => {
     });
   }, [messages, searchQuery, filterType, filterStatus]);
 
-  // Statistiques
-  const stats = useMemo(() => {
-    return {
-      total: messages.length,
-      sent: messages.filter(m => m.status === 'sent' || m.status === 'delivered' || m.status === 'opened').length,
-      failed: messages.filter(m => m.status === 'failed' || m.status === 'bounced').length,
-      opened: messages.filter(m => m.status === 'opened').length,
-    };
+  // Compteur de messages envoyés aujourd'hui
+  const messagesSentToday = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return messages.filter((m) => {
+      const sentDate = new Date(m.sent_at);
+      sentDate.setHours(0, 0, 0, 0);
+      return sentDate.getTime() === today.getTime() && 
+             (m.status === 'sent' || m.status === 'delivered' || m.status === 'opened');
+    }).length;
   }, [messages]);
 
   // Naviguer vers le document
@@ -205,49 +209,6 @@ const MessagingNew = () => {
       description="Historique de toutes les communications avec vos clients"
     >
       <div className="space-y-6">
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <GlassCard className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-              <Mail className="w-8 h-8 text-blue-500" />
-            </div>
-          </GlassCard>
-
-          <GlassCard className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Envoyés</p>
-                <p className="text-2xl font-bold text-foreground">{stats.sent}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </GlassCard>
-
-          <GlassCard className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Lus</p>
-                <p className="text-2xl font-bold text-foreground">{stats.opened}</p>
-              </div>
-              <Eye className="w-8 h-8 text-emerald-500" />
-            </div>
-          </GlassCard>
-
-          <GlassCard className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Échecs</p>
-                <p className="text-2xl font-bold text-foreground">{stats.failed}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-red-500" />
-            </div>
-          </GlassCard>
-        </div>
-
         {/* Filtres et recherche */}
         <GlassCard className="p-6">
           <div className="flex flex-col lg:flex-row gap-4">
@@ -297,7 +258,18 @@ const MessagingNew = () => {
         </GlassCard>
 
         {/* Liste des messages */}
-        <GlassCard className="p-6">
+        <div>
+          {/* Indicateur discret des messages envoyés aujourd'hui */}
+          <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+            <Send className="w-4 h-4" />
+            <span>
+              {messagesSentToday === 0 
+                ? "Aucun message envoyé aujourd'hui"
+                : `${messagesSentToday} message${messagesSentToday > 1 ? 's' : ''} envoyé${messagesSentToday > 1 ? 's' : ''} aujourd'hui`}
+            </span>
+          </div>
+
+          <GlassCard className="p-6">
           {documentIdFromUrl && (
             <div className="mb-4 p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-800 dark:text-blue-200">
@@ -420,6 +392,7 @@ const MessagingNew = () => {
             </div>
           )}
         </GlassCard>
+        </div>
       </div>
 
       {/* Modal détail du message */}
