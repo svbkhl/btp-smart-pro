@@ -666,7 +666,7 @@ export const useCreateInvoice = () => {
                 
                 return {
                   invoice_id: invoice.id,
-                  company_id: finalCompanyId,
+                  // company_id: IGNORÉ volontairement - le trigger backend le force depuis JWT
                   position: index,
                   label: line.description || "",
                   description: line.description || "",
