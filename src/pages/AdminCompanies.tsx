@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { useAllCompanies, useUpdateCompany, useCreateCompany, useDeleteCompany, Company } from "@/hooks/useCompany";
-import { ALL_FEATURES, SUPPORT_LEVELS } from "@/utils/companyFeatures";
+import { ALL_FEATURES } from "@/utils/companyFeatures";
 import { Loader2, Building2, Save, Plus, Edit, Mail, Trash2, AlertTriangle } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -39,7 +39,7 @@ const AdminCompanies = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newCompanyData, setNewCompanyData] = useState({
     name: "",
-    plan: "custom" as Company["plan"],
+    plan: "basic" as Company["plan"],
     support_level: 0 as Company["support_level"],
     features: {} as Company["features"],
   });
@@ -88,7 +88,7 @@ const AdminCompanies = () => {
       setIsCreateDialogOpen(false);
       setNewCompanyData({
         name: "",
-        plan: "custom",
+        plan: "basic",
         support_level: 0,
         features: {},
       });
@@ -224,31 +224,6 @@ const AdminCompanies = () => {
                   <SelectContent>
                     <SelectItem value="basic">Basic</SelectItem>
                     <SelectItem value="pro">Pro</SelectItem>
-                    <SelectItem value="enterprise">Enterprise</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="support_level">Niveau de support</Label>
-                <Select
-                  value={newCompanyData.support_level.toString()}
-                  onValueChange={(value) =>
-                    setNewCompanyData({
-                      ...newCompanyData,
-                      support_level: parseInt(value) as Company["support_level"],
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUPPORT_LEVELS.map((level) => (
-                      <SelectItem key={level.value} value={level.value.toString()}>
-                        {level.label} - {level.description}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -511,9 +486,6 @@ const AdminCompanies = () => {
                     <h3 className="text-xl font-semibold">{company.name}</h3>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                       <span>Plan: {company.plan}</span>
-                      <span>
-                        Support: {SUPPORT_LEVELS.find((l) => l.value === company.support_level)?.label}
-                      </span>
                       <span>Statut: {company.status}</span>
                     </div>
                   </div>
@@ -557,28 +529,6 @@ const AdminCompanies = () => {
 
                 {editingCompany?.id === company.id ? (
                   <div className="space-y-4 pt-4 border-t">
-                    <div>
-                      <Label>Niveau de support</Label>
-                      <Select
-                        value={company.support_level.toString()}
-                        onValueChange={(value) => {
-                          handleSaveCompany(company, {
-                            support_level: parseInt(value) as Company["support_level"],
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUPPORT_LEVELS.map((level) => (
-                            <SelectItem key={level.value} value={level.value.toString()}>
-                              {level.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
 
                     <div>
                       <Label>Modules activés</Label>
