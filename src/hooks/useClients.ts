@@ -191,28 +191,44 @@ export const useCreateClient = () => {
         throw new Error(`User ID invalide: ${user.id}`);
       }
 
-      // Récupérer company_id
+      // Vérifier que l'utilisateur est membre d'une entreprise
+      // ⚠️ SÉCURITÉ : On vérifie mais on ne passe JAMAIS company_id au backend
+      // Le trigger backend force company_id depuis le JWT pour sécurité maximale
       const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise pour créer un client");
       }
+      // ⚠️ companyId récupéré uniquement pour validation frontend
+      // Le backend ignore toute valeur company_id venant du frontend
 
       // Construire l'objet d'insertion de manière explicite avec seulement les champs nécessaires
+      // ⚠️ SÉCURITÉ : Ne JAMAIS envoyer company_id depuis le frontend
+      // Le trigger backend force company_id depuis le JWT
       const insertData: {
         user_id: string;
-        company_id: string;
+        // company_id est forcé par le trigger backend - on ne l'envoie PAS
         name: string;
         status: string;
+        titre?: string;
+        prenom?: string;
         email?: string;
         phone?: string;
         location?: string;
         avatar_url?: string;
       } = {
         user_id: user.id,
-        company_id: companyId,
+        // company_id: IGNORÉ - le trigger backend le force depuis JWT
         name: clientData.name.trim(),
         status: clientData.status || "actif",
       };
+      
+      // Ajouter les champs optionnels
+      if (clientData.titre) {
+        insertData.titre = clientData.titre;
+      }
+      if (clientData.prenom?.trim()) {
+        insertData.prenom = clientData.prenom.trim();
+      }
 
       // Ajouter les champs optionnels seulement s'ils sont définis et non vides
       if (clientData.email?.trim()) {
