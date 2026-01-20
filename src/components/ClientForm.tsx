@@ -26,10 +26,11 @@ import { Loader2 } from "lucide-react";
 
 const clientSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
+  prenom: z.string().optional(),
   email: z.string().email("Email invalide").optional().or(z.literal("")),
   phone: z.string().optional(),
   location: z.string().optional(),
-  status: z.enum(["actif", "terminé", "planifié", "VIP"]).optional(),
+  status: z.enum(["actif", "terminé", "planifié"]).optional(),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
@@ -56,6 +57,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
     resolver: zodResolver(clientSchema),
     defaultValues: {
       name: "",
+      prenom: "",
       email: "",
       phone: "",
       location: "",
@@ -70,15 +72,17 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
     if (client) {
       reset({
         name: client.name,
+        prenom: (client as any).prenom || "",
         email: client.email || "",
         phone: client.phone || "",
         location: client.location || "",
-        status: client.status || "actif",
+        status: client.status === "VIP" ? "actif" : (client.status || "actif"),
       });
       setAvatarUrl(client.avatar_url || "");
     } else {
       reset({
         name: "",
+        prenom: "",
         email: "",
         phone: "",
         location: "",
@@ -94,6 +98,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
     try {
       const clientData: CreateClientData = {
         name: data.name,
+        prenom: data.prenom || undefined,
         email: data.email || undefined,
         phone: data.phone || undefined,
         location: data.location || undefined,
@@ -128,13 +133,22 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="prenom">Prénom</Label>
+            <Input
+              id="prenom"
+              {...register("prenom")}
+              placeholder="Jean"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="name">
               Nom <span className="text-red-500">*</span>
             </Label>
             <Input
               id="name"
               {...register("name")}
-              placeholder="M. Martin"
+              placeholder="Martin"
             />
             {errors.name && (
               <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -182,7 +196,6 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
                 <SelectItem value="actif">Actif</SelectItem>
                 <SelectItem value="terminé">Terminé</SelectItem>
                 <SelectItem value="planifié">Planifié</SelectItem>
-                <SelectItem value="VIP">VIP</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -69,13 +69,13 @@ export const RecentClientsWidget = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                        {client.name}
+                        {client.prenom ? `${client.prenom} ${client.name}` : client.name}
                       </p>
                       <Badge
                         variant={
                           client.status === "actif"
                             ? "default"
-                            : client.status === "VIP"
+                            : client.status === "planifié"
                             ? "secondary"
                             : "outline"
                         }

@@ -134,7 +134,9 @@ const ClientsAndQuotes = () => {
                     <GlassCard key={client.id} className="p-6 hover:shadow-lg transition-shadow">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <h3 className="font-semibold text-lg mb-1">{client.name}</h3>
+                          <h3 className="font-semibold text-lg mb-1">
+                            {client.prenom ? `${client.prenom} ${client.name}` : client.name}
+                          </h3>
                           <Badge variant="outline">{client.status}</Badge>
                         </div>
                       </div>

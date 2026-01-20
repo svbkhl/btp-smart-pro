@@ -72,10 +72,10 @@ const Clients = () => {
     switch (status) {
       case "actif":
         return "default";
-      case "VIP":
-        return "secondary";
       case "terminé":
         return "outline";
+      case "planifié":
+        return "secondary";
       default:
         return "default";
     }
@@ -149,7 +149,9 @@ const Clients = () => {
               <GlassCard key={client.id} className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">{client.name}</h3>
+                    <h3 className="text-lg font-semibold mb-1">
+                      {client.prenom ? `${client.prenom} ${client.name}` : client.name}
+                    </h3>
                     <Badge variant={getStatusColor(client.status)} className="text-xs">
                       {client.status}
                     </Badge>

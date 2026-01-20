@@ -11,11 +11,12 @@ export interface Client {
   id: string;
   user_id: string;
   name: string;
+  prenom?: string;
   email?: string;
   phone?: string;
   location?: string;
   avatar_url?: string;
-  status: "actif" | "terminé" | "planifié" | "VIP";
+  status: "actif" | "terminé" | "planifié";
   total_spent?: number;
   created_at: string;
   updated_at: string;
@@ -23,11 +24,12 @@ export interface Client {
 
 export interface CreateClientData {
   name: string;
+  prenom?: string;
   email?: string;
   phone?: string;
   location?: string;
   avatar_url?: string;
-  status?: "actif" | "terminé" | "planifié" | "VIP";
+  status?: "actif" | "terminé" | "planifié";
 }
 
 export interface UpdateClientData extends Partial<CreateClientData> {
@@ -153,6 +155,7 @@ export const useCreateClient = () => {
           id: `fake-client-${Date.now()}`,
           user_id: user.id,
           name: clientData.name,
+          prenom: clientData.prenom,
           email: clientData.email,
           phone: clientData.phone,
           location: clientData.location,
