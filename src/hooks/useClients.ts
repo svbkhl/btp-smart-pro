@@ -250,21 +250,32 @@ export const useCreateClient = () => {
 
       // S'assurer que les champs optionnels NULL ne sont pas envoyés si vides
       // Cela évite les problèmes avec les triggers de validation qui vérifient email/phone
+      // ⚠️ SÉCURITÉ : company_id est OBLIGATOIREMENT ignoré - le trigger backend le force
       const cleanInsertData: {
         user_id: string;
-        company_id: string;
+        // company_id est forcé par le trigger backend - on ne l'envoie JAMAIS
         name: string;
         status: string;
+        titre?: string;
+        prenom?: string;
         email?: string;
         phone?: string;
         location?: string;
         avatar_url?: string;
       } = {
         user_id: user.id,
-        company_id: insertData.company_id,
+        // company_id: IGNORÉ volontairement - le trigger backend le force depuis JWT
         name: insertData.name,
         status: insertData.status,
       };
+      
+      // Ajouter les champs optionnels
+      if (insertData.titre) {
+        cleanInsertData.titre = insertData.titre;
+      }
+      if (insertData.prenom?.trim()) {
+        cleanInsertData.prenom = insertData.prenom.trim();
+      }
 
       // Ajouter seulement les champs non vides (les triggers de validation peuvent échouer si on envoie des chaînes vides)
       if (insertData.email && insertData.email.trim().length > 0) {
