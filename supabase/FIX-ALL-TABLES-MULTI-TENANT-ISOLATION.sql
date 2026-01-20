@@ -109,6 +109,7 @@ DECLARE
   v_has_null BOOLEAN;
   v_migrated_count INTEGER;
   v_deleted_count INTEGER;
+  v_constraint_name TEXT;
 BEGIN
   FOREACH v_table IN ARRAY v_tables
   LOOP
@@ -144,16 +145,20 @@ BEGIN
     END IF;
     
     -- 3.2 Ajouter Foreign Key si manquante
+    v_constraint_name := v_table || '_company_id_fkey';
+    
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.table_constraints 
       WHERE constraint_schema = 'public' 
       AND table_name = v_table 
-      AND constraint_name = v_table || '_company_id_fkey'
+      AND constraint_name = v_constraint_name
     ) THEN
       EXECUTE format('ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE', 
-        v_table, v_table || '_company_id_fkey');
+        v_table, v_constraint_name);
       
       RAISE NOTICE '✅ Foreign key ajoutée';
+    ELSE
+      RAISE NOTICE 'ℹ️ Foreign key existe déjà';
     END IF;
     
     -- 3.3 Créer index si manquant
