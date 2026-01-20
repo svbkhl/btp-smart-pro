@@ -6,16 +6,32 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Shield, Loader2, Save, Eye, EyeOff } from "lucide-react";
+import { Shield, Loader2, Save, Eye, EyeOff, Trash2, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
 
 export const SecuritySettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [changingPassword, setChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState("");
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -70,6 +86,67 @@ export const SecuritySettings = () => {
       });
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer votre email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Vérifier que l'email de confirmation correspond
+    if (confirmEmail !== user.email) {
+      toast({
+        title: "Email incorrect",
+        description: "L'email de confirmation doit correspondre à votre email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      // Appeler l'edge function pour supprimer le compte
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session) {
+        throw new Error("Vous devez être connecté");
+      }
+
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { email: user.email },
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Compte supprimé",
+        description: "Votre compte a été supprimé avec succès. Vous allez être déconnecté.",
+      });
+
+      // Déconnexion et redirection
+      await supabase.auth.signOut();
+      setTimeout(() => {
+        navigate("/auth");
+      }, 2000);
+    } catch (error: any) {
+      console.error("Erreur lors de la suppression du compte:", error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer le compte. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteDialog(false);
+      setConfirmEmail("");
     }
   };
 
@@ -213,6 +290,85 @@ export const SecuritySettings = () => {
               Connecté depuis {new Date().toLocaleDateString("fr-FR")}
             </p>
           </div>
+        </div>
+
+        {/* Supprimer le compte */}
+        <div className="mt-8 pt-6 border-t border-border/50">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="font-semibold mb-2 text-destructive">Zone de danger</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                La suppression de votre compte est irréversible. Toutes vos données seront définitivement supprimées.
+              </p>
+            </div>
+          </div>
+
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className="gap-2 rounded-xl"
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer mon compte
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  Supprimer définitivement mon compte
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-4">
+                  <p>
+                    Cette action est <strong>irréversible</strong>. Toutes vos données seront définitivement supprimées :
+                  </p>
+                  <ul className="list-disc list-inside text-sm space-y-1 ml-2">
+                    <li>Vos clients, projets, devis et factures</li>
+                    <li>Vos paramètres et préférences</li>
+                    <li>Votre historique de messages</li>
+                    <li>Toutes vos données associées</li>
+                  </ul>
+                  <div className="pt-2">
+                    <Label htmlFor="confirm_email" className="text-sm font-medium">
+                      Pour confirmer, tapez votre email : <strong>{user?.email}</strong>
+                    </Label>
+                    <Input
+                      id="confirm_email"
+                      type="email"
+                      value={confirmEmail}
+                      onChange={(e) => setConfirmEmail(e.target.value)}
+                      placeholder="Votre email"
+                      className="mt-2"
+                      disabled={isDeletingAccount}
+                    />
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeletingAccount} className="rounded-xl">
+                  Annuler
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  disabled={isDeletingAccount || confirmEmail !== user?.email}
+                  className="bg-destructive hover:bg-destructive/90 rounded-xl gap-2"
+                >
+                  {isDeletingAccount ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Suppression...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      Supprimer définitivement
+                    </>
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </GlassCard>
     </motion.div>
