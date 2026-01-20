@@ -231,10 +231,11 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_insert_policy', v_table);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_update_policy', v_table);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_table || '_delete_policy', v_table);
-    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can view their own ' || v_table, v_table);
-    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can create their own ' || v_table, v_table);
-    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can update their own ' || v_table, v_table);
-    EXECUTE format('DROP POLICY IF EXISTS %L ON public.%I', 'Users can delete their own ' || v_table, v_table);
+    -- Les noms avec espaces doivent être construits et utilisés avec %I
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'Users can view their own ' || v_table, v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'Users can create their own ' || v_table, v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'Users can update their own ' || v_table, v_table);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'Users can delete their own ' || v_table, v_table);
     
     -- 3.11 Créer les policies RLS strictes
     EXECUTE format('
