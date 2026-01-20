@@ -103,6 +103,12 @@ const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null 
       { icon: Mail, label: "Messagerie", path: "/messaging", feature: null },
     ],
   },
+  {
+    items: [
+      // 🔟 Ventes / Statistiques
+      { icon: BarChart3, label: "Ventes", path: "/sales", feature: null },
+    ],
+  },
 ];
 
 // Fonction pour filtrer les menu items selon les features
