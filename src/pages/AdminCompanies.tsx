@@ -493,7 +493,6 @@ const AdminCompanies = () => {
                     <InviteUserDialog
                       companyId={company.id}
                       companyName={company.name}
-                      defaultRole="owner"
                       trigger={
                         <Button
                           variant="outline"

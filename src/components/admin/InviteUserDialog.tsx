@@ -33,7 +33,6 @@ import { useAuth } from '@/hooks/useAuth';
 interface InviteUserDialogProps {
   companyId: string;
   companyName: string;
-  defaultRole?: 'admin' | 'member'; // owner ne peut pas être invité
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
@@ -41,7 +40,6 @@ interface InviteUserDialogProps {
 export const InviteUserDialog = ({
   companyId,
   companyName,
-  defaultRole = 'member',
   trigger,
   onSuccess,
 }: InviteUserDialogProps) => {
@@ -49,8 +47,9 @@ export const InviteUserDialog = ({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'member'>(defaultRole || 'member');
   const [success, setSuccess] = useState(false);
+  // Toujours inviter en tant que dirigeant (owner)
+  const role: 'owner' = 'owner';
 
   // Vérifier que companyId est chargé avant de permettre l'ouverture du dialog
   const isCompanyIdReady = companyId && companyId.trim() !== '';
@@ -83,34 +82,12 @@ export const InviteUserDialog = ({
     }
 
     const emailToSend = email.trim().toLowerCase();
-    
-    // Validation du rôle (owner ne peut pas être invité)
-    if (role === 'owner') {
-      toast({
-        title: 'Erreur',
-        description: 'Le rôle "owner" ne peut pas être attribué via invitation',
-        variant: 'destructive',
-      });
-      setLoading(false);
-      return;
-    }
 
     // Vérifier que companyId est défini
     if (!companyId || companyId.trim() === '') {
       toast({
         title: 'Erreur',
         description: 'L\'ID de l\'entreprise n\'est pas défini. Veuillez réessayer.',
-        variant: 'destructive',
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Vérifier que le rôle est valide
-    if (role !== 'admin' && role !== 'member') {
-      toast({
-        title: 'Erreur',
-        description: 'Le rôle doit être "admin" ou "member"',
         variant: 'destructive',
       });
       setLoading(false);
@@ -281,39 +258,25 @@ export const InviteUserDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
-            Inviter un utilisateur
+            Inviter un dirigeant
           </DialogTitle>
           <DialogDescription>
-            Envoyer une invitation à {companyName}
+            Inviter un dirigeant pour {companyName}. Le dirigeant pourra ensuite inviter ses employés.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleInvite} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="invite-email">Email *</Label>
+            <Label htmlFor="invite-email">Email du dirigeant *</Label>
             <Input
               id="invite-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="utilisateur@example.com"
+              placeholder="dirigeant@example.com"
               required
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="invite-role">Rôle *</Label>
-            <Select value={role} onValueChange={(value: any) => setRole(value)}>
-              <SelectTrigger id="invite-role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Administrateur (Admin)</SelectItem>
-                <SelectItem value="member">Membre (Member)</SelectItem>
-              </SelectContent>
-            </Select>
             <p className="text-xs text-muted-foreground">
-              {role === 'admin' && 'L\'administrateur pourra gérer les utilisateurs et les paramètres'}
-              {role === 'member' && 'Le membre aura un accès standard à l\'application'}
+              Une invitation sera envoyée à cette adresse pour rejoindre l'entreprise en tant que dirigeant.
             </p>
           </div>
 
