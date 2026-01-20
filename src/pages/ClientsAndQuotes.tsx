@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { ClientForm } from "@/components/ClientForm";
 import { Link } from "react-router-dom";
@@ -135,7 +135,7 @@ const ClientsAndQuotes = () => {
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg mb-1">
-                            {client.prenom ? `${client.prenom} ${client.name}` : client.name}
+                            {getClientFullName(client)}
                           </h3>
                           <Badge variant="outline">{client.status}</Badge>
                         </div>

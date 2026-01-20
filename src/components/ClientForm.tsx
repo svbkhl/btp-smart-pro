@@ -25,6 +25,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { Loader2 } from "lucide-react";
 
 const clientSchema = z.object({
+  titre: z.enum(["M.", "Mme"]).optional(),
   name: z.string().min(1, "Le nom est requis"),
   prenom: z.string().optional(),
   email: z.string().email("Email invalide").optional().or(z.literal("")),
@@ -56,6 +57,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
   } = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
+      titre: "M.",
       name: "",
       prenom: "",
       email: "",
@@ -71,6 +73,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
   useEffect(() => {
     if (client) {
       reset({
+        titre: (client as any).titre || "M.",
         name: client.name,
         prenom: (client as any).prenom || "",
         email: client.email || "",
@@ -81,6 +84,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
       setAvatarUrl(client.avatar_url || "");
     } else {
       reset({
+        titre: "M.",
         name: "",
         prenom: "",
         email: "",
@@ -97,6 +101,7 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
     setIsSubmitting(true);
     try {
       const clientData: CreateClientData = {
+        titre: data.titre || undefined,
         name: data.name,
         prenom: data.prenom || undefined,
         email: data.email || undefined,
@@ -132,6 +137,19 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="titre">Civilité</Label>
+            <Select value={watch("titre") || "M."} onValueChange={(value) => setValue("titre", value as any)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="M.">M.</SelectItem>
+                <SelectItem value="Mme">Mme</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="prenom">Prénom</Label>
             <Input

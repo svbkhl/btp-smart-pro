@@ -10,6 +10,7 @@ import { getCurrentCompanyId } from "@/utils/companyHelpers";
 export interface Client {
   id: string;
   user_id: string;
+  titre?: "M." | "Mme";
   name: string;
   prenom?: string;
   email?: string;
@@ -23,6 +24,7 @@ export interface Client {
 }
 
 export interface CreateClientData {
+  titre?: "M." | "Mme";
   name: string;
   prenom?: string;
   email?: string;
@@ -31,6 +33,15 @@ export interface CreateClientData {
   avatar_url?: string;
   status?: "actif" | "terminé" | "planifié";
 }
+
+// Fonction utilitaire pour formater le nom complet du client
+export const getClientFullName = (client: Client | Pick<Client, "titre" | "name" | "prenom">): string => {
+  const parts: string[] = [];
+  if (client.titre) parts.push(client.titre);
+  if (client.prenom) parts.push(client.prenom);
+  parts.push(client.name);
+  return parts.join(" ");
+};
 
 export interface UpdateClientData extends Partial<CreateClientData> {
   id: string;
@@ -154,6 +165,7 @@ export const useCreateClient = () => {
         const fakeClient: Client = {
           id: `fake-client-${Date.now()}`,
           user_id: user.id,
+          titre: clientData.titre,
           name: clientData.name,
           prenom: clientData.prenom,
           email: clientData.email,

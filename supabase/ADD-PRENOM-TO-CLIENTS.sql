@@ -5,7 +5,23 @@
 -- et retire VIP du statut CHECK constraint
 -- =====================================================
 
--- 1. Ajouter la colonne prenom si elle n'existe pas
+-- 1. Ajouter la colonne titre si elle n'existe pas
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'clients' 
+    AND column_name = 'titre'
+  ) THEN
+    ALTER TABLE public.clients ADD COLUMN titre TEXT CHECK (titre IS NULL OR titre IN ('M.', 'Mme'));
+    RAISE NOTICE '✅ Colonne titre ajoutée à la table clients';
+  ELSE
+    RAISE NOTICE 'ℹ️ Colonne titre existe déjà';
+  END IF;
+END $$;
+
+-- 2. Ajouter la colonne prenom si elle n'existe pas
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -21,7 +37,7 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Modifier le CHECK constraint pour retirer VIP du statut
+-- 3. Modifier le CHECK constraint pour retirer VIP du statut
 DO $$
 BEGIN
   -- Supprimer l'ancienne contrainte si elle existe
@@ -36,7 +52,7 @@ BEGIN
   RAISE NOTICE '✅ Contrainte de statut mise à jour (VIP retiré)';
 END $$;
 
--- 3. Mettre à jour les clients existants avec status = 'VIP' vers 'actif'
+-- 4. Mettre à jour les clients existants avec status = 'VIP' vers 'actif'
 UPDATE public.clients 
 SET status = 'actif' 
 WHERE status = 'VIP';
@@ -57,7 +73,7 @@ END $$;
 -- =====================================================
 -- VÉRIFICATION
 -- =====================================================
--- Vérifier que la colonne prenom existe
+-- Vérifier que les colonnes titre et prenom existent
 SELECT 
   column_name, 
   data_type, 
@@ -65,7 +81,8 @@ SELECT
 FROM information_schema.columns
 WHERE table_schema = 'public' 
   AND table_name = 'clients' 
-  AND column_name = 'prenom';
+  AND column_name IN ('titre', 'prenom')
+ORDER BY column_name;
 
 -- Vérifier qu'il n'y a plus de clients avec status = 'VIP'
 SELECT COUNT(*) as clients_vip_restants

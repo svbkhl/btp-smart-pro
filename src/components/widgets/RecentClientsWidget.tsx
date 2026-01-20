@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useClientsData } from "@/lib/data/orchestrator";
+import { getClientFullName } from "@/hooks/useClients";
 import { WidgetSkeleton } from "./WidgetSkeleton";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -69,7 +70,7 @@ export const RecentClientsWidget = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                        {client.prenom ? `${client.prenom} ${client.name}` : client.name}
+                        {getClientFullName(client)}
                       </p>
                       <Badge
                         variant={

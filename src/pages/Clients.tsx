@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useClients, useDeleteClient } from "@/hooks/useClients";
+import { useClients, useDeleteClient, getClientFullName } from "@/hooks/useClients";
 import { ClientForm } from "@/components/ClientForm";
 import { Plus, Search, Users, Mail, Phone, MapPin, Trash2, Edit } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -150,7 +150,7 @@ const Clients = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold mb-1">
-                      {client.prenom ? `${client.prenom} ${client.name}` : client.name}
+                      {getClientFullName(client)}
                     </h3>
                     <Badge variant={getStatusColor(client.status)} className="text-xs">
                       {client.status}

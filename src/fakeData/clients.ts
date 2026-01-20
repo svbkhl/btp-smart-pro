@@ -4,6 +4,7 @@ export const FAKE_CLIENTS: Client[] = [
   {
     id: "fake-client-1",
     user_id: "fake-user",
+    titre: "M.",
     name: "Martin",
     prenom: "Jean",
     email: "martin@example.com",
@@ -17,6 +18,7 @@ export const FAKE_CLIENTS: Client[] = [
   {
     id: "fake-client-2",
     user_id: "fake-user",
+    titre: "Mme",
     name: "Dupont",
     prenom: "Marie",
     email: "dupont@example.com",
@@ -30,6 +32,7 @@ export const FAKE_CLIENTS: Client[] = [
   {
     id: "fake-client-3",
     user_id: "fake-user",
+    titre: "M.",
     name: "Bernard",
     prenom: "Pierre",
     email: "contact@bernard.fr",
