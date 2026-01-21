@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_USER_SETTINGS } from "@/fakeData/userSettings";
+import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
 export interface UserSettings {
   id: string;
   user_id: string;
+  company_id?: string;
   company_name?: string;
   email?: string;
   phone?: string;
@@ -33,6 +35,7 @@ export interface UserSettings {
 
 /**
  * Hook pour récupérer les paramètres utilisateur (informations entreprise)
+ * Les paramètres sont maintenant isolés par entreprise (company_id)
  */
 export const useUserSettings = () => {
   const { user } = useAuth();
@@ -45,10 +48,16 @@ export const useUserSettings = () => {
         async () => {
           if (!user) throw new Error("User not authenticated");
 
+          // Récupérer le company_id de l'utilisateur
+          const companyId = await getCurrentCompanyId(user.id);
+          if (!companyId) {
+            throw new Error("User must be a member of a company");
+          }
+
           const { data, error } = await supabase
             .from("user_settings")
             .select("*")
-            .eq("user_id", user.id)
+            .eq("company_id", companyId)
             .maybeSingle();
 
           if (error) {
@@ -56,10 +65,11 @@ export const useUserSettings = () => {
           }
 
           // Si les settings n'existent pas, créer un enregistrement vide
+          // Le trigger force_company_id_for_user_settings ajoutera automatiquement company_id
           if (!data) {
             const { data: newSettings, error: insertError } = await supabase
               .from("user_settings")
-              .insert({ user_id: user.id })
+              .insert({})
               .select()
               .single();
 
@@ -103,6 +113,7 @@ export const useUserSettings = () => {
 
 /**
  * Hook pour mettre à jour les paramètres utilisateur
+ * Les paramètres sont maintenant isolés par entreprise (company_id)
  */
 export const useUpdateUserSettings = () => {
   const { user } = useAuth();
@@ -112,19 +123,28 @@ export const useUpdateUserSettings = () => {
     mutationFn: async (updates: Partial<UserSettings>) => {
       if (!user) throw new Error("User not authenticated");
 
-      console.log("🔄 Mise à jour des user_settings:", { user_id: user.id, updates });
+      // Récupérer le company_id de l'utilisateur
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("User must be a member of a company");
+      }
+
+      // Ne pas envoyer company_id depuis le frontend, le trigger le forcera
+      const { company_id, user_id, ...safeUpdates } = updates;
+
+      console.log("🔄 Mise à jour des user_settings:", { company_id, updates: safeUpdates });
 
       // Utiliser upsert pour créer l'enregistrement s'il n'existe pas
+      // Le trigger ajoutera automatiquement company_id
       const { data, error } = await supabase
         .from("user_settings")
         .upsert(
           {
-            user_id: user.id,
-            ...updates,
+            ...safeUpdates,
             updated_at: new Date().toISOString(),
           },
           {
-            onConflict: "user_id",
+            onConflict: "company_id",
           }
         )
         .select()
@@ -152,6 +172,7 @@ export const useUpdateUserSettings = () => {
 
 /**
  * Hook pour créer les paramètres utilisateur (si n'existent pas)
+ * Les paramètres sont maintenant isolés par entreprise (company_id)
  */
 export const useCreateUserSettings = () => {
   const { user } = useAuth();
@@ -161,12 +182,18 @@ export const useCreateUserSettings = () => {
     mutationFn: async (settings: Partial<UserSettings>) => {
       if (!user) throw new Error("User not authenticated");
 
+      // Récupérer le company_id de l'utilisateur
+      const companyId = await getCurrentCompanyId(user.id);
+      if (!companyId) {
+        throw new Error("User must be a member of a company");
+      }
+
+      // Ne pas envoyer company_id depuis le frontend, le trigger le forcera
+      const { company_id, user_id, ...safeSettings } = settings;
+
       const { data, error } = await supabase
         .from("user_settings")
-        .insert({
-          user_id: user.id,
-          ...settings,
-        })
+        .insert(safeSettings)
         .select()
         .single();
 
