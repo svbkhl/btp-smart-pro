@@ -32,6 +32,8 @@ import { useToast } from "@/components/ui/use-toast";
 import CreatePaymentLinkDialog from "./CreatePaymentLinkDialog";
 import QuoteStatusBadge from "@/components/quotes/QuoteStatusBadge";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useQuotes } from "@/hooks/useQuotes";
 import {
   Select,
   SelectContent,
@@ -62,6 +64,7 @@ interface PaymentsTabProps {
 export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -307,6 +310,12 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
 
                 <CreatePaymentLinkDialog
                   quote={quote}
+                  onSuccess={() => {
+                    // Rafraîchir les données après création du lien
+                    queryClient.invalidateQueries({ queryKey: ['quotes'] });
+                    queryClient.invalidateQueries({ queryKey: ['payments'] });
+                    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                  }}
                   trigger={
                     <Button size="sm" className="gap-2">
                       <CreditCard className="h-4 w-4" />

@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
 import { computeLineTotals } from "@/utils/quoteCalculations";
 
 export interface QuoteLine {
@@ -54,13 +54,13 @@ export interface UpdateQuoteLineData extends Partial<CreateQuoteLineData> {
  */
 export const useQuoteLines = (quoteId: string | undefined) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
     queryKey: ["quote_lines", quoteId, user?.id],
     queryFn: async () => {
       if (!user || !quoteId) throw new Error("User not authenticated or quote ID missing");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -85,13 +85,13 @@ export const useQuoteLines = (quoteId: string | undefined) => {
  */
 export const useCreateQuoteLine = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (lineData: CreateQuoteLineData) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -133,13 +133,13 @@ export const useCreateQuoteLine = () => {
  */
 export const useUpdateQuoteLine = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, ...lineData }: UpdateQuoteLineData) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -196,13 +196,13 @@ export const useUpdateQuoteLine = () => {
  */
 export const useDeleteQuoteLine = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, quoteId }: { id: string; quoteId: string }) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -228,13 +228,13 @@ export const useDeleteQuoteLine = () => {
  */
 export const useCreateMultipleQuoteLines = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ quoteId, lines }: { quoteId: string; lines: CreateQuoteLineData[] }) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }

@@ -224,6 +224,8 @@ export const AIAssistant = () => {
       // Forcer le rafraîchissement de la liste des conversations si c'était une nouvelle
       if (isNewConversation) {
         console.log("🔄 Rafraîchissement de la liste des conversations");
+        // Invalider les queries pour forcer le rafraîchissement
+        queryClient.invalidateQueries({ queryKey: ["ai_conversations"] });
       }
     } catch (error: any) {
       console.error("❌ Erreur lors de l'envoi du message:", error);

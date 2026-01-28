@@ -215,6 +215,38 @@ serve(async (req) => {
 
       console.log('✅ [get-public-document] Devis trouvé:', { id: data.id, quote_number: data.quote_number });
 
+      // Récupérer les sections et lignes si le devis est en mode détaillé
+      const quoteMode = data.mode || (data.details?.format === "simplified" ? "simple" : "detailed");
+      if (quoteMode === "detailed" && data.id) {
+        try {
+          const { data: sectionsData } = await supabaseClient
+            .from('quote_sections')
+            .select('*')
+            .eq('quote_id', data.id)
+            .order('position', { ascending: true });
+          
+          if (sectionsData) {
+            document.sections = sectionsData;
+            console.log('✅ [get-public-document] Sections récupérées:', sectionsData.length);
+          }
+
+          const { data: linesData } = await supabaseClient
+            .from('quote_lines')
+            .select('*')
+            .eq('quote_id', data.id)
+            .order('section_id', { ascending: true, nullsFirst: false })
+            .order('position', { ascending: true });
+          
+          if (linesData) {
+            document.lines = linesData;
+            console.log('✅ [get-public-document] Lignes récupérées:', linesData.length);
+          }
+        } catch (sectionsError) {
+          console.warn('⚠️ [get-public-document] Erreur récupération sections/lignes:', sectionsError);
+          // Continuer sans sections/lignes
+        }
+      }
+
       document = data;
       documentType = 'quote';
     } else if (invoice_id) {

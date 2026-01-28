@@ -30,6 +30,8 @@ import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuoteLines } from "@/hooks/useQuoteLines";
 import { computeQuoteTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
+import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
+import { SendToClientModal } from "@/components/billing/SendToClientModal";
 
 interface QuoteDetailViewProps {
   quote: any;
@@ -38,6 +40,7 @@ interface QuoteDetailViewProps {
   onSendEmail?: () => void;
   onDownloadPDF?: () => void;
   onViewMessages?: () => void; // Nouveau : Voir dans Messagerie
+  onClose?: () => void; // Nouveau : Fermer le dialog
 }
 
 export default function QuoteDetailView({
@@ -47,8 +50,10 @@ export default function QuoteDetailView({
   onSendEmail,
   onDownloadPDF,
   onViewMessages,
+  onClose,
 }: QuoteDetailViewProps) {
   const [activeTab, setActiveTab] = useState("details");
+  const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const quoteMode = quote.mode || "simple";
   const tvaRate = quote.tva_rate ?? 0.20;
   const tva293b = quote.tva_non_applicable_293b ?? false;
@@ -60,6 +65,7 @@ export default function QuoteDetailView({
   });
 
   const isReadOnly = quote.signed || quote.status === 'signed';
+  const isSigned = quote.signed || quote.status === 'signed';
 
   return (
     <div className="space-y-6">
@@ -332,6 +338,17 @@ export default function QuoteDetailView({
               </CardContent>
             </Card>
           )}
+
+          {/* Signature du client */}
+          {quote.signed && (
+            <SignatureDisplay
+              signatureData={quote.signature_data}
+              signedBy={quote.signed_by}
+              signedAt={quote.signed_at}
+              title="Signature du client"
+              showImage={true}
+            />
+          )}
         </TabsContent>
 
         {/* Onglet Timeline */}
@@ -350,6 +367,37 @@ export default function QuoteDetailView({
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Boutons de fermeture et envoi au client */}
+      {onClose && (
+        <div className="flex justify-center gap-3 pt-4 border-t mt-6">
+          {/* Bouton Envoyer au client - masqué si le devis est signé */}
+          {!isSigned && (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSendToClientOpen(true)}
+              className="gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Envoyer au client
+            </Button>
+          )}
+          <Button variant="outline" onClick={onClose}>
+            Fermer
+          </Button>
+        </div>
+      )}
+
+      {/* Modal Envoyer au client */}
+      <SendToClientModal
+        open={isSendToClientOpen}
+        onOpenChange={setIsSendToClientOpen}
+        documentType="quote"
+        document={quote}
+        onSent={() => {
+          setIsSendToClientOpen(false);
+        }}
+      />
     </div>
   );
 }

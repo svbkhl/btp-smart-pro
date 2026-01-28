@@ -212,6 +212,33 @@ serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
+    // Récupérer d'abord les données complètes du devis pour obtenir l'email
+    const { data: quoteFullData } = await supabaseClient
+      .from(tableName)
+      .select('client_email, email, client_name, user_id, project_id')
+      .eq('id', quote_id)
+      .single();
+    
+    // Si le devis est lié à un projet, récupérer l'email depuis le client du projet
+    let clientEmailFromProject = null;
+    if (quoteFullData?.project_id) {
+      try {
+        const { data: project } = await supabaseClient
+          .from('projects')
+          .select('client_id, clients(email, name)')
+          .eq('id', quoteFullData.project_id)
+          .single();
+        
+        if (project?.clients) {
+          const client = Array.isArray(project.clients) ? project.clients[0] : project.clients;
+          clientEmailFromProject = client?.email;
+          console.log('📧 [sign-quote] Email depuis projet:', clientEmailFromProject);
+        }
+      } catch (error) {
+        console.warn('⚠️ [sign-quote] Erreur récupération email depuis projet:', error);
+      }
+    }
+
     const { data: updatedQuote, error: updateError } = await supabaseClient
       .from(tableName)
       .update(signatureMetadata)
@@ -266,18 +293,98 @@ serve(async (req) => {
 
     // ⚠️ ENVOI AUTOMATIQUE EMAIL DE CONFIRMATION (non bloquant)
     try {
-      console.log('📧 Envoi email de confirmation...');
-      // On ne bloque pas la réponse, l'email sera envoyé en arrière-plan
-      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-signature-confirmation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        },
-        body: JSON.stringify({ quote_id: quote_id }),
-      }).catch(err => console.error('⚠️ Erreur envoi email confirmation (non bloquant):', err));
+      console.log('📧 [sign-quote] Envoi email de confirmation pour quote:', quote_id);
+      
+      // Récupérer l'email du client (priorité: projet > quoteFullData > updatedQuote > session)
+      let clientEmail = null;
+      
+      // 1. Email depuis le projet (si disponible)
+      if (clientEmailFromProject) {
+        clientEmail = clientEmailFromProject;
+        console.log('📧 [sign-quote] Email depuis projet:', clientEmail);
+      }
+      
+      // 2. Email depuis quoteFullData
+      if (!clientEmail && quoteFullData) {
+        clientEmail = quoteFullData.client_email || quoteFullData.email;
+        console.log('📧 [sign-quote] Email depuis quoteFullData:', clientEmail);
+      }
+      
+      // 3. Email depuis updatedQuote
+      if (!clientEmail && updatedQuote) {
+        clientEmail = updatedQuote.client_email || updatedQuote.email;
+        console.log('📧 [sign-quote] Email depuis updatedQuote:', clientEmail);
+      }
+      
+      // 4. Si pas d'email dans le devis, chercher dans la session
+      if (!clientEmail && token) {
+        const { data: session } = await supabaseClient
+          .from('signature_sessions')
+          .select('signer_email')
+          .eq('token', token)
+          .maybeSingle();
+        
+        if (session?.signer_email) {
+          clientEmail = session.signer_email;
+          console.log('✅ [sign-quote] Email trouvé dans session:', clientEmail);
+        }
+      }
+      
+      if (!clientEmail) {
+        console.error('❌ [sign-quote] Pas d\'email client trouvé, email de confirmation non envoyé', {
+          quote_id,
+          has_quoteFullData: !!quoteFullData,
+          has_updatedQuote: !!updatedQuote,
+          has_token: !!token,
+          has_project_email: !!clientEmailFromProject,
+          quoteFullData_email: quoteFullData?.client_email || quoteFullData?.email,
+          updatedQuote_email: updatedQuote?.client_email || updatedQuote?.email,
+        });
+      } else {
+        console.log('✅ [sign-quote] Envoi email de confirmation à:', clientEmail);
+        
+        // Appeler send-signature-confirmation de manière synchrone pour mieux gérer les erreurs
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+        const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        
+        if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+          console.error('❌ [sign-quote] Configuration Supabase manquante pour envoi email');
+        } else {
+          try {
+            const emailResponse = await fetch(`${SUPABASE_URL}/functions/v1/send-signature-confirmation`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+                'apikey': SERVICE_ROLE_KEY,
+              },
+              body: JSON.stringify({ 
+                quote_id: quote_id,
+                client_email: clientEmail, // Passer explicitement l'email
+              }),
+            });
+            
+            if (!emailResponse.ok) {
+              const errorData = await emailResponse.json().catch(() => ({ error: 'Unknown error' }));
+              console.error('❌ [sign-quote] Erreur envoi email confirmation:', {
+                status: emailResponse.status,
+                statusText: emailResponse.statusText,
+                error: errorData,
+              });
+            } else {
+              const result = await emailResponse.json();
+              console.log('✅ [sign-quote] Email de confirmation envoyé avec succès:', {
+                success: result.success,
+                message: result.message,
+              });
+            }
+          } catch (err) {
+            console.error('❌ [sign-quote] Erreur envoi email confirmation:', err);
+          }
+        }
+      }
     } catch (emailError) {
-      console.error('⚠️ Erreur envoi email confirmation (non bloquant):', emailError);
+      console.error('❌ [sign-quote] Erreur envoi email confirmation (non bloquant):', emailError);
     }
 
     return new Response(

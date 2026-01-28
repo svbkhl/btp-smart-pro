@@ -26,6 +26,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell, BarChart, Bar, Legend, Label } from "recharts";
+import { BarChart3, Sparkles } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -194,14 +195,38 @@ const Dashboard = () => {
               Bienvenue ! Voici un aperçu de votre activité
             </p>
           </div>
-          <Link to="/projects">
-            <Button className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nouveau chantier</span>
-              <span className="sm:hidden">Nouveau</span>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2">
+              <Link to="/analytics">
+                <Button
+                  variant="outline"
+                  className="gap-2 rounded-xl"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Analyses Avancées</span>
+                  <span className="sm:hidden">Analyses</span>
+                </Button>
+              </Link>
+              <Link to="/ai-insights">
+                <Button
+                  variant="outline"
+                  className="gap-2 rounded-xl"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="hidden sm:inline">Insights IA</span>
+                  <span className="sm:hidden">Insights</span>
+                </Button>
+              </Link>
+            </div>
+            <Link to="/projects">
+              <Button className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Nouveau chantier</span>
+                <span className="sm:hidden">Nouveau</span>
               </Button>
             </Link>
           </div>
+        </div>
 
         {/* KPI Blocks */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">

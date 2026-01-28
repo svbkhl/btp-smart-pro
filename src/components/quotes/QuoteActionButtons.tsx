@@ -7,7 +7,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "@/hooks/useCompanyId";
 
 interface QuoteActionButtonsProps {
   quote: Quote;
@@ -19,6 +19,7 @@ interface QuoteActionButtonsProps {
 export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: QuoteActionButtonsProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const { data: companyInfo } = useUserSettings();
   const [downloading, setDownloading] = useState(false);
 
@@ -35,10 +36,8 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
       let pdfSections: any[] | undefined = undefined;
       let pdfLines: any[] | undefined = undefined;
 
-      if (quoteMode === "detailed" && quote.id && user) {
+      if (quoteMode === "detailed" && quote.id && user && companyId) {
         try {
-          const companyId = await getCurrentCompanyId(user.id);
-          if (companyId) {
             // Récupérer les sections
             const { data: sectionsData, error: sectionsError } = await supabase
               .from("quote_sections")
@@ -80,7 +79,6 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
               }));
               console.log("✅ [QuoteActionButtons] Lignes récupérées:", pdfLines.length);
             }
-          }
         } catch (error: any) {
           console.warn("⚠️ [QuoteActionButtons] Erreur récupération sections/lignes:", error);
         }
@@ -108,8 +106,8 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
         total_tva: quote.total_tva,
         total_ttc: quote.total_ttc || quote.estimated_cost,
         // Ajouter automatiquement la signature depuis les paramètres
-        signatureData: companyInfo?.signatureUrl,
-        signedBy: companyInfo?.companyName || companyInfo?.contactName,
+        signatureData: companyInfo?.signature_data,
+        signedBy: companyInfo?.signature_name || companyInfo?.company_name,
         signedAt: new Date().toISOString(),
       });
       toast({
@@ -128,10 +126,12 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
     }
   };
 
+  const isSigned = quote.signed || quote.status === "signed";
+
   return (
     <div className="flex flex-wrap gap-2">
-      {/* Bouton Modifier - toujours visible si onEdit est fourni */}
-      {onEdit && (
+      {/* Bouton Modifier - masqué si le devis est signé */}
+      {onEdit && !isSigned && (
         <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
           <Edit className="w-4 h-4" />
           Modifier
@@ -148,9 +148,14 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
         </>
       )}
 
-      {/* Bouton Envoyer au client - toujours visible */}
-      {onSendToClient && (
-        <Button variant="outline" size="sm" onClick={onSendToClient} className="gap-2">
+      {/* Bouton Envoyer au client - masqué si le devis est signé */}
+      {onSendToClient && !isSigned && (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={onSendToClient} 
+          className="gap-2"
+        >
           <Send className="w-4 h-4" />
           Envoyer au client
         </Button>

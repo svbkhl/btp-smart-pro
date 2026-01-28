@@ -8,7 +8,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "@/components/ui/use-toast";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
 import { generateQuoteNumber } from "@/utils/documentNumbering";
 
 export interface DetailedQuote {
@@ -48,20 +49,18 @@ export interface UpdateDetailedQuoteData {
  */
 export const useCreateDetailedQuote = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (quoteData: CreateDetailedQuoteData): Promise<DetailedQuote> => {
       if (!user) throw new Error("User not authenticated");
-
-      console.log("🔧 [useCreateDetailedQuote] Création devis détaillé:", { quoteData });
-
-      // Récupérer company_id
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise pour créer un devis");
       }
+
+      logger.debug("useCreateDetailedQuote: Creating detailed quote", { quoteData });
 
       // Générer le numéro de devis
       const quoteNumber = await generateQuoteNumber(user.id);
@@ -81,10 +80,9 @@ export const useCreateDetailedQuote = () => {
         estimated_cost: 0,
       };
 
-      // Ajouter les colonnes optionnelles (ignorées par PostgREST si elles n'existent pas)
-      if (companyId) {
-        insertData.company_id = companyId;
-      }
+      // ⚠️ SÉCURITÉ : Ne JAMAIS passer company_id depuis le frontend
+      // Le trigger backend force company_id depuis le JWT pour sécurité maximale
+      // On vérifie companyId uniquement pour validation frontend, mais on ne l'envoie pas
       
       if (quoteData.client_id) {
         insertData.client_id = quoteData.client_id;
@@ -137,8 +135,10 @@ export const useCreateDetailedQuote = () => {
           console.log("✅ [useCreateDetailedQuote] Devis créé avec payload minimal:", retryData.id);
           
           // Mettre à jour avec les colonnes optionnelles si elles existent
+          // ⚠️ SÉCURITÉ : Ne JAMAIS passer company_id depuis le frontend
+          // Le trigger backend force company_id depuis le JWT pour sécurité maximale
           const updateData: any = {};
-          if (companyId) updateData.company_id = companyId;
+          // company_id est forcé par le trigger backend, on ne le passe pas
           if (quoteData.client_id) updateData.client_id = quoteData.client_id;
           
           if (Object.keys(updateData).length > 0) {
@@ -178,6 +178,7 @@ export const useCreateDetailedQuote = () => {
  */
 export const useUpdateDetailedQuote = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -187,13 +188,11 @@ export const useUpdateDetailedQuote = () => {
       ...updateData
     }: UpdateDetailedQuoteData) => {
       if (!user) throw new Error("User not authenticated");
-
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
 
-      console.log("🔧 [useUpdateDetailedQuote] Mise à jour devis:", { id, updateData });
+      logger.debug("useUpdateDetailedQuote: Updating quote", { id, updateData });
 
       const { data, error } = await supabase
         .from("ai_quotes")

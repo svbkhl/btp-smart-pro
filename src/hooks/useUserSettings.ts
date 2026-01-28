@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_USER_SETTINGS } from "@/fakeData/userSettings";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
 
 export interface UserSettings {
   id: string;
@@ -39,17 +40,15 @@ export interface UserSettings {
  */
 export const useUserSettings = () => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: ["user_settings", user?.id],
+    queryKey: ["user_settings", companyId],
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
-
-          // Récupérer le company_id de l'utilisateur
-          const companyId = await getCurrentCompanyId(user.id);
           if (!companyId) {
             throw new Error("User must be a member of a company");
           }
@@ -104,7 +103,7 @@ export const useUserSettings = () => {
         }
       );
     },
-    enabled: !!user,
+    enabled: !!user && !isLoadingCompanyId && !!companyId,
     staleTime: 60 * 60 * 1000, // 1 heure - données rarement modifiées
     gcTime: 24 * 60 * 60 * 1000, // 24 heures en cache
     retry: 2,
@@ -117,55 +116,74 @@ export const useUserSettings = () => {
  */
 export const useUpdateUserSettings = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (updates: Partial<UserSettings>) => {
       if (!user) throw new Error("User not authenticated");
-
-      // Récupérer le company_id de l'utilisateur
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User must be a member of a company");
       }
 
       // Ne pas envoyer company_id depuis le frontend, le trigger le forcera
+      // Mais on doit inclure user_id lors d'un INSERT
       const { company_id, user_id, ...safeUpdates } = updates;
 
-      console.log("🔄 Mise à jour des user_settings:", { company_id, updates: safeUpdates });
+      logger.debug("useUpdateUserSettings: Updating user settings", { companyId, updates: safeUpdates });
 
-      // Utiliser upsert pour créer l'enregistrement s'il n'existe pas
-      // Le trigger ajoutera automatiquement company_id
-      const { data, error } = await supabase
+      // Vérifier si l'enregistrement existe déjà
+      const { data: existingSettings } = await supabase
         .from("user_settings")
-        .upsert(
-          {
+        .select("id")
+        .eq("company_id", companyId)
+        .maybeSingle();
+
+      let data, error;
+      
+      if (existingSettings) {
+        // Mise à jour d'un enregistrement existant
+        ({ data, error } = await supabase
+          .from("user_settings")
+          .update({
             ...safeUpdates,
             updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "company_id",
-          }
-        )
-        .select()
-        .single();
+          })
+          .eq("company_id", companyId)
+          .select()
+          .single());
+      } else {
+        // Création d'un nouvel enregistrement - inclure user_id explicitement
+        // Le trigger ajoutera company_id automatiquement
+        if (!user?.id) {
+          throw new Error("User ID is required to create user settings");
+        }
+        
+        ({ data, error } = await supabase
+          .from("user_settings")
+          .insert({
+            ...safeUpdates,
+            user_id: user.id, // Inclure user_id explicitement lors de la création
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single());
+      }
 
       if (error) {
         console.error("❌ Erreur lors de la mise à jour des user_settings:", error);
         throw error;
       }
 
-      console.log("✅ user_settings mis à jour avec succès:", data);
+      logger.debug("useUpdateUserSettings: Settings updated successfully", { data });
       return data as UserSettings;
     },
     onSuccess: (data) => {
-      console.log("✅ onSuccess appelé, invalidation du cache");
-      queryClient.invalidateQueries({ queryKey: ["user_settings", user?.id] });
-      // Mettre à jour le cache directement
-      queryClient.setQueryData(["user_settings", user?.id], data);
+      // Mettre à jour le cache directement sans invalider (plus efficace)
+      queryClient.setQueryData(["user_settings", companyId], data);
     },
     onError: (error) => {
-      console.error("❌ Erreur dans onError:", error);
+      logger.error("useUpdateUserSettings: Error", { error });
     },
   });
 };
@@ -176,14 +194,12 @@ export const useUpdateUserSettings = () => {
  */
 export const useCreateUserSettings = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (settings: Partial<UserSettings>) => {
       if (!user) throw new Error("User not authenticated");
-
-      // Récupérer le company_id de l'utilisateur
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User must be a member of a company");
       }
@@ -201,7 +217,7 @@ export const useCreateUserSettings = () => {
       return data as UserSettings;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user_settings", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["user_settings", companyId] });
     },
   });
 };

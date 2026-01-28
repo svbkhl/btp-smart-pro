@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import { Invoice } from '@/hooks/useInvoices';
 import { UserSettings } from '@/hooks/useUserSettings';
 import { calculateFromTTC } from '@/utils/priceCalculations';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DownloadInvoicePDFParams {
   invoice: Invoice;
@@ -63,6 +64,29 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
   try {
     const { invoice, companyInfo } = params;
 
+    // Récupérer les informations complètes du client si client_id est disponible
+    let clientCivility = '';
+    let clientFirstName = '';
+    let clientPhone = '';
+    let clientAddress = invoice.client_address || '';
+    
+    if (invoice.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("titre, prenom, phone, location")
+        .eq("id", invoice.client_id)
+        .single();
+      
+      if (client) {
+        clientCivility = client.titre || '';
+        clientFirstName = client.prenom || '';
+        clientPhone = client.phone || '';
+        if (client.location && !clientAddress) {
+          clientAddress = client.location;
+        }
+      }
+    }
+
     // Créer le document PDF en format A4 portrait
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -88,15 +112,37 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
     doc.setFillColor(...primaryColor);
     doc.rect(margin, yPosition, contentWidth, 40, 'F');
 
-    // Logo (si disponible)
-    if (companyInfo?.logo_url) {
+    // Logo (si disponible) - utiliser company_logo_url depuis user_settings
+    const logoUrl = companyInfo?.company_logo_url || companyInfo?.logo_url;
+    let logoLoaded = false;
+    
+    console.log('[Invoice PDF] Logo URL:', logoUrl ? `${logoUrl.substring(0, 50)}...` : 'non fourni');
+    
+    if (logoUrl) {
       try {
-        const logoImg = await loadImage(companyInfo.logo_url);
-        const logoSize = 30;
-        doc.addImage(logoImg, 'PNG', margin + 5, yPosition + 5, logoSize, logoSize);
-      } catch (error) {
-        console.warn('[Invoice PDF] Impossible de charger le logo:', error);
+        // Valider l'URL avant de charger
+        const trimmedUrl = logoUrl.trim();
+        console.log('[Invoice PDF] Tentative de chargement du logo:', trimmedUrl.substring(0, 50));
+        
+        if (trimmedUrl && (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('data:image'))) {
+          const logoImg = await loadImage(trimmedUrl);
+          const logoSize = 30;
+          // Déterminer le format de l'image depuis l'URL ou utiliser PNG par défaut
+          const imageFormat = trimmedUrl.startsWith('data:image/jpeg') || trimmedUrl.includes('.jpg') || trimmedUrl.includes('.jpeg') 
+            ? 'JPEG' 
+            : 'PNG';
+          doc.addImage(logoImg, imageFormat, margin + 5, yPosition + 5, logoSize, logoSize);
+          logoLoaded = true;
+          console.log('[Invoice PDF] Logo chargé avec succès');
+        } else {
+          console.warn('[Invoice PDF] URL du logo invalide (doit commencer par http ou data:image):', trimmedUrl.substring(0, 50));
+        }
+      } catch (error: any) {
+        console.warn('[Invoice PDF] Impossible de charger le logo:', error?.message || error);
+        // Continuer sans logo - ne pas bloquer la génération du PDF
       }
+    } else {
+      console.log('[Invoice PDF] Aucun logo fourni dans companyInfo');
     }
 
     // Nom de l'entreprise
@@ -104,13 +150,13 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     const companyName = companyInfo?.company_name || 'Votre Entreprise';
-    doc.text(companyName, margin + (companyInfo?.logo_url ? 40 : 5), yPosition + 15);
+    doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
     // Forme juridique
     if (companyInfo?.legal_form) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(companyInfo.legal_form, margin + (companyInfo?.logo_url ? 40 : 5), yPosition + 22);
+      doc.text(companyInfo.legal_form, margin + (logoLoaded ? 40 : 5), yPosition + 22);
     }
 
     // Titre "FACTURE" à droite
@@ -210,12 +256,35 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(invoice.client_name || 'Non spécifié', margin + 5, yPosition + 14);
-    if (invoice.client_address) {
-      doc.text(invoice.client_address, margin + 5, yPosition + 20);
+    
+    // Construire le nom complet avec civilité et prénom
+    let clientName = '';
+    if (clientCivility) {
+      clientName += `${clientCivility} `;
+    }
+    if (clientFirstName) {
+      clientName += `${clientFirstName} `;
+    }
+    clientName += invoice.client_name || 'Non spécifié';
+    
+    doc.text(clientName.trim(), margin + 5, yPosition + 14);
+    
+    // Adresse complète
+    if (clientAddress) {
+      doc.text(clientAddress, margin + 5, yPosition + 20);
+    }
+    
+    // Téléphone et email sur la même ligne
+    let contactLine = '';
+    if (clientPhone) {
+      contactLine += `Tél: ${clientPhone}`;
     }
     if (invoice.client_email) {
-      doc.text(`Email: ${invoice.client_email}`, margin + 5, yPosition + 26);
+      if (contactLine) contactLine += ' - ';
+      contactLine += `Email: ${invoice.client_email}`;
+    }
+    if (contactLine) {
+      doc.text(contactLine, margin + 5, yPosition + 26);
     }
 
     yPosition += 35;
@@ -335,7 +404,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
         // Si pas de TVA, afficher "Total à payer"
         doc.text('Total à payer:', rightX - 40, yPosition, { align: 'right' });
       } else {
-        doc.text('Total à payer (TTC):', rightX - 40, yPosition, { align: 'right' });
+      doc.text('Total à payer (TTC):', rightX - 40, yPosition, { align: 'right' });
       }
       doc.setTextColor(...primaryColor);
       doc.text(formatCurrency(finalTTC), rightX, yPosition, { align: 'right' });
@@ -344,18 +413,18 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
 
       // TVA (seulement si > 0)
       if (hasVAT) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(100, 100, 100);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
         doc.text(`dont TVA (${vat.toFixed(1)}%):`, rightX - 30, yPosition, { align: 'right' });
-        doc.text(formatCurrency(finalVAT), rightX, yPosition, { align: 'right' });
-        yPosition += 5;
+      doc.text(formatCurrency(finalVAT), rightX, yPosition, { align: 'right' });
+      yPosition += 5;
 
-        // Total HT
-        doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
-        doc.text(formatCurrency(finalHT), rightX, yPosition, { align: 'right' });
-        doc.setTextColor(...textColor);
-        yPosition += 10;
+      // Total HT
+      doc.text('Total HT:', rightX - 30, yPosition, { align: 'right' });
+      doc.text(formatCurrency(finalHT), rightX, yPosition, { align: 'right' });
+      doc.setTextColor(...textColor);
+      yPosition += 10;
       } else {
         // Pas de TVA - afficher "TVA non applicable" ou rien
         doc.setFont('helvetica', 'normal');
@@ -394,27 +463,27 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
         yPosition += 10;
       } else {
         // Avec TVA - afficher HT, TVA, TTC
-        doc.text('Montant HT:', rightX - 30, yPosition, { align: 'right' });
+      doc.text('Montant HT:', rightX - 30, yPosition, { align: 'right' });
         doc.text(formatCurrency(totalHT), rightX, yPosition, { align: 'right' });
-        yPosition += 6;
+      yPosition += 6;
 
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
         doc.text(`TVA (${vatRate.toFixed(1)}%):`, rightX - 30, yPosition, { align: 'right' });
         doc.text(formatCurrency(totalVAT), rightX, yPosition, { align: 'right' });
-        yPosition += 6;
+      yPosition += 6;
 
-        doc.setDrawColor(...primaryColor);
-        doc.setLineWidth(1);
-        doc.line(margin, yPosition, rightX, yPosition);
-        yPosition += 5;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.text('Total TTC:', rightX - 30, yPosition, { align: 'right' });
-        doc.setTextColor(...primaryColor);
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(1);
+      doc.line(margin, yPosition, rightX, yPosition);
+      yPosition += 5;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Total TTC:', rightX - 30, yPosition, { align: 'right' });
+      doc.setTextColor(...primaryColor);
         doc.text(formatCurrency(totalTTC), rightX, yPosition, { align: 'right' });
-        doc.setTextColor(...textColor);
-        yPosition += 10;
+      doc.setTextColor(...textColor);
+      yPosition += 10;
       }
     }
 
@@ -480,6 +549,42 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
     });
 
     // ============================================
+    // FOOTER - SIRET ET TVA
+    // ============================================
+    if (yPosition > pageHeight - 20) {
+      doc.addPage();
+      yPosition = margin;
+    }
+
+    yPosition += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 8;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    
+    const footerInfo: string[] = [];
+    
+    if (companyInfo?.siret) {
+      footerInfo.push(`SIRET: ${companyInfo.siret}`);
+    }
+    if (companyInfo?.vat_number) {
+      footerInfo.push(`TVA intracommunautaire: ${companyInfo.vat_number}`);
+    }
+    
+    if (footerInfo.length > 0) {
+      footerInfo.forEach((info, index) => {
+        if (index > 0) {
+          doc.text(' - ', margin + (index * 50), yPosition);
+        }
+        doc.text(info, margin + (index * 50) + (index > 0 ? 5 : 0), yPosition);
+      });
+    }
+
+    // ============================================
     // TÉLÉCHARGEMENT
     // ============================================
     const fileName = invoice.invoice_number
@@ -506,6 +611,29 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
   try {
     const { invoice, companyInfo } = params;
 
+    // Récupérer les informations complètes du client si client_id est disponible
+    let clientCivility = '';
+    let clientFirstName = '';
+    let clientPhone = '';
+    let clientAddress = invoice.client_address || '';
+    
+    if (invoice.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("titre, prenom, phone, location")
+        .eq("id", invoice.client_id)
+        .single();
+      
+      if (client) {
+        clientCivility = client.titre || '';
+        clientFirstName = client.prenom || '';
+        clientPhone = client.phone || '';
+        if (client.location && !clientAddress) {
+          clientAddress = client.location;
+        }
+      }
+    }
+
     // Créer le document PDF en format A4 portrait
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -531,15 +659,37 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
     doc.setFillColor(...primaryColor);
     doc.rect(margin, yPosition, contentWidth, 40, 'F');
 
-    // Logo (si disponible)
-    if (companyInfo?.logo_url) {
+    // Logo (si disponible) - utiliser company_logo_url depuis user_settings
+    const logoUrl = companyInfo?.company_logo_url || companyInfo?.logo_url;
+    let logoLoaded = false;
+    
+    console.log('[Invoice PDF] Logo URL:', logoUrl ? `${logoUrl.substring(0, 50)}...` : 'non fourni');
+    
+    if (logoUrl) {
       try {
-        const logoImg = await loadImage(companyInfo.logo_url);
-        const logoSize = 30;
-        doc.addImage(logoImg, 'PNG', margin + 5, yPosition + 5, logoSize, logoSize);
-      } catch (error) {
-        console.warn('[Invoice PDF] Impossible de charger le logo:', error);
+        // Valider l'URL avant de charger
+        const trimmedUrl = logoUrl.trim();
+        console.log('[Invoice PDF] Tentative de chargement du logo:', trimmedUrl.substring(0, 50));
+        
+        if (trimmedUrl && (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('data:image'))) {
+          const logoImg = await loadImage(trimmedUrl);
+          const logoSize = 30;
+          // Déterminer le format de l'image depuis l'URL ou utiliser PNG par défaut
+          const imageFormat = trimmedUrl.startsWith('data:image/jpeg') || trimmedUrl.includes('.jpg') || trimmedUrl.includes('.jpeg') 
+            ? 'JPEG' 
+            : 'PNG';
+          doc.addImage(logoImg, imageFormat, margin + 5, yPosition + 5, logoSize, logoSize);
+          logoLoaded = true;
+          console.log('[Invoice PDF] Logo chargé avec succès');
+        } else {
+          console.warn('[Invoice PDF] URL du logo invalide (doit commencer par http ou data:image):', trimmedUrl.substring(0, 50));
+        }
+      } catch (error: any) {
+        console.warn('[Invoice PDF] Impossible de charger le logo:', error?.message || error);
+        // Continuer sans logo - ne pas bloquer la génération du PDF
       }
+    } else {
+      console.log('[Invoice PDF] Aucun logo fourni dans companyInfo');
     }
 
     // Nom de l'entreprise
@@ -547,13 +697,13 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     const companyName = companyInfo?.company_name || 'Votre Entreprise';
-    doc.text(companyName, margin + (companyInfo?.logo_url ? 40 : 5), yPosition + 15);
+    doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
     // Forme juridique
     if (companyInfo?.legal_form) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(companyInfo.legal_form, margin + (companyInfo?.logo_url ? 40 : 5), yPosition + 22);
+      doc.text(companyInfo.legal_form, margin + (logoLoaded ? 40 : 5), yPosition + 22);
     }
 
     // Titre "FACTURE" à droite
@@ -647,12 +797,35 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(invoice.client_name || 'Non spécifié', margin + 5, yPosition + 14);
-    if (invoice.client_address) {
-      doc.text(invoice.client_address, margin + 5, yPosition + 20);
+    
+    // Construire le nom complet avec civilité et prénom
+    let clientName = '';
+    if (clientCivility) {
+      clientName += `${clientCivility} `;
+    }
+    if (clientFirstName) {
+      clientName += `${clientFirstName} `;
+    }
+    clientName += invoice.client_name || 'Non spécifié';
+    
+    doc.text(clientName.trim(), margin + 5, yPosition + 14);
+    
+    // Adresse complète
+    if (clientAddress) {
+      doc.text(clientAddress, margin + 5, yPosition + 20);
+    }
+    
+    // Téléphone et email sur la même ligne
+    let contactLine = '';
+    if (clientPhone) {
+      contactLine += `Tél: ${clientPhone}`;
     }
     if (invoice.client_email) {
-      doc.text(`Email: ${invoice.client_email}`, margin + 5, yPosition + 26);
+      if (contactLine) contactLine += ' - ';
+      contactLine += `Email: ${invoice.client_email}`;
+    }
+    if (contactLine) {
+      doc.text(contactLine, margin + 5, yPosition + 26);
     }
 
     yPosition += 35;

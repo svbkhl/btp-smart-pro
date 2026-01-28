@@ -25,6 +25,7 @@ import { downloadInvoicePDF } from "@/services/invoicePdfService";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
+import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
 
 interface InvoiceDisplayProps {
   invoice: Invoice;
@@ -236,59 +237,58 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
 
         {/* Signature */}
         {invoice.signature_data && (
-          <div className="p-4 bg-white/10 dark:bg-black/20 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span className="font-semibold">Facture signée</span>
-            </div>
-            {invoice.signed_by && (
-              <p className="text-sm text-muted-foreground">
-                Signée par: {invoice.signed_by}
-              </p>
-            )}
-            {invoice.signed_at && (
-              <p className="text-sm text-muted-foreground">
-                Le: {format(new Date(invoice.signed_at), "d MMMM yyyy à HH:mm", { locale: fr })}
-              </p>
-            )}
-          </div>
+          <SignatureDisplay
+            signatureData={invoice.signature_data}
+            signedBy={invoice.signed_by}
+            signedAt={invoice.signed_at}
+            title="Signature du client"
+            showImage={true}
+          />
         )}
 
         {/* Actions */}
         {showActions && (
-          <div className="flex flex-wrap gap-3 pt-4 border-t">
-            <Button 
-              variant="outline" 
-              className="gap-2"
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-            >
-              {downloading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Génération...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  Télécharger PDF
-                </>
-              )}
-            </Button>
-            {/* Bouton Envoyer au client - toujours visible */}
-            <SendToClientButton invoice={invoice} />
-            {invoice.status === "draft" && (
-              <SendForSignatureButton invoice={invoice} />
-            )}
-            {invoice.status === "signed" && (
-              <PaymentButton invoice={invoice} />
-            )}
-            {onClose && (
-              <Button variant="outline" onClick={onClose}>
-                Fermer
+          <>
+            <div className="flex flex-wrap gap-3 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={handleDownloadPDF}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Génération...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Télécharger PDF
+                  </>
+                )}
               </Button>
+              {invoice.status === "draft" && (
+                <SendForSignatureButton invoice={invoice} />
+              )}
+              {invoice.status === "signed" && (
+                <PaymentButton invoice={invoice} />
+              )}
+            </div>
+            
+            {/* Boutons de fermeture et envoi au client */}
+            {onClose && (
+              <div className="flex justify-center gap-3 pt-4 border-t mt-4">
+                {/* Bouton Envoyer au client - masqué si la facture est signée */}
+                {invoice.status !== "signed" && (
+                  <SendToClientButton invoice={invoice} />
+                )}
+                <Button variant="outline" onClick={onClose}>
+                  Fermer
+                </Button>
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </GlassCard>

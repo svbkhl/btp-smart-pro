@@ -44,6 +44,8 @@ export const InvoiceActionButtons = ({ invoice, onEdit, onSend, onSendToClient, 
     }
   };
 
+  const isSigned = invoice.status === "signed";
+
   return (
     <>
       <div className="flex flex-wrap gap-2">
@@ -64,19 +66,21 @@ export const InvoiceActionButtons = ({ invoice, onEdit, onSend, onSendToClient, 
           </>
         )}
 
-        {/* Bouton Envoyer au client - toujours visible */}
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => {
-            setIsSendToClientOpen(true);
-            onSendToClient?.();
-          }} 
-          className="gap-2"
-        >
-          <Send className="w-4 h-4" />
-          Envoyer au client
-        </Button>
+        {/* Bouton Envoyer au client - masqué si la facture est signée */}
+        {!isSigned && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setIsSendToClientOpen(true);
+              onSendToClient?.();
+            }} 
+            className="gap-2"
+          >
+            <Send className="w-4 h-4" />
+            Envoyer au client
+          </Button>
+        )}
 
         <Button
           variant="outline"

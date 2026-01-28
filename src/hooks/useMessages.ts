@@ -151,6 +151,21 @@ export const useCreateMessage = () => {
         .single();
 
       if (error) throw error;
+      
+      // Mettre à jour last_message_at de la conversation
+      try {
+        await supabase
+          .from("ai_conversations")
+          .update({ 
+            last_message_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", data.conversation_id);
+      } catch (updateError) {
+        // Si la colonne n'existe pas, on continue quand même
+        console.warn("Impossible de mettre à jour last_message_at:", updateError);
+      }
+      
       return message as AIMessage;
     },
     onSuccess: (message) => {

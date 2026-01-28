@@ -23,7 +23,7 @@ import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, FileText, User, MapPin } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "@/hooks/useCompanyId";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateQuoteSection } from "@/hooks/useQuoteSections";
 import { useCreateQuoteLine } from "@/hooks/useQuoteLines";
@@ -66,6 +66,7 @@ interface LocalLine {
 
 export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQuoteEditorProps) => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const { toast } = useToast();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: companySettings } = useCompanySettings();
@@ -272,7 +273,6 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
 
     setIsSaving(true);
     try {
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise");
       }
@@ -890,9 +890,9 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
           <div className="space-y-2 sm:space-y-4 mb-4">
             <h3 className="text-base sm:text-lg font-semibold">Devis détaillé</h3>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Ajoutez des sections (corps de métier) et des lignes (prestations) avec quantités et prix
+                  Ajoutez des sections (corps de métier) et des lignes (prestations) avec quantités et prix
             </p>
-          </div>
+              </div>
           <div>
             {quoteId ? (
               // Mode DB : utiliser QuoteSectionsEditor si devis déjà créé
@@ -1017,21 +1017,21 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                                     className="min-h-[48px] min-w-[48px] text-xl font-bold flex-shrink-0"
                                   >
                                     ×
-                                  </Button>
+              </Button>
                                 </div>
                               </div>
                             </div>
                           );
                         })}
 
-                      <Button
+              <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleAddLine(section.id)}
                         className="mt-2"
                       >
                         + Ajouter une ligne
-                      </Button>
+              </Button>
             </div>
           </div>
                 ))}

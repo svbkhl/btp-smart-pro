@@ -5,7 +5,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
+import { getCompanyIdForUser } from "@/utils/companyHelpers";
 
 export interface MaterialsPriceCatalogItem {
   id: string;
@@ -47,13 +48,13 @@ function normalizeMaterialKey(material: string): string {
  */
 export const useGetMaterialPrice = (materialName: string) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
     queryKey: ["materials_price", user?.id, materialName],
     queryFn: async () => {
       if (!user || !materialName.trim()) return null;
 
-      const companyId = await getCurrentCompanyId(user.id);
       const materialKey = normalizeMaterialKey(materialName);
 
       // Chercher d'abord dans les prix de l'entreprise
@@ -92,7 +93,7 @@ export async function estimateMaterialPrice(
   unit: string,
   userId: string
 ): Promise<{ price: number; source: "catalog" | "estimate"; catalogItem?: MaterialsPriceCatalogItem }> {
-  const companyId = await getCurrentCompanyId(userId);
+  const companyId = await getCompanyIdForUser(userId);
   const materialKey = normalizeMaterialKey(materialName);
 
   // Chercher dans le catalogue
@@ -150,13 +151,13 @@ export async function estimateMaterialPrice(
  */
 export const useMaterialsPriceCatalog = () => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
     queryKey: ["materials_price_catalog", user?.id],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
 
       // Récupérer prix company + global
       const queries = [];
@@ -205,13 +206,13 @@ export const useMaterialsPriceCatalog = () => {
  */
 export const useUpsertMaterialPrice = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (priceData: CreateMaterialPriceData) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }

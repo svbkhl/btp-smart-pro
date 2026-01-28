@@ -6,7 +6,9 @@ import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_PROJECTS } from "@/fakeData/projects";
 import type { Project } from "@/fakeData/projects";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
+import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 
 export interface CreateProjectData {
   name: string;
@@ -29,25 +31,20 @@ export interface UpdateProjectData extends Partial<CreateProjectData> {
 export const useProjects = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["projects", user?.id, fakeDataEnabled],
+    queryKey: ["projects", companyId],
     queryFn: async () => {
-      // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
-        console.log("🎭 Mode démo activé - Retour des fake projects");
         return FAKE_PROJECTS;
       }
 
-      // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
-
-          // Récupérer company_id pour filtrage multi-tenant
-          const companyId = await getCurrentCompanyId(user.id);
           if (!companyId) {
-            console.warn("User is not a member of any company");
+            logger.warn("User is not a member of any company", { userId: user.id });
             return [];
           }
 
@@ -64,28 +61,24 @@ export const useProjects = () => {
         "useProjects"
       );
     },
-    enabled: !!user || fakeDataEnabled,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
-    refetchInterval: 60000, // Polling automatique toutes les 60s
+    enabled: !!user && !isLoadingCompanyId && (!!companyId || fakeDataEnabled),
+    ...QUERY_CONFIG.MODERATE,
   });
 };
 
 // Hook pour récupérer un projet par ID
 export const useProject = (id: string | undefined) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["project", id, user?.id],
+    queryKey: ["project", id, companyId],
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
           if (!user || !id) throw new Error("User not authenticated or no ID provided");
-
-          // Récupérer company_id pour vérification
-          const companyId = await getCurrentCompanyId(user.id);
           if (!companyId) {
+            logger.warn("useProject: No company_id available");
             throw new Error("User is not a member of any company");
           }
 
@@ -107,32 +100,24 @@ export const useProject = (id: string | undefined) => {
         "useProject"
       );
     },
-    enabled: !!user && !!id,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
+    enabled: !!user && !!id && !isLoadingCompanyId && !!companyId,
+    ...QUERY_CONFIG.MODERATE,
   });
 };
 
 // Hook pour créer un projet
 export const useCreateProject = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (projectData: CreateProjectData) => {
       if (!user) throw new Error("User not authenticated");
-
-      // Vérifier que l'utilisateur est membre d'une entreprise
-      // ⚠️ SÉCURITÉ : On vérifie mais on ne passe JAMAIS company_id au backend
-      // Le trigger backend force company_id depuis le JWT pour sécurité maximale
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise pour créer un projet");
       }
-      // ⚠️ companyId récupéré uniquement pour validation frontend
-      // Le backend ignore toute valeur company_id venant du frontend
 
       // Valider et normaliser le statut
       const validStatuses = ["planifié", "en_attente", "en_cours", "terminé", "annulé"] as const;
@@ -168,14 +153,61 @@ export const useCreateProject = () => {
       if (error) throw error;
       return data as Project;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    onMutate: async (newProject) => {
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["projects", companyId] });
+      
+      // Sauvegarder les données actuelles
+      const previousProjects = queryClient.getQueryData<Project[]>(["projects", companyId]);
+      
+      // Mettre à jour optimistiquement avec un projet temporaire
+      if (previousProjects) {
+        const tempProject: Project = {
+          id: `temp-${Date.now()}`,
+          user_id: user!.id,
+          company_id: companyId!,
+          name: newProject.name,
+          status: newProject.status || "planifié",
+          budget: newProject.budget,
+          costs: newProject.costs,
+          actual_revenue: newProject.actual_revenue,
+          start_date: newProject.start_date,
+          end_date: newProject.end_date,
+          description: newProject.description,
+          client_id: newProject.client_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        queryClient.setQueryData<Project[]>(
+          ["projects", companyId],
+          [tempProject, ...previousProjects]
+        );
+      }
+      
+      return { previousProjects };
+    },
+    onSuccess: (newProject) => {
+      // Remplacer le projet temporaire par le vrai
+      queryClient.setQueryData<Project[]>(
+        ["projects", companyId],
+        (old) => {
+          if (!old) return [newProject];
+          return old.map(p => p.id.startsWith('temp-') ? newProject : p);
+        }
+      );
+      
       toast({
         title: "Projet créé",
         description: "Le projet a été créé avec succès.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousProjects) {
+        queryClient.setQueryData(["projects", companyId], context.previousProjects);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message,
@@ -188,15 +220,13 @@ export const useCreateProject = () => {
 // Hook pour mettre à jour un projet
 export const useUpdateProject = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({ id, ...projectData }: UpdateProjectData) => {
       if (!user) throw new Error("User not authenticated");
-
-      // Récupérer company_id pour vérification
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise");
       }
@@ -232,15 +262,59 @@ export const useUpdateProject = () => {
       if (error) throw error;
       return data as Project;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["project"] });
+    onMutate: async (updateData) => {
+      const { id, ...updates } = updateData;
+      
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["projects", companyId] });
+      await queryClient.cancelQueries({ queryKey: ["project", id, companyId] });
+      
+      // Sauvegarder les données actuelles
+      const previousProjects = queryClient.getQueryData<Project[]>(["projects", companyId]);
+      const previousProject = queryClient.getQueryData<Project>(["project", id, companyId]);
+      
+      // Mettre à jour optimistiquement la liste
+      if (previousProjects) {
+        queryClient.setQueryData<Project[]>(
+          ["projects", companyId],
+          previousProjects.map(p =>
+            p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p
+          )
+        );
+      }
+      
+      // Mettre à jour optimistiquement le projet individuel
+      if (previousProject) {
+        queryClient.setQueryData<Project>(
+          ["project", id, companyId],
+          { ...previousProject, ...updates, updated_at: new Date().toISOString() }
+        );
+      }
+      
+      return { previousProjects, previousProject };
+    },
+    onSuccess: (updatedProject) => {
+      // Mettre à jour avec les vraies données du serveur
+      queryClient.setQueryData<Project[]>(
+        ["projects", companyId],
+        (old) => old?.map(p => p.id === updatedProject.id ? updatedProject : p)
+      );
+      queryClient.setQueryData(["project", updatedProject.id, companyId], updatedProject);
+      
       toast({
         title: "Projet mis à jour",
         description: "Le projet a été mis à jour avec succès.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousProjects) {
+        queryClient.setQueryData(["projects", companyId], context.previousProjects);
+      }
+      if (context?.previousProject) {
+        queryClient.setQueryData(["project", variables.id, companyId], context.previousProject);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message,
@@ -253,15 +327,13 @@ export const useUpdateProject = () => {
 // Hook pour supprimer un projet
 export const useDeleteProject = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
-
-      // Récupérer company_id pour vérification
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise");
       }
@@ -275,14 +347,38 @@ export const useDeleteProject = () => {
       if (error) throw error;
       return id;
     },
+    onMutate: async (deletedId) => {
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["projects", companyId] });
+      
+      // Sauvegarder les données actuelles
+      const previousProjects = queryClient.getQueryData<Project[]>(["projects", companyId]);
+      
+      // Supprimer optimistiquement de la liste
+      if (previousProjects) {
+        queryClient.setQueryData<Project[]>(
+          ["projects", companyId],
+          previousProjects.filter(p => p.id !== deletedId)
+        );
+      }
+      
+      // Supprimer le cache du projet individuel
+      queryClient.removeQueries({ queryKey: ["project", deletedId, companyId] });
+      
+      return { previousProjects };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast({
         title: "Projet supprimé",
         description: "Le projet a été supprimé avec succès.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _deletedId, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousProjects) {
+        queryClient.setQueryData(["projects", companyId], context.previousProjects);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message,

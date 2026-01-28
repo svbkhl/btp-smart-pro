@@ -4,6 +4,8 @@ import { useAuth } from "./useAuth";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_USER_STATS } from "@/fakeData/stats";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
 
 export interface UserStats {
   id: string;
@@ -22,9 +24,10 @@ export interface UserStats {
 export const useUserStats = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["user_stats", user?.id, fakeDataEnabled],
+    queryKey: ["user_stats", companyId],
     queryFn: async () => {
       // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
@@ -63,7 +66,7 @@ export const useUserStats = () => {
         "useUserStats"
       );
     },
-    enabled: !!user || fakeDataEnabled,
+    enabled: (!!user && !isLoadingCompanyId && !!companyId) || fakeDataEnabled,
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
@@ -74,39 +77,46 @@ export const useUserStats = () => {
 // Fonction pour recalculer les statistiques
 export const useRecalculateStats = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) {
+        throw new Error("Vous devez être membre d'une entreprise pour calculer les statistiques");
+      }
 
-      // Compter les projets
+      // Compter les projets (filtrés par company_id pour isolation multi-tenant)
       const { count: totalProjects, error: totalProjectsError } = await supabase
         .from("projects")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("company_id", companyId);
 
       if (totalProjectsError) throw totalProjectsError;
 
-      // Compter les projets actifs
+      // Compter les projets actifs (filtrés par company_id)
       const { count: activeProjects, error: activeError } = await supabase
         .from("projects")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
+        .eq("company_id", companyId)
         .in("status", ["planifié", "en_attente", "en_cours"]);
 
       if (activeError) throw activeError;
 
-      // Compter les projets terminés
+      // Compter les projets terminés (filtrés par company_id)
       const { count: completedProjectsCount, error: completedError } = await supabase
         .from("projects")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
+        .eq("company_id", companyId)
         .eq("status", "terminé");
 
       if (completedError) throw completedError;
 
-      // Récupérer tous les projets terminés avec leurs devis et bénéfices
+      // Récupérer tous les projets terminés avec leurs devis et bénéfices (filtrés par company_id)
       const { data: completedProjectsData, error: completedProjectsDataError } = await supabase
         .from("projects")
         .select(`
@@ -122,6 +132,7 @@ export const useRecalculateStats = () => {
           )
         `)
         .eq("user_id", user.id)
+        .eq("company_id", companyId)
         .eq("status", "terminé");
 
       if (completedProjectsDataError) throw completedProjectsDataError;
@@ -183,11 +194,11 @@ export const useRecalculateStats = () => {
 
       // Le bénéfice total a déjà été calculé dans la boucle ci-dessus
 
-      // Compter les clients
+      // Compter les clients (filtrés par company_id pour isolation multi-tenant)
       const { count: totalClients, error: clientsError } = await supabase
         .from("clients")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("company_id", companyId);
 
       if (clientsError) throw clientsError;
 
@@ -210,7 +221,7 @@ export const useRecalculateStats = () => {
       return data as UserStats;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user_stats"] });
+      queryClient.invalidateQueries({ queryKey: ["user_stats", companyId] });
     },
   });
 };

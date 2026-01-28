@@ -290,6 +290,7 @@ const Quotes = () => {
                     description: "Le PDF du devis est en cours de génération",
                   });
                 }}
+                onClose={() => setViewingQuote(null)}
               />
             )}
           </DialogContent>

@@ -38,9 +38,9 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { quote_id } = body;
+    const { quote_id, client_email } = body;
 
-    console.log('📧 [send-signature-confirmation] Envoi email pour quote:', quote_id);
+    console.log('📧 [send-signature-confirmation] Envoi email pour quote:', quote_id, 'client_email fourni:', client_email);
 
     if (!quote_id) {
       return new Response(
@@ -55,14 +55,14 @@ serve(async (req) => {
     // Récupérer les données du devis signé
     let { data: quote, error: quoteError } = await supabaseClient
       .from('ai_quotes')
-      .select('*')
+      .select('*, project_id')
       .eq('id', quote_id)
       .maybeSingle();
 
     if (!quote) {
       const quotesResult = await supabaseClient
         .from('quotes')
-        .select('*')
+        .select('*, project_id')
         .eq('id', quote_id)
         .maybeSingle();
       
@@ -70,6 +70,7 @@ serve(async (req) => {
     }
 
     if (!quote || !quote.signed) {
+      console.warn('⚠️ [send-signature-confirmation] Devis non trouvé ou non signé:', quote_id);
       return new Response(
         JSON.stringify({ error: 'Quote not found or not signed' }),
         {
@@ -79,12 +80,107 @@ serve(async (req) => {
       );
     }
 
-    const clientEmail = quote.email || quote.client_email;
+    // Récupérer l'email du signataire (priorité: paramètre > devis > session)
+    let clientEmail = client_email || quote.email || quote.client_email;
+    let clientName = quote.client_name || quote.signed_by || 'Client';
+    
+    console.log('🔍 [send-signature-confirmation] Recherche email client:', {
+      client_email_param: client_email,
+      quote_email: quote.email,
+      quote_client_email: quote.client_email,
+      current_clientEmail: clientEmail,
+    });
+    
+    // Si pas d'email fourni, chercher dans signature_sessions
+    if (!clientEmail) {
+      console.log('🔍 [send-signature-confirmation] Pas d\'email dans le devis, recherche dans signature_sessions...');
+      const { data: signatureSession } = await supabaseClient
+        .from('signature_sessions')
+        .select('signer_email, signer_name')
+        .eq('quote_id', quote_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (signatureSession?.signer_email) {
+        clientEmail = signatureSession.signer_email;
+        console.log('✅ [send-signature-confirmation] Email depuis session:', clientEmail);
+      }
+      
+      if (signatureSession?.signer_name && !clientName) {
+        clientName = signatureSession.signer_name;
+      }
+      
+      // Si toujours pas d'email, chercher dans les événements de signature
+      if (!clientEmail) {
+        console.log('🔍 [send-signature-confirmation] Pas d\'email dans session, recherche dans signature_events...');
+        const { data: signatureEvent } = await supabaseClient
+          .from('signature_events')
+          .select('event_data')
+          .eq('quote_id', quote_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (signatureEvent?.event_data?.signer_email) {
+          clientEmail = signatureEvent.event_data.signer_email;
+          console.log('✅ [send-signature-confirmation] Email depuis signature_events:', clientEmail);
+        }
+      }
+      
+      // Si toujours pas d'email et que le devis est lié à un projet, chercher dans le client du projet
+      if (!clientEmail && quote.project_id) {
+        console.log('🔍 [send-signature-confirmation] Pas d\'email trouvé, recherche dans projet:', quote.project_id);
+        try {
+          const { data: project } = await supabaseClient
+            .from('projects')
+            .select('client_id, clients(email, name)')
+            .eq('id', quote.project_id)
+            .single();
+          
+          if (project?.clients) {
+            const client = Array.isArray(project.clients) ? project.clients[0] : project.clients;
+            if (client?.email) {
+              clientEmail = client.email;
+              console.log('✅ [send-signature-confirmation] Email depuis projet:', clientEmail);
+            }
+            if (client?.name && !clientName) {
+              clientName = client.name;
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ [send-signature-confirmation] Erreur récupération email depuis projet:', error);
+        }
+      }
+    } else {
+      console.log('✅ [send-signature-confirmation] Email trouvé:', clientEmail);
+    }
 
     if (!clientEmail) {
-      console.warn('⚠️ Pas d\'email client trouvé');
+      console.error('❌ [send-signature-confirmation] Pas d\'email client trouvé pour quote:', quote_id);
+      console.error('❌ [send-signature-confirmation] Données disponibles:', {
+        quote_id,
+        quote_email: quote.email,
+        quote_client_email: quote.client_email,
+        client_email_param: client_email,
+        quote_data: {
+          id: quote.id,
+          quote_number: quote.quote_number,
+          signed: quote.signed,
+          signed_at: quote.signed_at,
+        }
+      });
       return new Response(
-        JSON.stringify({ error: 'Client email not found' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Client email not found',
+          quote_id: quote_id,
+          quote_data: {
+            has_email: !!quote.email,
+            has_client_email: !!quote.client_email,
+            has_client_email_param: !!client_email,
+          }
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -92,11 +188,31 @@ serve(async (req) => {
       );
     }
 
-    // Envoyer l'email via Resend
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    console.log('📧 [send-signature-confirmation] Envoi email à:', clientEmail, 'pour devis:', quote.quote_number);
+
+    // Récupérer les informations de l'entreprise pour la signature de l'email
+    let companyName = 'BTP Smart Pro';
+    let companyEmail = '';
     
-    if (!resendApiKey) {
-      console.warn('⚠️ RESEND_API_KEY non configurée');
+    if (quote.user_id) {
+      const { data: userSettings } = await supabaseClient
+        .from('user_settings')
+        .select('company_name, email, signature_name')
+        .eq('user_id', quote.user_id)
+        .single();
+      
+      if (userSettings) {
+        companyName = userSettings.company_name || companyName;
+        companyEmail = userSettings.email || '';
+      }
+    }
+
+    // Envoyer l'email via l'Edge Function send-email (système centralisé)
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      console.error('❌ [send-signature-confirmation] Configuration Supabase manquante');
       return new Response(
         JSON.stringify({
           success: false,
@@ -104,22 +220,12 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
+          status: 500,
         }
       );
     }
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: Deno.env.get('FROM_EMAIL') || 'noreply@btpsmartpro.com',
-        to: [clientEmail],
-        subject: `✅ Confirmation de signature - Devis ${quote.quote_number || ''}`,
-        html: `
+    const emailHtml = `
           <!DOCTYPE html>
           <html>
             <head>
@@ -187,24 +293,167 @@ serve(async (req) => {
                   
                   <p style="margin-top: 30px;">Pour toute question, n'hésitez pas à nous contacter.</p>
                   
-                  <p style="margin-top: 20px;">Cordialement,<br><strong>L'équipe BTP Smart Pro</strong></p>
+                  <p style="margin-top: 20px;">Cordialement,<br><strong>${companyName}</strong></p>
+                  ${companyEmail ? `<p style="font-size: 12px; color: #6B7280;">Email: ${companyEmail}</p>` : ''}
                 </div>
                 <div class="footer">
-                  <p><strong>BTP Smart Pro</strong> - Gestion intelligente de vos projets</p>
+                  <p><strong>${companyName}</strong> - Gestion intelligente de vos projets</p>
                   <p style="font-size: 12px; color: #9CA3AF;">Cet email a été envoyé automatiquement, merci de ne pas y répondre directement.</p>
                 </div>
               </div>
             </body>
           </html>
-        `,
+        `;
+
+    const emailText = `
+✅ Confirmation de signature - Devis ${quote.quote_number || ''}
+
+Bonjour ${clientName},
+
+Nous avons bien reçu la signature de votre devis. Voici un récapitulatif :
+
+📄 Informations du devis
+- Numéro de devis: ${quote.quote_number || 'N/A'}
+- Montant TTC: ${quote.estimated_cost ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(quote.estimated_cost) : 'N/A'}
+- Signé le: ${new Date(quote.signed_at).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' })}
+- Signé par: ${quote.signed_by || 'Non spécifié'}
+
+🚀 Prochaines étapes
+- Notre équipe va traiter votre dossier sous 24-48h
+- Vous recevrez prochainement un lien de paiement sécurisé
+- Un certificat de signature électronique sera généré
+- Nous vous contacterons pour planifier les travaux
+
+Pour toute question, n'hésitez pas à nous contacter.
+
+Cordialement,
+${companyName}
+${companyEmail ? `Email: ${companyEmail}` : ''}
+    `;
+
+    // TODO: Générer le PDF du devis signé
+    // Pour l'instant, on envoie l'email sans pièce jointe
+    // Une Edge Function dédiée pour générer le PDF devrait être créée
+    // et appelée ici pour ajouter le PDF en pièce jointe
+    
+    // Récupérer les informations complètes pour générer le PDF
+    let companySettings = null;
+    if (quote.user_id) {
+      const { data: settings } = await supabaseClient
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', quote.user_id)
+        .single();
+      
+      if (settings) {
+        companySettings = settings;
+      }
+    }
+
+    // Récupérer les sections et lignes si mode détaillé
+    let pdfSections: any[] | undefined = undefined;
+    let pdfLines: any[] | undefined = undefined;
+    
+    const quoteMode = quote.mode || (quote.details?.format === "simplified" ? "simple" : "detailed");
+    if (quoteMode === "detailed" && quote.id) {
+      const { data: sectionsData } = await supabaseClient
+        .from('quote_sections')
+        .select('*')
+        .eq('quote_id', quote.id)
+        .order('position', { ascending: true });
+      
+      if (sectionsData) {
+        pdfSections = sectionsData;
+      }
+
+      const { data: linesData } = await supabaseClient
+        .from('quote_lines')
+        .select('*')
+        .eq('quote_id', quote.id)
+        .order('section_id', { ascending: true, nullsFirst: false })
+        .order('position', { ascending: true });
+      
+      if (linesData) {
+        pdfLines = linesData;
+      }
+    }
+
+    // Préparer les attachments (pour l'instant vide, à compléter avec génération PDF)
+    const attachments: Array<{
+      filename: string;
+      content: string; // Base64
+      type: string;
+    }> = [];
+
+    // TODO: Appeler une Edge Function pour générer le PDF en base64
+    // const pdfResponse = await fetch(`${SUPABASE_URL}/functions/v1/generate-quote-pdf-base64`, {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+    //     'apikey': SERVICE_ROLE_KEY,
+    //   },
+    //   body: JSON.stringify({
+    //     quote_id: quote_id,
+    //     include_signature: true,
+    //   }),
+    // });
+    // 
+    // if (pdfResponse.ok) {
+    //   const pdfData = await pdfResponse.json();
+    //   attachments.push({
+    //     filename: `Devis-${quote.quote_number || quote_id}.pdf`,
+    //     content: pdfData.base64,
+    //     type: 'application/pdf',
+    //   });
+    // }
+
+    // Appeler l'Edge Function send-email avec les attachments
+    console.log('📧 [send-signature-confirmation] Appel send-email avec:', {
+      to: clientEmail,
+      subject: `✅ Confirmation de signature - Devis ${quote.quote_number || ''}`,
+      has_html: !!emailHtml,
+      has_text: !!emailText,
+      attachments_count: attachments.length,
+    });
+    
+    const emailResponse = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        'apikey': SERVICE_ROLE_KEY,
+      },
+      body: JSON.stringify({
+        to: clientEmail,
+        subject: `✅ Confirmation de signature - Devis ${quote.quote_number || ''}`,
+        html: emailHtml,
+        text: emailText,
+        type: 'confirmation',
+        quote_id: quote_id,
+        attachments: attachments.length > 0 ? attachments : undefined,
       }),
     });
 
+    const emailResult = await emailResponse.json().catch(async (err) => {
+      const text = await emailResponse.text().catch(() => 'Unable to read response');
+      console.error('❌ [send-signature-confirmation] Erreur parsing réponse email:', err, 'response:', text);
+      return { error: 'Failed to parse response', details: text };
+    });
+
     if (!emailResponse.ok) {
-      const errorData = await emailResponse.json();
-      console.error('❌ Erreur envoi email:', errorData);
+      console.error('❌ [send-signature-confirmation] Erreur envoi email:', {
+        status: emailResponse.status,
+        statusText: emailResponse.statusText,
+        result: emailResult,
+      });
       return new Response(
-        JSON.stringify({ error: 'Failed to send email', details: errorData }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Failed to send email', 
+          details: emailResult,
+          status: emailResponse.status,
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -212,7 +461,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ Email de confirmation envoyé à:', clientEmail);
+    console.log('✅ [send-signature-confirmation] Email de confirmation envoyé à:', clientEmail, 'email_id:', emailResult.email_id || emailResult.id);
 
     return new Response(
       JSON.stringify({

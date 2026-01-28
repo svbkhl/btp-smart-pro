@@ -287,6 +287,8 @@ export default function DevisGenerator() {
               quoteDate={new Date()}
               quoteNumber={quoteNumber || undefined}
               quoteFormat={mode}
+              tvaRate={result?.tva_rate ?? 0.20}
+              tva293b={result?.tva_non_applicable_293b ?? false}
             />
           </CardContent>
         </Card>

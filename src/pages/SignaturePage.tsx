@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { extractUUID } from "@/utils/uuidExtractor";
 import SignatureWithOTP from "@/components/signature/SignatureWithOTP";
-import { generateQuotePDF } from "@/services/pdfService";
+import { generateQuotePDFBase64 } from "@/services/pdfService";
 
 export default function SignaturePage() {
   const { quoteId: rawQuoteId } = useParams<{ quoteId: string }>();
@@ -25,6 +25,7 @@ export default function SignaturePage() {
   const [error, setError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [signerEmail, setSignerEmail] = useState<string>("");
 
   // Déterminer si rawQuoteId est un token (avec suffixe) ou un UUID pur
@@ -117,8 +118,13 @@ export default function SignaturePage() {
         setQuote(quoteData);
         setLoading(false);
         
-        // Générer le PDF pour l'aperçu
-        generatePdfPreview(quoteData);
+        // Générer le PDF pour l'aperçu (avec gestion d'erreur)
+        try {
+          await generatePdfPreview(quoteData);
+        } catch (previewError: any) {
+          console.error("❌ [SignaturePage] Erreur lors de la génération initiale du PDF:", previewError);
+          setPdfError(previewError?.message || "Impossible de générer l'aperçu PDF");
+        }
       } catch (err: any) {
         console.error("❌ Erreur:", err);
         setError("Erreur lors du chargement du devis");
@@ -138,39 +144,326 @@ export default function SignaturePage() {
         quote_number: quoteData.quote_number,
         client_name: quoteData.client_name,
         hasDetails: !!quoteData.details,
+        mode: quoteData.mode,
+        tva_rate: quoteData.tva_rate,
       });
 
-      const pdfBlob = await generateQuotePDF({
-        result: {
-          estimatedCost: quoteData.estimated_cost || 0,
-          workSteps: quoteData.details?.workSteps || quoteData.details?.work_steps || [],
-          materials: quoteData.details?.materials || [],
-          description: quoteData.details?.description || quoteData.description || "Devis sans description",
-          quote_number: quoteData.quote_number || "N/A",
-        },
-        companyInfo: {
-          company_name: "BTP Smart Pro",
-          address: "Adresse de l'entreprise",
-          phone: "Téléphone",
-          email: "contact@btpsmartpro.com",
-          siret: "",
-        },
-        clientInfo: {
-          name: quoteData.client_name || "Client",
-          address: "",
-          email: quoteData.client_email || quoteData.email || "",
-          phone: "",
-        },
-        surface: quoteData.details?.surface || "",
-        workType: quoteData.details?.prestation || quoteData.details?.workType || "Prestation",
+      // Récupérer les informations de l'entreprise depuis la base de données
+      // Note: Le client n'est pas authentifié, donc on utilise les données du devis ou des valeurs par défaut
+      let companyInfo = {
+        company_name: quoteData.company_name || "BTP Smart Pro",
+        legalForm: quoteData.legal_form || "",
+        logoUrl: quoteData.company_logo_url || "",
+        address: quoteData.company_address || "",
+        city: quoteData.company_city || "",
+        postalCode: quoteData.company_postal_code || "",
+        country: quoteData.company_country || "",
+        siret: quoteData.company_siret || "",
+        vatNumber: quoteData.company_vat_number || "",
+      };
+
+      // Essayer de récupérer depuis user_settings si possible (peut échouer si pas authentifié)
+      if (quoteData.user_id) {
+        try {
+          const { data: settings, error: settingsError } = await supabase
+            .from("user_settings")
+            .select("company_name, legal_form, company_logo_url, address, city, postal_code, country, siret, vat_number")
+            .eq("user_id", quoteData.user_id)
+            .single();
+
+          if (!settingsError && settings) {
+            companyInfo = {
+              company_name: settings.company_name || companyInfo.company_name,
+              legalForm: settings.legal_form || companyInfo.legalForm,
+              logoUrl: settings.company_logo_url || companyInfo.logoUrl,
+              address: settings.address || companyInfo.address,
+              city: settings.city || companyInfo.city,
+              postalCode: settings.postal_code || companyInfo.postalCode,
+              country: settings.country || companyInfo.country,
+              siret: settings.siret || companyInfo.siret,
+              vatNumber: settings.vat_number || companyInfo.vatNumber,
+            };
+            console.log("✅ [SignaturePage] Infos entreprise récupérées depuis user_settings");
+          } else {
+            console.warn("⚠️ [SignaturePage] Impossible de récupérer les infos entreprise depuis user_settings:", settingsError?.message || "Données non disponibles");
+            console.log("ℹ️ [SignaturePage] Utilisation des valeurs par défaut ou du devis");
+          }
+        } catch (error: any) {
+          console.warn("⚠️ [SignaturePage] Erreur récupération infos entreprise:", error?.message || error);
+          console.log("ℹ️ [SignaturePage] Utilisation des valeurs par défaut ou du devis");
+        }
+      }
+
+      // Déterminer le mode du devis
+      const quoteMode = quoteData.mode || (quoteData.details?.format === "simplified" ? "simple" : "detailed");
+      const tvaRate = quoteData.tva_rate ?? 0.20;
+      const tva293b = quoteData.tva_non_applicable_293b || false;
+      const effectiveTvaRate = tva293b ? 0 : tvaRate;
+
+      // Récupérer les sections et lignes si mode détaillé
+      // Utiliser les données déjà présentes dans quoteData si disponibles (depuis get-public-document)
+      let pdfSections: any[] | undefined = undefined;
+      let pdfLines: any[] | undefined = undefined;
+
+      if (quoteMode === "detailed" && quoteData.id) {
+        // Essayer d'abord avec les données déjà chargées dans quoteData
+        if (quoteData.sections && Array.isArray(quoteData.sections)) {
+          pdfSections = quoteData.sections.map((section: any) => ({
+            id: section.id,
+            title: section.title,
+            position: section.position,
+          }));
+          console.log("✅ [SignaturePage] Sections récupérées depuis quoteData:", pdfSections.length);
+        }
+        
+        if (quoteData.lines && Array.isArray(quoteData.lines)) {
+          pdfLines = quoteData.lines.map((line: any) => ({
+            label: line.label,
+            description: line.description,
+            unit: line.unit || "",
+            quantity: line.quantity || 0,
+            unit_price_ht: line.unit_price_ht || 0,
+            total_ht: line.total_ht || 0,
+            tva_rate: effectiveTvaRate,
+            total_tva: line.total_tva || 0,
+            total_ttc: line.total_ttc || 0,
+            section_id: line.section_id,
+          }));
+          console.log("✅ [SignaturePage] Lignes récupérées depuis quoteData:", pdfLines.length);
+        }
+        
+        // Si pas de données dans quoteData, essayer de les récupérer depuis la base (peut échouer si pas authentifié)
+        if ((!pdfSections || !pdfLines) && quoteData.id) {
+          try {
+            if (!pdfSections) {
+              const { data: sectionsData, error: sectionsError } = await supabase
+                .from("quote_sections")
+                .select("*")
+                .eq("quote_id", quoteData.id)
+                .order("position", { ascending: true });
+
+              if (!sectionsError && sectionsData) {
+                pdfSections = sectionsData.map(section => ({
+                  id: section.id,
+                  title: section.title,
+                  position: section.position,
+                }));
+                console.log("✅ [SignaturePage] Sections récupérées depuis DB:", pdfSections.length);
+              } else {
+                console.warn("⚠️ [SignaturePage] Impossible de récupérer sections depuis DB:", sectionsError?.message);
+              }
+            }
+
+            if (!pdfLines) {
+              const { data: linesData, error: linesError } = await supabase
+                .from("quote_lines")
+                .select("*")
+                .eq("quote_id", quoteData.id)
+                .order("section_id", { ascending: true, nullsFirst: false })
+                .order("position", { ascending: true });
+
+              if (!linesError && linesData) {
+                pdfLines = linesData.map(line => ({
+                  label: line.label,
+                  description: line.description,
+                  unit: line.unit || "",
+                  quantity: line.quantity || 0,
+                  unit_price_ht: line.unit_price_ht || 0,
+                  total_ht: line.total_ht || 0,
+                  tva_rate: effectiveTvaRate,
+                  total_tva: line.total_tva || 0,
+                  total_ttc: line.total_ttc || 0,
+                  section_id: line.section_id,
+                }));
+                console.log("✅ [SignaturePage] Lignes récupérées depuis DB:", pdfLines.length);
+              } else {
+                console.warn("⚠️ [SignaturePage] Impossible de récupérer lignes depuis DB:", linesError?.message);
+              }
+            }
+          } catch (error: any) {
+            console.warn("⚠️ [SignaturePage] Erreur récupération sections/lignes:", error?.message || error);
+            // Continuer sans sections/lignes pour le mode simple
+          }
+        }
+      }
+
+      // Préparer les données du devis pour le PDF
+      const quoteResult = {
+        estimatedCost: quoteData.estimated_cost || 0,
+        workSteps: quoteData.details?.workSteps || quoteData.details?.work_steps || [],
+        materials: quoteData.details?.materials || [],
+        description: quoteData.details?.description || quoteData.description || "Devis sans description",
+        quote_number: quoteData.quote_number || "N/A",
+      };
+
+      // Récupérer les informations complètes du client depuis la table clients
+      let clientCivility = '';
+      let clientFirstName = '';
+      let clientPhone = quoteData.client_phone || '';
+      let clientAddress = quoteData.client_address || '';
+      let clientEmail = quoteData.client_email || quoteData.email || '';
+      let clientName = quoteData.client_name || "Client";
+      let actualClientId = quoteData.client_id || null;
+
+      // Si le devis est lié à un projet, récupérer le client_id depuis le projet
+      if (!actualClientId && quoteData.project_id) {
+        try {
+          const { data: project } = await supabase
+            .from("projects")
+            .select("client_id")
+            .eq("id", quoteData.project_id)
+            .single();
+          
+          if (project?.client_id) {
+            actualClientId = project.client_id;
+            console.log("📋 [SignaturePage] client_id récupéré depuis projet:", actualClientId);
+          }
+        } catch (error) {
+          console.warn("⚠️ [SignaturePage] Impossible de récupérer client_id depuis projet:", error);
+        }
+      }
+
+      // Récupérer les informations complètes du client si client_id est disponible
+      if (actualClientId) {
+        try {
+          const { data: client } = await supabase
+            .from("clients")
+            .select("titre, prenom, phone, location, email, name")
+            .eq("id", actualClientId)
+            .single();
+          
+          if (client) {
+            clientCivility = client.titre || '';
+            clientFirstName = client.prenom || '';
+            if (client.phone && !clientPhone) {
+              clientPhone = client.phone;
+            }
+            if (client.location && !clientAddress) {
+              clientAddress = client.location;
+            }
+            if (client.email && !clientEmail) {
+              clientEmail = client.email;
+            }
+            if (client.name && !clientName) {
+              clientName = client.name;
+            }
+            console.log("✅ [SignaturePage] Infos client complètes récupérées:", {
+              civility: clientCivility,
+              firstName: clientFirstName,
+              phone: clientPhone,
+              address: clientAddress,
+            });
+          }
+        } catch (error) {
+          console.warn("⚠️ [SignaturePage] Impossible de récupérer les infos client complètes:", error);
+        }
+      } else {
+        console.warn("⚠️ [SignaturePage] Aucun client_id disponible pour récupérer les infos complètes");
+      }
+
+      console.log("📄 [SignaturePage] Données pour PDF:", {
+        quoteMode,
+        effectiveTvaRate,
+        tva293b,
+        sectionsCount: pdfSections?.length || 0,
+        linesCount: pdfLines?.length || 0,
+        companyInfo: companyInfo.company_name,
+        clientName,
+        clientCivility,
+        clientFirstName,
+        clientAddress,
       });
+
+      // Vérifier que toutes les données nécessaires sont présentes
+      if (!quoteResult.quote_number && !quoteData.quote_number) {
+        console.warn("⚠️ [SignaturePage] Pas de numéro de devis disponible");
+      }
+
+      console.log("📄 [SignaturePage] Tentative de génération PDF avec:", {
+        hasResult: !!quoteResult,
+        hasCompanyInfo: !!companyInfo,
+        hasClientInfo: !!clientName,
+        quoteMode,
+        effectiveTvaRate,
+        tva293b,
+        sectionsCount: pdfSections?.length || 0,
+        linesCount: pdfLines?.length || 0,
+        totalTTC: quoteData.total_ttc || quoteData.estimated_cost,
+      });
+
+      // Générer le PDF en base64 puis convertir en Blob
+      const pdfData = await generateQuotePDFBase64({
+        result: quoteResult,
+        companyInfo,
+        clientInfo: {
+          name: clientName,
+          email: clientEmail,
+          phone: clientPhone,
+          location: clientAddress,
+          civility: clientCivility,
+          firstName: clientFirstName,
+          address: clientAddress,
+        },
+        quoteDate: quoteData.created_at ? new Date(quoteData.created_at) : new Date(),
+        quoteNumber: quoteData.quote_number || "N/A",
+        mode: quoteMode,
+        tvaRate: effectiveTvaRate,
+        tva293b: tva293b,
+        sections: pdfSections,
+        lines: pdfLines,
+        subtotal_ht: quoteData.subtotal_ht,
+        total_tva: quoteData.total_tva,
+        total_ttc: quoteData.total_ttc || quoteData.estimated_cost,
+        signatureData: quoteData.signature_data || undefined,
+        signedBy: quoteData.signed_by || undefined,
+        signedAt: quoteData.signed_at || undefined,
+      });
+
+      if (!pdfData || !pdfData.base64) {
+        throw new Error("La génération du PDF n'a retourné aucune donnée");
+      }
+
+      console.log("📄 [SignaturePage] PDF généré, taille base64:", pdfData.base64.length);
+
+      // Convertir le base64 en Blob
+      const base64Data = pdfData.base64;
       
-      const url = URL.createObjectURL(pdfBlob);
-      setPdfUrl(url);
-      console.log("✅ [SignaturePage] PDF généré avec succès");
-    } catch (error) {
+      // Vérifier que le base64 est valide
+      if (!base64Data || base64Data.length === 0) {
+        throw new Error("Les données PDF sont vides");
+      }
+
+      try {
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
+        
+        if (pdfBlob.size === 0) {
+          throw new Error("Le Blob PDF est vide");
+        }
+        
+        const url = URL.createObjectURL(pdfBlob);
+        setPdfUrl(url);
+        setPdfError(null);
+        console.log("✅ [SignaturePage] PDF généré avec succès, URL créée, taille:", pdfBlob.size, "bytes");
+      } catch (blobError: any) {
+        console.error("❌ [SignaturePage] Erreur lors de la conversion en Blob:", blobError);
+        throw new Error(`Erreur lors de la conversion du PDF: ${blobError?.message || 'Erreur inconnue'}`);
+      }
+    } catch (error: any) {
       console.error("❌ [SignaturePage] Erreur génération PDF aperçu:", error);
-      // Ne pas bloquer l'UI si le PDF échoue
+      const errorMessage = error?.message || "Erreur lors de la génération de l'aperçu PDF";
+      setPdfError(errorMessage);
+      console.error("❌ [SignaturePage] Détails complets de l'erreur:", {
+        message: errorMessage,
+        stack: error?.stack,
+        name: error?.name,
+        error: error,
+      });
     } finally {
       setGeneratingPdf(false);
     }
@@ -389,8 +682,27 @@ export default function SignaturePage() {
               </CardHeader>
               <CardContent>
                 {generatingPdf ? (
-                  <div className="flex items-center justify-center h-96">
+                  <div className="flex flex-col items-center justify-center h-96 space-y-4">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Génération de l'aperçu PDF...</p>
+                  </div>
+                ) : pdfError ? (
+                  <div className="flex flex-col items-center justify-center h-96 space-y-4 p-4">
+                    <AlertCircle className="h-12 w-12 text-destructive" />
+                    <div className="text-center space-y-2">
+                      <p className="font-medium text-destructive">Erreur lors de la génération de l'aperçu</p>
+                      <p className="text-sm text-muted-foreground">{pdfError}</p>
+                      <Button
+                        onClick={() => {
+                          setPdfError(null);
+                          generatePdfPreview(quote);
+                        }}
+                        variant="outline"
+                        className="mt-4"
+                      >
+                        Réessayer
+                      </Button>
+                    </div>
                   </div>
                 ) : pdfUrl ? (
                   <div className="space-y-4">
@@ -414,8 +726,23 @@ export default function SignaturePage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-96 text-muted-foreground">
-                    Aperçu non disponible
+                  <div className="flex flex-col items-center justify-center h-96 space-y-4 p-4">
+                    <FileText className="h-12 w-12 text-muted-foreground" />
+                    <div className="text-center space-y-2">
+                      <p className="font-medium text-muted-foreground">Aperçu non disponible</p>
+                      <p className="text-sm text-muted-foreground">
+                        L'aperçu PDF n'a pas pu être généré. Veuillez réessayer.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          generatePdfPreview(quote);
+                        }}
+                        variant="outline"
+                        className="mt-4"
+                      >
+                        Générer l'aperçu
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

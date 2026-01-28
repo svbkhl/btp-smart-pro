@@ -34,8 +34,8 @@ import { useClients, useCreateClient } from "@/hooks/useClients";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanyId } from "@/hooks/useCompanyId";
 import { supabase } from "@/integrations/supabase/client";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
 import { MultiImageUpload } from "@/components/MultiImageUpload";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,6 +52,8 @@ import { useQuote } from "@/hooks/useQuotes";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SendToClientModal } from "@/components/billing/SendToClientModal";
+import { Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -861,6 +863,56 @@ const QuoteDetailViewWrapper = ({ quoteId }: { quoteId: string }) => {
   );
 };
 
+// Wrapper pour le bouton "Envoyer au client"
+const QuoteActionButtonsWrapper = ({ quoteId, onSendToClient }: { quoteId: string; onSendToClient: () => void }) => {
+  const { data: quote } = useQuote(quoteId);
+  const isSigned = quote?.signed || quote?.status === "signed";
+
+  if (!quote || isSigned) {
+    return null;
+  }
+
+  return (
+    <Button 
+      variant="outline" 
+      onClick={onSendToClient} 
+      className="gap-2"
+    >
+      <Send className="w-4 h-4" />
+      Envoyer au client
+    </Button>
+  );
+};
+
+// Wrapper pour le modal "Envoyer au client"
+const SendToClientModalWrapper = ({ 
+  quoteId, 
+  open, 
+  onOpenChange 
+}: { 
+  quoteId: string; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const { data: quote } = useQuote(quoteId);
+
+  if (!quote) {
+    return null;
+  }
+
+  return (
+    <SendToClientModal
+      open={open}
+      onOpenChange={onOpenChange}
+      documentType="quote"
+      document={quote}
+      onSent={() => {
+        onOpenChange(false);
+      }}
+    />
+  );
+};
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -868,6 +920,7 @@ const QuoteDetailViewWrapper = ({ quoteId }: { quoteId: string }) => {
 export const AIQuoteGenerator = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: companyInfo } = useUserSettings();
   const createClient = useCreateClient();
@@ -918,6 +971,7 @@ export const AIQuoteGenerator = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
+  const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const [quoteSignature, setQuoteSignature] = useState<{
     data?: string;
     signedBy?: string;
@@ -1203,10 +1257,8 @@ export const AIQuoteGenerator = () => {
       // Récupérer les sections et lignes si mode detailed
       let quoteSections: any[] | undefined = undefined;
       let quoteLines: any[] | undefined = undefined;
-      if (quoteMode === "detailed" && quoteId && user) {
+      if (quoteMode === "detailed" && quoteId && user && companyId) {
         try {
-          const companyId = await getCurrentCompanyId(user.id);
-          if (companyId) {
             console.log("📋 Récupération sections/lignes pour quoteId:", quoteId);
             // Récupérer sections
             const { data: sectionsData, error: sectionsError } = await supabase
@@ -1238,7 +1290,6 @@ export const AIQuoteGenerator = () => {
               quoteLines = linesData || [];
               console.log("✅ Lignes récupérées:", quoteLines.length);
             }
-          }
         } catch (error) {
           console.error("❌ Erreur récupération sections/lignes:", error);
         }
@@ -1344,10 +1395,26 @@ export const AIQuoteGenerator = () => {
             <Button variant="outline" onClick={() => setIsPreviewOpen(false)} className="gap-2">
               Fermer l'aperçu
             </Button>
+            {/* Bouton Envoyer au client - masqué si le devis est signé */}
+            {quoteId && (
+              <QuoteActionButtonsWrapper 
+                quoteId={quoteId} 
+                onSendToClient={() => setIsSendToClientOpen(true)}
+              />
+            )}
             <Button variant="outline" onClick={handleReset} className="gap-2">
               Nouveau devis
             </Button>
           </div>
+
+          {/* Modal Envoyer au client */}
+          {quoteId && (
+            <SendToClientModalWrapper 
+              quoteId={quoteId}
+              open={isSendToClientOpen}
+              onOpenChange={setIsSendToClientOpen}
+            />
+          )}
         </div>
       ) : (
         // Formulaire de génération (affiché quand pas de résultat ou aperçu fermé)

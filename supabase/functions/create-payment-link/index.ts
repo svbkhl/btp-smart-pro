@@ -46,14 +46,29 @@ serve(async (req) => {
     const APP_URL = Deno.env.get('APP_URL') || Deno.env.get('PUBLIC_URL') || 'https://www.btpsmartpro.com';
 
     if (!STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
+      console.error('❌ [create-payment-link] STRIPE_SECRET_KEY non configuré');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'STRIPE_SECRET_KEY not configured',
+          details: 'La clé API Stripe n\'est pas configurée dans les variables d\'environnement',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Missing authorization header',
+          details: 'Un token d\'authentification est requis',
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -64,31 +79,68 @@ serve(async (req) => {
     // Create Supabase client
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Vérifier l'authentification et l'appartenance à une company
-    const { verifyCompanyMember } = await import("../_shared/auth.ts");
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
-    
-    const authResult = await verifyCompanyMember(
-      req,
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
 
-    if (!authResult.success || !authResult.user || !authResult.companyId) {
+    if (authError || !authUser) {
+      console.error('❌ [create-payment-link] Erreur authentification:', authError);
       return new Response(
-        JSON.stringify({ error: authResult.error || 'Unauthorized' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Unauthorized', 
+          details: authError?.message || 'Token d\'authentification invalide ou expiré',
+        }),
         {
-          status: authResult.status || 401,
+          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
 
-    const user = { id: authResult.user.id, email: authResult.user.email };
-    const companyId = authResult.companyId;
+    const user = { id: authUser.id, email: authUser.email };
+
+    // Essayer de récupérer le company_id, mais ne pas bloquer si l'utilisateur n'est pas membre
+    let companyId: string | null = null;
+    try {
+      const { verifyCompanyMember } = await import("../_shared/auth.ts");
+      const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
+      
+      const authResult = await verifyCompanyMember(
+        req,
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+
+      if (authResult.success && authResult.companyId) {
+        companyId = authResult.companyId;
+        console.log('✅ [create-payment-link] Company ID récupéré:', companyId);
+      } else {
+        console.warn('⚠️ [create-payment-link] Utilisateur non membre d\'une entreprise, utilisation de user_id uniquement');
+      }
+    } catch (companyError) {
+      console.warn('⚠️ [create-payment-link] Erreur récupération company:', companyError);
+      // Continuer sans company_id
+    }
 
     // Parse request body
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('❌ [create-payment-link] Erreur parsing body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Invalid JSON in request body',
+          details: parseError instanceof Error ? parseError.message : 'Unknown error',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const { 
       quote_id, 
       invoice_id,
@@ -98,15 +150,28 @@ serve(async (req) => {
       client_name
     } = body;
 
-    console.log('📥 [create-payment-link] Requête:', { quote_id, invoice_id, payment_type, amount, user_id: user.id });
+    console.log('📥 [create-payment-link] Requête reçue:', { 
+      quote_id, 
+      invoice_id, 
+      payment_type, 
+      amount, 
+      user_id: user.id,
+      company_id: companyId,
+      body_keys: Object.keys(body),
+    });
 
     // =====================================================
     // 1️⃣ VÉRIFIER LE DEVIS
     // =====================================================
 
     if (!quote_id) {
+      console.error('❌ [create-payment-link] quote_id manquant dans la requête');
       return new Response(
-        JSON.stringify({ error: 'quote_id is required' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'quote_id is required',
+          received_body: body,
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -114,29 +179,37 @@ serve(async (req) => {
       );
     }
 
-    // Récupérer le devis (vérifier qu'il appartient à la company de l'user)
-    const { data: quote, error: quoteError } = await supabaseClient
+    // Récupérer le devis (vérifier qu'il appartient à la company de l'user ou à l'user)
+    let { data: quote, error: quoteError } = await supabaseClient
       .from('ai_quotes')
       .select('*')
       .eq('id', quote_id)
-      .eq('company_id', companyId) // Multi-tenant: vérifier company_id au lieu de user_id
       .maybeSingle();
 
-    if (!quote) {
-      console.error('❌ Devis non trouvé ou n\'appartient pas à votre entreprise');
-      return new Response(
-        JSON.stringify({ error: 'Quote not found or access denied' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    // Si pas trouvé dans ai_quotes, essayer dans quotes
+    if (!quote || quoteError) {
+      console.log('🔍 [create-payment-link] Pas trouvé dans ai_quotes, essai dans quotes');
+      const quotesResult = await supabaseClient
+        .from('quotes')
+        .select('*')
+        .eq('id', quote_id)
+        .maybeSingle();
+      
+      if (quotesResult.data) {
+        quote = quotesResult.data;
+        quoteError = null;
+      }
     }
 
     if (quoteError || !quote) {
-      console.error('❌ Devis non trouvé:', quoteError);
+      console.error('❌ [create-payment-link] Devis non trouvé:', quoteError);
       return new Response(
-        JSON.stringify({ error: 'Quote not found' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Quote not found', 
+          details: quoteError?.message || 'Le devis n\'a pas été trouvé dans la base de données',
+          quote_id,
+        }),
         {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -144,11 +217,53 @@ serve(async (req) => {
       );
     }
 
+    // Vérifier l'appartenance : soit company_id correspond, soit user_id correspond
+    const hasCompanyAccess = companyId && quote.company_id && quote.company_id === companyId;
+    const hasUserAccess = quote.user_id === user.id;
+    
+    if (!hasCompanyAccess && !hasUserAccess) {
+      console.error('❌ [create-payment-link] Devis n\'appartient pas à votre entreprise ou utilisateur', {
+        quote_company_id: quote.company_id,
+        user_company_id: companyId,
+        quote_user_id: quote.user_id,
+        user_id: user.id,
+      });
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Quote not found or access denied',
+          details: 'Le devis n\'appartient pas à votre compte',
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
+    console.log('✅ [create-payment-link] Accès autorisé au devis:', {
+      quote_id: quote_id,
+      hasCompanyAccess,
+      hasUserAccess,
+    });
+
     // Vérifier que le devis est signé
     if (!quote.signed || !quote.signed_at) {
-      console.error('❌ Devis non signé');
+      console.error('❌ [create-payment-link] Devis non signé:', {
+        quote_id,
+        signed: quote.signed,
+        signed_at: quote.signed_at,
+        status: quote.status,
+      });
       return new Response(
-        JSON.stringify({ error: 'Quote must be signed before payment', quote_status: quote.status }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Quote must be signed before payment',
+          details: 'Le devis doit être signé avant de créer un lien de paiement',
+          quote_status: quote.status,
+          quote_signed: quote.signed,
+          quote_signed_at: quote.signed_at,
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -167,12 +282,25 @@ serve(async (req) => {
 
     if (!invoiceId) {
       // Vérifier si une facture existe déjà pour ce devis
-      const { data: existingInvoice } = await supabaseClient
+      let { data: existingInvoice } = await supabaseClient
         .from('invoices')
         .select('*')
         .eq('quote_id', quote_id)
-        .eq('company_id', companyId)
         .maybeSingle();
+      
+      // Si pas trouvée avec company_id, essayer avec user_id
+      if (!existingInvoice) {
+        const invoiceByUser = await supabaseClient
+          .from('invoices')
+          .select('*')
+          .eq('quote_id', quote_id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (invoiceByUser.data) {
+          existingInvoice = invoiceByUser.data;
+        }
+      }
 
       if (existingInvoice) {
         invoice = existingInvoice;
@@ -183,30 +311,41 @@ serve(async (req) => {
         const invoiceAmount = quote.estimated_cost || 0;
         const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
 
+        const invoiceData: any = {
+          user_id: user.id,
+          client_id: quote.client_id,
+          quote_id: quote_id,
+          invoice_number: invoiceNumber,
+          client_name: quote.client_name || client_name,
+          client_email: quote.client_email || client_email,
+          amount: invoiceAmount,
+          total_ttc: invoiceAmount,
+          amount_paid: 0,
+          amount_remaining: invoiceAmount,
+          status: 'draft',
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 jours
+        };
+        
+        // Ajouter company_id seulement s'il existe
+        if (quote.company_id || companyId) {
+          invoiceData.company_id = quote.company_id || companyId;
+        }
+
         const { data: newInvoice, error: invoiceError } = await supabaseClient
           .from('invoices')
-          .insert({
-            user_id: user.id,
-            company_id: quote.company_id,
-            client_id: quote.client_id,
-            quote_id: quote_id,
-            invoice_number: invoiceNumber,
-            client_name: quote.client_name || client_name,
-            client_email: quote.client_email || client_email,
-            amount: invoiceAmount,
-            total_ttc: invoiceAmount,
-            amount_paid: 0,
-            amount_remaining: invoiceAmount,
-            status: 'draft',
-            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 jours
-          })
+          .insert(invoiceData)
           .select()
           .single();
 
         if (invoiceError || !newInvoice) {
-          console.error('❌ Erreur création facture:', invoiceError);
+          console.error('❌ [create-payment-link] Erreur création facture:', invoiceError);
           return new Response(
-            JSON.stringify({ error: 'Failed to create invoice', details: invoiceError?.message }),
+            JSON.stringify({ 
+              success: false,
+              error: 'Failed to create invoice', 
+              details: invoiceError?.message,
+              code: invoiceError?.code,
+            }),
             {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -228,9 +367,14 @@ serve(async (req) => {
         .maybeSingle();
 
       if (invoiceError || !existingInvoice) {
-        console.error('❌ Facture non trouvée:', invoiceError);
+        console.error('❌ [create-payment-link] Facture non trouvée:', invoiceError);
         return new Response(
-          JSON.stringify({ error: 'Invoice not found' }),
+          JSON.stringify({ 
+            success: false,
+            error: 'Invoice not found',
+            details: invoiceError?.message || 'La facture n\'a pas été trouvée',
+            invoice_id: invoiceId,
+          }),
           {
             status: 404,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -243,8 +387,15 @@ serve(async (req) => {
 
     // Vérifier si la facture est déjà payée
     if (invoice.status === 'paid') {
+      console.warn('⚠️ [create-payment-link] Facture déjà payée:', invoiceId);
       return new Response(
-        JSON.stringify({ error: 'Invoice already paid' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Invoice already paid',
+          details: 'Cette facture a déjà été payée',
+          invoice_id: invoiceId,
+          invoice_status: invoice.status,
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -266,7 +417,12 @@ serve(async (req) => {
     } else if (payment_type === 'deposit' || payment_type === 'partial') {
       if (!amount || amount <= 0) {
         return new Response(
-          JSON.stringify({ error: 'Amount is required for deposit/partial payment' }),
+          JSON.stringify({ 
+            success: false,
+            error: 'Amount is required for deposit/partial payment',
+            payment_type,
+            amount_provided: amount,
+          }),
           {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -276,7 +432,11 @@ serve(async (req) => {
       paymentAmount = Math.min(amount, remaining); // Ne pas dépasser le restant
     } else {
       return new Response(
-        JSON.stringify({ error: 'Invalid payment_type. Use: total, deposit, or partial' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Invalid payment_type. Use: total, deposit, or partial',
+          payment_type_received: payment_type,
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -285,8 +445,17 @@ serve(async (req) => {
     }
 
     if (paymentAmount <= 0) {
+      console.error('❌ [create-payment-link] Montant invalide:', paymentAmount);
       return new Response(
-        JSON.stringify({ error: 'Payment amount must be greater than 0' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Payment amount must be greater than 0',
+          paymentAmount,
+          payment_type,
+          invoiceTotal,
+          alreadyPaid,
+          remaining,
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -294,7 +463,22 @@ serve(async (req) => {
       );
     }
 
-    console.log('💰 Montant à payer:', { paymentAmount, payment_type, invoiceTotal, alreadyPaid, remaining });
+    if (isNaN(paymentAmount)) {
+      console.error('❌ [create-payment-link] Montant n\'est pas un nombre:', paymentAmount);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Payment amount must be a valid number',
+          paymentAmount,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('💰 [create-payment-link] Montant à payer:', { paymentAmount, payment_type, invoiceTotal, alreadyPaid, remaining });
 
     // =====================================================
     // 4️⃣ CRÉER LA STRIPE CHECKOUT SESSION
@@ -315,6 +499,24 @@ serve(async (req) => {
 
     const stripeAccountId = userSettings?.stripe_account_id;
 
+    // Vérifier que le montant est valide pour Stripe (minimum 0.50€)
+    const amountInCents = Math.round(paymentAmount * 100);
+    if (amountInCents < 50) {
+      console.error('❌ [create-payment-link] Montant trop faible pour Stripe:', amountInCents, 'centimes');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Le montant minimum est de 0,50 €',
+          paymentAmount,
+          amountInCents,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Paramètres de base pour la session
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'payment',
@@ -324,10 +526,10 @@ serve(async (req) => {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `Facture ${invoice.invoice_number}`,
+              name: `Facture ${invoice.invoice_number || 'N/A'}`,
               description: `Paiement ${payment_type === 'total' ? 'total' : 'acompte'} - Devis ${quote.quote_number || quote_id.slice(0, 8)}`,
             },
-            unit_amount: Math.round(paymentAmount * 100), // Stripe utilise les centimes
+            unit_amount: amountInCents, // Stripe utilise les centimes
           },
           quantity: 1,
         },
@@ -342,8 +544,22 @@ serve(async (req) => {
         client_email: invoice.client_email || quote.client_email || client_email || '',
         client_name: invoice.client_name || quote.client_name || client_name || '',
       },
-      customer_email: invoice.client_email || quote.client_email || client_email,
     };
+
+    // Ajouter customer_email seulement s'il existe
+    const customerEmail = invoice.client_email || quote.client_email || client_email;
+    if (customerEmail) {
+      sessionParams.customer_email = customerEmail;
+    }
+
+    console.log('📋 [create-payment-link] Paramètres session Stripe:', {
+      amountInCents,
+      currency: 'eur',
+      invoice_number: invoice.invoice_number,
+      quote_number: quote.quote_number,
+      customer_email: customerEmail,
+      stripeAccountId: stripeAccountId || 'none',
+    });
 
     // Si Stripe Connect est configuré, ajouter le connected account
     if (stripeAccountId && userSettings?.stripe_connected) {
@@ -354,42 +570,70 @@ serve(async (req) => {
       };
     }
 
-    const session = await stripe.checkout.sessions.create(
-      sessionParams,
-      stripeAccountId ? { stripeAccount: stripeAccountId } : undefined
-    );
-
-    console.log('✅ Stripe Checkout Session créée:', session.id);
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create(
+        sessionParams,
+        stripeAccountId ? { stripeAccount: stripeAccountId } : undefined
+      );
+      console.log('✅ [create-payment-link] Stripe Checkout Session créée:', session.id);
+    } catch (stripeError: any) {
+      console.error('❌ [create-payment-link] Erreur création session Stripe:', stripeError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Erreur Stripe lors de la création de la session',
+          details: stripeError.message || 'Erreur inconnue',
+          type: stripeError.type,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // =====================================================
     // 5️⃣ ENREGISTRER LE PAIEMENT EN BASE
     // =====================================================
 
+    const paymentData: any = {
+      user_id: user.id,
+      invoice_id: invoiceId,
+      quote_id: quote_id,
+      client_id: quote.client_id,
+      amount: paymentAmount,
+      payment_type: payment_type,
+      payment_method: 'stripe',
+      payment_link: session.url,
+      stripe_session_id: session.id,
+      currency: 'EUR',
+      status: 'pending',
+      reference: invoice.invoice_number,
+    };
+    
+    // Ajouter company_id seulement s'il existe
+    if (quote.company_id || companyId) {
+      paymentData.company_id = quote.company_id || companyId;
+    }
+
     const { data: payment, error: paymentError } = await supabaseClient
       .from('payments')
-      .insert({
-        user_id: user.id,
-        company_id: quote.company_id,
-        invoice_id: invoiceId,
-        quote_id: quote_id,
-        client_id: quote.client_id,
-        amount: paymentAmount,
-        payment_type: payment_type,
-        payment_method: 'stripe',
-        payment_link: session.url,
-        stripe_session_id: session.id,
-        currency: 'EUR',
-        status: 'pending',
-        reference: invoice.invoice_number,
-      })
+      .insert(paymentData)
       .select()
       .single();
 
     if (paymentError) {
-      console.error('❌ Erreur création paiement:', paymentError);
-      // Ne pas bloquer, le webhook gérera
+      console.error('❌ [create-payment-link] Erreur création paiement:', paymentError);
+      // Ne pas bloquer, le webhook gérera, mais logger l'erreur
+      console.error('❌ [create-payment-link] Détails erreur paiement:', {
+        message: paymentError.message,
+        code: paymentError.code,
+        details: paymentError.details,
+        hint: paymentError.hint,
+      });
     } else {
-      console.log('✅ Paiement créé en base:', payment.id);
+      console.log('✅ [create-payment-link] Paiement créé en base:', payment.id);
     }
 
     // Mettre à jour la facture
@@ -404,6 +648,29 @@ serve(async (req) => {
     // =====================================================
     // 6️⃣ RETOURNER LE LIEN
     // =====================================================
+
+    if (!session || !session.url) {
+      console.error('❌ [create-payment-link] Session Stripe invalide:', session);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Session Stripe invalide',
+          details: 'La session de paiement n\'a pas été créée correctement',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('✅ [create-payment-link] Succès - Lien créé:', {
+      session_id: session.id,
+      payment_url: session.url,
+      payment_id: payment?.id,
+      invoice_id: invoiceId,
+      amount: paymentAmount,
+    });
 
     return new Response(
       JSON.stringify({
@@ -423,9 +690,48 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error('❌ Error in create-payment-link:', error);
+    console.error('❌ [create-payment-link] Error in create-payment-link:', error);
+    console.error('❌ [create-payment-link] Error stack:', error.stack);
+    console.error('❌ [create-payment-link] Error name:', error.name);
+    console.error('❌ [create-payment-link] Error message:', error.message);
+    
+    // Messages d'erreur plus clairs
+    let errorMessage = 'Erreur lors de la création du lien de paiement';
+    let errorDetails = error.message || 'Erreur inconnue';
+    
+    if (error.message?.includes('Stripe') || error.type?.includes('Stripe')) {
+      errorMessage = 'Erreur Stripe';
+      errorDetails = error.message || error.raw?.message || 'Erreur lors de la communication avec Stripe';
+    } else if (error.message?.includes('not found') || error.message?.includes('not found')) {
+      errorMessage = 'Devis ou facture introuvable';
+      errorDetails = error.message;
+    } else if (error.message?.includes('Unauthorized') || error.message?.includes('access denied')) {
+      errorMessage = 'Accès refusé';
+      errorDetails = 'Vous n\'avez pas les permissions nécessaires';
+    } else if (error.message?.includes('STRIPE_SECRET_KEY')) {
+      errorMessage = 'Configuration Stripe manquante';
+      errorDetails = 'La clé API Stripe n\'est pas configurée';
+    } else if (error.message?.includes('company')) {
+      errorMessage = 'Erreur entreprise';
+      errorDetails = error.message;
+    }
+    
+    const errorResponse = {
+      success: false,
+      error: errorMessage,
+      details: errorDetails,
+      error_type: error.name || error.type || 'UnknownError',
+    };
+    
+    // Ajouter la stack seulement en développement
+    if (Deno.env.get('ENVIRONMENT') === 'development' || Deno.env.get('NODE_ENV') === 'development') {
+      errorResponse.stack = error.stack;
+    }
+    
+    console.error('❌ [create-payment-link] Envoi réponse d\'erreur:', errorResponse);
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error', details: error.stack }),
+      JSON.stringify(errorResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,

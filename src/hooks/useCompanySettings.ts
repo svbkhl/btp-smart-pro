@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
 
 export interface CompanySettings {
   company_id: string;
@@ -29,13 +29,12 @@ export interface UpdateCompanySettingsData {
  */
 export const useCompanySettings = () => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["company_settings", user?.id],
+    queryKey: ["company_settings", companyId],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
-
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         // Retourner valeurs par défaut si pas de company
         return {
@@ -93,7 +92,7 @@ export const useCompanySettings = () => {
 
       return normalizedData as CompanySettings;
     },
-    enabled: !!user,
+    enabled: !!user && !isLoadingCompanyId,
   });
 };
 
@@ -102,13 +101,12 @@ export const useCompanySettings = () => {
  */
 export const useUpdateCompanySettings = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (settingsData: UpdateCompanySettingsData) => {
       if (!user) throw new Error("User not authenticated");
-
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }

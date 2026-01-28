@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
 
 export interface QuoteSectionLibraryItem {
   id: string;
@@ -37,13 +37,13 @@ function normalizeTitle(title: string): string {
  */
 export const useQuoteSectionLibrary = () => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["quote_section_library", user?.id],
+    queryKey: ["quote_section_library", companyId],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         return [];
       }
@@ -58,7 +58,7 @@ export const useQuoteSectionLibrary = () => {
       if (error) throw error;
       return (data || []) as QuoteSectionLibraryItem[];
     },
-    enabled: !!user,
+    enabled: !!user && !isLoadingCompanyId && !!companyId,
   });
 };
 
@@ -67,13 +67,13 @@ export const useQuoteSectionLibrary = () => {
  */
 export const useSearchQuoteSectionLibrary = (searchQuery: string) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["quote_section_library_search", user?.id, searchQuery],
+    queryKey: ["quote_section_library_search", companyId, searchQuery],
     queryFn: async () => {
       if (!user || !searchQuery.trim()) return [];
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         return [];
       }
@@ -97,7 +97,7 @@ export const useSearchQuoteSectionLibrary = (searchQuery: string) => {
       }
       return (data || []) as QuoteSectionLibraryItem[];
     },
-    enabled: !!user && searchQuery.trim().length > 0,
+    enabled: !!user && searchQuery.trim().length > 0 && !isLoadingCompanyId && !!companyId,
   });
 };
 
@@ -106,13 +106,13 @@ export const useSearchQuoteSectionLibrary = (searchQuery: string) => {
  */
 export const useUpsertQuoteSectionLibrary = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (itemData: CreateSectionLibraryItemData) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -192,13 +192,13 @@ export const useUpsertQuoteSectionLibrary = () => {
  */
 export const useDeleteQuoteSectionLibrary = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }

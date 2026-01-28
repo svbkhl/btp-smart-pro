@@ -32,6 +32,9 @@ interface ClientInfo {
   email?: string;
   phone?: string;
   location?: string;
+  civility?: string; // Civilité (M., Mme, etc.)
+  firstName?: string; // Prénom
+  address?: string; // Adresse complète
 }
 
 interface QuoteLine {
@@ -184,13 +187,26 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
 
     // Logo (si disponible) - gérer les deux formats de noms de champs
     const logoUrl = companyInfo.logoUrl || companyInfo.company_logo_url;
+    let logoLoaded = false;
     if (logoUrl) {
       try {
-        const logoImg = await loadImage(logoUrl);
-        const logoSize = 30;
-        doc.addImage(logoImg, 'PNG', margin + 5, yPosition + 5, logoSize, logoSize);
-      } catch (error) {
-        console.warn('[PDF Service] Impossible de charger le logo:', error);
+        // Valider l'URL avant de charger
+        const trimmedUrl = logoUrl.trim();
+        if (trimmedUrl && (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('data:image'))) {
+          const logoImg = await loadImage(trimmedUrl);
+          const logoSize = 30;
+          // Déterminer le format de l'image depuis l'URL ou utiliser PNG par défaut
+          const imageFormat = trimmedUrl.startsWith('data:image/jpeg') || trimmedUrl.includes('.jpg') || trimmedUrl.includes('.jpeg') 
+            ? 'JPEG' 
+            : 'PNG';
+          doc.addImage(logoImg, imageFormat, margin + 5, yPosition + 5, logoSize, logoSize);
+          logoLoaded = true;
+        } else {
+          console.warn('[PDF Service] URL du logo invalide:', trimmedUrl);
+        }
+      } catch (error: any) {
+        console.warn('[PDF Service] Impossible de charger le logo:', error?.message || error);
+        // Continuer sans logo - ne pas bloquer la génération du PDF
       }
     }
 
@@ -199,14 +215,14 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     const companyName = companyInfo.companyName || companyInfo.company_name || 'Votre Entreprise';
-    doc.text(companyName, margin + (logoUrl ? 40 : 5), yPosition + 15);
+    doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
     // Forme juridique - gérer les deux formats de noms de champs
     const legalForm = companyInfo.legalForm || companyInfo.legal_form;
     if (legalForm) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(legalForm, margin + (logoUrl ? 40 : 5), yPosition + 22);
+      doc.text(legalForm, margin + (logoLoaded ? 40 : 5), yPosition + 22);
     }
 
     // Titre "DEVIS" à droite
@@ -312,15 +328,36 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(clientInfo.name, margin + 5, yPosition + 14);
-    if (clientInfo.location) {
-      doc.text(clientInfo.location, margin + 5, yPosition + 20);
+    
+    // Construire le nom complet avec civilité et prénom
+    let clientName = '';
+    if (clientInfo.civility) {
+      clientName += `${clientInfo.civility} `;
+    }
+    if (clientInfo.firstName) {
+      clientName += `${clientInfo.firstName} `;
+    }
+    clientName += clientInfo.name;
+    
+    doc.text(clientName.trim(), margin + 5, yPosition + 14);
+    
+    // Adresse complète (priorité: address > location)
+    const fullAddress = clientInfo.address || clientInfo.location;
+    if (fullAddress) {
+      doc.text(fullAddress, margin + 5, yPosition + 20);
+    }
+    
+    // Téléphone et email sur la même ligne
+    let contactLine = '';
+    if (clientInfo.phone) {
+      contactLine += `Tél: ${clientInfo.phone}`;
     }
     if (clientInfo.email) {
-      doc.text(`Email: ${clientInfo.email}`, margin + 5, yPosition + 26);
+      if (contactLine) contactLine += ' - ';
+      contactLine += `Email: ${clientInfo.email}`;
     }
-    if (clientInfo.phone) {
-      doc.text(`Tél: ${clientInfo.phone}`, margin + 120, yPosition + 26);
+    if (contactLine) {
+      doc.text(contactLine, margin + 5, yPosition + 26);
     }
 
     yPosition += 35;
@@ -728,6 +765,43 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
     });
 
     // ============================================
+    // FOOTER - SIRET ET TVA
+    // ============================================
+    if (yPosition > pageHeight - 20) {
+      doc.addPage();
+      yPosition = margin;
+    }
+
+    yPosition += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 8;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    
+    const footerInfo: string[] = [];
+    // Réutiliser les variables siret et vatNumber déjà déclarées plus haut dans la fonction (ligne 270-271)
+    
+    if (siret) {
+      footerInfo.push(`SIRET: ${siret}`);
+    }
+    if (vatNumber) {
+      footerInfo.push(`TVA intracommunautaire: ${vatNumber}`);
+    }
+    
+    if (footerInfo.length > 0) {
+      footerInfo.forEach((info, index) => {
+        if (index > 0) {
+          doc.text(' - ', margin + (index * 50), yPosition);
+        }
+        doc.text(info, margin + (index * 50) + (index > 0 ? 5 : 0), yPosition);
+      });
+    }
+
+    // ============================================
     // TÉLÉCHARGEMENT
     // ============================================
     const fileName = quoteNumber
@@ -949,13 +1023,26 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
 
     // Logo (si disponible) - gérer les deux formats de noms de champs
     const logoUrl = companyInfo.logoUrl || companyInfo.company_logo_url;
+    let logoLoaded = false;
     if (logoUrl) {
       try {
-        const logoImg = await loadImage(logoUrl);
-        const logoSize = 30;
-        doc.addImage(logoImg, 'PNG', margin + 5, yPosition + 5, logoSize, logoSize);
-      } catch (error) {
-        console.warn('[PDF Service] Impossible de charger le logo:', error);
+        // Valider l'URL avant de charger
+        const trimmedUrl = logoUrl.trim();
+        if (trimmedUrl && (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('data:image'))) {
+          const logoImg = await loadImage(trimmedUrl);
+          const logoSize = 30;
+          // Déterminer le format de l'image depuis l'URL ou utiliser PNG par défaut
+          const imageFormat = trimmedUrl.startsWith('data:image/jpeg') || trimmedUrl.includes('.jpg') || trimmedUrl.includes('.jpeg') 
+            ? 'JPEG' 
+            : 'PNG';
+          doc.addImage(logoImg, imageFormat, margin + 5, yPosition + 5, logoSize, logoSize);
+          logoLoaded = true;
+        } else {
+          console.warn('[PDF Service] URL du logo invalide:', trimmedUrl);
+        }
+      } catch (error: any) {
+        console.warn('[PDF Service] Impossible de charger le logo:', error?.message || error);
+        // Continuer sans logo - ne pas bloquer la génération du PDF
       }
     }
 
@@ -964,14 +1051,14 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     const companyName = companyInfo.companyName || companyInfo.company_name || 'Votre Entreprise';
-    doc.text(companyName, margin + (logoUrl ? 40 : 5), yPosition + 15);
+    doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
     // Forme juridique - gérer les deux formats de noms de champs
     const legalForm = companyInfo.legalForm || companyInfo.legal_form;
     if (legalForm) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(legalForm, margin + (logoUrl ? 40 : 5), yPosition + 22);
+      doc.text(legalForm, margin + (logoLoaded ? 40 : 5), yPosition + 22);
     }
 
     // Titre "DEVIS" à droite
@@ -994,14 +1081,40 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    if (clientInfo.name) doc.text(clientInfo.name, margin, yPosition);
+    
+    // Construire le nom complet avec civilité et prénom
+    let clientName = '';
+    if (clientInfo.civility) {
+      clientName += `${clientInfo.civility} `;
+    }
+    if (clientInfo.firstName) {
+      clientName += `${clientInfo.firstName} `;
+    }
+    clientName += clientInfo.name || '';
+    
+    if (clientName.trim()) {
+      doc.text(clientName.trim(), margin, yPosition);
+      yPosition += 5;
+    }
+    
+    // Adresse complète (priorité: address > location)
+    const fullAddress = clientInfo.address || clientInfo.location;
+    if (fullAddress) {
+      doc.text(fullAddress, margin, yPosition);
+      yPosition += 5;
+    }
+    
+    // Téléphone et email
+    if (clientInfo.phone) {
+      doc.text(`Tél: ${clientInfo.phone}`, margin, yPosition);
+      yPosition += 5;
+    }
+    if (clientInfo.email) {
+      doc.text(`Email: ${clientInfo.email}`, margin, yPosition);
+      yPosition += 5;
+    }
+    
     yPosition += 5;
-    if (clientInfo.location) doc.text(clientInfo.location, margin, yPosition);
-    yPosition += 5;
-    if (clientInfo.email) doc.text(`Email: ${clientInfo.email}`, margin, yPosition);
-    yPosition += 5;
-    if (clientInfo.phone) doc.text(`Tél: ${clientInfo.phone}`, margin, yPosition);
-    yPosition += 10;
 
     // ============================================
     // INFORMATIONS DEVIS
@@ -1257,6 +1370,44 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
     });
 
     // ============================================
+    // FOOTER - SIRET ET TVA
+    // ============================================
+    if (yPosition > pageHeight - 20) {
+      doc.addPage();
+      yPosition = margin;
+    }
+
+    yPosition += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 8;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    
+    const footerInfo: string[] = [];
+    const siret = companyInfo.siret;
+    const vatNumber = companyInfo.vatNumber || companyInfo.vat_number;
+    
+    if (siret) {
+      footerInfo.push(`SIRET: ${siret}`);
+    }
+    if (vatNumber) {
+      footerInfo.push(`TVA intracommunautaire: ${vatNumber}`);
+    }
+    
+    if (footerInfo.length > 0) {
+      footerInfo.forEach((info, index) => {
+        if (index > 0) {
+          doc.text(' - ', margin + (index * 50), yPosition);
+        }
+        doc.text(info, margin + (index * 50) + (index > 0 ? 5 : 0), yPosition);
+      });
+    }
+
+    // ============================================
     // CONVERSION EN BASE64
     // ============================================
     const base64 = doc.output('datauristring').split(',')[1]; // Retirer le préfixe data:application/pdf;base64,
@@ -1285,10 +1436,45 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
  */
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
+    // Vérifier que l'URL est valide
+    if (!src || typeof src !== 'string' || src.trim() === '') {
+      reject(new Error('URL du logo invalide ou vide'));
+      return;
+    }
+
+    // Vérifier si c'est une data URL valide
+    if (src.startsWith('data:')) {
+      // Vérifier le format de la data URL
+      const dataUrlMatch = src.match(/^data:image\/(png|jpeg|jpg|gif);base64,/i);
+      if (!dataUrlMatch) {
+        reject(new Error('Format de data URL invalide pour le logo'));
+        return;
+      }
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
+    
+    // Timeout pour éviter d'attendre indéfiniment
+    const timeout = setTimeout(() => {
+      reject(new Error('Timeout lors du chargement du logo'));
+    }, 10000); // 10 secondes max
+
+    img.onload = () => {
+      clearTimeout(timeout);
+      // Vérifier que l'image est valide (largeur et hauteur > 0)
+      if (img.width === 0 || img.height === 0) {
+        reject(new Error('Image du logo invalide (dimensions nulles)'));
+        return;
+      }
+      resolve(img);
+    };
+
+    img.onerror = (error) => {
+      clearTimeout(timeout);
+      reject(new Error(`Erreur lors du chargement du logo: ${error}`));
+    };
+
     img.src = src;
   });
 }

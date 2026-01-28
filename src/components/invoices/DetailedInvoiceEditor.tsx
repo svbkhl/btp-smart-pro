@@ -21,7 +21,6 @@ import { useCreateInvoice, CreateInvoiceData } from "@/hooks/useInvoices";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, FileText, User, MapPin } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
 import { computeQuoteTotals } from "@/utils/quoteCalculations";
 import { SectionTitleInput } from "@/components/quotes/SectionTitleInput";
 import { LineLabelInput } from "@/components/quotes/LineLabelInput";

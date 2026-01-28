@@ -8,6 +8,8 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { TextLibraryButton } from "@/components/facturation/TextLibraryButton";
+import { PaymentRemindersManager } from "@/components/reminders/PaymentRemindersManager";
 import { 
   Search, 
   FileText, 
@@ -300,17 +302,20 @@ const Facturation = () => {
   return (
     <PageLayout>
       <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
-            Facturation
-          </h1>
-          <p className="text-muted-foreground">
-            Gérez vos devis et factures
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+              Facturation
+            </h1>
+            <p className="text-muted-foreground">
+              Gérez vos devis et factures
+            </p>
+          </div>
+          <TextLibraryButton />
         </div>
 
         <Tabs defaultValue="quotes" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 gap-2 bg-transparent p-1">
+          <TabsList className="grid w-full grid-cols-4 gap-2 bg-transparent p-1">
             <TabsTrigger 
               value="quotes" 
               className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
@@ -328,6 +333,12 @@ const Facturation = () => {
               className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
               Paiements
+            </TabsTrigger>
+            <TabsTrigger 
+              value="reminders" 
+              className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+            >
+              Relances
             </TabsTrigger>
           </TabsList>
 
@@ -893,6 +904,10 @@ const Facturation = () => {
               quotes={quotes}
               loading={paymentsLoading}
             />
+          </TabsContent>
+
+          <TabsContent value="reminders" className="mt-0">
+            <PaymentRemindersManager />
           </TabsContent>
         </Tabs>
 

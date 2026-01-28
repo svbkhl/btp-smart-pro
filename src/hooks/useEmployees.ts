@@ -4,6 +4,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_EMPLOYEES } from "@/fakeData/employees";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { useAuth } from "./useAuth";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
+import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 
 export interface Employee {
   id: string;
@@ -40,21 +44,29 @@ export interface UpdateEmployeeData {
 
 // Récupérer tous les employés
 export const useEmployees = () => {
+  const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["employees", fakeDataEnabled],
+    queryKey: ["employees", companyId],
     queryFn: async () => {
       // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
-        console.log("🎭 Mode démo activé - Retour des fake employees");
+        logger.debug("Mode démo activé - Retour des fake employees");
         return FAKE_EMPLOYEES;
       }
 
       // Sinon, faire la vraie requête
       return queryWithTimeout(
         async () => {
-          // Récupérer tous les employés
+          if (!user) throw new Error("User not authenticated");
+          if (!companyId) {
+            logger.warn("useEmployees: No company_id available");
+            return [];
+          }
+
+          // Récupérer tous les employés de l'entreprise
           const { data: employeesData, error: employeesError } = await supabase
             .from("employees" as any)
             .select(`
@@ -64,6 +76,7 @@ export const useEmployees = () => {
                 email_confirmed_at
               )
             `)
+            .eq("company_id", companyId)
             .order("nom", { ascending: true });
 
           if (employeesError) throw employeesError;
@@ -116,13 +129,9 @@ export const useEmployees = () => {
         "useEmployees"
       );
     },
-    enabled: true, // Toujours activé, même sans user en mode démo
-    retry: 1,
-    staleTime: 30000,
-    // Ne pas bloquer l'UI en cas d'erreur
-    throwOnError: false,
-    gcTime: 300000,
-    refetchInterval: 60000, // Polling automatique toutes les 60s
+    enabled: (!!user && !isLoadingCompanyId && !!companyId) || fakeDataEnabled,
+    ...QUERY_CONFIG.MODERATE, // Cache intelligent : 5min staleTime, pas de refetch auto
+    throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
   });
 };
 

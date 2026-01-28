@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
+import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 
 export interface Notification {
   id: string;
@@ -54,20 +57,25 @@ const FAKE_NOTIFICATIONS: Notification[] = [
 
 export const useNotifications = () => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   // Récupérer les notifications
   const { data: notifications, isLoading, error } = useQuery({
-    queryKey: ["notifications", user?.id],
+    queryKey: ["notifications", companyId],
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
+          if (!companyId) {
+            logger.warn("useNotifications: No company_id available");
+            return [];
+          }
 
           const { data, error } = await supabase
             .from("notifications")
             .select("*")
-            .eq("user_id", user.id)
+            .eq("company_id", companyId)
             .order("created_at", { ascending: false })
             .limit(50);
 
@@ -93,11 +101,8 @@ export const useNotifications = () => {
         "useNotifications"
       );
     },
-    enabled: !!user,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
-    refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
+    enabled: !!user && !isLoadingCompanyId && !!companyId,
+    ...QUERY_CONFIG.REALTIME, // Cache temps réel : 30s staleTime, refetch toutes les 60s
   });
 
   // Compter les notifications non lues
@@ -107,17 +112,20 @@ export const useNotifications = () => {
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) {
+        throw new Error("User must be a member of a company");
+      }
 
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("company_id", companyId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", companyId] });
     },
   });
 
@@ -125,6 +133,9 @@ export const useNotifications = () => {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) {
+        throw new Error("User must be a member of a company");
+      }
 
       const unreadIds = notifications
         ?.filter((n) => !n.is_read)
@@ -136,12 +147,12 @@ export const useNotifications = () => {
         .from("notifications")
         .update({ is_read: true, read_at: new Date().toISOString() })
         .in("id", unreadIds)
-        .eq("user_id", user.id);
+        .eq("company_id", companyId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", companyId] });
     },
   });
 

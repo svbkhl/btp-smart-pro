@@ -1,0 +1,164 @@
+-- =====================================================
+-- CORRECTION FINALE : RLS Policies pour clients
+-- =====================================================
+-- PROBLÈME : RLS retourne des clients d'autres entreprises
+-- SOLUTION : Forcer des policies RESTRICTIVES (pas PERMISSIVE)
+-- =====================================================
+
+-- ÉTAPE 1 : Désactiver RLS temporairement
+ALTER TABLE public.clients DISABLE ROW LEVEL SECURITY;
+
+-- ÉTAPE 2 : Supprimer TOUTES les policies (y compris celles cachées)
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (
+    SELECT policyname 
+    FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'clients'
+  )
+  LOOP
+    BEGIN
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.clients CASCADE', r.policyname);
+      RAISE NOTICE '✅ Policy supprimée: %', r.policyname;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING '⚠️ Erreur: %', SQLERRM;
+    END;
+  END LOOP;
+END $$;
+
+-- ÉTAPE 3 : Vérifier qu'il ne reste AUCUNE policy
+DO $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_count
+  FROM pg_policies
+  WHERE schemaname = 'public'
+  AND tablename = 'clients';
+  
+  IF v_count > 0 THEN
+    RAISE EXCEPTION 'Il reste encore % policy(ies) - arrêt du script pour sécurité', v_count;
+  END IF;
+  
+  RAISE NOTICE '✅ Aucune policy restante';
+END $$;
+
+-- ÉTAPE 4 : Réactiver RLS
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+
+-- ÉTAPE 5 : Créer UNE SEULE policy SELECT RESTRICTIVE (par défaut, mais explicite)
+-- IMPORTANT : Pas de PERMISSIVE, seulement RESTRICTIVE
+CREATE POLICY "clients_select_company_isolation"
+ON public.clients
+FOR SELECT
+TO authenticated
+USING (
+  -- Condition ABSOLUMENT stricte : company_id doit correspondre EXACTEMENT
+  company_id IS NOT NULL
+  AND company_id = public.current_company_id()
+  AND public.current_company_id() IS NOT NULL
+  AND EXISTS (
+    SELECT 1 
+    FROM public.company_users cu
+    WHERE cu.user_id = auth.uid()
+    AND cu.company_id = clients.company_id
+    AND (
+      NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'company_users' 
+        AND column_name = 'status'
+      )
+      OR cu.status = 'active'
+    )
+  )
+);
+
+-- ÉTAPE 6 : Créer policy INSERT
+CREATE POLICY "clients_insert_company_isolation"
+ON public.clients
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  company_id IS NOT NULL
+  AND company_id = public.current_company_id()
+  AND public.current_company_id() IS NOT NULL
+);
+
+-- ÉTAPE 7 : Créer policy UPDATE
+CREATE POLICY "clients_update_company_isolation"
+ON public.clients
+FOR UPDATE
+TO authenticated
+USING (
+  company_id IS NOT NULL
+  AND company_id = public.current_company_id()
+  AND public.current_company_id() IS NOT NULL
+)
+WITH CHECK (
+  company_id IS NOT NULL
+  AND company_id = public.current_company_id()
+  AND public.current_company_id() IS NOT NULL
+);
+
+-- ÉTAPE 8 : Créer policy DELETE
+CREATE POLICY "clients_delete_company_isolation"
+ON public.clients
+FOR DELETE
+TO authenticated
+USING (
+  company_id IS NOT NULL
+  AND company_id = public.current_company_id()
+  AND public.current_company_id() IS NOT NULL
+);
+
+-- ÉTAPE 9 : Vérification STRICTE
+DO $$
+DECLARE
+  v_policy_count INTEGER;
+  v_select_qual TEXT;
+  v_rls_enabled BOOLEAN;
+BEGIN
+  -- Vérifier RLS
+  SELECT relforcerowsecurity INTO v_rls_enabled
+  FROM pg_class
+  WHERE relname = 'clients'
+  AND relnamespace = 'public'::regnamespace;
+  
+  -- Compter les policies
+  SELECT COUNT(*) INTO v_policy_count
+  FROM pg_policies
+  WHERE schemaname = 'public'
+  AND tablename = 'clients';
+  
+  -- Vérifier la policy SELECT
+  SELECT qual INTO v_select_qual
+  FROM pg_policies
+  WHERE schemaname = 'public'
+  AND tablename = 'clients'
+  AND cmd = 'SELECT'
+  LIMIT 1;
+  
+  IF v_rls_enabled AND v_policy_count = 4 AND v_select_qual IS NOT NULL THEN
+    RAISE NOTICE '✅ SUCCÈS : RLS activé, 4 policies créées';
+    RAISE NOTICE '✅ Policy SELECT utilise company_id = current_company_id()';
+  ELSE
+    RAISE EXCEPTION 'ÉCHEC: RLS=%, Policies=%, SELECT=%', v_rls_enabled, v_policy_count, v_select_qual IS NOT NULL;
+  END IF;
+END $$;
+
+-- Afficher toutes les policies
+SELECT 
+  'Policies créées' as info,
+  policyname,
+  cmd,
+  permissive,
+  qual as using_expression
+FROM pg_policies
+WHERE schemaname = 'public'
+AND tablename = 'clients'
+ORDER BY cmd;

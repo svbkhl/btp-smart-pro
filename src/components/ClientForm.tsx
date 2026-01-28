@@ -97,7 +97,6 @@ export const ClientForm = ({ open, onOpenChange, client }: ClientFormProps) => {
   }, [client, open, reset]);
 
   const onSubmit = async (data: ClientFormData) => {
-    console.log("Client form submitted:", data);
     setIsSubmitting(true);
     try {
       const clientData: CreateClientData = {

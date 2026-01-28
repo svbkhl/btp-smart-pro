@@ -6,7 +6,9 @@ import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_INVOICES } from "@/fakeData/invoices";
 import { generateInvoiceNumber } from "@/utils/documentNumbering";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
+import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 
 // ✅ HELPER P0: Mapper les colonnes DB vers l'interface (compatibilité)
 export function normalizeInvoice(invoice: any): Invoice {
@@ -100,10 +102,11 @@ export interface UpdateInvoiceData extends Partial<CreateInvoiceData> {
 export const useInvoices = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: ["invoices", user?.id, fakeDataEnabled],
+    queryKey: ["invoices", companyId],
     queryFn: async () => {
       // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
@@ -115,11 +118,8 @@ export const useInvoices = () => {
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
-
-          // Récupérer company_id pour filtrage multi-tenant
-          const companyId = await getCurrentCompanyId(user.id);
           if (!companyId) {
-            console.warn("User is not a member of any company");
+            logger.warn("useInvoices: No company_id available");
             return [];
           }
 
@@ -194,40 +194,24 @@ export const useInvoices = () => {
         "useInvoices"
       );
     },
-    enabled: !!user || fakeDataEnabled,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
-    refetchInterval: (query) => {
-      // ✅ CORRECTION: Vérifier si des factures ont été supprimées récemment
-      // Si oui, ne pas refetch pour éviter de recharger les factures supprimées
-      const deletedInvoices = queryClient.getQueryData<Set<string>>(["deleted_invoices"]);
-      if (deletedInvoices && deletedInvoices.size > 0) {
-        // Si des factures ont été supprimées, attendre 5 minutes avant de refetch
-        // Cela évite de recharger les factures supprimées trop rapidement
-        return 300000; // 5 minutes au lieu de 60 secondes
-      }
-      return 60000; // Polling automatique toutes les 60s normalement
-    },
+    enabled: (!!user && !isLoadingCompanyId && !!companyId) || fakeDataEnabled,
+    ...QUERY_CONFIG.MODERATE, // Cache intelligent : 5min staleTime, pas de refetch auto
   });
 };
 
 // Hook pour récupérer une facture par ID
 export const useInvoice = (id: string | undefined) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["invoice", id, user?.id],
+    queryKey: ["invoice", id, companyId],
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
           if (!user || !id) throw new Error("User not authenticated or no ID provided");
-
-          // ✅ CORRECTION P0: Sélectionner uniquement les colonnes qui existent réellement
-          // ✅ Récupérer aussi les invoice_lines (lignes détaillées)
-          // Récupérer company_id pour vérification multi-tenant
-          const companyId = await getCurrentCompanyId(user.id);
           if (!companyId) {
+            logger.warn("useInvoice: No company_id available");
             throw new Error("User is not a member of any company");
           }
 
@@ -281,16 +265,15 @@ export const useInvoice = (id: string | undefined) => {
         "useInvoice"
       );
     },
-    enabled: !!user && !!id,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
+    enabled: !!user && !!id && !isLoadingCompanyId && !!companyId,
+    ...QUERY_CONFIG.MODERATE,
   });
 };
 
 // Hook pour créer une facture
 export const useCreateInvoice = () => {
   const { user } = useAuth();
+  const { companyId: userCompanyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { fakeDataEnabled } = useFakeDataStore();
@@ -298,6 +281,7 @@ export const useCreateInvoice = () => {
   return useMutation({
     mutationFn: async (data: CreateInvoiceData) => {
       if (!user) throw new Error("User not authenticated");
+      if (!userCompanyId) throw new Error("User is not a member of any company");
 
       // ⚠️ IMPORTANT: Toujours générer un nouveau numéro de facture (FACTURE-YYYY-XXX)
       // même si la facture est créée depuis un devis
@@ -314,18 +298,15 @@ export const useCreateInvoice = () => {
       let quoteTotalTtc: number | null = null;
       let quoteDescription: string | null = null;
       
-      // Company ID pour l'insertion des invoice_lines (initialisé plus tard si nécessaire)
-      let companyId: string | null = null;
+      // Company ID pour l'insertion des invoice_lines
+      let companyId: string = userCompanyId;
       
       // Toujours générer un numéro de facture (format FACTURE-YYYY-XXX)
       invoiceNumber = await generateInvoiceNumber(user.id);
-      console.log("📄 Numéro de facture généré:", invoiceNumber);
+      logger.debug("useCreateInvoice: Invoice number generated", { invoiceNumber });
       
       if (data.quote_id) {
-        console.log("🔄 [useCreateInvoice] Récupération du devis:", data.quote_id);
-        
-        // Récupérer company_id pour filtrer le devis (multi-tenant)
-        const currentCompanyId = await getCurrentCompanyId(user.id);
+        logger.debug("useCreateInvoice: Fetching quote", { quoteId: data.quote_id });
         
         // 🎯 ÉTAPE 1: Charger le devis complet avec ses totaux
         let quoteQuery = supabase
@@ -333,10 +314,8 @@ export const useCreateInvoice = () => {
           .select("id, client_id, client_name, company_id, tva_rate, tva_non_applicable_293b, subtotal_ht, total_tva, total_ttc, mode, estimated_cost")
           .eq("id", data.quote_id);
         
-        // Filtrer par company_id si disponible (multi-tenant)
-        if (currentCompanyId) {
-          quoteQuery = quoteQuery.eq("company_id", currentCompanyId);
-        }
+        // Filtrer par company_id pour isolation multi-tenant
+        quoteQuery = quoteQuery.eq("company_id", companyId);
         
         const { data: quote, error: quoteError } = await quoteQuery.maybeSingle();
         
@@ -374,51 +353,45 @@ export const useCreateInvoice = () => {
           });
           
           // 🎯 ÉTAPE 2: Charger les lignes du devis
-          // Initialiser companyId depuis le devis ou le récupérer
-          companyId = quote.company_id || await getCurrentCompanyId(user.id);
-          console.log("🏢 [useCreateInvoice] Company ID utilisé:", companyId, "depuis quote.company_id:", quote.company_id);
+          logger.debug("useCreateInvoice: Company ID used", { companyId, quoteCompanyId: quote.company_id });
           
-          if (companyId) {
-            try {
-              // Récupérer les sections (pour devis détaillé)
-              const { data: sections, error: sectionsError } = await supabase
-                .from("quote_sections")
-                .select("*")
-                .eq("quote_id", data.quote_id)
-                .eq("company_id", companyId)
-                .order("position", { ascending: true });
-              
-              if (!sectionsError && sections) {
-                quoteSections = sections;
-                console.log("📋 [useCreateInvoice] Sections récupérées:", quoteSections.length);
-              } else if (sectionsError) {
-                console.warn("⚠️ [useCreateInvoice] Erreur récupération sections:", sectionsError.message);
-              }
-              
-              // Récupérer les lignes (CRITIQUE pour transférer les prestations)
-              const { data: lines, error: linesError } = await supabase
-                .from("quote_lines")
-                .select("*")
-                .eq("quote_id", data.quote_id)
-                .eq("company_id", companyId)
-                .order("section_id", { ascending: true, nullsFirst: true })
-                .order("position", { ascending: true });
-              
-              console.log("🔍 [useCreateInvoice] Requête lignes - quote_id:", data.quote_id, "company_id:", companyId);
-              
-              if (!linesError && lines) {
-                quoteLines = lines;
-                console.log("✅ [useCreateInvoice] Lignes récupérées:", quoteLines.length, quoteLines);
-              } else if (linesError) {
-                console.error("❌ [useCreateInvoice] Erreur récupération lignes:", linesError.message, linesError);
-              } else {
-                console.warn("⚠️ [useCreateInvoice] Aucune ligne retournée pour quote_id:", data.quote_id);
-              }
-            } catch (error: any) {
-              console.error("❌ [useCreateInvoice] Exception récupération sections/lignes:", error?.message, error);
+          try {
+            // Récupérer les sections (pour devis détaillé)
+            const { data: sections, error: sectionsError } = await supabase
+              .from("quote_sections")
+              .select("*")
+              .eq("quote_id", data.quote_id)
+              .eq("company_id", companyId)
+              .order("position", { ascending: true });
+            
+            if (!sectionsError && sections) {
+              quoteSections = sections;
+              console.log("📋 [useCreateInvoice] Sections récupérées:", quoteSections.length);
+            } else if (sectionsError) {
+              console.warn("⚠️ [useCreateInvoice] Erreur récupération sections:", sectionsError.message);
             }
-          } else {
-            console.warn("⚠️ [useCreateInvoice] Aucun company_id disponible, impossible de charger les lignes");
+            
+            // Récupérer les lignes (CRITIQUE pour transférer les prestations)
+            const { data: lines, error: linesError } = await supabase
+              .from("quote_lines")
+              .select("*")
+              .eq("quote_id", data.quote_id)
+              .eq("company_id", companyId)
+              .order("section_id", { ascending: true, nullsFirst: true })
+              .order("position", { ascending: true });
+            
+            console.log("🔍 [useCreateInvoice] Requête lignes - quote_id:", data.quote_id, "company_id:", companyId);
+            
+            if (!linesError && lines) {
+              quoteLines = lines;
+              console.log("✅ [useCreateInvoice] Lignes récupérées:", quoteLines.length, quoteLines);
+            } else if (linesError) {
+              console.error("❌ [useCreateInvoice] Erreur récupération lignes:", linesError.message, linesError);
+            } else {
+              console.warn("⚠️ [useCreateInvoice] Aucune ligne retournée pour quote_id:", data.quote_id);
+            }
+          } catch (error: any) {
+            console.error("❌ [useCreateInvoice] Exception récupération sections/lignes:", error?.message, error);
           }
         }
       }
@@ -576,14 +549,6 @@ export const useCreateInvoice = () => {
         dataVatRate: data.vat_rate
       });
 
-      // Récupérer company_id si pas déjà défini (depuis quote ou user)
-      if (!companyId) {
-        companyId = await getCurrentCompanyId(user.id);
-      }
-      if (!companyId) {
-        throw new Error("Vous devez être membre d'une entreprise pour créer une facture");
-      }
-
       // Préparer les données d'insertion
       // Commencer avec SEULEMENT les colonnes de base qui existent TOUJOURS
       // D'après le schéma, la table de base a: id, user_id, company_id, client_id, quote_id, invoice_number, amount (NOT NULL), status, due_date, paid_date, created_at, updated_at
@@ -640,14 +605,6 @@ export const useCreateInvoice = () => {
         
         // ✅ STOCKER LES SERVICE_LINES dans invoice_lines si disponibles
         if (serviceLines.length > 0 && invoice?.id) {
-          // Récupérer companyId si pas déjà défini (depuis quote, invoice ou user)
-          // Si companyId n'a pas été initialisé (pas de quote_id), le récupérer maintenant
-          if (!companyId) {
-            companyId = (invoice as any).company_id || await getCurrentCompanyId(user.id);
-          }
-          const finalCompanyId = companyId;
-          
-          if (finalCompanyId) {
             try {
               // Supprimer les anciennes lignes si elles existent (au cas où)
               await supabase
@@ -666,7 +623,7 @@ export const useCreateInvoice = () => {
                 
                 return {
                   invoice_id: invoice.id,
-                  // company_id: IGNORÉ volontairement - le trigger backend le force depuis JWT
+                  company_id: companyId, // ✅ REQUIS : company_id est NOT NULL dans la table
                   position: index,
                   label: line.description || "",
                   description: line.description || "",
@@ -690,11 +647,8 @@ export const useCreateInvoice = () => {
                 console.log("✅ [useCreateInvoice] Invoice lines insérées:", invoiceLinesToInsert.length);
               }
             } catch (linesError: any) {
-              console.error("❌ [useCreateInvoice] Exception insertion invoice_lines:", linesError?.message);
+              logger.error("useCreateInvoice: Exception insertion invoice_lines", { error: linesError?.message });
             }
-          } else {
-            console.warn("⚠️ [useCreateInvoice] Pas de company_id disponible pour insérer invoice_lines");
-          }
         }
         
         // Optionnel: Ajouter vat_rate si la colonne existe (mais ne pas bloquer si elle n'existe pas)
@@ -984,6 +938,7 @@ export const useCreateInvoice = () => {
 // Hook pour mettre à jour une facture
 export const useUpdateInvoice = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1052,14 +1007,59 @@ export const useUpdateInvoice = () => {
       // ✅ NORMALISER l'invoice retourné pour compatibilité
       return normalizeInvoice(invoice) as Invoice;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    onMutate: async (updateData) => {
+      const { id, ...updates } = updateData;
+      
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["invoices", companyId] });
+      await queryClient.cancelQueries({ queryKey: ["invoice", id, companyId] });
+      
+      // Sauvegarder les données actuelles
+      const previousInvoices = queryClient.getQueryData<Invoice[]>(["invoices", companyId]);
+      const previousInvoice = queryClient.getQueryData<Invoice>(["invoice", id, companyId]);
+      
+      // Mettre à jour optimistiquement la liste
+      if (previousInvoices) {
+        queryClient.setQueryData<Invoice[]>(
+          ["invoices", companyId],
+          previousInvoices.map(inv =>
+            inv.id === id ? { ...inv, ...updates, updated_at: new Date().toISOString() } : inv
+          )
+        );
+      }
+      
+      // Mettre à jour optimistiquement la facture individuelle
+      if (previousInvoice) {
+        queryClient.setQueryData<Invoice>(
+          ["invoice", id, companyId],
+          { ...previousInvoice, ...updates, updated_at: new Date().toISOString() }
+        );
+      }
+      
+      return { previousInvoices, previousInvoice };
+    },
+    onSuccess: (updatedInvoice) => {
+      // Mettre à jour avec les vraies données du serveur (calculs TVA, etc.)
+      queryClient.setQueryData<Invoice[]>(
+        ["invoices", companyId],
+        (old) => old?.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv)
+      );
+      queryClient.setQueryData(["invoice", updatedInvoice.id, companyId], updatedInvoice);
+      
       toast({
         title: "Facture mise à jour",
         description: "La facture a été mise à jour avec succès.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousInvoices) {
+        queryClient.setQueryData(["invoices", companyId], context.previousInvoices);
+      }
+      if (context?.previousInvoice) {
+        queryClient.setQueryData(["invoice", variables.id, companyId], context.previousInvoice);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message || "Impossible de mettre à jour la facture",
@@ -1072,94 +1072,60 @@ export const useUpdateInvoice = () => {
 // Hook pour supprimer une facture
 export const useDeleteInvoice = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { fakeDataEnabled } = useFakeDataStore();
 
   return useMutation({
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) throw new Error("No company_id available");
 
       const { error } = await supabase
         .from("invoices")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("company_id", companyId); // Filtre multi-tenant
 
       if (error) throw error;
-      
-      // Attendre un peu pour s'assurer que la suppression est complète
-      await new Promise(resolve => setTimeout(resolve, 100));
+      return id;
     },
-    onSuccess: async (_, deletedInvoiceId: string) => {
-      console.log("🔄 [useDeleteInvoice] Suppression de la facture:", deletedInvoiceId);
+    onMutate: async (deletedId) => {
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["invoices", companyId] });
       
-      // ✅ ÉTAPE 1: Ajouter l'ID à la liste des factures supprimées (pour filtre permanent)
-      const deletedSet = queryClient.getQueryData<Set<string>>(["deleted_invoices"]) || new Set<string>();
-      deletedSet.add(deletedInvoiceId);
-      queryClient.setQueryData(["deleted_invoices"], deletedSet);
-      console.log("📝 [useDeleteInvoice] ID ajouté à la liste des supprimées:", deletedInvoiceId);
+      // Sauvegarder les données actuelles
+      const previousInvoices = queryClient.getQueryData<Invoice[]>(["invoices", companyId]);
       
-      // ✅ ÉTAPE 2: SUPPRESSION IMMÉDIATE DU CACHE - Mise à jour optimiste
-      // Mettre à jour toutes les variantes de la query ["invoices"]
-      const queryKeysToUpdate = [
-        ["invoices", user?.id, fakeDataEnabled],
-        ["invoices", user?.id, true],
-        ["invoices", user?.id, false],
-        ["invoices"],
-      ];
-      
-      queryKeysToUpdate.forEach(queryKey => {
-        queryClient.setQueriesData(
-          { queryKey, exact: false }, 
-          (oldData: Invoice[] | undefined | any) => {
-            // Vérifier que oldData est un tableau valide
-            if (!oldData || !Array.isArray(oldData)) {
-              return oldData;
-            }
-            // Filtrer la facture supprimée
-            const filtered = oldData.filter((inv: Invoice) => inv?.id !== deletedInvoiceId);
-            if (filtered.length !== oldData.length) {
-              console.log("🗑️ [useDeleteInvoice] Cache mis à jour pour", queryKey, "- Avant:", oldData.length, "Après:", filtered.length);
-            }
-            return filtered;
-          }
-        );
-      });
-      
-      // ✅ ÉTAPE 3: Invalider toutes les queries invoices (sans refetch automatique)
-      queryClient.invalidateQueries({ queryKey: ["invoices"], exact: false, refetchType: "none" });
-      queryClient.invalidateQueries({ queryKey: ["invoice", deletedInvoiceId], exact: false, refetchType: "none" });
-      
-      // ✅ ÉTAPE 4: Supprimer explicitement la query de la facture supprimée
-      queryClient.removeQueries({ queryKey: ["invoice", deletedInvoiceId], exact: false });
-      
-      // ✅ ÉTAPE 5: Nettoyage final après un délai pour s'assurer que le polling ne les recharge pas
-      setTimeout(() => {
-        // Vérifier une dernière fois que la facture n'est plus dans le cache
-        const allInvoicesQueries = queryClient.getQueriesData({ queryKey: ["invoices"], exact: false });
-        allInvoicesQueries.forEach(([queryKey, data]) => {
-          if (data && Array.isArray(data)) {
-            const hasDeleted = (data as Invoice[]).some((inv: Invoice) => inv?.id === deletedInvoiceId);
-            if (hasDeleted) {
-              console.warn("⚠️ [useDeleteInvoice] Facture encore présente dans le cache, nettoyage forcé...");
-              queryClient.setQueryData(queryKey, (data as Invoice[]).filter((inv: Invoice) => inv?.id !== deletedInvoiceId));
-            }
-          }
+      // Supprimer optimistiquement de la liste
+      if (previousInvoices) {
+        const filtered = previousInvoices.filter(inv => inv.id !== deletedId);
+        queryClient.setQueryData<Invoice[]>(["invoices", companyId], filtered);
+        logger.debug("useDeleteInvoice: Optimistic delete", { 
+          before: previousInvoices.length, 
+          after: filtered.length 
         });
-        
-        // Réinvalider une dernière fois sans refetch
-        queryClient.invalidateQueries({ queryKey: ["invoices"], exact: false, refetchType: "none" });
-        queryClient.removeQueries({ queryKey: ["invoice", deletedInvoiceId], exact: false });
-      }, 1000);
+      }
       
-      console.log("✅ [useDeleteInvoice] Facture supprimée définitivement du cache");
+      // Supprimer le cache de la facture individuelle
+      queryClient.removeQueries({ queryKey: ["invoice", deletedId, companyId] });
+      
+      return { previousInvoices };
+    },
+    onSuccess: (_, deletedId) => {
+      logger.info("useDeleteInvoice: Invoice deleted successfully", { deletedId });
       toast({
         title: "Facture supprimée",
         description: "La facture a été supprimée définitivement.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, _deletedId, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousInvoices) {
+        queryClient.setQueryData(["invoices", companyId], context.previousInvoices);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message || "Impossible de supprimer la facture",

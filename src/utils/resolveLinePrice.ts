@@ -15,7 +15,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { getCurrentCompanyId } from "./companyHelpers";
+import { getCompanyIdForUser } from "./companyHelpers";
 
 export type PriceSource = "library" | "catalog" | "ai_estimate" | "manual";
 
@@ -80,7 +80,7 @@ export async function resolveLinePrice(
 
   // Chercher dans la bibliothèque
   try {
-    const companyId = await getCurrentCompanyId(userId);
+    const companyId = await getCompanyIdForUser(userId);
     if (companyId) {
       const labelNormalized = normalizeLabel(label);
       const { data: libraryItem } = await supabase
@@ -111,7 +111,7 @@ export async function resolveLinePrice(
   // Uniquement pour les matériaux
   if (category === "material" && unit) {
     try {
-      const companyId = await getCurrentCompanyId(userId);
+      const companyId = await getCompanyIdForUser(userId);
       const materialKey = normalizeMaterialKey(label);
 
       // Chercher d'abord dans le catalogue de l'entreprise
@@ -211,7 +211,7 @@ export async function resolvePriceFromLibrary(
   userId: string
 ): Promise<ResolvedPrice | null> {
   try {
-    const companyId = await getCurrentCompanyId(userId);
+    const companyId = await getCompanyIdForUser(userId);
     if (!companyId) return null;
 
     const { data: libraryItem } = await supabase

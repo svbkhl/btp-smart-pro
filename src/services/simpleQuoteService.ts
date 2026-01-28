@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateDevisNumber } from "@/utils/generateDevisNumber";
 import { useCreateQuote } from "@/hooks/useQuotes";
 import { calculateFromTTC } from "@/utils/priceCalculations";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { getCompanyIdForUser } from "@/utils/companyHelpers";
 
 export interface SimpleQuoteData {
   prestation: string; // Nom de la prestation
@@ -93,7 +93,7 @@ export async function generateSimpleQuote(
   };
 
   // Récupérer company_id
-  const companyId = await getCurrentCompanyId(session.user.id);
+  const companyId = await getCompanyIdForUser(session.user.id);
   if (!companyId) {
     throw new Error("Vous devez être membre d'une entreprise pour créer un devis");
   }
@@ -138,6 +138,8 @@ export async function generateSimpleQuote(
     description: description,
     created_at: quote.created_at,
     status: quote.status as any,
+    tva_rate: tvaRate, // ✅ Ajouter le taux TVA
+    tva_non_applicable_293b: data.tva293b || false, // ✅ Ajouter le flag 293B
     details: details,
   };
 }

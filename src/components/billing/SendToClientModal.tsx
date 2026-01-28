@@ -191,12 +191,26 @@ export const SendToClientModal = ({
 
       // Envoyer l'email via les nouveaux adapters (enregistrement automatique dans messages)
       if (documentType === "quote") {
+        // Récupérer les informations complètes du client pour la civilité et le prénom
+        let clientCivility: string | undefined;
+        let clientFirstName: string | undefined;
+        
+        if (document.client_id && clients) {
+          const client = clients.find(c => c.id === document.client_id);
+          if (client) {
+            clientCivility = client.titre || undefined;
+            clientFirstName = client.prenom || undefined;
+          }
+        }
+        
         const result = await sendQuoteEmail({
           quoteId: document.id,
           quoteNumber: document.quote_number || document.id.substring(0, 8),
           clientEmail: email,
           clientName: document.client_name || "Client",
           clientId: document.client_id,
+          clientCivility,
+          clientFirstName,
           includePDF,
           includeSignatureLink: includeSignatureLink && !!signatureUrl,
           signatureUrl,

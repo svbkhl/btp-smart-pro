@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FloatingAIAssistant } from './components/ai/FloatingAIAssistant';
 import { DemoModeGuard } from './components/DemoModeGuard';
+import { CompanySelector } from './components/CompanySelector';
 import { useAuth } from './hooks/useAuth';
 
 // Pages publiques
@@ -37,6 +38,10 @@ import EmployeesPlanning from './pages/EmployeesPlanning';
 import Mailbox from './pages/Mailbox';
 import MessagingNew from './pages/MessagingNew'; // Nouvelle page Messagerie (from scratch)
 import AI from './pages/AI';
+import Analytics from './pages/Analytics';
+import TextLibrary from './pages/TextLibrary';
+import PaymentReminders from './pages/PaymentReminders';
+import AIInsights from './pages/AIInsights';
 import Settings from './pages/Settings';
 import { GoogleCalendarIntegration } from './pages/GoogleCalendarIntegration';
 import CompleteProfile from './pages/CompleteProfile';
@@ -101,6 +106,8 @@ function App() {
     <ErrorBoundary>
       {/* Guard qui désactive automatiquement le mode démo si l'utilisateur se connecte */}
       <DemoModeGuard />
+      {/* Sélecteur d'entreprise - affiché uniquement si l'utilisateur appartient à plusieurs entreprises */}
+      {user && !isPublicPage && <CompanySelector />}
       {/* Widget Agent IA flottant - masqué sur les pages publiques (signature, paiement) */}
       {user && !isPublicPage && <FloatingAIAssistant />}
       <Routes>
@@ -234,6 +241,14 @@ function App() {
           }
         />
         <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/quotes/:id"
           element={
             <ProtectedRoute>
@@ -246,6 +261,30 @@ function App() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/text-library"
+          element={
+            <ProtectedRoute>
+              <TextLibrary />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment-reminders"
+          element={
+            <ProtectedRoute>
+              <PaymentReminders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-insights"
+          element={
+            <ProtectedRoute>
+              <AIInsights />
             </ProtectedRoute>
           }
         />

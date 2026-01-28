@@ -13,6 +13,11 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:check-env": "node tests/check-env.js",
+    "test:multi-tenant": "vitest run tests/multi-tenant-isolation.test.ts",
     "cleanup": "tsx scripts/cleanup-codebase.ts",
     "cleanup:fix": "tsx scripts/cleanup-codebase.ts --fix",
     "check-api": "tsx scripts/check-api-calls.ts",
@@ -89,6 +94,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitest/ui": "^4.0.18",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -102,6 +108,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vercel": "^48.9.2",
-    "vite": "^5.4.19"
+    "vite": "^5.4.19",
+    "vitest": "^4.0.18"
   }
 }

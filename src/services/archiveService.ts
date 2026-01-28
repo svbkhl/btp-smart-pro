@@ -122,12 +122,20 @@ export async function unarchiveInvoice(invoiceId: string): Promise<void> {
 /**
  * Archive un client
  */
-export async function archiveClient(clientId: string): Promise<void> {
+export async function archiveClient(clientId: string, userId: string): Promise<void> {
   try {
+    // Récupérer company_id pour isolation multi-tenant
+    const { getCompanyIdForUser } = await import("@/utils/companyHelpers");
+    const companyId = await getCompanyIdForUser(userId);
+    if (!companyId) {
+      throw new Error("User must be a member of a company");
+    }
+
     const { error } = await supabase
       .from('clients')
       .update({ archived: true, archived_at: new Date().toISOString() })
-      .eq('id', clientId);
+      .eq('id', clientId)
+      .eq('company_id', companyId);
 
     if (error) throw error;
   } catch (error) {
@@ -139,12 +147,20 @@ export async function archiveClient(clientId: string): Promise<void> {
 /**
  * Désarchive un client
  */
-export async function unarchiveClient(clientId: string): Promise<void> {
+export async function unarchiveClient(clientId: string, userId: string): Promise<void> {
   try {
+    // Récupérer company_id pour isolation multi-tenant
+    const { getCompanyIdForUser } = await import("@/utils/companyHelpers");
+    const companyId = await getCompanyIdForUser(userId);
+    if (!companyId) {
+      throw new Error("User must be a member of a company");
+    }
+
     const { error } = await supabase
       .from('clients')
       .update({ archived: false, archived_at: null })
-      .eq('id', clientId);
+      .eq('id', clientId)
+      .eq('company_id', companyId);
 
     if (error) throw error;
   } catch (error) {

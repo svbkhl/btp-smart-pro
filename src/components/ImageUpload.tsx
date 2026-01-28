@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,8 +28,18 @@ export const ImageUpload = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(value || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Utiliser directement value au lieu de preview pour éviter les problèmes de synchronisation
+  const displayValue = value?.trim() || null;
+  const [imageError, setImageError] = useState(false);
+  const [imageKey, setImageKey] = useState(0);
+  
+  // Réinitialiser l'erreur quand la valeur change
+  useEffect(() => {
+    setImageError(false);
+    setImageKey(prev => prev + 1); // Force le rechargement de l'image
+  }, [value]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,12 +56,7 @@ export const ImageUpload = ({
       return;
     }
 
-    // Créer une prévisualisation
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Note: La prévisualisation sera gérée par onChange après l'upload
 
     // Upload l'image
     if (!user) {
@@ -86,7 +91,7 @@ export const ImageUpload = ({
         variant: "destructive",
         duration: 5000,
       });
-      setPreview(null);
+      onChange(""); // Réinitialiser la valeur
     } finally {
       setUploading(false);
       // Réinitialiser l'input
@@ -97,7 +102,6 @@ export const ImageUpload = ({
   };
 
   const handleRemove = () => {
-    setPreview(null);
     onChange("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -114,22 +118,74 @@ export const ImageUpload = ({
     <div className={cn("space-y-2", className)}>
       <Label>{label}</Label>
       <div className="space-y-2">
-        {preview ? (
-          <div className="relative group">
-            <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border">
-              <img
-                src={preview}
-                alt="Preview"
-                className="w-full h-full object-cover"
-              />
+        {displayValue ? (
+          <div className="relative">
+            <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border bg-white dark:bg-gray-900">
+              {!imageError ? (
+                <img
+                  key={`${displayValue}-${imageKey}`} // Force le rechargement si l'URL change ou après erreur
+                  src={displayValue}
+                  alt="Logo de l'entreprise"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    console.error("❌ [ImageUpload] Erreur chargement logo:", displayValue);
+                    const target = e.target as HTMLImageElement;
+                    // Ne pas afficher l'image cassée
+                    target.style.display = "none";
+                    setImageError(true);
+                  }}
+                  onLoad={() => {
+                    console.log("✅ [ImageUpload] Logo chargé avec succès:", displayValue);
+                    setImageError(false);
+                  }}
+                />
+              ) : null}
+              {imageError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">⚠️ Erreur de chargement</p>
+                  <p className="text-xs text-red-500 dark:text-red-300 text-center mb-2">L'image ne peut pas être chargée depuis cette URL.</p>
+                  <p className="text-xs text-muted-foreground text-center mb-3">Vérifiez que le bucket Supabase Storage est public.</p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImageError(false);
+                        setImageKey(prev => prev + 1); // Force le rechargement
+                      }}
+                      className="text-xs"
+                    >
+                      Réessayer
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Ouvrir l'URL dans un nouvel onglet pour vérifier
+                        if (displayValue) {
+                          window.open(displayValue, '_blank');
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      Vérifier l'URL
+                    </Button>
+                  </div>
+                </div>
+              )}
               {!disabled && (
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute top-2 right-2">
                   <Button
                     type="button"
                     variant="destructive"
                     size="icon"
                     onClick={handleRemove}
                     disabled={uploading}
+                    className="h-8 w-8"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -177,7 +233,7 @@ export const ImageUpload = ({
           className="hidden"
         />
 
-        {!preview && !uploading && (
+        {!displayValue && !uploading && (
           <Button
             type="button"
             variant="outline"

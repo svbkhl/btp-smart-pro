@@ -7,8 +7,10 @@ import { FAKE_QUOTES } from "@/fakeData/quotes";
 import { generateQuoteNumber } from "@/utils/documentNumbering";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { extractUUID } from "@/utils/uuidExtractor";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
+import { logger } from "@/utils/logger";
 import { computeQuoteTotals } from "@/utils/quoteCalculations";
+import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 
 export interface Quote {
   id: string;
@@ -84,9 +86,10 @@ export interface UpdateQuoteData extends Partial<CreateQuoteData> {
 export const useQuotes = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["quotes", user?.id, fakeDataEnabled],
+    queryKey: ["quotes", companyId],
     queryFn: async () => {
       // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
@@ -98,13 +101,16 @@ export const useQuotes = () => {
       return queryWithTimeout(
         async () => {
           if (!user) throw new Error("User not authenticated");
+          if (!companyId) {
+            logger.warn("useQuotes: No company_id available");
+            return [];
+          }
 
-          // Construire la requête : filtrer par user_id (comme useAIQuotes mais avec sécurité)
-          // On filtre par user_id pour la sécurité, pas par company_id pour voir tous les devis de l'utilisateur
+          // Filtrer par company_id pour isolation multi-tenant
           const { data, error } = await supabase
             .from("ai_quotes")
             .select("*")
-            .eq("user_id", user.id) // Filtrer par user_id pour la sécurité
+            .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
           if (error) throw error;
@@ -153,11 +159,8 @@ export const useQuotes = () => {
         "useQuotes"
       );
     },
-    enabled: !!user || fakeDataEnabled,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
-    refetchInterval: 60000, // Polling automatique toutes les 60s
+    enabled: (!!user && !isLoadingCompanyId && !!companyId) || fakeDataEnabled,
+    ...QUERY_CONFIG.MODERATE, // Cache intelligent : 5min staleTime, pas de refetch auto
   });
 };
 
@@ -165,24 +168,29 @@ export const useQuotes = () => {
 // L'ID peut contenir un suffixe de sécurité (ex: "uuid-suffix")
 export const useQuote = (id: string | undefined) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["quote", id, user?.id],
+    queryKey: ["quote", id, companyId],
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
           if (!user || !id) throw new Error("User not authenticated or no ID provided");
+          if (!companyId) {
+            logger.warn("useQuote: No company_id available");
+            throw new Error("No company_id available");
+          }
 
           // Extraire l'UUID valide (peut contenir un suffixe)
           const validUuid = extractUUID(id);
           if (!validUuid) {
-            console.error("❌ [useQuote] Impossible d'extraire l'UUID de:", id);
+            logger.error("useQuote: Cannot extract UUID from", { id });
             throw new Error("Invalid quote ID format");
           }
 
           // ⚠️ LOG si l'ID original contenait un suffixe
           if (id !== validUuid) {
-            console.warn("⚠️ [useQuote] ID avec suffixe détecté, utilisation de l'UUID extrait:", { 
+            logger.warn("useQuote: ID with suffix detected", { 
               originalId: id, 
               extractedUuid: validUuid 
             });
@@ -192,7 +200,7 @@ export const useQuote = (id: string | undefined) => {
             .from("ai_quotes")
             .select("*")
             .eq("id", validUuid) // Utiliser l'UUID extrait, pas l'ID complet
-            .eq("user_id", user.id)
+            .eq("company_id", companyId) // Filtrer par company_id pour isolation multi-tenant
             .maybeSingle();
 
           if (!data) {
@@ -206,25 +214,21 @@ export const useQuote = (id: string | undefined) => {
         "useQuote"
       );
     },
-    enabled: !!user && !!id,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
+    enabled: !!user && !!id && !isLoadingCompanyId && !!companyId,
+    ...QUERY_CONFIG.MODERATE,
   });
 };
 
 // Hook pour créer un devis
 export const useCreateQuote = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (quoteData: CreateQuoteData) => {
       if (!user) throw new Error("User not authenticated");
-
-      // Récupérer company_id
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("Vous devez être membre d'une entreprise pour créer un devis");
       }
@@ -273,8 +277,53 @@ export const useCreateQuote = () => {
       if (error) throw error;
       return data as Quote;
     },
-    onSuccess: async (quote) => {
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    onMutate: async (newQuoteData) => {
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["quotes", companyId] });
+      
+      // Sauvegarder les données actuelles
+      const previousQuotes = queryClient.getQueryData<Quote[]>(["quotes", companyId]);
+      
+      // Mettre à jour optimistiquement avec un devis temporaire
+      if (previousQuotes && user && companyId) {
+        const tempQuote: Quote = {
+          id: `temp-${Date.now()}`,
+          user_id: user.id,
+          company_id: companyId,
+          client_name: newQuoteData.client_name,
+          client_email: newQuoteData.client_email,
+          client_id: newQuoteData.client_id,
+          project_id: newQuoteData.project_id,
+          quote_number: "En cours...",
+          status: newQuoteData.status || "draft",
+          estimated_cost: newQuoteData.estimated_cost,
+          mode: newQuoteData.mode,
+          tva_rate: newQuoteData.tva_rate ?? 0.20,
+          subtotal_ht: newQuoteData.estimated_cost || 0,
+          total_tva: (newQuoteData.estimated_cost || 0) * (newQuoteData.tva_rate ?? 0.20),
+          total_ttc: (newQuoteData.estimated_cost || 0) * (1 + (newQuoteData.tva_rate ?? 0.20)),
+          details: newQuoteData.details,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        queryClient.setQueryData<Quote[]>(
+          ["quotes", companyId],
+          [tempQuote, ...previousQuotes]
+        );
+      }
+      
+      return { previousQuotes };
+    },
+    onSuccess: async (quote, _variables, context) => {
+      // Remplacer le devis temporaire par le vrai
+      queryClient.setQueryData<Quote[]>(
+        ["quotes", companyId],
+        (old) => {
+          if (!old) return [quote];
+          return old.map(q => q.id.startsWith('temp-') ? quote : q);
+        }
+      );
       
       // Générer automatiquement le PDF après la création
       try {
@@ -373,7 +422,12 @@ export const useCreateQuote = () => {
         });
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousQuotes) {
+        queryClient.setQueryData(["quotes", companyId], context.previousQuotes);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message,
@@ -386,12 +440,14 @@ export const useCreateQuote = () => {
 // Hook pour mettre à jour un devis
 export const useUpdateQuote = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({ id, ...quoteData }: UpdateQuoteData) => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) throw new Error("No company_id available");
 
       // Extraire l'UUID valide si l'ID contient un suffixe
       const validUuid = extractUUID(id);
@@ -403,22 +459,72 @@ export const useUpdateQuote = () => {
         .from("ai_quotes")
         .update(quoteData)
         .eq("id", validUuid) // Utiliser l'UUID extrait
-        .eq("user_id", user.id)
+        .eq("company_id", companyId) // Filtrer par company_id pour isolation multi-tenant
         .select()
         .single();
 
       if (error) throw error;
       return data as Quote;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["quote"] });
+    onMutate: async (updateData) => {
+      const { id, ...updates } = updateData;
+      const validUuid = extractUUID(id);
+      
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["quotes", companyId] });
+      await queryClient.cancelQueries({ queryKey: ["quote", id, companyId] });
+      
+      // Sauvegarder les données actuelles
+      const previousQuotes = queryClient.getQueryData<Quote[]>(["quotes", companyId]);
+      const previousQuote = queryClient.getQueryData<Quote>(["quote", id, companyId]);
+      
+      // Mettre à jour optimistiquement la liste
+      if (previousQuotes && validUuid) {
+        queryClient.setQueryData<Quote[]>(
+          ["quotes", companyId],
+          previousQuotes.map(q =>
+            (q.id === id || q.id === validUuid) ? { ...q, ...updates, updated_at: new Date().toISOString() } : q
+          )
+        );
+      }
+      
+      // Mettre à jour optimistiquement le devis individuel
+      if (previousQuote) {
+        queryClient.setQueryData<Quote>(
+          ["quote", id, companyId],
+          { ...previousQuote, ...updates, updated_at: new Date().toISOString() }
+        );
+      }
+      
+      return { previousQuotes, previousQuote };
+    },
+    onSuccess: (updatedQuote) => {
+      // Mettre à jour avec les vraies données du serveur
+      const validUuid = extractUUID(updatedQuote.id);
+      
+      queryClient.setQueryData<Quote[]>(
+        ["quotes", companyId],
+        (old) => old?.map(q => q.id === updatedQuote.id || q.id === validUuid ? updatedQuote : q)
+      );
+      queryClient.setQueryData(["quote", updatedQuote.id, companyId], updatedQuote);
+      if (validUuid && validUuid !== updatedQuote.id) {
+        queryClient.setQueryData(["quote", validUuid, companyId], updatedQuote);
+      }
+      
       toast({
         title: "Devis mis à jour",
         description: "Le devis a été mis à jour avec succès.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousQuotes) {
+        queryClient.setQueryData(["quotes", companyId], context.previousQuotes);
+      }
+      if (context?.previousQuote) {
+        queryClient.setQueryData(["quote", variables.id, companyId], context.previousQuote);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message,
@@ -431,6 +537,7 @@ export const useUpdateQuote = () => {
 // Hook pour supprimer un devis
 export const useDeleteQuote = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { fakeDataEnabled } = useFakeDataStore();
@@ -438,6 +545,7 @@ export const useDeleteQuote = () => {
   return useMutation({
     mutationFn: async (id: string) => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) throw new Error("No company_id available");
 
       // Extraire l'UUID valide si l'ID contient un suffixe
       const validUuid = extractUUID(id);
@@ -449,7 +557,7 @@ export const useDeleteQuote = () => {
         .from("ai_quotes")
         .delete()
         .eq("id", validUuid) // Utiliser l'UUID extrait
-        .eq("user_id", user.id);
+        .eq("company_id", companyId); // Filtrer par company_id pour isolation multi-tenant
 
       if (error) throw error;
       
@@ -458,55 +566,48 @@ export const useDeleteQuote = () => {
       
       return id;
     },
-    onSuccess: async (_, deletedQuoteId: string) => {
-      console.log("🔄 [useDeleteQuote] Suppression du devis:", deletedQuoteId);
+    onMutate: async (deletedId) => {
+      const validUuid = extractUUID(deletedId);
       
-      // ✅ SUPPRESSION IMMÉDIATE DU CACHE - Mise à jour optimiste
-      // Mettre à jour toutes les variantes de la query ["quotes"]
-      const queryKeysToUpdate = [
-        ["quotes", user?.id, fakeDataEnabled],
-        ["quotes", user?.id, true],
-        ["quotes", user?.id, false],
-        ["quotes"],
-      ];
+      // Annuler les requêtes en cours
+      await queryClient.cancelQueries({ queryKey: ["quotes", companyId] });
       
-      queryKeysToUpdate.forEach(queryKey => {
-        queryClient.setQueriesData(
-          { queryKey, exact: false }, 
-          (oldData: Quote[] | undefined | any) => {
-            // Vérifier que oldData est un tableau valide
-            if (!oldData || !Array.isArray(oldData)) {
-              return oldData;
-            }
-            // Filtrer le devis supprimé (comparer avec l'ID original ou l'UUID extrait)
-            const filtered = oldData.filter((quote: Quote) => {
-              const quoteId = quote.id || "";
-              const validUuid = extractUUID(quoteId);
-              const deletedUuid = extractUUID(deletedQuoteId);
-              return validUuid !== deletedUuid && quoteId !== deletedQuoteId;
-            });
-            if (filtered.length !== oldData.length) {
-              console.log("🗑️ [useDeleteQuote] Cache mis à jour pour", queryKey, "- Avant:", oldData.length, "Après:", filtered.length);
-            }
-            return filtered;
-          }
-        );
-      });
+      // Sauvegarder les données actuelles
+      const previousQuotes = queryClient.getQueryData<Quote[]>(["quotes", companyId]);
       
-      // Invalider toutes les queries quotes (sans refetch automatique pour éviter qu'il revienne)
-      queryClient.invalidateQueries({ queryKey: ["quotes"], exact: false, refetchType: "none" });
-      queryClient.invalidateQueries({ queryKey: ["quote", deletedQuoteId], exact: false, refetchType: "none" });
+      // Supprimer optimistiquement de la liste
+      if (previousQuotes) {
+        const filtered = previousQuotes.filter((quote: Quote) => {
+          const quoteId = quote.id || "";
+          const quoteUuid = extractUUID(quoteId);
+          return quoteUuid !== validUuid && quoteId !== deletedId;
+        });
+        
+        queryClient.setQueryData<Quote[]>(["quotes", companyId], filtered);
+        logger.debug("useDeleteQuote: Optimistic delete", { before: previousQuotes.length, after: filtered.length });
+      }
       
-      // Supprimer explicitement la query du devis supprimé
-      queryClient.removeQueries({ queryKey: ["quote", deletedQuoteId], exact: false });
+      // Supprimer le cache du devis individuel
+      queryClient.removeQueries({ queryKey: ["quote", deletedId, companyId] });
+      if (validUuid && validUuid !== deletedId) {
+        queryClient.removeQueries({ queryKey: ["quote", validUuid, companyId] });
+      }
       
-      console.log("✅ [useDeleteQuote] Devis supprimé du cache (sans refetch)");
+      return { previousQuotes };
+    },
+    onSuccess: (_, deletedQuoteId) => {
+      logger.info("useDeleteQuote: Quote deleted successfully", { deletedQuoteId });
       toast({
         title: "Devis supprimé",
         description: "Le devis a été supprimé définitivement.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, _deletedId, context) => {
+      // Rollback en cas d'erreur
+      if (context?.previousQuotes) {
+        queryClient.setQueryData(["quotes", companyId], context.previousQuotes);
+      }
+      
       toast({
         title: "Erreur",
         description: error.message || "Impossible de supprimer le devis",
@@ -519,6 +620,7 @@ export const useDeleteQuote = () => {
 // Hook pour supprimer plusieurs devis en masse
 export const useDeleteQuotesBulk = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { fakeDataEnabled } = useFakeDataStore();
@@ -526,6 +628,7 @@ export const useDeleteQuotesBulk = () => {
   return useMutation({
     mutationFn: async (ids: string[]) => {
       if (!user) throw new Error("User not authenticated");
+      if (!companyId) throw new Error("No company_id available");
       if (ids.length === 0) return;
 
       // Extraire les UUIDs valides
@@ -538,7 +641,7 @@ export const useDeleteQuotesBulk = () => {
         .from("ai_quotes")
         .delete()
         .in("id", validUuids)
-        .eq("user_id", user.id);
+        .eq("company_id", companyId); // Filtrer par company_id pour isolation multi-tenant
 
       if (error) throw error;
       
@@ -546,44 +649,31 @@ export const useDeleteQuotesBulk = () => {
       await new Promise(resolve => setTimeout(resolve, 100));
     },
     onSuccess: async (_, deletedQuoteIds: string[]) => {
-      console.log("🔄 [useDeleteQuotesBulk] Suppression de", deletedQuoteIds.length, "devis");
+      logger.debug("useDeleteQuotesBulk: Deleting quotes from cache", { count: deletedQuoteIds.length });
       
       // Extraire les UUIDs pour la comparaison
       const deletedUuids = deletedQuoteIds.map(id => extractUUID(id)).filter(Boolean) as string[];
       
       // Mettre à jour le cache pour supprimer tous les devis supprimés
-      const queryKeysToUpdate = [
-        ["quotes", user?.id, fakeDataEnabled],
-        ["quotes", user?.id, true],
-        ["quotes", user?.id, false],
-        ["quotes"],
-      ];
-      
-      queryKeysToUpdate.forEach(queryKey => {
-        queryClient.setQueriesData(
-          { queryKey, exact: false }, 
-          (oldData: Quote[] | undefined | any) => {
-            if (!oldData || !Array.isArray(oldData)) {
-              return oldData;
-            }
-            const filtered = oldData.filter((quote: Quote) => {
-              const quoteId = quote.id || "";
-              const validUuid = extractUUID(quoteId);
-              return !deletedUuids.includes(validUuid) && !deletedQuoteIds.includes(quoteId);
-            });
-            if (filtered.length !== oldData.length) {
-              console.log("🗑️ [useDeleteQuotesBulk] Cache mis à jour - Avant:", oldData.length, "Après:", filtered.length);
-            }
-            return filtered;
-          }
-        );
+      queryClient.setQueryData(["quotes", companyId], (oldData: Quote[] | undefined) => {
+        if (!oldData || !Array.isArray(oldData)) {
+          return oldData;
+        }
+        const filtered = oldData.filter((quote: Quote) => {
+          const quoteId = quote.id || "";
+          const validUuid = extractUUID(quoteId);
+          return !deletedUuids.includes(validUuid) && !deletedQuoteIds.includes(quoteId);
+        });
+        logger.debug("useDeleteQuotesBulk: Cache updated", { before: oldData.length, after: filtered.length });
+        return filtered;
       });
       
-      queryClient.invalidateQueries({ queryKey: ["quotes"], exact: false, refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: ["quotes", companyId], refetchType: "none" });
       deletedQuoteIds.forEach(id => {
-        queryClient.removeQueries({ queryKey: ["quote", id], exact: false });
+        queryClient.removeQueries({ queryKey: ["quote", id] });
       });
       
+      logger.info("useDeleteQuotesBulk: Quotes deleted successfully", { count: deletedQuoteIds.length });
       toast({
         title: "Devis supprimés",
         description: `${deletedQuoteIds.length} devis supprimé${deletedQuoteIds.length > 1 ? 's' : ''} définitivement.`,

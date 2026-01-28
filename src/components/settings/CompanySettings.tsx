@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,8 @@ import {
 import { useUserSettings, useUpdateUserSettings } from "@/hooks/useUserSettings";
 import { useToast } from "@/components/ui/use-toast";
 import { ImageUpload } from "@/components/ImageUpload";
-import { Building2, Loader2, Save } from "lucide-react";
+import { SignatureCanvas } from "@/components/SignatureCanvas";
+import { Building2, Loader2, Save, FileSignature } from "lucide-react";
 import { motion } from "framer-motion";
 
 export const CompanySettings = () => {
@@ -22,6 +23,8 @@ export const CompanySettings = () => {
   const updateSettings = useUpdateUserSettings();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [savedSignatureData, setSavedSignatureData] = useState<string>("");
+  const [savedSignatureName, setSavedSignatureName] = useState<string>("");
 
   const [formData, setFormData] = useState({
     company_name: "",
@@ -36,26 +39,66 @@ export const CompanySettings = () => {
     legal_form: "",
     company_logo_url: "",
     terms_and_conditions: "",
-    app_base_url: "",
+    signature_data: "",
+    signature_name: "",
   });
+
+  // Référence pour éviter les réinitialisations pendant la saisie
+  const isInitializedRef = useRef(false);
+  const previousLogoRef = useRef<string>("");
+  const previousSignatureRef = useRef<string>("");
 
   useEffect(() => {
     if (settings) {
-      setFormData({
-        company_name: settings.company_name || "",
-        email: settings.email || "",
-        phone: settings.phone || "",
-        address: settings.address || "",
-        city: settings.city || "",
-        postal_code: settings.postal_code || "",
-        country: settings.country || "France",
-        siret: settings.siret || "",
-        vat_number: settings.vat_number || "",
-        legal_form: settings.legal_form || "",
-        company_logo_url: settings.company_logo_url || "",
-        terms_and_conditions: settings.terms_and_conditions || "",
-        app_base_url: settings.app_base_url || "",
-      });
+      const currentLogo = settings.company_logo_url || "";
+      const currentSignature = settings.signature_data || "";
+
+      // Initialiser au premier chargement
+      if (!isInitializedRef.current) {
+        setFormData({
+          company_name: settings.company_name || "",
+          email: settings.email || "",
+          phone: settings.phone || "",
+          address: settings.address || "",
+          city: settings.city || "",
+          postal_code: settings.postal_code || "",
+          country: settings.country || "France",
+          siret: settings.siret || "",
+          vat_number: settings.vat_number || "",
+          legal_form: settings.legal_form || "",
+          company_logo_url: currentLogo,
+          terms_and_conditions: settings.terms_and_conditions || "",
+          signature_data: currentSignature,
+          signature_name: settings.signature_name || "",
+        });
+        setSavedSignatureData(currentSignature);
+        setSavedSignatureName(settings.signature_name || "");
+        previousLogoRef.current = currentLogo;
+        previousSignatureRef.current = currentSignature;
+        isInitializedRef.current = true;
+      } else {
+        // Après l'initialisation, mettre à jour seulement le logo et la signature si ils ont changé
+        // pour éviter de réinitialiser les champs en cours de saisie
+        if (previousLogoRef.current !== currentLogo && currentLogo) {
+          console.log("🖼️ [CompanySettings] Mise à jour du logo:", currentLogo);
+          setFormData((prev) => ({
+            ...prev,
+            company_logo_url: currentLogo,
+          }));
+          previousLogoRef.current = currentLogo;
+        }
+        
+        if (previousSignatureRef.current !== currentSignature) {
+          setFormData((prev) => ({
+            ...prev,
+            signature_data: currentSignature,
+            signature_name: settings.signature_name || prev.signature_name || "",
+          }));
+          setSavedSignatureData(currentSignature);
+          setSavedSignatureName(settings.signature_name || "");
+          previousSignatureRef.current = currentSignature;
+        }
+      }
     }
   }, [settings]);
 
@@ -67,6 +110,51 @@ export const CompanySettings = () => {
   const validateVAT = (vat: string): boolean => {
     if (!vat) return true; // Optionnel
     return /^[A-Z]{2}[A-Z0-9]{2,12}$/.test(vat);
+  };
+
+  const handleSaveSignature = async () => {
+    if (!formData.signature_data) {
+      toast({
+        title: "Signature vide",
+        description: "Veuillez dessiner une signature avant de l'enregistrer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!settings) {
+      toast({
+        title: "Chargement en cours",
+        description: "Veuillez patienter pendant le chargement des paramètres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Sauvegarder uniquement la signature (pas besoin d'envoyer toutes les données)
+      await updateSettings.mutateAsync({
+        signature_data: formData.signature_data,
+        signature_name: formData.signature_name,
+      });
+      // Marquer la signature comme sauvegardée
+      setSavedSignatureData(formData.signature_data);
+      setSavedSignatureName(formData.signature_name);
+      toast({
+        title: "Signature sauvegardée",
+        description: "Votre signature électronique a été enregistrée avec succès.",
+      });
+    } catch (error: any) {
+      console.error("Erreur lors de la sauvegarde de la signature:", error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de sauvegarder la signature. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,13 +224,47 @@ export const CompanySettings = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Logo */}
-          <div>
+          <div className="space-y-2">
             <ImageUpload
               label="Logo de l'entreprise"
-              value={formData.company_logo_url}
-              onChange={(url) => setFormData({ ...formData, company_logo_url: url })}
+              value={settings?.company_logo_url || formData.company_logo_url || ""}
+              onChange={async (url) => {
+                // Mettre à jour formData immédiatement pour afficher le logo
+                setFormData((prev) => ({ ...prev, company_logo_url: url }));
+                
+                // Sauvegarder automatiquement le logo après l'upload
+                if (url) {
+                  try {
+                    const result = await updateSettings.mutateAsync({
+                      company_logo_url: url,
+                    });
+                    
+                    // S'assurer que formData est mis à jour avec la valeur sauvegardée
+                    if (result?.company_logo_url) {
+                      setFormData((prev) => ({ ...prev, company_logo_url: result.company_logo_url || url }));
+                    }
+                    
+                    toast({
+                      title: "Logo sauvegardé",
+                      description: "Le logo de l'entreprise a été enregistré avec succès.",
+                    });
+                  } catch (error: any) {
+                    console.error("Erreur lors de la sauvegarde du logo:", error);
+                    toast({
+                      title: "Erreur",
+                      description: error.message || "Le logo a été uploadé mais n'a pas pu être sauvegardé. Veuillez réessayer.",
+                      variant: "destructive",
+                    });
+                  }
+                }
+              }}
               folder="projects"
             />
+            {formData.company_logo_url && formData.company_logo_url === settings?.company_logo_url && (
+              <p className="text-xs text-green-600 dark:text-green-400">
+                ✓ Logo enregistré. Il apparaîtra sur vos devis et factures.
+              </p>
+            )}
           </div>
 
           {/* Nom et Forme juridique */}
@@ -154,7 +276,10 @@ export const CompanySettings = () => {
               <Input
                 id="company_name"
                 value={formData.company_name}
-                onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData((prev) => ({ ...prev, company_name: value }));
+                }}
                 placeholder="Ex: BTP Smart Pro"
                 required
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
@@ -164,7 +289,7 @@ export const CompanySettings = () => {
               <Label htmlFor="legal_form">Forme juridique</Label>
               <Select
                 value={formData.legal_form}
-                onValueChange={(value) => setFormData({ ...formData, legal_form: value })}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, legal_form: value }))}
               >
                 <SelectTrigger id="legal_form" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
                   <SelectValue placeholder="Sélectionnez une forme juridique" />
@@ -188,7 +313,7 @@ export const CompanySettings = () => {
             <Input
               id="address"
               value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
               placeholder="Ex: 123 Rue de la Construction"
               className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
             />
@@ -201,7 +326,7 @@ export const CompanySettings = () => {
               <Input
                 id="city"
                 value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
                 placeholder="Ex: Paris"
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
@@ -211,7 +336,7 @@ export const CompanySettings = () => {
               <Input
                 id="postal_code"
                 value={formData.postal_code}
-                onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, postal_code: e.target.value }))}
                 placeholder="Ex: 75001"
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
@@ -221,7 +346,7 @@ export const CompanySettings = () => {
               <Input
                 id="country"
                 value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
                 placeholder="Ex: France"
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
@@ -235,7 +360,7 @@ export const CompanySettings = () => {
               <Input
                 id="siret"
                 value={formData.siret}
-                onChange={(e) => setFormData({ ...formData, siret: e.target.value.replace(/\D/g, "") })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, siret: e.target.value.replace(/\D/g, "") }))}
                 placeholder="14 chiffres"
                 maxLength={14}
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
@@ -249,7 +374,7 @@ export const CompanySettings = () => {
               <Input
                 id="vat_number"
                 value={formData.vat_number}
-                onChange={(e) => setFormData({ ...formData, vat_number: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, vat_number: e.target.value.toUpperCase() }))}
                 placeholder="Ex: FR12345678901"
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
@@ -267,7 +392,7 @@ export const CompanySettings = () => {
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 placeholder="contact@entreprise.fr"
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
@@ -278,7 +403,7 @@ export const CompanySettings = () => {
                 id="phone"
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                 placeholder="+33 1 23 45 67 89"
                 className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
               />
@@ -291,7 +416,7 @@ export const CompanySettings = () => {
             <Textarea
               id="terms_and_conditions"
               value={formData.terms_and_conditions}
-              onChange={(e) => setFormData({ ...formData, terms_and_conditions: e.target.value })}
+              onChange={(e) => setFormData((prev) => ({ ...prev, terms_and_conditions: e.target.value }))}
               placeholder="Conditions générales de vente, mentions légales..."
               rows={6}
               className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
@@ -319,35 +444,97 @@ export const CompanySettings = () => {
           </div>
         </form>
 
-          {/* Configuration URL de l'application */}
-          <div className="mt-8 pt-6 border-t border-border/50">
-            <h3 className="font-semibold text-lg mb-4">Configuration des liens de signature</h3>
+        {/* Configuration de la signature électronique */}
+        <div className="mt-8 pt-6 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-4">
+            <FileSignature className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold text-lg">Signature électronique de l'entreprise</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-6">
+            Cette signature sera automatiquement ajoutée à vos devis et factures. Vous pouvez la dessiner ci-dessous ou la laisser vide si vous préférez signer manuellement chaque document.
+          </p>
+          
+          <div className="space-y-4">
+            <SignatureCanvas
+              value={formData.signature_data}
+              onChange={(signatureData) => {
+                setFormData((prev) => ({ ...prev, signature_data: signatureData }));
+              }}
+              signerName={formData.signature_name}
+              onSignerNameChange={(name) => {
+                setFormData((prev) => ({ ...prev, signature_name: name }));
+              }}
+            />
             
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="app_base_url">
-                  URL de base de l'application
-                </Label>
-                <Input
-                  id="app_base_url"
-                  type="url"
-                  placeholder="https://votre-app.vercel.app ou https://abc123.ngrok.io"
-                  value={formData.app_base_url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, app_base_url: e.target.value })
-                  }
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Cette URL sera utilisée pour générer les liens de signature dans les emails.
-                  <br />
-                  <strong>En développement :</strong> Utilisez ngrok (ex: https://abc123.ngrok.io)
-                  <br />
-                  <strong>En production :</strong> Votre URL Vercel/Netlify (ex: https://votre-app.vercel.app)
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                onClick={handleSaveSignature}
+                disabled={saving || !formData.signature_data}
+                className="gap-2 rounded-xl"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sauvegarde...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Enregistrer la signature
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {/* Afficher le message de confirmation seulement si la signature a été sauvegardée */}
+            {savedSignatureData && 
+             formData.signature_data === savedSignatureData && 
+             formData.signature_name === savedSignatureName && (
+              <>
+                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">
+                        ✓ Signature enregistrée
+                      </p>
+                      <p className="text-xs text-green-700 dark:text-green-300">
+                        Cette signature sera automatiquement ajoutée à vos devis et factures lors de leur génération.
+                      </p>
+                      {savedSignatureName && (
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                          Signataire : {savedSignatureName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={savedSignatureData} 
+                        alt="Aperçu de la signature" 
+                        className="w-24 h-12 object-contain bg-white rounded border border-green-300 dark:border-green-700 p-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    💡 <strong>Astuce :</strong> La signature sera automatiquement utilisée lors de la création de devis et de la génération de PDFs.
+                  </p>
+                </div>
+              </>
+            )}
+            
+            {/* Afficher un message si la signature a été modifiée mais pas encore sauvegardée */}
+            {formData.signature_data && 
+             (formData.signature_data !== savedSignatureData || formData.signature_name !== savedSignatureName) && (
+              <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+                <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                  ⚠️ <strong>Signature modifiée :</strong> N'oubliez pas d'enregistrer la signature pour qu'elle soit utilisée automatiquement.
                 </p>
               </div>
-            </div>
+            )}
           </div>
+        </div>
 
           {/* Informations sur les fonctionnalités automatiques */}
         <div className="mt-8 pt-6 border-t border-border/50 space-y-4">

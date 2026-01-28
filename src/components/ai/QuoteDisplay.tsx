@@ -46,6 +46,8 @@ interface QuoteDisplayProps {
   signedBy?: string;
   signedAt?: string;
   quoteFormat?: "detailed" | "simplified"; // Format du devis
+  tvaRate?: number; // Taux de TVA (0-1)
+  tva293b?: boolean; // TVA non applicable 293B
 }
 
 export const QuoteDisplay = ({
@@ -61,6 +63,8 @@ export const QuoteDisplay = ({
   signedBy,
   signedAt,
   quoteFormat = "detailed",
+  tvaRate = 0.20, // Par défaut 20%
+  tva293b = false, // Par défaut TVA applicable
 }: QuoteDisplayProps) => {
   const isSimplified = quoteFormat === "simplified" || result?.format === "simplified";
   // ID pour l'export PDF
@@ -88,10 +92,13 @@ export const QuoteDisplay = ({
 
   // ⚠️ CALCUL CORRECT: TTC → HT et TVA
   // Le prix saisi/stocké est TOUJOURS TTC, on calcule HT et TVA à partir du TTC
-  const prices = calculateFromTTC(priceTTC, 20);
+  // Si TVA 293B est activé, le taux est 0
+  const effectiveTvaRate = tva293b ? 0 : tvaRate;
+  const tvaPercent = effectiveTvaRate * 100;
+  const prices = calculateFromTTC(priceTTC, tvaPercent);
   const totalTTC = prices.total_ttc;  // Source de vérité
   const totalHT = prices.total_ht;    // Calculé
-  const tva = prices.vat_amount;      // Calculé
+  const tva = prices.vat_amount;      // Calculé (sera 0 si tva293b)
 
   // Formater l'adresse complète de l'entreprise
   const companyAddress = [
@@ -322,15 +329,30 @@ export const QuoteDisplay = ({
                       })} €
                     </td>
                   </tr>
-                  <tr>
-                    <td className="border border-gray-300 p-2 text-right text-sm text-muted-foreground">dont TVA (20%)</td>
-                    <td className="border border-gray-300 p-2 text-right text-sm">
-                      {tva.toLocaleString('fr-FR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })} €
-                    </td>
-                  </tr>
+                  {/* Afficher la TVA seulement si elle n'est pas exonérée (293B) */}
+                  {!tva293b && (
+                    <tr>
+                      <td className="border border-gray-300 p-2 text-right text-sm text-muted-foreground">
+                        dont TVA ({tvaPercent.toFixed(2)}%)
+                      </td>
+                      <td className="border border-gray-300 p-2 text-right text-sm">
+                        {tva.toLocaleString('fr-FR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })} €
+                      </td>
+                    </tr>
+                  )}
+                  {tva293b && (
+                    <tr>
+                      <td className="border border-gray-300 p-2 text-right text-sm text-muted-foreground italic">
+                        TVA non applicable - Article 293 B du CGI
+                      </td>
+                      <td className="border border-gray-300 p-2 text-right text-sm italic">
+                        -
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td className="border border-gray-300 p-2 text-right text-sm text-muted-foreground">Total HT</td>
                     <td className="border border-gray-300 p-2 text-right text-sm">

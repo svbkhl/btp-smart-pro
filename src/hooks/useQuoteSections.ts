@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { getCurrentCompanyId } from "@/utils/companyHelpers";
+import { useCompanyId } from "./useCompanyId";
 
 export interface QuoteSection {
   id: string;
@@ -32,13 +32,13 @@ export interface UpdateSectionData extends Partial<CreateSectionData> {
  */
 export const useQuoteSections = (quoteId: string | undefined) => {
   const { user } = useAuth();
+  const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
     queryKey: ["quote_sections", quoteId, user?.id],
     queryFn: async () => {
       if (!user || !quoteId) throw new Error("User not authenticated or quote ID missing");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -62,13 +62,13 @@ export const useQuoteSections = (quoteId: string | undefined) => {
  */
 export const useCreateQuoteSection = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (sectionData: CreateSectionData) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -97,13 +97,13 @@ export const useCreateQuoteSection = () => {
  */
 export const useUpdateQuoteSection = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, ...sectionData }: UpdateSectionData) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -130,13 +130,13 @@ export const useUpdateQuoteSection = () => {
  */
 export const useDeleteQuoteSection = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, quoteId }: { id: string; quoteId: string }) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }
@@ -162,13 +162,13 @@ export const useDeleteQuoteSection = () => {
  */
 export const useReorderQuoteSections = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ quoteId, sectionIds }: { quoteId: string; sectionIds: string[] }) => {
       if (!user) throw new Error("User not authenticated");
 
-      const companyId = await getCurrentCompanyId(user.id);
       if (!companyId) {
         throw new Error("User is not a member of any company");
       }

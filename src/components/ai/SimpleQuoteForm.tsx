@@ -20,8 +20,9 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { generateSimpleQuote, STANDARD_PHRASE } from "@/services/simpleQuoteService";
 import { QuoteDisplay } from "./QuoteDisplay";
 import { downloadQuotePDF } from "@/services/pdfService";
-import { Loader2, Sparkles, Download, CheckCircle2, Euro, Ruler, User, FileText } from "lucide-react";
+import { Loader2, Sparkles, Download, CheckCircle2, Euro, Ruler, User, FileText, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SendToClientModal } from "@/components/billing/SendToClientModal";
 
 interface SimpleQuoteFormProps {
   onSuccess?: () => void;
@@ -58,6 +59,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
   const isPreviewOpenRef = useRef<boolean>(false);
   const [quote, setQuote] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   
   // Synchroniser les refs avec les états pour persister lors des re-renders
   useEffect(() => {
@@ -399,6 +401,8 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
             workType={displayQuote.prestation}
             quoteDate={new Date(displayQuote.created_at)}
             quoteNumber={displayQuote.quote_number}
+            tvaRate={displayQuote.tva_rate ?? tvaRate}
+            tva293b={displayQuote.tva_non_applicable_293b ?? tva293b}
           />
         </GlassCard>
 
@@ -407,6 +411,17 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
           <Button variant="outline" onClick={handleReset} className="gap-2">
             Créer un nouveau devis
           </Button>
+          {/* Bouton Envoyer au client - masqué si le devis est signé */}
+          {displayQuote && !displayQuote.signed && displayQuote.status !== "signed" && (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSendToClientOpen(true)} 
+              className="gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Envoyer au client
+            </Button>
+          )}
           <Button onClick={handleClosePreview} className="gap-2" variant="outline">
             Fermer l'aperçu
           </Button>
@@ -419,6 +434,19 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
             </Button>
           )}
         </div>
+
+        {/* Modal Envoyer au client */}
+        {displayQuote && (
+          <SendToClientModal
+            open={isSendToClientOpen}
+            onOpenChange={setIsSendToClientOpen}
+            documentType="quote"
+            document={displayQuote}
+            onSent={() => {
+              setIsSendToClientOpen(false);
+            }}
+          />
+        )}
       </div>
     );
   }
