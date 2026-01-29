@@ -5,6 +5,7 @@ import { useCompanyId } from "./useCompanyId";
 import { useToast } from "@/components/ui/use-toast";
 import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 import { logger } from "@/utils/logger";
+import { sendReminderEmail } from "@/services/emailAdapters";
 import type { PaymentReminder, ReminderTemplate, CreateReminderTemplateData, OverdueInvoice, ReminderStats } from "@/types/reminders";
 
 // Hook pour récupérer les factures impayées
@@ -214,15 +215,41 @@ export const useSendReminder = () => {
 
       if (reminderError) throw reminderError;
 
-      // 5. TODO: Envoyer l'email réel (via service email)
-      // Pour l'instant, on simule l'envoi
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const clientEmail = invoice.client_email?.trim();
+      if (!clientEmail) {
+        throw new Error("Aucune adresse email client pour cette facture. Ajoutez l'email du client avant d'envoyer la relance.");
+      }
+
+      // 5. Envoyer l'email réel via le service de messagerie
+      const emailResult = await sendReminderEmail({
+        clientEmail,
+        clientName: invoice.client_name || "Client",
+        subject,
+        message: body,
+        clientId: invoice.client_id ?? undefined,
+        documentId: invoiceId,
+        documentType: "invoice",
+        documentNumber: invoice.invoice_number,
+      }).catch((emailError) => {
+        return { success: false as const, error: emailError?.message ?? "Erreur envoi email" };
+      });
+
+      if (!emailResult?.success) {
+        await supabase
+          .from("payment_reminders")
+          .update({ status: "failed" })
+          .eq("id", reminder.id);
+        logger.error("useSendReminder: envoi email échoué", emailResult?.error);
+        throw new Error(
+          emailResult?.error ?? "Impossible d'envoyer l'email de relance. Vérifiez la configuration email."
+        );
+      }
 
       // 6. Marquer comme envoyé
       const { error: updateError } = await supabase
         .from("payment_reminders")
         .update({
-          status: 'sent',
+          status: "sent",
           sent_at: new Date().toISOString(),
         })
         .eq("id", reminder.id);

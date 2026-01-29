@@ -319,32 +319,34 @@ export const SecuritySettings = () => {
                   <AlertTriangle className="h-5 w-5" />
                   Supprimer définitivement mon compte
                 </AlertDialogTitle>
-                <AlertDialogDescription className="space-y-4">
-                  <p>
-                    Cette action est <strong>irréversible</strong>. Toutes vos données seront définitivement supprimées :
-                  </p>
-                  <ul className="list-disc list-inside text-sm space-y-1 ml-2">
-                    <li>Vos clients, projets, devis et factures</li>
-                    <li>Vos paramètres et préférences</li>
-                    <li>Votre historique de messages</li>
-                    <li>Toutes vos données associées</li>
-                  </ul>
-                  <div className="pt-2">
-                    <Label htmlFor="confirm_email" className="text-sm font-medium">
-                      Pour confirmer, tapez votre email : <strong>{user?.email}</strong>
-                    </Label>
-                    <Input
-                      id="confirm_email"
-                      type="email"
-                      value={confirmEmail}
-                      onChange={(e) => setConfirmEmail(e.target.value)}
-                      placeholder="Votre email"
-                      className="mt-2"
-                      disabled={isDeletingAccount}
-                    />
-                  </div>
+                <AlertDialogDescription asChild>
+                  <span>
+                    Cette action est irréversible. Toutes vos données seront définitivement supprimées.
+                  </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Vos clients, projets, devis et factures</li>
+                  <li>Vos paramètres et préférences</li>
+                  <li>Votre historique de messages</li>
+                  <li>Toutes vos données associées</li>
+                </ul>
+                <div className="pt-2">
+                  <Label htmlFor="confirm_email" className="text-sm font-medium">
+                    Pour confirmer, tapez votre email : <strong>{user?.email}</strong>
+                  </Label>
+                  <Input
+                    id="confirm_email"
+                    type="email"
+                    value={confirmEmail}
+                    onChange={(e) => setConfirmEmail(e.target.value)}
+                    placeholder="Votre email"
+                    className="mt-2"
+                    disabled={isDeletingAccount}
+                  />
+                </div>
+              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={isDeletingAccount} className="rounded-xl">
                   Annuler

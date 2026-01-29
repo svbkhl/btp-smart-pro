@@ -50,6 +50,7 @@ export default function SignatureWithOTP({
   const [otpVerified, setOtpVerified] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
   
   // Pour signature tracée
   const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
@@ -115,6 +116,7 @@ export default function SignatureWithOTP({
   // Étape 2 : Vérifier le code OTP
   const handleVerifyOTP = async () => {
     if (!otpCode || otpCode.length !== 6) {
+      setOtpError("Le code doit contenir 6 chiffres");
       toast({
         title: "⚠️ Code invalide",
         description: "Le code doit contenir 6 chiffres",
@@ -124,6 +126,7 @@ export default function SignatureWithOTP({
     }
 
     setVerifyingOtp(true);
+    setOtpError(null); // Réinitialiser l'erreur avant la vérification
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -144,10 +147,18 @@ export default function SignatureWithOTP({
       const result = await response.json();
 
       if (!response.ok || !result.valid) {
-        throw new Error(result.error || 'Code incorrect');
+        const errorMessage = result.error || 'Code incorrect';
+        setOtpError(errorMessage);
+        toast({
+          title: "❌ Code invalide",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
       }
 
       setOtpVerified(true);
+      setOtpError(null);
       setStep('sign');
       
       toast({
@@ -156,9 +167,11 @@ export default function SignatureWithOTP({
       });
     } catch (error: any) {
       console.error('Erreur vérification OTP:', error);
+      const errorMessage = error.message || "Le code saisi est incorrect ou expiré";
+      setOtpError(errorMessage);
       toast({
         title: "❌ Code invalide",
-        description: error.message || "Le code saisi est incorrect ou expiré",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -298,11 +311,22 @@ export default function SignatureWithOTP({
             inputMode="numeric"
             maxLength={6}
             value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+            onChange={(e) => {
+              setOtpCode(e.target.value.replace(/\D/g, ''));
+              setOtpError(null); // Réinitialiser l'erreur quand l'utilisateur tape
+            }}
             placeholder="000000"
-            className="text-center text-2xl tracking-widest"
+            className={`text-center text-2xl tracking-widest ${otpError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
             disabled={verifyingOtp || disabled}
           />
+          {otpError && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm font-medium">
+                {otpError}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <Button

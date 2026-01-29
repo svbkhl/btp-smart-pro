@@ -214,65 +214,33 @@ export const GoogleCalendarConnection = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Toujours afficher le bouton si canConnect est true, sinon afficher le message */}
-            {canConnect || isOwner ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Connectez Google Calendar pour créer un calendrier dédié à votre entreprise.
-                  Les événements et plannings seront automatiquement synchronisés.
-                </p>
-                <Button
-                  onClick={handleConnect}
-                  disabled={getAuthUrl.isPending || isConnecting}
-                  className="w-full"
-                >
-                  {getAuthUrl.isPending || isConnecting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Connexion en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Connecter Google Calendar
-                    </>
-                  )}
-                </Button>
-              </>
-            ) : (
-              <div className="text-center py-4">
-                {connection ? (
-                  <>
-                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-600 dark:text-green-400" />
-                    <p className="text-sm font-medium text-foreground mb-1">
-                      Google Calendar est déjà configuré
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {connection.enabled 
-                        ? `Connecté avec ${connection.google_email}`
-                        : `Configuré avec ${connection.google_email} (désactivé)`
-                      }
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Seul le propriétaire ou l'administrateur peut modifier la configuration.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Crown className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Seul le propriétaire ou l'administrateur de l'entreprise peut connecter Google Calendar.
-                    </p>
-                    {/* Debug: Afficher les valeurs pour comprendre pourquoi canConnect est false */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Debug: canConnect={String(canConnect)}, isOwner={String(isOwner)}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+            <p className="text-sm text-muted-foreground">
+              Connectez Google Calendar pour créer un calendrier dédié à votre entreprise.
+              Les événements et plannings seront automatiquement synchronisés.
+            </p>
+            {!canConnect && !isOwner && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Crown className="h-3.5 w-3.5" />
+                Réservé au dirigeant ou à l'administrateur de l'entreprise.
+              </p>
             )}
+            <Button
+              onClick={handleConnect}
+              disabled={getAuthUrl.isPending || isConnecting}
+              className="w-full"
+            >
+              {getAuthUrl.isPending || isConnecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Connexion en cours...
+                </>
+              ) : (
+                <>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Connecter Google Calendar
+                </>
+              )}
+            </Button>
           </div>
         )}
       </CardContent>

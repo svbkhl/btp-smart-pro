@@ -50,7 +50,7 @@ export const InviteUserDialogRBAC = ({
   onSuccess,
 }: InviteUserDialogRBACProps) => {
   const { user, currentCompanyId } = useAuth();
-  const { can } = usePermissions();
+  const { can, isOwner, isAdmin } = usePermissions();
   const { roles, isLoading: rolesLoading } = useRoles();
   
   const [open, setOpen] = useState(false);
@@ -58,11 +58,11 @@ export const InviteUserDialogRBAC = ({
   const [email, setEmail] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
 
-  // Vérifier les permissions
-  const canInvite = can('users.invite');
+  // Dirigeant et administrateur peuvent toujours inviter ; sinon permission users.invite
+  const canInvite = can('users.invite') || isOwner || isAdmin;
 
   if (!canInvite) {
-    return null; // Ne pas afficher le bouton si pas de permission
+    return null;
   }
 
   const handleInvite = async (e: React.FormEvent) => {

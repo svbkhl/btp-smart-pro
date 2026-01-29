@@ -123,88 +123,80 @@ export default function CreatePaymentLinkDialog({
 
       console.log('📤 [CreatePaymentLinkDialog] Appel Edge Function:', functionName);
 
+      // Utiliser fetch directement pour avoir accès au body d'erreur
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Vous devez être connecté pour créer un lien de paiement');
+      }
+
       let data, error;
       try {
-        const result = await supabase.functions.invoke(functionName, {
-          body: requestBody,
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          },
+          body: JSON.stringify(requestBody),
         });
-        data = result.data;
-        error = result.error;
-      } catch (invokeError: any) {
-        console.error('❌ [CreatePaymentLinkDialog] Exception lors de l\'appel:', invokeError);
-        // Essayer d'extraire le message d'erreur depuis la réponse
-        let errorMessage = 'Erreur lors de la création du lien de paiement';
-        if (invokeError.message) {
-          errorMessage = invokeError.message;
+
+        const responseData = await response.json().catch(() => ({}));
+        
+        if (!response.ok) {
+          // Extraire le message d'erreur depuis le body
+          const errorMessage = responseData.error || responseData.details || `Erreur ${response.status}: ${response.statusText}`;
+          const errorDetails = responseData.details || responseData.message || '';
+          
+          console.error('❌ [CreatePaymentLinkDialog] Erreur HTTP:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: responseData.error,
+            details: responseData.details,
+            fullResponse: responseData,
+          });
+          
+          throw new Error(errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage);
         }
-        throw new Error(errorMessage);
+
+        data = responseData;
+        error = null;
+      } catch (fetchError: any) {
+        console.error('❌ [CreatePaymentLinkDialog] Exception lors de l\'appel fetch:', fetchError);
+        // Si c'est déjà une Error avec un message, la relancer
+        if (fetchError instanceof Error) {
+          throw fetchError;
+        }
+        // Sinon, créer une nouvelle erreur
+        throw new Error(fetchError.message || 'Erreur lors de la création du lien de paiement');
       }
 
       console.log('📥 [CreatePaymentLinkDialog] Réponse Edge Function:', { 
         hasData: !!data, 
-        hasError: !!error,
         dataSuccess: data?.success,
         dataError: data?.error,
         dataDetails: data?.details,
-        errorMessage: error?.message,
-        errorContext: error?.context,
-        fullError: error,
         fullData: data,
       });
 
-      // Si data existe mais contient une erreur (cas où l'Edge Function retourne 200 avec success: false)
-      if (data && !data.success) {
+      // Vérifier que data existe et contient success: true
+      if (!data) {
+        console.error('❌ [CreatePaymentLinkDialog] Pas de données dans la réponse');
+        throw new Error('Aucune donnée reçue de l\'Edge Function');
+      }
+
+      if (!data.success) {
         const errorMsg = data.error || data.details || 'Impossible de créer le lien de paiement';
         console.error('❌ [CreatePaymentLinkDialog] Erreur dans data:', {
           success: data.success,
           error: data.error,
           details: data.details,
+          error_type: data.error_type,
           fullData: data,
         });
-        throw new Error(errorMsg);
-      }
-
-      if (error) {
-        console.error('❌ [CreatePaymentLinkDialog] Erreur Edge Function complète:', error);
-        console.error('❌ [CreatePaymentLinkDialog] Type erreur:', typeof error);
-        console.error('❌ [CreatePaymentLinkDialog] Keys erreur:', Object.keys(error || {}));
-        
-        // Essayer d'extraire un message d'erreur plus détaillé depuis plusieurs sources
-        let errorMessage = error.message || 'Erreur lors de l\'appel à l\'Edge Function';
-        
-        // Si l'erreur a un context avec des détails
-        if (error.context) {
-          console.log('📋 [CreatePaymentLinkDialog] Contexte erreur:', error.context);
-          if (error.context.msg) {
-            errorMessage = error.context.msg;
-          } else if (error.context.body) {
-            try {
-              const errorBody = typeof error.context.body === 'string' 
-                ? JSON.parse(error.context.body) 
-                : error.context.body;
-              console.log('📋 [CreatePaymentLinkDialog] Body erreur parsé:', errorBody);
-              if (errorBody.error) {
-                errorMessage = errorBody.error;
-              }
-              if (errorBody.details) {
-                errorMessage += `: ${errorBody.details}`;
-              }
-            } catch (e) {
-              console.warn('⚠️ [CreatePaymentLinkDialog] Erreur parsing body:', e);
-            }
-          }
-        }
-        
-        // Si data existe mais contient une erreur, l'utiliser (cas où l'Edge Function retourne 200 avec success: false)
-        if (data && data.error) {
-          errorMessage = data.error;
-          if (data.details) {
-            errorMessage += `: ${data.details}`;
-          }
-        }
-        
-        console.error('❌ [CreatePaymentLinkDialog] Message d\'erreur final:', errorMessage);
-        throw new Error(errorMessage);
+        throw new Error(data.details ? `${data.error}: ${data.details}` : errorMsg);
       }
 
       if (!data) {
@@ -245,11 +237,8 @@ export default function CreatePaymentLinkDialog({
       // Fermer le dialog de création
       setOpen(false);
       
-      // Appeler le callback de succès pour rafraîchir les données AVANT d'ouvrir le modal
-      if (onSuccess) {
-        onSuccess();
-      }
-      
+      // Ne pas appeler onSuccess ici : on l'appellera à la fermeture du modal d'envoi,
+      // sinon un reload immédiat empêche le modal de s'afficher.
       // Ouvrir le modal d'envoi après un court délai
       setTimeout(() => {
         setSendModalOpen(true);
@@ -472,6 +461,7 @@ export default function CreatePaymentLinkDialog({
               Annuler
             </Button>
             <Button
+              type="button"
               onClick={handleCreatePaymentLink}
               disabled={loading || !quote.signed}
               className="gap-2"
@@ -495,7 +485,10 @@ export default function CreatePaymentLinkDialog({
       {/* Modal d'envoi du lien (s'ouvre après création) */}
       <SendPaymentLinkModal
         open={sendModalOpen}
-        onOpenChange={setSendModalOpen}
+        onOpenChange={(open) => {
+          setSendModalOpen(open);
+          if (!open) onSuccess?.(); // Rafraîchir les données à la fermeture du modal
+        }}
         quote={quote}
         paymentUrl={createdPaymentUrl}
         paymentType={paymentType}

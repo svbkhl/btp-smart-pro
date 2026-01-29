@@ -217,14 +217,6 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
     const companyName = companyInfo.companyName || companyInfo.company_name || 'Votre Entreprise';
     doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
-    // Forme juridique - gérer les deux formats de noms de champs
-    const legalForm = companyInfo.legalForm || companyInfo.legal_form;
-    if (legalForm) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(legalForm, margin + (logoLoaded ? 40 : 5), yPosition + 22);
-    }
-
     // Titre "DEVIS" à droite
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
@@ -266,23 +258,7 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       companyDetails.push('');
     }
     
-    // Informations légales (gérer les deux formats)
-    const siret = companyInfo.siret;
-    const vatNumber = companyInfo.vatNumber || companyInfo.vat_number;
-    
-    if (siret) {
-      companyDetails.push(`SIRET: ${siret}`);
-    }
-    if (vatNumber) {
-      companyDetails.push(`TVA intracommunautaire: ${vatNumber}`);
-    }
-    
-    // Ligne vide pour séparer
-    if (siret || vatNumber) {
-      companyDetails.push('');
-    }
-    
-    // Coordonnées (gérer les deux formats)
+    // Coordonnées (gérer les deux formats) — SIRET/TVA/forme juridique en bas au centre
     const phone = companyInfo.phone;
     const email = companyInfo.email;
     
@@ -782,23 +758,16 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     
-    const footerInfo: string[] = [];
-    // Réutiliser les variables siret et vatNumber déjà déclarées plus haut dans la fonction (ligne 270-271)
-    
-    if (siret) {
-      footerInfo.push(`SIRET: ${siret}`);
-    }
-    if (vatNumber) {
-      footerInfo.push(`TVA intracommunautaire: ${vatNumber}`);
-    }
-    
-    if (footerInfo.length > 0) {
-      footerInfo.forEach((info, index) => {
-        if (index > 0) {
-          doc.text(' - ', margin + (index * 50), yPosition);
-        }
-        doc.text(info, margin + (index * 50) + (index > 0 ? 5 : 0), yPosition);
-      });
+    const centerX = pageWidth / 2;
+    const legalForm = companyInfo.legalForm || companyInfo.legal_form;
+    const siret = companyInfo.siret;
+    const vatNumber = companyInfo.vatNumber || companyInfo.vat_number;
+    const footerParts: string[] = [];
+    if (legalForm) footerParts.push(legalForm);
+    if (siret) footerParts.push(`SIRET: ${siret}`);
+    if (vatNumber) footerParts.push(`TVA intracommunautaire: ${vatNumber}`);
+    if (footerParts.length > 0) {
+      doc.text(footerParts.join(' — '), centerX, yPosition, { align: 'center' });
     }
 
     // ============================================
@@ -1052,14 +1021,6 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
     doc.setFont('helvetica', 'bold');
     const companyName = companyInfo.companyName || companyInfo.company_name || 'Votre Entreprise';
     doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
-
-    // Forme juridique - gérer les deux formats de noms de champs
-    const legalForm = companyInfo.legalForm || companyInfo.legal_form;
-    if (legalForm) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(legalForm, margin + (logoLoaded ? 40 : 5), yPosition + 22);
-    }
 
     // Titre "DEVIS" à droite
     doc.setFontSize(24);
@@ -1387,24 +1348,16 @@ export async function generateQuotePDFBase64(params: DownloadQuotePDFParams): Pr
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     
-    const footerInfo: string[] = [];
+    const centerX = pageWidth / 2;
+    const legalForm = companyInfo.legalForm || companyInfo.legal_form;
     const siret = companyInfo.siret;
     const vatNumber = companyInfo.vatNumber || companyInfo.vat_number;
-    
-    if (siret) {
-      footerInfo.push(`SIRET: ${siret}`);
-    }
-    if (vatNumber) {
-      footerInfo.push(`TVA intracommunautaire: ${vatNumber}`);
-    }
-    
-    if (footerInfo.length > 0) {
-      footerInfo.forEach((info, index) => {
-        if (index > 0) {
-          doc.text(' - ', margin + (index * 50), yPosition);
-        }
-        doc.text(info, margin + (index * 50) + (index > 0 ? 5 : 0), yPosition);
-      });
+    const footerParts: string[] = [];
+    if (legalForm) footerParts.push(legalForm);
+    if (siret) footerParts.push(`SIRET: ${siret}`);
+    if (vatNumber) footerParts.push(`TVA intracommunautaire: ${vatNumber}`);
+    if (footerParts.length > 0) {
+      doc.text(footerParts.join(' — '), centerX, yPosition, { align: 'center' });
     }
 
     // ============================================

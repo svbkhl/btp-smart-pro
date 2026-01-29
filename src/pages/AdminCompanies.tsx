@@ -114,8 +114,10 @@ const AdminCompanies = () => {
   const handleDeleteCompany = async () => {
     if (!companyToDelete) return;
 
-    // Vérifier que le texte de confirmation correspond
-    if (deleteConfirmationText !== companyToDelete.name) {
+    // Vérifier que le texte de confirmation correspond (insensible à la casse, trim)
+    const normalizedConfirm = deleteConfirmationText.trim().toLowerCase();
+    const normalizedName = companyToDelete.name.trim().toLowerCase();
+    if (normalizedConfirm !== normalizedName) {
       toast({
         title: "Erreur de confirmation",
         description: "Le nom de l'entreprise ne correspond pas. Veuillez réessayer.",
@@ -302,7 +304,7 @@ const AdminCompanies = () => {
                     <Label className="text-sm cursor-pointer">Calendrier</Label>
                   </div>
 
-                  {/* Employés & RH */}
+                  {/* Employés */}
                   <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
                     <Switch
                       checked={newCompanyData.features.employes === true}
@@ -316,7 +318,7 @@ const AdminCompanies = () => {
                         });
                       }}
                     />
-                    <Label className="text-sm cursor-pointer">Employés & RH</Label>
+                    <Label className="text-sm cursor-pointer">Employés</Label>
                   </div>
 
                   {/* IA */}
@@ -455,7 +457,10 @@ const AdminCompanies = () => {
                 <Button
                   variant="destructive"
                   onClick={handleDeleteCompany}
-                  disabled={deleteCompany.isPending || deleteConfirmationText !== companyToDelete.name}
+                  disabled={
+                    deleteCompany.isPending ||
+                    deleteConfirmationText.trim().toLowerCase() !== companyToDelete.name.trim().toLowerCase()
+                  }
                   className="gap-2 rounded-xl"
                 >
                   {deleteCompany.isPending ? (

@@ -133,21 +133,8 @@ export const QuoteDisplay = ({
           )}
           <div className="space-y-1">
             <h1 className={isSimplified ? "text-xl font-bold" : "text-2xl font-bold"}>{companyInfo?.company_name || 'Nom de l\'entreprise'}</h1>
-            {!isSimplified && companyInfo?.legal_form && (
-              <p className="text-sm text-gray-600">{companyInfo.legal_form}</p>
-            )}
             {!isSimplified && companyAddress && (
               <p className="text-sm text-gray-600">{companyAddress}</p>
-            )}
-            {!isSimplified && (
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
-                {companyInfo?.siret && (
-                  <span>SIRET: {companyInfo.siret}</span>
-                )}
-                {companyInfo?.vat_number && (
-                  <span>TVA: {companyInfo.vat_number}</span>
-                )}
-              </div>
             )}
             {!isSimplified && (
               <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
@@ -394,6 +381,13 @@ export const QuoteDisplay = ({
           <div className="text-xs text-gray-600 line-clamp-3">
             {companyInfo.terms_and_conditions}
           </div>
+        </div>
+      )}
+
+      {/* Pied de page : forme juridique, SIRET, TVA — au centre */}
+      {(companyInfo?.legal_form || companyInfo?.siret || companyInfo?.vat_number) && (
+        <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+          {[companyInfo?.legal_form, companyInfo?.siret && `SIRET: ${companyInfo.siret}`, companyInfo?.vat_number && `TVA: ${companyInfo.vat_number}`].filter(Boolean).join(' — ')}
         </div>
       )}
 

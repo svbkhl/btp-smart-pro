@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Mail,
   Search,
@@ -33,13 +34,17 @@ import {
   User,
   AlertCircle,
   Send,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useQuery } from "@tanstack/react-query";
-import { getMessages, Message, MessageType } from "@/services/messageService";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getMessages, deleteMessages, Message, MessageType } from "@/services/messageService";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 
 // =====================================================
 // TYPES
@@ -121,11 +126,65 @@ const STATUS_CONFIG: Record<string, {
 
 const MessagingNew = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const toggleMessageSelection = (id: string) => {
+    setSelectedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    const ids = Array.from(selectedMessageIds);
+    if (ids.length === 0) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteMessages(ids);
+      if (result.success) {
+        await queryClient.invalidateQueries({ queryKey: ["messages"] });
+        setSelectedMessageIds(new Set());
+        setSelectionMode(false);
+        toast({
+          title: "Messages supprimés",
+          description: `${ids.length} message${ids.length > 1 ? "s" : ""} supprimé${ids.length > 1 ? "s" : ""}.`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: result.error ?? "Impossible de supprimer les messages.",
+        });
+      }
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: e?.message ?? "Impossible de supprimer les messages.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedMessageIds(new Set(filteredMessages.map((m) => m.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedMessageIds(new Set());
+  };
 
   // Récupérer les filtres depuis l'URL
   const documentIdFromUrl = searchParams.get('document');
@@ -246,14 +305,39 @@ const MessagingNew = () => {
 
         {/* Liste des messages */}
         <div>
-          {/* Indicateur discret des messages envoyés aujourd'hui */}
-          <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-            <Send className="w-4 h-4" />
-            <span>
-              {messagesSentToday === 0 
-                ? "Aucun message envoyé aujourd'hui"
-                : `${messagesSentToday} message${messagesSentToday > 1 ? 's' : ''} envoyé${messagesSentToday > 1 ? 's' : ''} aujourd'hui`}
-            </span>
+          {/* Indicateur + bouton sélection */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Send className="w-4 h-4" />
+              <span>
+                {messagesSentToday === 0 
+                  ? "Aucun message envoyé aujourd'hui"
+                  : `${messagesSentToday} message${messagesSentToday > 1 ? 's' : ''} envoyé${messagesSentToday > 1 ? 's' : ''} aujourd'hui`}
+              </span>
+            </div>
+            {filteredMessages.length > 0 && (
+              <Button
+                variant={selectionMode ? "secondary" : "outline"}
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  setSelectionMode((v) => !v);
+                  if (selectionMode) setSelectedMessageIds(new Set());
+                }}
+              >
+                {selectionMode ? (
+                  <>
+                    <Square className="w-4 h-4" />
+                    Annuler la sélection
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="w-4 h-4" />
+                    Sélectionner des messages
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           <GlassCard className="p-6">
@@ -274,6 +358,38 @@ const MessagingNew = () => {
                   ✕ Retirer le filtre
                 </Button>
               </p>
+            </div>
+          )}
+          {selectionMode && filteredMessages.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border border-border bg-muted/30">
+              <span className="text-sm font-medium">
+                {selectedMessageIds.size > 0
+                  ? `${selectedMessageIds.size} message${selectedMessageIds.size > 1 ? "s" : ""} sélectionné${selectedMessageIds.size > 1 ? "s" : ""}`
+                  : "Sélectionnez des messages à supprimer"}
+              </span>
+              <div className="flex items-center gap-2">
+                {selectedMessageIds.size < filteredMessages.length ? (
+                  <Button variant="outline" size="sm" onClick={selectAllFiltered}>
+                    Tout sélectionner
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={clearSelection}>
+                    Tout désélectionner
+                  </Button>
+                )}
+                {selectedMessageIds.size > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    disabled={isDeleting}
+                    onClick={handleDeleteSelected}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isDeleting ? "Suppression…" : `Supprimer (${selectedMessageIds.size})`}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
           {isLoading ? (
@@ -308,10 +424,32 @@ const MessagingNew = () => {
                       className="group"
                     >
                       <div
-                        className="p-4 rounded-lg border border-border/50 hover:border-border hover:bg-accent/50 transition-all cursor-pointer"
-                        onClick={() => setSelectedMessage(message)}
+                        className={`p-4 rounded-lg border transition-all ${
+                          selectionMode 
+                            ? selectedMessageIds.has(message.id)
+                              ? "border-primary bg-primary/10 hover:bg-primary/15 cursor-pointer"
+                              : "border-border/50 hover:border-border hover:bg-accent/50 cursor-pointer"
+                            : "border-border/50 hover:border-border hover:bg-accent/50 cursor-pointer"
+                        }`}
+                        onClick={() => {
+                          if (selectionMode) {
+                            toggleMessageSelection(message.id);
+                          } else {
+                            setSelectedMessage(message);
+                          }
+                        }}
                       >
                         <div className="flex items-start gap-4">
+                          {/* Checkbox de sélection */}
+                          {selectionMode && (
+                            <div className="flex-shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedMessageIds.has(message.id)}
+                                onCheckedChange={() => toggleMessageSelection(message.id)}
+                              />
+                            </div>
+                          )}
+                          
                           {/* Icône type */}
                           <div className={`p-2 rounded-lg ${typeConfig.bgColor} flex-shrink-0`}>
                             <TypeIcon className={`w-5 h-5 ${typeConfig.color}`} />

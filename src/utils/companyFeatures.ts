@@ -71,7 +71,7 @@ export const ALL_FEATURES: Array<{
   },
   {
     key: "employes",
-    label: "Employés & RH",
+    label: "Employés",
     description: "Gestion des employés et ressources humaines",
   },
 ];

@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 
 interface NotificationPreferences {
-  email_notifications: boolean;
   push_notifications: boolean;
   quote_reminders: boolean;
   payment_reminders: boolean;
@@ -25,8 +24,9 @@ export const NotificationSettings = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pushRequesting, setPushRequesting] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
-    email_notifications: true,
     push_notifications: true,
     quote_reminders: true,
     payment_reminders: true,
@@ -35,20 +35,6 @@ export const NotificationSettings = () => {
     quote_reminder_days: 3,
     payment_reminder_days: 3,
   });
-
-  // Demander automatiquement la permission pour les notifications push au montage
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          setPreferences((prev) => ({ ...prev, push_notifications: true }));
-          console.log("✅ Permission pour les notifications push accordée");
-        }
-      });
-    } else if (Notification.permission === "granted") {
-      setPreferences((prev) => ({ ...prev, push_notifications: true }));
-    }
-  }, []);
 
   // Charger les préférences au montage
   useEffect(() => {
@@ -61,11 +47,10 @@ export const NotificationSettings = () => {
           .from("user_notification_preferences")
           .select("*")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
         if (data && !error) {
           setPreferences({
-            email_notifications: data.email_notifications ?? true,
             push_notifications: data.push_notifications ?? true,
             quote_reminders: data.quote_reminders ?? true,
             payment_reminders: data.payment_reminders ?? true,
@@ -74,12 +59,15 @@ export const NotificationSettings = () => {
             quote_reminder_days: data.quote_reminder_days ?? 3,
             payment_reminder_days: data.payment_reminder_days ?? 3,
           });
-          console.log("✅ Préférences de notifications chargées");
-        } else {
-          console.log("ℹ️ Aucune préférence trouvée, utilisation des valeurs par défaut");
         }
-      } catch (error) {
-        console.error("Erreur chargement préférences:", error);
+        setTableError(null);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        const err = error as { code?: string; status?: number };
+        const isTableMissing = msg.includes("does not exist") || msg.includes("relation") || msg.includes("42P01") || err?.code === "PGRST301" || err?.status === 404;
+        if (isTableMissing) {
+          setTableError("La table des préférences n'existe pas encore. Exécutez la migration Supabase « user_notification_preferences » puis réessayez.");
+        }
       } finally {
         setLoading(false);
       }
@@ -88,7 +76,7 @@ export const NotificationSettings = () => {
     loadPreferences();
   }, [user]);
 
-  // Demander la permission pour les notifications push
+  // Demander la permission pour les notifications push (doit être appelé au clic utilisateur)
   const requestPushPermission = async () => {
     if (!("Notification" in window)) {
       toast({
@@ -100,6 +88,7 @@ export const NotificationSettings = () => {
     }
 
     if (Notification.permission === "granted") {
+      setPreferences((p) => ({ ...p, push_notifications: true }));
       toast({
         title: "Déjà autorisé",
         description: "Les notifications push sont déjà activées",
@@ -107,20 +96,43 @@ export const NotificationSettings = () => {
       return;
     }
 
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-      setPreferences({ ...preferences, push_notifications: true });
+    if (Notification.permission === "denied") {
       toast({
-        title: "Autorisation accordée",
-        description: "Les notifications push sont maintenant activées",
-      });
-    } else {
-      setPreferences({ ...preferences, push_notifications: false });
-      toast({
-        title: "Autorisation refusée",
-        description: "Les notifications push ne peuvent pas être activées",
+        title: "Notifications bloquées",
+        description: "Autorisez les notifications dans les paramètres du navigateur pour ce site.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setPushRequesting(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        const next = { ...preferences, push_notifications: true };
+        setPreferences(next);
+        toast({
+          title: "Autorisation accordée",
+          description: "Les notifications push sont activées.",
+        });
+        try {
+          await supabase.from("user_notification_preferences").upsert(
+            { user_id: user!.id, email_notifications: true, ...next, updated_at: new Date().toISOString() },
+            { onConflict: "user_id" }
+          );
+        } catch {
+          // Table peut ne pas exister
+        }
+      } else {
+        setPreferences((p) => ({ ...p, push_notifications: false }));
+        toast({
+          title: "Autorisation refusée",
+          description: "Activez-les plus tard via ce bouton si vous changez d'avis.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setPushRequesting(false);
     }
   };
 
@@ -139,11 +151,15 @@ export const NotificationSettings = () => {
     try {
       const { error } = await supabase
         .from("user_notification_preferences")
-        .upsert({
-          user_id: user.id,
-          ...preferences,
-          updated_at: new Date().toISOString(),
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            email_notifications: true,
+            ...preferences,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        )
         .select()
         .single();
 
@@ -155,11 +171,15 @@ export const NotificationSettings = () => {
         title: "Préférences sauvegardées",
         description: "Vos préférences de notifications ont été mises à jour",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Erreur sauvegarde préférences:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("does not exist") || msg.includes("relation") || msg.includes("42P01")) {
+        setTableError("La table des préférences n'existe pas. Exécutez la migration Supabase « user_notification_preferences ».");
+      }
       toast({
         title: "Erreur",
-        description: error.message || "Impossible de sauvegarder les préférences",
+        description: msg || "Impossible de sauvegarder les préférences",
         variant: "destructive",
       });
     } finally {
@@ -169,7 +189,7 @@ export const NotificationSettings = () => {
 
   if (loading) {
     return (
-      <GlassCard className="p-6">
+      <GlassCard className="p-4 sm:p-6">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
@@ -184,73 +204,76 @@ export const NotificationSettings = () => {
       transition={{ duration: 0.3 }}
       className="space-y-6"
     >
-      <GlassCard className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Bell className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">Paramètres de Notifications</h2>
+      <GlassCard className="p-4 sm:p-6">
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-semibold">Paramètres de Notifications</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Configurez les notifications push et les rappels
+            </p>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground mb-6">
-          Configurez comment et quand vous souhaitez recevoir des notifications
-        </p>
 
-        {/* Types de notifications */}
+        {tableError && (
+          <div className="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
+            {tableError}
+          </div>
+        )}
+
+        {/* Notifications push */}
         <div className="space-y-6">
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Types de notifications</h3>
-            
-            <div className="space-y-4 p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email_notifications">Notifications par email</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Recevoir des emails pour les événements importants
+            <h3 className="font-semibold text-lg">Notifications push</h3>
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-0.5 min-w-0">
+                  <Label htmlFor="push_notifications" className="text-base">Notifications dans le navigateur</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                    Recevoir des alertes pour les événements importants (devis, paiements, rappels).
                   </p>
                 </div>
-                <Switch
-                  id="email_notifications"
-                  checked={preferences.email_notifications}
-                  onCheckedChange={(checked) =>
-                    setPreferences({ ...preferences, email_notifications: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="push_notifications">Notifications push</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Recevoir des notifications dans le navigateur
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-shrink-0 items-center gap-2">
                   {Notification.permission === "denied" && (
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" aria-hidden />
                   )}
-                  <Switch
-                    id="push_notifications"
-                    checked={preferences.push_notifications && Notification.permission === "granted"}
-                    onCheckedChange={(checked) => {
-                      if (checked && Notification.permission !== "granted") {
-                        requestPushPermission();
-                      } else {
-                        setPreferences({ ...preferences, push_notifications: checked });
-                      }
-                    }}
-                    disabled={Notification.permission === "denied"}
-                  />
+                  {Notification.permission === "granted" ? (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="h-5 w-5" />
+                      <span>Activées</span>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={requestPushPermission}
+                      disabled={pushRequesting || Notification.permission === "denied"}
+                      className="gap-2 rounded-xl shrink-0"
+                    >
+                      {pushRequesting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Demande en cours…
+                        </>
+                      ) : (
+                        <>
+                          <Bell className="h-4 w-4" />
+                          Activer les notifications push
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
-
-              {Notification.permission !== "granted" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={requestPushPermission}
-                  className="w-full gap-2 rounded-xl"
-                >
-                  <Bell className="h-4 w-4" />
-                  Autoriser les notifications push
-                </Button>
+              {Notification.permission !== "granted" && Notification.permission !== "denied" && (
+                <p className="text-xs text-muted-foreground">
+                  Cliquez sur le bouton pour demander l&apos;autorisation au navigateur (requis pour activer).
+                </p>
+              )}
+              {Notification.permission === "denied" && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Les notifications sont bloquées. Autorisez-les dans les paramètres du site (icône cadenas dans la barre d&apos;adresse).
+                </p>
               )}
             </div>
           </div>
@@ -258,117 +281,70 @@ export const NotificationSettings = () => {
           {/* Rappels spécifiques */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Rappels automatiques</h3>
-            
-            <div className="space-y-4 p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="quote_reminders">Rappels de devis</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Rappels pour les devis en attente
-                  </p>
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              {[
+                { id: "quote_reminders", label: "Rappels de devis", desc: "Rappels pour les devis en attente", key: "quote_reminders" as const },
+                { id: "payment_reminders", label: "Rappels de paiement", desc: "Rappels pour les paiements dus ou en retard", key: "payment_reminders" as const },
+                { id: "project_reminders", label: "Rappels de projets", desc: "Rappels pour les débuts et fins de chantiers", key: "project_reminders" as const },
+                { id: "maintenance_reminders", label: "Rappels de maintenance", desc: "Rappels pour les échéances de maintenance", key: "maintenance_reminders" as const },
+              ].map(({ id, label, desc, key }) => (
+                <div key={key} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                  <div className="space-y-0.5 min-w-0">
+                    <Label htmlFor={id}>{label}</Label>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
+                  <Switch
+                    id={id}
+                    checked={preferences[key]}
+                    onCheckedChange={(checked) =>
+                      setPreferences({ ...preferences, [key]: checked })
+                    }
+                    className="sm:flex-shrink-0"
+                  />
                 </div>
-                <Switch
-                  id="quote_reminders"
-                  checked={preferences.quote_reminders}
-                  onCheckedChange={(checked) =>
-                    setPreferences({ ...preferences, quote_reminders: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="payment_reminders">Rappels de paiement</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Rappels pour les paiements dus ou en retard
-                  </p>
-                </div>
-                <Switch
-                  id="payment_reminders"
-                  checked={preferences.payment_reminders}
-                  onCheckedChange={(checked) =>
-                    setPreferences({ ...preferences, payment_reminders: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="project_reminders">Rappels de projets</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Rappels pour les débuts et fins de chantiers
-                  </p>
-                </div>
-                <Switch
-                  id="project_reminders"
-                  checked={preferences.project_reminders}
-                  onCheckedChange={(checked) =>
-                    setPreferences({ ...preferences, project_reminders: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="maintenance_reminders">Rappels de maintenance</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Rappels pour les échéances de maintenance
-                  </p>
-                </div>
-                <Switch
-                  id="maintenance_reminders"
-                  checked={preferences.maintenance_reminders}
-                  onCheckedChange={(checked) =>
-                    setPreferences({ ...preferences, maintenance_reminders: checked })
-                  }
-                />
-              </div>
+              ))}
             </div>
           </div>
 
           {/* Délais de rappel */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Délais de rappel</h3>
-            
-            <div className="space-y-4 p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
-              <div className="space-y-2">
-                <Label htmlFor="quote_reminder_days">
-                  Rappeler les devis en attente après (jours)
-                </Label>
-                <input
-                  id="quote_reminder_days"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={preferences.quote_reminder_days}
-                  onChange={(e) =>
-                    setPreferences({
-                      ...preferences,
-                      quote_reminder_days: parseInt(e.target.value) || 3,
-                    })
-                  }
-                  className="w-full px-3 py-2 rounded-lg bg-background border border-border"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="payment_reminder_days">
-                  Rappeler les paiements avant l'échéance (jours)
-                </Label>
-                <input
-                  id="payment_reminder_days"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={preferences.payment_reminder_days}
-                  onChange={(e) =>
-                    setPreferences({
-                      ...preferences,
-                      payment_reminder_days: parseInt(e.target.value) || 3,
-                    })
-                  }
-                  className="w-full px-3 py-2 rounded-lg bg-background border border-border"
-                />
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quote_reminder_days">Rappeler les devis en attente après (jours)</Label>
+                  <input
+                    id="quote_reminder_days"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={preferences.quote_reminder_days}
+                    onChange={(e) =>
+                      setPreferences({
+                        ...preferences,
+                        quote_reminder_days: parseInt(e.target.value, 10) || 3,
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payment_reminder_days">Rappeler les paiements avant l&apos;échéance (jours)</Label>
+                  <input
+                    id="payment_reminder_days"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={preferences.payment_reminder_days}
+                    onChange={(e) =>
+                      setPreferences({
+                        ...preferences,
+                        payment_reminder_days: parseInt(e.target.value, 10) || 3,
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border"
+                  />
+                </div>
               </div>
             </div>
           </div>

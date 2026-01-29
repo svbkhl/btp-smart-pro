@@ -16,6 +16,62 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 import { verifyCompanyMember } from "../_shared/auth.ts";
 
+// Helper pour récupérer le company_id avec fallback agressif
+async function getCompanyId(supabaseClient: any, userId: string, quoteCompanyId?: string): Promise<string> {
+  // Priorité 1 : company_id du devis
+  if (quoteCompanyId) {
+    console.log('✅ company_id trouvé depuis le devis:', quoteCompanyId);
+    return quoteCompanyId;
+  }
+
+  // Priorité 2 : company_id depuis company_users
+  console.log('⚠️ Pas de company_id dans le devis, récupération depuis user');
+  const { data: companyUser, error } = await supabaseClient
+    .from('company_users')
+    .select('company_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ Erreur récupération company_id depuis company_users:', error);
+  }
+
+  if (companyUser?.company_id) {
+    console.log('✅ company_id trouvé depuis company_users:', companyUser.company_id);
+    return companyUser.company_id;
+  }
+
+  // Priorité 3 : Créer une company par défaut pour cet utilisateur
+  console.error('⚠️ FALLBACK ULTIME: Création company pour user:', userId);
+
+  const { data: newCompany, error: companyError } = await supabaseClient
+    .from('companies')
+    .insert({
+      name: 'Entreprise par défaut',
+      owner_id: userId,
+    })
+    .select()
+    .single();
+
+  if (companyError || !newCompany) {
+    console.error('❌ Impossible de créer company de fallback:', companyError);
+    throw new Error('Impossible de déterminer ou créer company_id');
+  }
+
+  // Lier l'utilisateur à cette nouvelle company
+  await supabaseClient
+    .from('company_users')
+    .insert({
+      user_id: userId,
+      company_id: newCompany.id,
+      role: 'owner',
+    });
+
+  console.log('✅ Company de fallback créée:', newCompany.id);
+  return newCompany.id;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -273,6 +329,18 @@ serve(async (req) => {
 
     console.log('✅ Devis trouvé et signé:', quote_id);
 
+    // Résoudre company_id (auth, devis ou company_users) pour facture/paiement
+    if (!companyId) {
+      companyId = await getCompanyId(supabaseClient, user.id, quote.company_id);
+    }
+    if (!companyId) {
+      console.error('❌ [create-payment-link] Impossible de déterminer company_id');
+      return new Response(
+        JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // =====================================================
     // 2️⃣ GÉNÉRER OU RÉCUPÉRER LA FACTURE
     // =====================================================
@@ -307,12 +375,32 @@ serve(async (req) => {
         invoiceId = existingInvoice.id;
         console.log('✅ Facture existante trouvée:', invoiceId);
       } else {
-        // Créer une nouvelle facture
+        // Créer une nouvelle facture — résolution définitive de company_id juste avant l'insert (défensif)
+        let finalCompanyId: string | null = (companyId && String(companyId).trim()) ? companyId : null;
+        if (!finalCompanyId) {
+          try {
+            finalCompanyId = await getCompanyId(supabaseClient, user.id, quote.company_id);
+          } catch (e) {
+            console.error('❌ [create-payment-link] getCompanyId fallback failed:', e);
+            return new Response(
+              JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+        if (!finalCompanyId || !String(finalCompanyId).trim()) {
+          console.error('❌ [create-payment-link] company_id vide avant insert facture');
+          return new Response(
+            JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         const invoiceAmount = quote.estimated_cost || 0;
         const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
 
         const invoiceData: any = {
           user_id: user.id,
+          company_id: finalCompanyId,
           client_id: quote.client_id,
           quote_id: quote_id,
           invoice_number: invoiceNumber,
@@ -326,10 +414,23 @@ serve(async (req) => {
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 jours
         };
         
-        // Ajouter company_id seulement s'il existe
-        if (quote.company_id || companyId) {
-          invoiceData.company_id = quote.company_id || companyId;
+        // Garde absolue : ne jamais insérer avec company_id null
+        const safeCompanyId = (invoiceData.company_id && String(invoiceData.company_id).trim()) || finalCompanyId || (companyId && String(companyId).trim()) || null;
+        if (!safeCompanyId) {
+          console.error('❌ [create-payment-link] Blocage insert: company_id manquant');
+          return new Response(
+            JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
+        invoiceData.company_id = safeCompanyId;
+
+        console.log('📋 [create-payment-link] Données facture à créer:', {
+          user_id: invoiceData.user_id,
+          company_id: invoiceData.company_id,
+          quote_id: invoiceData.quote_id,
+          invoice_number: invoiceData.invoice_number,
+        });
 
         const { data: newInvoice, error: invoiceError } = await supabaseClient
           .from('invoices')
@@ -339,12 +440,24 @@ serve(async (req) => {
 
         if (invoiceError || !newInvoice) {
           console.error('❌ [create-payment-link] Erreur création facture:', invoiceError);
+          console.error('❌ [create-payment-link] Données tentées:', {
+            user_id: invoiceData.user_id,
+            company_id: invoiceData.company_id,
+            quote_id: invoiceData.quote_id,
+            invoice_number: invoiceData.invoice_number,
+            companyId: companyId,
+            invoiceData_full: JSON.stringify(invoiceData),
+          });
           return new Response(
             JSON.stringify({ 
               success: false,
               error: 'Failed to create invoice', 
               details: invoiceError?.message,
               code: invoiceError?.code,
+              attempted_data: {
+                has_company_id: !!invoiceData.company_id,
+                company_id_value: invoiceData.company_id,
+              },
             }),
             {
               status: 500,
@@ -599,6 +712,7 @@ serve(async (req) => {
 
     const paymentData: any = {
       user_id: user.id,
+      company_id: companyId || quote.company_id || invoice.company_id,
       invoice_id: invoiceId,
       quote_id: quote_id,
       client_id: quote.client_id,
@@ -612,10 +726,12 @@ serve(async (req) => {
       reference: invoice.invoice_number,
     };
     
-    // Ajouter company_id seulement s'il existe
-    if (quote.company_id || companyId) {
-      paymentData.company_id = quote.company_id || companyId;
-    }
+    console.log('📋 [create-payment-link] Données paiement à créer:', {
+      user_id: paymentData.user_id,
+      company_id: paymentData.company_id,
+      invoice_id: paymentData.invoice_id,
+      quote_id: paymentData.quote_id,
+    });
 
     const { data: payment, error: paymentError } = await supabaseClient
       .from('payments')
@@ -689,54 +805,43 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error: any) {
-    console.error('❌ [create-payment-link] Error in create-payment-link:', error);
-    console.error('❌ [create-payment-link] Error stack:', error.stack);
-    console.error('❌ [create-payment-link] Error name:', error.name);
-    console.error('❌ [create-payment-link] Error message:', error.message);
-    
-    // Messages d'erreur plus clairs
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const msg = error?.message ?? 'Erreur inconnue';
+    console.error('❌ [create-payment-link] Error:', msg);
+    if (error?.stack) console.error('❌ [create-payment-link] Stack:', error.stack);
+
     let errorMessage = 'Erreur lors de la création du lien de paiement';
-    let errorDetails = error.message || 'Erreur inconnue';
-    
-    if (error.message?.includes('Stripe') || error.type?.includes('Stripe')) {
+    let errorDetails = msg;
+
+    if (msg.includes('Stripe') || (err as { type?: string })?.type?.includes?.('Stripe')) {
       errorMessage = 'Erreur Stripe';
-      errorDetails = error.message || error.raw?.message || 'Erreur lors de la communication avec Stripe';
-    } else if (error.message?.includes('not found') || error.message?.includes('not found')) {
+      errorDetails = (err as { raw?: { message?: string } })?.raw?.message ?? msg;
+    } else if (msg.includes('not found')) {
       errorMessage = 'Devis ou facture introuvable';
-      errorDetails = error.message;
-    } else if (error.message?.includes('Unauthorized') || error.message?.includes('access denied')) {
+    } else if (msg.includes('Unauthorized') || msg.includes('access denied')) {
       errorMessage = 'Accès refusé';
       errorDetails = 'Vous n\'avez pas les permissions nécessaires';
-    } else if (error.message?.includes('STRIPE_SECRET_KEY')) {
+    } else if (msg.includes('STRIPE_SECRET_KEY')) {
       errorMessage = 'Configuration Stripe manquante';
-      errorDetails = 'La clé API Stripe n\'est pas configurée';
-    } else if (error.message?.includes('company')) {
+    } else if (msg.includes('company')) {
       errorMessage = 'Erreur entreprise';
-      errorDetails = error.message;
     }
-    
-    const errorResponse = {
+
+    const errorResponse: Record<string, unknown> = {
       success: false,
       error: errorMessage,
       details: errorDetails,
-      error_type: error.name || error.type || 'UnknownError',
+      error_type: error?.name ?? 'UnknownError',
     };
-    
-    // Ajouter la stack seulement en développement
     if (Deno.env.get('ENVIRONMENT') === 'development' || Deno.env.get('NODE_ENV') === 'development') {
-      errorResponse.stack = error.stack;
+      errorResponse.stack = error?.stack;
     }
-    
-    console.error('❌ [create-payment-link] Envoi réponse d\'erreur:', errorResponse);
-    
-    return new Response(
-      JSON.stringify(errorResponse),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+
+    return new Response(JSON.stringify(errorResponse), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });
 

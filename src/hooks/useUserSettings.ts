@@ -63,12 +63,14 @@ export const useUserSettings = () => {
             throw error;
           }
 
-          // Si les settings n'existent pas, créer un enregistrement vide
-          // Le trigger force_company_id_for_user_settings ajoutera automatiquement company_id
+          // Si les settings n'existent pas, créer un enregistrement avec user_id et company_id (requis)
           if (!data) {
             const { data: newSettings, error: insertError } = await supabase
               .from("user_settings")
-              .insert({})
+              .insert({
+                user_id: user.id,
+                company_id: companyId,
+              })
               .select()
               .single();
 

@@ -26,7 +26,20 @@ export const useTextSnippets = () => {
         .eq("company_id", companyId)
         .order("usage_count", { ascending: false }); // Les plus utilisés en premier
 
-      if (error) throw error;
+      // Table absente ou inaccessible : signaler pour afficher le message de migration
+      if (error) {
+        const msg = (error as any)?.message || "";
+        const code = (error as any)?.code;
+        if (
+          code === "PGRST204" ||
+          (msg.includes("relation") && msg.includes("does not exist")) ||
+          msg.includes("Could not find")
+        ) {
+          logger.warn("useTextSnippets: table text_snippets absente ou non accessible", { code, message: msg });
+          throw new Error("TABLE_TEXT_SNIPPETS_MISSING");
+        }
+        throw error;
+      }
       return (data || []) as TextSnippet[];
     },
     enabled: !!user && !isLoadingCompanyId && !!companyId,

@@ -4,23 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useUserSettings, useUpdateUserSettings } from "@/hooks/useUserSettings";
 import { useToast } from "@/components/ui/use-toast";
 import { ImageUpload } from "@/components/ImageUpload";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
+import { EmailSignatureEditor } from "@/components/EmailSignatureEditor";
+import { useCompanyId } from "@/hooks/useCompanyId";
+import { useCompanies } from "@/hooks/useCompany";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Building2, Loader2, Save, FileSignature } from "lucide-react";
 import { motion } from "framer-motion";
 
 export const CompanySettings = () => {
   const { data: settings, isLoading } = useUserSettings();
   const updateSettings = useUpdateUserSettings();
+  const { companyId } = useCompanyId();
+  const { data: companies } = useCompanies();
+  const queryClient = useQueryClient();
+  const currentCompany = companyId && companies?.length ? companies.find((c) => c.id === companyId) ?? companies[0] : null;
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [savedSignatureData, setSavedSignatureData] = useState<string>("");
@@ -53,10 +55,11 @@ export const CompanySettings = () => {
       const currentLogo = settings.company_logo_url || "";
       const currentSignature = settings.signature_data || "";
 
-      // Initialiser au premier chargement
+      // Initialiser au premier chargement : nom = companies.name (celui choisi par l'admin) ou user_settings
       if (!isInitializedRef.current) {
+        const initialCompanyName = currentCompany?.name?.trim() || settings.company_name || "";
         setFormData({
-          company_name: settings.company_name || "",
+          company_name: initialCompanyName,
           email: settings.email || "",
           phone: settings.phone || "",
           address: settings.address || "",
@@ -98,9 +101,13 @@ export const CompanySettings = () => {
           setSavedSignatureName(settings.signature_name || "");
           previousSignatureRef.current = currentSignature;
         }
+        // Synchroniser le nom entreprise depuis companies (choisi par l'admin) si le champ est vide
+        if (currentCompany?.name?.trim() && !formData.company_name?.trim()) {
+          setFormData((prev) => ({ ...prev, company_name: currentCompany.name.trim() }));
+        }
       }
     }
-  }, [settings]);
+  }, [settings, currentCompany?.name]);
 
   const validateSIRET = (siret: string): boolean => {
     if (!siret) return true; // Optionnel
@@ -182,6 +189,14 @@ export const CompanySettings = () => {
     setSaving(true);
     try {
       await updateSettings.mutateAsync(formData);
+      // Garder companies.name en sync avec le nom affiché (sidebar + paramètres)
+      if (companyId && formData.company_name?.trim()) {
+        await supabase
+          .from("companies")
+          .update({ name: formData.company_name.trim(), updated_at: new Date().toISOString() })
+          .eq("id", companyId);
+        queryClient.invalidateQueries({ queryKey: ["companies"] });
+      }
       toast({
         title: "Paramètres sauvegardés",
         description: "Les informations de l'entreprise ont été mises à jour avec succès.",
@@ -286,24 +301,17 @@ export const CompanySettings = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="legal_form">Forme juridique</Label>
-              <Select
+              <Label htmlFor="legal_form">Forme juridique (optionnel)</Label>
+              <Input
+                id="legal_form"
                 value={formData.legal_form}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, legal_form: value }))}
-              >
-                <SelectTrigger id="legal_form" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
-                  <SelectValue placeholder="Sélectionnez une forme juridique" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SARL">SARL</SelectItem>
-                  <SelectItem value="SAS">SAS</SelectItem>
-                  <SelectItem value="EURL">EURL</SelectItem>
-                  <SelectItem value="SA">SA</SelectItem>
-                  <SelectItem value="SNC">SNC</SelectItem>
-                  <SelectItem value="Auto-entrepreneur">Auto-entrepreneur</SelectItem>
-                  <SelectItem value="Autre">Autre</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData((prev) => ({ ...prev, legal_form: e.target.value }))}
+                placeholder="Ex: SAS au capital social de 10 000 €, Auto-entrepreneur, SARL..."
+                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              />
+              <p className="text-xs text-muted-foreground">
+                Texte libre : forme juridique, capital social, etc. S’affiche en bas au centre des devis et factures.
+              </p>
             </div>
           </div>
 
@@ -444,17 +452,19 @@ export const CompanySettings = () => {
           </div>
         </form>
 
-        {/* Configuration de la signature électronique */}
+        {/* Signature : documents (devis/factures) + emails */}
         <div className="mt-8 pt-6 border-t border-border/50">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-2">
             <FileSignature className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-lg">Signature électronique de l'entreprise</h3>
+            <h3 className="font-semibold text-lg">Signature</h3>
           </div>
           <p className="text-sm text-muted-foreground mb-6">
-            Cette signature sera automatiquement ajoutée à vos devis et factures. Vous pouvez la dessiner ci-dessous ou la laisser vide si vous préférez signer manuellement chaque document.
+            Signature pour vos documents (devis, factures) et texte de fin pour vos emails. Les deux sont utilisés automatiquement.
           </p>
-          
-          <div className="space-y-4">
+
+          {/* 1. Signature électronique (dessin) pour devis et factures */}
+          <div className="space-y-4 mb-8">
+            <h4 className="font-medium text-sm text-foreground">Signature pour les documents (devis et factures)</h4>
             <SignatureCanvas
               value={formData.signature_data}
               onChange={(signatureData) => {
@@ -465,7 +475,6 @@ export const CompanySettings = () => {
                 setFormData((prev) => ({ ...prev, signature_name: name }));
               }}
             />
-            
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -486,53 +495,36 @@ export const CompanySettings = () => {
                 )}
               </Button>
             </div>
-            
-            {/* Afficher le message de confirmation seulement si la signature a été sauvegardée */}
             {savedSignatureData && 
              formData.signature_data === savedSignatureData && 
              formData.signature_name === savedSignatureName && (
-              <>
-                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">
-                        ✓ Signature enregistrée
-                      </p>
-                      <p className="text-xs text-green-700 dark:text-green-300">
-                        Cette signature sera automatiquement ajoutée à vos devis et factures lors de leur génération.
-                      </p>
-                      {savedSignatureName && (
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                          Signataire : {savedSignatureName}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0">
-                      <img 
-                        src={savedSignatureData} 
-                        alt="Aperçu de la signature" 
-                        className="w-24 h-12 object-contain bg-white rounded border border-green-300 dark:border-green-700 p-1"
-                      />
-                    </div>
+              <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">✓ Signature documents enregistrée</p>
+                    {savedSignatureName && (
+                      <p className="text-xs text-green-600 dark:text-green-400">Signataire : {savedSignatureName}</p>
+                    )}
                   </div>
+                  <img src={savedSignatureData} alt="Aperçu" className="w-24 h-12 object-contain bg-white rounded border border-green-300 dark:border-green-700 p-1 flex-shrink-0" />
                 </div>
-                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    💡 <strong>Astuce :</strong> La signature sera automatiquement utilisée lors de la création de devis et de la génération de PDFs.
-                  </p>
-                </div>
-              </>
+              </div>
             )}
-            
-            {/* Afficher un message si la signature a été modifiée mais pas encore sauvegardée */}
             {formData.signature_data && 
              (formData.signature_data !== savedSignatureData || formData.signature_name !== savedSignatureName) && (
               <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
-                <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                  ⚠️ <strong>Signature modifiée :</strong> N'oubliez pas d'enregistrer la signature pour qu'elle soit utilisée automatiquement.
-                </p>
+                <p className="text-xs text-yellow-800 dark:text-yellow-200">⚠️ Signature modifiée : enregistrez pour appliquer.</p>
               </div>
             )}
+          </div>
+
+          {/* 2. Signature email (texte) pour la fin des emails */}
+          <div className="pt-6 border-t border-border/50">
+            <h4 className="font-medium text-sm text-foreground mb-2">Signature pour les emails</h4>
+            <p className="text-xs text-muted-foreground mb-4">
+              Ce texte sera ajouté à la fin de vos emails (devis, factures, relances).
+            </p>
+            <EmailSignatureEditor />
           </div>
         </div>
 

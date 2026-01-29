@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings as SettingsIcon } from "lucide-react";
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { StripeSettings } from "@/components/settings/StripeSettings";
-import { EmailSettings } from "@/components/settings/EmailSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
+import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
+import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
@@ -27,10 +27,12 @@ import DelegationsManagement from "@/pages/DelegationsManagement";
 import RolesManagement from "@/pages/RolesManagement";
 import UsersManagementRBAC from "@/pages/UsersManagementRBAC";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 const Settings = () => {
   const { user, isAdmin, userRole, currentCompanyId } = useAuth();
   const { isOwner, can } = usePermissions();
+  const { fakeDataEnabled } = useFakeDataStore();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -40,9 +42,10 @@ const Settings = () => {
   const hasProcessedOAuth = useRef(false);
   const oauthCodeRef = useRef<string | null>(null);
   
-  // Lire le paramètre tab de l'URL
+  // Lire le paramètre tab de l'URL (contrôlé pour que ?tab=notifications ouvre le bon onglet)
   const tabFromUrl = searchParams.get("tab");
-  const defaultTab = tabFromUrl || "company";
+  const activeTab = tabFromUrl || "company";
+  const setActiveTab = (value: string) => setSearchParams({ tab: value }, { replace: true });
   
   // Gérer le callback Google Calendar OAuth
   const googleCalendarStatus = searchParams.get("google_calendar_status");
@@ -154,17 +157,16 @@ const Settings = () => {
   const canManageDelegations = isOwner || can("delegations.manage");
   
   // Ajuster le nombre de colonnes selon les onglets
-  // company, companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (si admin), stripe, email, integrations, notifications, security
+  // company, companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (si admin), stripe, integrations, notifications, security
   const tabCount = isAdministrator 
     ? (canManageDelegations ? 13 : 12) // +1 si delegations
     : isAdmin
     ? (canManageDelegations ? 10 : 9) // +1 si delegations
-    : 7; // company, stripe, email, integrations, notifications, security
+    : 6; // company, stripe, integrations, notifications, security
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     // Si on est en mode démo, rediriger vers le formulaire d'essai
-    const { fakeDataEnabled } = useFakeDataStore();
     if (fakeDataEnabled) {
       navigate("/?openTrialForm=true");
     } else {
@@ -185,11 +187,15 @@ const Settings = () => {
           </p>
         </div>
 
-        <Tabs defaultValue={defaultTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
             <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Entreprise</span>
+            </TabsTrigger>
+            <TabsTrigger value="employees" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+              <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">Employés</span>
             </TabsTrigger>
             {(isAdmin || isAdministrator) && (
               <>
@@ -231,10 +237,6 @@ const Settings = () => {
               <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Paiements</span>
             </TabsTrigger>
-            <TabsTrigger value="email" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">Emails</span>
-            </TabsTrigger>
             <TabsTrigger value="integrations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Intégrations</span>
@@ -247,10 +249,20 @@ const Settings = () => {
               <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Sécurité</span>
             </TabsTrigger>
+            <TabsTrigger value="legal" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+              <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">RGPD, Mentions légales, CGU</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="company" className="mt-0">
             <CompanySettings />
+          </TabsContent>
+
+          <TabsContent value="employees" className="mt-0">
+            <div className="[&_div]:!p-0 [&_main]:!p-0">
+              <UsersManagementRBAC embedded />
+            </div>
           </TabsContent>
 
           {(isAdmin || isAdministrator) && (
@@ -292,10 +304,6 @@ const Settings = () => {
             <StripeSettings />
           </TabsContent>
 
-          <TabsContent value="email" className="mt-0">
-            <EmailSettings />
-          </TabsContent>
-
           <TabsContent value="integrations" className="mt-0">
             <div className="space-y-6">
               <GoogleCalendarConnection />
@@ -308,6 +316,10 @@ const Settings = () => {
 
           <TabsContent value="security" className="mt-0">
             <SecuritySettings />
+          </TabsContent>
+
+          <TabsContent value="legal" className="mt-0">
+            <LegalPagesContent />
           </TabsContent>
         </Tabs>
       </div>

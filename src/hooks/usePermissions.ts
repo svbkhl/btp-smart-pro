@@ -98,14 +98,16 @@ export function usePermissions(): UsePermissionsReturn {
         .select('role_id, roles(id, slug, name, is_system, color, icon)')
         .eq('user_id', user.id)
         .eq('company_id', currentCompanyId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ [usePermissions] Error fetching role:', error);
         return null;
       }
 
-      console.log('✅ [usePermissions] Role loaded:', data);
+      if (data) {
+        console.log('✅ [usePermissions] Role loaded:', data);
+      }
       return data;
     },
     enabled: !!user && !!currentCompanyId,
@@ -115,6 +117,13 @@ export function usePermissions(): UsePermissionsReturn {
 
   const roleSlug = roleData?.roles?.slug || null;
   const roleName = roleData?.roles?.name || null;
+
+  // Propriétaire : slug 'owner' ou nom de rôle équivalent (Patron, Dirigeant, Propriétaire)
+  const isOwnerRole = useMemo(() => {
+    if (roleSlug === 'owner') return true;
+    const name = (roleName || '').toLowerCase();
+    return ['patron', 'propriétaire', 'dirigeant', 'owner'].some((s) => name.includes(s));
+  }, [roleSlug, roleName]);
 
   // Fonctions de vérification des permissions
   const can = useMemo(
@@ -139,7 +148,7 @@ export function usePermissions(): UsePermissionsReturn {
   );
 
   // Vérifications de rôles
-  const isOwner = roleSlug === 'owner';
+  const isOwner = isOwnerRole;
   const isAdmin = roleSlug === 'admin';
   const isRH = roleSlug === 'rh';
   const isEmployee = roleSlug === 'employee';

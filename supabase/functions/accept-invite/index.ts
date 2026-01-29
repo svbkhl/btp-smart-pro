@@ -86,7 +86,10 @@ serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Récupérer l'invitation
+    // Email du compte administrateur : les invitations envoyées par lui donnent le rôle dirigeant (owner)
+    const ADMIN_OWNER_EMAIL = "sabri.khalfallah6@gmail.com";
+
+    // Récupérer l'invitation (avec invited_by pour détecter l'inviteur)
     const { data: invite, error: inviteError } = await adminClient
       .from('company_invites')
       .select(`
@@ -97,6 +100,7 @@ serve(async (req) => {
         status,
         expires_at,
         token_hash,
+        invited_by,
         companies!inner(name)
       `)
       .eq('id', invite_id)
@@ -251,21 +255,40 @@ serve(async (req) => {
       isNewUser = true;
     }
 
-    // Récupérer le role_id depuis la table roles (si elle existe et est liée à company_id)
-    const roleSlugMapping: Record<'admin' | 'member', 'admin' | 'employee'> = {
-      admin: 'admin',
-      member: 'employee',
-    };
-    
-    const targetRoleSlug = roleSlugMapping[invite.role as 'admin' | 'member'];
-    
-    // Chercher le rôle par company_id ET slug (car roles est lié à company_id)
+    // Rôle effectif : celui stocké dans l'invitation (owner=dirigeant, admin, member) ou fallback si invité par l'admin propriétaire
+    let effectiveRoleSlug: 'owner' | 'admin' | 'employee' =
+      invite.role === 'owner' ? 'owner'
+      : invite.role === 'admin' ? 'admin'
+      : 'employee';
+    let effectiveRoleLabel: 'owner' | 'admin' | 'member' =
+      invite.role === 'owner' ? 'owner'
+      : invite.role === 'admin' ? 'admin'
+      : 'member';
+
+    if (effectiveRoleSlug === 'owner') {
+      console.log("✅ [accept-invite] Invitation en tant que dirigeant (owner) : rôle attribué");
+    }
+    if (effectiveRoleLabel !== 'owner' && invite.invited_by) {
+      try {
+        const { data: { user: inviterUser } } = await adminClient.auth.admin.getUserById(invite.invited_by);
+        const inviterEmail = (inviterUser?.email || '').toLowerCase().trim();
+        if (inviterEmail === ADMIN_OWNER_EMAIL.toLowerCase()) {
+          effectiveRoleSlug = 'owner';
+          effectiveRoleLabel = 'owner';
+          console.log("✅ [accept-invite] Invitation envoyée par le compte administrateur : rôle dirigeant (owner) attribué");
+        }
+      } catch (e) {
+        console.warn("⚠️ [accept-invite] Impossible de récupérer l'inviteur:", e);
+      }
+    }
+
+    // Récupérer le role_id depuis la table roles (company_id + slug)
     const { data: roleData } = await adminClient
       .from('roles')
       .select('id')
       .eq('company_id', invite.company_id)
-      .eq('slug', targetRoleSlug)
-      .maybeSingle(); // maybeSingle au lieu de single pour éviter erreur si pas de rôle
+      .eq('slug', effectiveRoleSlug)
+      .maybeSingle();
 
     // Ajouter à company_users (UPSERT pour éviter doublons)
     const { error: companyUserError } = await adminClient
@@ -273,7 +296,7 @@ serve(async (req) => {
       .upsert({
         company_id: invite.company_id,
         user_id: userId,
-        role: invite.role,
+        role: effectiveRoleLabel,
         role_id: roleData?.id || null,
         status: 'active',
       }, {
@@ -311,7 +334,7 @@ serve(async (req) => {
       is_new_user: isNewUser,
       company_id: invite.company_id,
       company_name: (invite.companies as any)?.name,
-      role: invite.role,
+      role: effectiveRoleLabel,
       // Pour nouveau user, retourner les infos pour connexion
       ...(isNewUser && {
         email: normalizedEmail,

@@ -13,15 +13,17 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Max-Age": "86400",
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight (204 + headers requis pour que le navigateur accepte la réponse)
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -36,15 +38,15 @@ serve(async (req) => {
     // Vérifier les variables d'environnement
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
       return new Response(
         JSON.stringify({ error: "Missing environment variables" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Créer le client Supabase avec le token de l'utilisateur
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -54,9 +56,11 @@ serve(async (req) => {
     }
 
     const userToken = authHeader.replace("Bearer ", "");
-    const supabaseUser = createClient(supabaseUrl, userToken);
+    // Client avec clé anon + JWT utilisateur en header pour vérifier l'identité (createClient(url, key) attend la clé anon, pas le JWT)
+    const supabaseUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${userToken}` } },
+    });
 
-    // Vérifier l'authentification de l'utilisateur
     const { data: { user: authenticatedUser }, error: authError } = await supabaseUser.auth.getUser();
     
     if (authError || !authenticatedUser) {

@@ -243,6 +243,28 @@ export async function verifyCompanyAdmin(
 }
 
 /**
+ * Récupère le company_id pour un utilisateur (pour factures/paiements).
+ * Utilise quote.company_id si fourni et non vide, sinon company_users.
+ * À utiliser dans create-payment-link et create-payment-link-v2.
+ */
+export async function getCompanyId(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  quoteCompanyId?: string | null
+): Promise<string | null> {
+  if (quoteCompanyId != null && String(quoteCompanyId).trim() !== "") {
+    return quoteCompanyId;
+  }
+  const { data: row } = await supabase
+    .from("company_users")
+    .select("company_id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  return row?.company_id ?? null;
+}
+
+/**
  * Crée une réponse HTTP d'erreur d'authentification
  */
 export function createAuthErrorResponse(authResult: AuthResult): Response {

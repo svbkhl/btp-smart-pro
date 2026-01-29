@@ -32,8 +32,6 @@ import { useToast } from "@/components/ui/use-toast";
 import CreatePaymentLinkDialog from "./CreatePaymentLinkDialog";
 import QuoteStatusBadge from "@/components/quotes/QuoteStatusBadge";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import { useQuotes } from "@/hooks/useQuotes";
 import {
   Select,
   SelectContent,
@@ -54,6 +52,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface PaymentsTabProps {
   payments: any[];
@@ -311,10 +310,9 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
                 <CreatePaymentLinkDialog
                   quote={quote}
                   onSuccess={() => {
-                    // Rafraîchir les données après création du lien
-                    queryClient.invalidateQueries({ queryKey: ['quotes'] });
-                    queryClient.invalidateQueries({ queryKey: ['payments'] });
-                    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                    // Rafraîchir paiements et devis sans recharger la page
+                    queryClient.invalidateQueries({ queryKey: ["payments"] });
+                    queryClient.invalidateQueries({ queryKey: ["quotes"] });
                   }}
                   trigger={
                     <Button size="sm" className="gap-2">

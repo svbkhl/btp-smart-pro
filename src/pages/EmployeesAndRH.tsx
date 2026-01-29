@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { 
   Users, 
-  ClipboardList, 
   UserCheck,
   ArrowRight,
   Briefcase,
@@ -117,7 +116,7 @@ const EmployeesAndRH = () => {
         >
           <div className="space-y-1 sm:space-y-2">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
-              Employés & RH
+              Employés
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
               Gérez vos employés, leurs plannings et les ressources humaines
@@ -232,26 +231,6 @@ const EmployeesAndRH = () => {
               <div className="flex items-center gap-3 min-h-[2.5rem]">
                 <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <span className="font-semibold text-sm flex-1">Mon planning</span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </div>
-            </GlassCard>
-          </Link>
-
-          <Link to="/rh/taches" className="h-full">
-            <GlassCard className="p-4 hover:bg-accent/50 transition-all cursor-pointer h-full">
-              <div className="flex items-center gap-3 min-h-[2.5rem]">
-                <ClipboardList className="w-5 h-5 text-indigo-500 flex-shrink-0" />
-                <span className="font-semibold text-sm flex-1">Tâches RH</span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </div>
-            </GlassCard>
-          </Link>
-
-          <Link to="/rh/candidatures" className="h-full">
-            <GlassCard className="p-4 hover:bg-accent/50 transition-all cursor-pointer h-full">
-              <div className="flex items-center gap-3 min-h-[2.5rem]">
-                <UserCheck className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                <span className="font-semibold text-sm flex-1">Candidatures</span>
                 <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               </div>
             </GlassCard>

@@ -116,12 +116,7 @@ export const useEmployeesRH = () => {
           try {
             const { data, error } = await supabase
               .from("employees" as any)
-              .select(`
-                *,
-                user:user_id (
-                  email
-                )
-              `)
+              .select("*")
               .order("created_at", { ascending: false });
 
             if (error) {

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ThemeProvider } from './components/ThemeProvider';
+import { DecorativeBackgroundProvider } from './contexts/DecorativeBackgroundContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 import { initEnv } from './lib/env';
 import './index.css';
@@ -24,7 +25,8 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="btp-smart-pro-theme">
-        <SidebarProvider>
+        <DecorativeBackgroundProvider>
+          <SidebarProvider>
           <BrowserRouter
             future={{
               v7_startTransition: true,
@@ -34,6 +36,7 @@ createRoot(document.getElementById('root')!).render(
             <App />
           </BrowserRouter>
         </SidebarProvider>
+        </DecorativeBackgroundProvider>
       </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>

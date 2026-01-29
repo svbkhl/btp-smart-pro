@@ -60,9 +60,14 @@ interface CompanyUser {
   };
 }
 
-export default function UsersManagementRBAC() {
+interface UsersManagementRBACProps {
+  /** Quand true, le composant est affiché dans un onglet (ex: Paramètres > Employés) sans layout complet */
+  embedded?: boolean;
+}
+
+export default function UsersManagementRBAC({ embedded = false }: UsersManagementRBACProps) {
   const { currentCompanyId, user: currentUser } = useAuth();
-  const { can, isOwner } = usePermissions();
+  const { can, isOwner, isAdmin } = usePermissions();
   const { roles } = useRoles();
   const queryClient = useQueryClient();
 
@@ -71,25 +76,80 @@ export default function UsersManagementRBAC() {
   const [selectedUser, setSelectedUser] = useState<CompanyUser | null>(null);
   const [newRoleId, setNewRoleId] = useState<string>('');
 
-  // Récupérer tous les utilisateurs de l'entreprise
-  const { data: companyUsers = [], isLoading } = useQuery({
+  // Récupérer tous les utilisateurs de l'entreprise (RPC pour éviter embed auth.users → 400)
+  const { data: companyUsers = [], isLoading, isError, error: queryError } = useQuery({
     queryKey: ['company-users', currentCompanyId],
     queryFn: async () => {
       if (!currentCompanyId) return [];
-
-      const { data, error } = await supabase
-        .from('company_users')
-        .select(`
-          *,
-          users:user_id(email, raw_user_meta_data),
-          roles:role_id(id, name, slug, color, is_system)
-        `)
-        .eq('company_id', currentCompanyId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as CompanyUser[];
+      const { data, error } = await supabase.rpc('get_company_users_with_profile', {
+        p_company_id: currentCompanyId,
+      });
+      if (!error) {
+        const rows = (data ?? []) as Array<{
+          id: string;
+          user_id: string;
+          company_id: string;
+          role_id: string;
+          status: string;
+          created_at: string;
+          email: string | null;
+          raw_user_meta_data: { first_name?: string; last_name?: string } | null;
+          role_pk: string;
+          role_name: string;
+          role_slug: string;
+          role_color: string;
+          role_is_system: boolean;
+        }>;
+        return rows.map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          company_id: row.company_id,
+          role_id: row.role_id,
+          status: row.status,
+          created_at: row.created_at,
+          users: {
+            email: row.email ?? '',
+            raw_user_meta_data: row.raw_user_meta_data ?? {},
+          },
+          roles: {
+            id: row.role_pk,
+            name: row.role_name,
+            slug: row.role_slug,
+            color: row.role_color,
+            is_system: row.role_is_system,
+          },
+        })) as CompanyUser[];
+      }
+      // Fallback si la RPC n'existe pas (PGRST202) : requête REST sans embed auth.users pour éviter 400
+      if (error?.code === 'PGRST202') {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('company_users')
+          .select('id, user_id, company_id, role_id, status, created_at, roles:role_id(id, name, slug, color, is_system)')
+          .eq('company_id', currentCompanyId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        if (fallbackError) throw fallbackError;
+        const rows = (fallbackData ?? []) as Array<{
+          id: string;
+          user_id: string;
+          company_id: string;
+          role_id: string;
+          status: string;
+          created_at: string;
+          roles: { id: string; name: string; slug: string; color: string; is_system: boolean };
+        }>;
+        return rows.map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          company_id: row.company_id,
+          role_id: row.role_id,
+          status: row.status,
+          created_at: row.created_at,
+          users: { email: '—', raw_user_meta_data: {} },
+          roles: row.roles,
+        })) as CompanyUser[];
+      }
+      throw error;
     },
     enabled: !!currentCompanyId && can('users.read'),
   });
@@ -195,30 +255,49 @@ export default function UsersManagementRBAC() {
 
   if (!can('users.read')) {
     return (
-      <PageLayout title="Gestion des utilisateurs" subtitle="Accès refusé" icon={Users}>
-        <Card className="p-8 text-center">
-          <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
-          <p className="text-muted-foreground">
-            Vous n'avez pas les permissions nécessaires pour accéder à cette page.
-          </p>
-        </Card>
-      </PageLayout>
+      <Card className="p-8 text-center">
+        <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
+        <p className="text-muted-foreground">
+          Vous n'avez pas les permissions nécessaires pour accéder à cette page.
+        </p>
+      </Card>
     );
   }
 
-  return (
-    <PageLayout
-      title="Gestion des utilisateurs"
-      subtitle="Gérer les membres de votre entreprise et leurs rôles"
-      icon={Users}
-      actions={
-        can('users.invite') && (
-          <InviteUserDialogRBAC
-            onSuccess={() => queryClient.invalidateQueries({ queryKey: ['company-users'] })}
-          />
-        )
+  const canInvite = can('users.invite') || isOwner || isAdmin;
+  const inviteButton = canInvite ? (
+    <InviteUserDialogRBAC
+      onSuccess={() => queryClient.invalidateQueries({ queryKey: ['company-users'] })}
+    />
+  ) : (
+    <Button
+      variant="default"
+      onClick={() =>
+        toast({
+          title: 'Permission requise',
+          description: 'Seuls les responsables ou administrateurs peuvent inviter des membres.',
+          variant: 'destructive',
+        })
       }
     >
+      <UserPlus className="h-4 w-4 mr-2" />
+      Inviter un employé
+    </Button>
+  );
+
+  const content = (
+    <>
+      {/* Barre d'action : uniquement le bouton Inviter (pas de recherche en mode embedded) */}
+      {!embedded && inviteButton ? (
+        <div className="flex justify-end mb-4">
+          {inviteButton}
+        </div>
+      ) : embedded && inviteButton ? (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 p-3 sm:p-4 mb-4">
+          {inviteButton}
+        </div>
+      ) : null}
+
       {/* Liste des utilisateurs */}
       <div className="grid gap-4">
         {companyUsers.map((companyUser) => {
@@ -314,9 +393,14 @@ export default function UsersManagementRBAC() {
         {companyUsers.length === 0 && !isLoading && (
           <Card className="p-8 text-center">
             <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-6">
               Aucun utilisateur trouvé. Invitez des membres à rejoindre votre entreprise !
             </p>
+            {inviteButton ? (
+              <div className="flex justify-center">
+                {inviteButton}
+              </div>
+            ) : null}
           </Card>
         )}
       </div>
@@ -391,6 +475,24 @@ export default function UsersManagementRBAC() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4 min-w-0">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <PageLayout
+      title="Gestion des utilisateurs"
+      subtitle="Gérer les membres de votre entreprise et leurs rôles"
+      icon={Users}
+    >
+      {content}
     </PageLayout>
   );
 }

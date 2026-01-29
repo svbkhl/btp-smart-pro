@@ -12,29 +12,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTextSnippets, useCreateTextSnippet, useUpdateTextSnippet, useDeleteTextSnippet, useIncrementSnippetUsage } from "@/hooks/useTextLibrary";
 import type { TextSnippet, CreateTextSnippetData } from "@/types/textLibrary";
 import { useToast } from "@/components/ui/use-toast";
 
-const CATEGORIES = [
-  { value: 'introduction', label: 'Introduction' },
-  { value: 'description', label: 'Description' },
-  { value: 'conditions', label: 'Conditions' },
-  { value: 'conclusion', label: 'Conclusion' },
-  { value: 'custom', label: 'Personnalisé' },
-] as const;
-
 export const TextLibraryManager = () => {
-  const { data: snippets = [], isLoading } = useTextSnippets();
+  const { data: snippets = [], isLoading, isError, error } = useTextSnippets();
   const createSnippet = useCreateTextSnippet();
   const updateSnippet = useUpdateTextSnippet();
   const deleteSnippet = useDeleteTextSnippet();
@@ -42,33 +26,30 @@ export const TextLibraryManager = () => {
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<TextSnippet | null>(null);
   
   // Form state
   const [formData, setFormData] = useState<CreateTextSnippetData>({
-    category: 'custom',
+    category: 'description',
     title: '',
     content: '',
     tags: [],
   });
 
-  // Filtrer les snippets
+  // Filtrer les snippets (recherche uniquement)
   const filteredSnippets = snippets.filter(snippet => {
-    const matchesSearch = !searchQuery || 
+    if (!searchQuery) return true;
+    return (
       snippet.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       snippet.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      snippet.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesCategory = filterCategory === 'all' || snippet.category === filterCategory;
-    
-    return matchesSearch && matchesCategory;
+      snippet.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
   });
 
-  // Copier dans le presse-papier
+  // Copier dans le presse-papier (contenu ou titre si pas de description)
   const handleCopy = (snippet: TextSnippet) => {
-    navigator.clipboard.writeText(snippet.content);
+    navigator.clipboard.writeText(snippet.content || snippet.title);
     incrementUsage.mutate(snippet.id);
     toast({
       title: "Copié !",
@@ -90,7 +71,7 @@ export const TextLibraryManager = () => {
     createSnippet.mutate(formData, {
       onSuccess: () => {
         setIsCreateDialogOpen(false);
-        setFormData({ category: 'custom', title: '', content: '', tags: [] });
+        setFormData({ category: 'description', title: '', content: '', tags: [] });
       },
     });
   };
@@ -111,7 +92,7 @@ export const TextLibraryManager = () => {
       {
         onSuccess: () => {
           setEditingSnippet(null);
-          setFormData({ category: 'custom', title: '', content: '', tags: [] });
+          setFormData({ category: 'description', title: '', content: '', tags: [] });
         },
       }
     );
@@ -156,39 +137,20 @@ export const TextLibraryManager = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Catégorie</label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value: any) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map(cat => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Titre</label>
+                <label className="text-sm font-medium">Titre de la section (corps de métier)</label>
                 <Input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Ex: Conditions de paiement"
+                  placeholder="Ex: Plâtrerie - Isolation"
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium">Contenu</label>
+                <label className="text-sm font-medium">Prestation (description complète)</label>
                 <Textarea
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="Votre texte ici..."
+                  placeholder="Ex: Fouille mécanique, béton..."
                   rows={6}
                 />
               </div>
@@ -206,7 +168,7 @@ export const TextLibraryManager = () => {
         </Dialog>
       </div>
 
-      {/* Filtres */}
+      {/* Recherche */}
       <div className="flex gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -217,20 +179,6 @@ export const TextLibraryManager = () => {
             className="pl-10"
           />
         </div>
-        
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Toutes les catégories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Toutes les catégories</SelectItem>
-            {CATEGORIES.map(cat => (
-              <SelectItem key={cat.value} value={cat.value}>
-                {cat.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Liste des snippets */}
@@ -238,12 +186,27 @@ export const TextLibraryManager = () => {
         <div className="text-center py-8 text-muted-foreground">
           Chargement...
         </div>
+      ) : isError && (error as Error)?.message === "TABLE_TEXT_SNIPPETS_MISSING" ? (
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground space-y-2">
+            <p className="font-medium">Bibliothèque de phrases non activée</p>
+            <p className="text-sm">
+              La table <code className="bg-muted px-1 rounded">text_snippets</code> est absente. Exécutez la migration <code className="bg-muted px-1 rounded">create_text_snippets_fixed.sql</code> dans Supabase (SQL Editor) pour que les textes des devis s&apos;enregistrent ici.
+            </p>
+          </CardContent>
+        </Card>
+      ) : isError ? (
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            <p>Erreur lors du chargement de la bibliothèque.</p>
+          </CardContent>
+        </Card>
       ) : filteredSnippets.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
             <p>Aucun texte enregistré.</p>
             <p className="text-sm mt-2">
-              Créez votre premier texte réutilisable !
+              Créez votre premier texte réutilisable, ou enregistrez un devis détaillé : les titres de sections et les libellés des lignes seront ajoutés ici automatiquement.
             </p>
           </CardContent>
         </Card>
@@ -253,19 +216,22 @@ export const TextLibraryManager = () => {
             <Card key={snippet.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <Badge variant="secondary" className="mb-2">
-                      {CATEGORIES.find(c => c.value === snippet.category)?.label}
-                    </Badge>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Titre de la section (corps de métier)</p>
                     <CardTitle className="text-base">{snippet.title}</CardTitle>
                   </div>
                 </div>
               </CardHeader>
               
               <CardContent>
-                <CardDescription className="line-clamp-3 mb-4">
-                  {snippet.content}
-                </CardDescription>
+                {snippet.content && snippet.content !== snippet.title ? (
+                  <>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Prestation (description complète)</p>
+                    <CardDescription className="line-clamp-3 mb-4">
+                      {snippet.content}
+                    </CardDescription>
+                  </>
+                ) : null}
                 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
                   <Hash className="h-3 w-3" />
@@ -326,26 +292,7 @@ export const TextLibraryManager = () => {
           
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Catégorie</label>
-              <Select
-                value={formData.category}
-                onValueChange={(value: any) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Titre</label>
+              <label className="text-sm font-medium">Titre de la section (corps de métier)</label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -353,7 +300,7 @@ export const TextLibraryManager = () => {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Contenu</label>
+              <label className="text-sm font-medium">Prestation (description complète)</label>
               <Textarea
                 value={formData.content}
                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}

@@ -144,8 +144,6 @@ export default function SignaturePage() {
         quote_number: quoteData.quote_number,
         client_name: quoteData.client_name,
         hasDetails: !!quoteData.details,
-        mode: quoteData.mode,
-        tva_rate: quoteData.tva_rate,
       });
 
       // Récupérer les informations de l'entreprise depuis la base de données
@@ -569,56 +567,6 @@ export default function SignaturePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-muted-foreground">Chargement du devis...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !quote) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-        <Card className="w-full max-w-md backdrop-blur-xl bg-white/90 dark:bg-gray-800/90">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle className="h-10 w-10 text-orange-600 dark:text-orange-400" />
-            </div>
-            <CardTitle className="text-xl text-orange-600 dark:text-orange-400">
-              Document introuvable
-            </CardTitle>
-            <CardDescription className="text-base mt-2">
-              Le lien que vous avez utilisé n'est plus valide ou a expiré.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="bg-orange-50 dark:bg-orange-900/20 border-orange-200">
-              <AlertCircle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800 dark:text-orange-200">
-                <p className="font-medium mb-2">Que faire ?</p>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Vérifiez que vous avez bien copié le lien complet</li>
-                  <li>Contactez l'entreprise pour obtenir un nouveau lien</li>
-                  <li>Le document a peut-être déjà été signé</li>
-                </ul>
-              </AlertDescription>
-            </Alert>
-            
-            <div className="p-4 bg-muted/30 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground">
-                Vous pouvez fermer cette page
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (quote.signed && quote.signed_at) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
@@ -682,27 +630,8 @@ export default function SignaturePage() {
               </CardHeader>
               <CardContent>
                 {generatingPdf ? (
-                  <div className="flex flex-col items-center justify-center h-96 space-y-4">
+                  <div className="flex items-center justify-center h-96">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">Génération de l'aperçu PDF...</p>
-                  </div>
-                ) : pdfError ? (
-                  <div className="flex flex-col items-center justify-center h-96 space-y-4 p-4">
-                    <AlertCircle className="h-12 w-12 text-destructive" />
-                    <div className="text-center space-y-2">
-                      <p className="font-medium text-destructive">Erreur lors de la génération de l'aperçu</p>
-                      <p className="text-sm text-muted-foreground">{pdfError}</p>
-                      <Button
-                        onClick={() => {
-                          setPdfError(null);
-                          generatePdfPreview(quote);
-                        }}
-                        variant="outline"
-                        className="mt-4"
-                      >
-                        Réessayer
-                      </Button>
-                    </div>
                   </div>
                 ) : pdfUrl ? (
                   <div className="space-y-4">
@@ -726,23 +655,8 @@ export default function SignaturePage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-96 space-y-4 p-4">
-                    <FileText className="h-12 w-12 text-muted-foreground" />
-                    <div className="text-center space-y-2">
-                      <p className="font-medium text-muted-foreground">Aperçu non disponible</p>
-                      <p className="text-sm text-muted-foreground">
-                        L'aperçu PDF n'a pas pu être généré. Veuillez réessayer.
-                      </p>
-                      <Button
-                        onClick={() => {
-                          generatePdfPreview(quote);
-                        }}
-                        variant="outline"
-                        className="mt-4"
-                      >
-                        Générer l'aperçu
-                      </Button>
-                    </div>
+                  <div className="flex items-center justify-center h-96 text-muted-foreground">
+                    Aperçu non disponible
                   </div>
                 )}
               </CardContent>

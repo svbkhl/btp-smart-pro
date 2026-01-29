@@ -5,6 +5,8 @@
  */
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,8 +40,9 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { useQuoteSections } from "@/hooks/useQuoteSections";
 import { useQuoteLines } from "@/hooks/useQuoteLines";
 import { useQuotes } from "@/hooks/useQuotes";
-import { CheckCircle2, Download, X } from "lucide-react";
+import { CheckCircle2, Download, X, Send } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { SendToClientModal } from "@/components/billing/SendToClientModal";
 
 interface DetailedQuoteEditorProps {
   onSuccess?: (quoteId: string) => void;
@@ -65,9 +68,12 @@ interface LocalLine {
 }
 
 export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQuoteEditorProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { companyId } = useCompanyId();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: companySettings } = useCompanySettings();
   const updateCompanySettings = useUpdateCompanySettings();
@@ -479,9 +485,70 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
         default_tva_293b: tva293b,
       });
 
+      // 6. Enregistrer les textes du devis dans la Bibliothèque de phrases (tout ce qu'on met dans le devis)
+      let phrasesAdded = 0;
+      let phrasesTableMissing = false;
+      try {
+        const { data: existingData, error: existingError } = await supabase
+          .from("text_snippets")
+          .select("content")
+          .eq("company_id", companyId);
+        const err = existingError;
+        if (err) {
+          const msg = err?.message || "";
+          const code = (err as any)?.code;
+          if (code === "PGRST204" || (msg.includes("relation") && msg.includes("does not exist")) || msg.includes("Could not find")) {
+            phrasesTableMissing = true;
+            throw err;
+          }
+        }
+        const existingTitles = new Set((existingData || []).map((r: { title: string }) => (r.title || "").trim()));
+        const itemsToAdd: { title: string; content: string }[] = [];
+        // Sections : titre uniquement (pas de description dupliquée)
+        for (const s of localSections) {
+          const t = s.title?.trim();
+          if (t && t.length >= 2 && !existingTitles.has(t)) {
+            itemsToAdd.push({ title: t, content: "" });
+            existingTitles.add(t);
+          }
+        }
+        // Lignes / prestations : titre = libellé, description = vide (éviter d'écrire 2 fois la même chose)
+        for (const l of localLines) {
+          const t = l.label?.trim();
+          if (t && t.length >= 2 && !existingTitles.has(t)) {
+            itemsToAdd.push({ title: t, content: "" });
+            existingTitles.add(t);
+          }
+        }
+        if (user && itemsToAdd.length > 0) {
+          for (const { title, content } of itemsToAdd) {
+            const { error: insertErr } = await supabase.from("text_snippets").insert({
+              user_id: user.id,
+              company_id: companyId,
+              category: "description",
+              title,
+              content,
+              usage_count: 0,
+            });
+            if (!insertErr) phrasesAdded++;
+          }
+          queryClient.invalidateQueries({ queryKey: ["text-snippets", companyId] });
+        }
+      } catch (phraseErr: any) {
+        if (phraseErr?.code === "PGRST204" || phraseErr?.message?.includes("Could not find") || (phraseErr?.message?.includes("relation") && phraseErr?.message?.includes("does not exist"))) {
+          phrasesTableMissing = true;
+        } else if (phraseErr?.message !== "TABLE_TEXT_SNIPPETS_MISSING") {
+          console.warn("⚠️ Enregistrement bibliothèque de phrases:", phraseErr);
+        }
+      }
+
       toast({
         title: "Devis créé",
-        description: "Le devis a été créé et sauvegardé avec succès",
+        description: phrasesAdded > 0
+          ? `Le devis a été sauvegardé. ${phrasesAdded} phrase(s) ajoutée(s) à la Bibliothèque de phrases.`
+          : phrasesTableMissing && (localSections.some(s => s.title?.trim()) || localLines.some(l => l.label?.trim()))
+            ? "Le devis a été créé. Pour enregistrer les phrases ici, exécutez la migration create_text_snippets_fixed.sql dans Supabase (SQL Editor)."
+            : "Le devis a été créé et sauvegardé avec succès",
       });
 
       // Ouvrir l'aperçu après création
@@ -596,7 +663,15 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
               <FileText className="w-5 h-5" />
               Devis {previewQuote.quote_number}
             </h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="default" onClick={() => navigate("/facturation")} className="gap-2">
+                <FileText className="w-4 h-4" />
+                Ouvrir dans facturation
+              </Button>
+              <Button variant="outline" onClick={() => setIsSendToClientOpen(true)} className="gap-2">
+                <Send className="w-4 h-4" />
+                Envoyer au client
+              </Button>
               <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
                 <Download className="w-4 h-4" />
                 Télécharger PDF
@@ -634,18 +709,11 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                   )}
                   <div className="space-y-1">
                     <h1 className="text-2xl font-bold">{companyInfo?.company_name || 'Nom de l\'entreprise'}</h1>
-                    {companyInfo?.legal_form && (
-                      <p className="text-sm text-gray-600">{companyInfo.legal_form}</p>
-                    )}
                     {(companyInfo?.address || companyInfo?.postal_code || companyInfo?.city) && (
                       <p className="text-sm text-gray-600">
                         {[companyInfo.address, companyInfo.postal_code && companyInfo.city ? `${companyInfo.postal_code} ${companyInfo.city}` : companyInfo.city || companyInfo.postal_code].filter(Boolean).join(', ')}
                       </p>
                     )}
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
-                      {companyInfo?.siret && <span>SIRET: {companyInfo.siret}</span>}
-                      {companyInfo?.vat_number && <span>TVA: {companyInfo.vat_number}</span>}
-                    </div>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
                       {companyInfo?.phone && <span>Tél: {companyInfo.phone}</span>}
                       {companyInfo?.email && <span>Email: {companyInfo.email}</span>}
@@ -787,6 +855,13 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
               </div>
             </div>
 
+            {/* Pied de page : forme juridique, SIRET, TVA — au centre */}
+            {(companyInfo?.legal_form || companyInfo?.siret || companyInfo?.vat_number) && (
+              <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+                {[companyInfo?.legal_form, companyInfo?.siret && `SIRET: ${companyInfo.siret}`, companyInfo?.vat_number && `TVA: ${companyInfo.vat_number}`].filter(Boolean).join(' — ')}
+              </div>
+            )}
+
             {/* Signature */}
             <div className="mt-8 pt-4 border-t-2 border-gray-300">
               <div className="flex justify-between items-end">
@@ -804,6 +879,15 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
             </div>
           </div>
         </GlassCard>
+
+        {/* Modal Envoyer au client */}
+        <SendToClientModal
+          open={isSendToClientOpen}
+          onOpenChange={setIsSendToClientOpen}
+          documentType="quote"
+          document={previewQuote}
+          onSent={() => setIsSendToClientOpen(false)}
+        />
       </div>
     );
   }

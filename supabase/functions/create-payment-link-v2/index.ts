@@ -20,6 +20,26 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 
+// Même helper que create-payment-link : devis → company_users → création company par défaut
+async function getCompanyId(supabaseClient: any, userId: string, quoteCompanyId?: string): Promise<string> {
+  if (quoteCompanyId) return quoteCompanyId;
+  const { data: companyUser } = await supabaseClient
+    .from('company_users')
+    .select('company_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  if (companyUser?.company_id) return companyUser.company_id;
+  const { data: newCompany, error: companyError } = await supabaseClient
+    .from('companies')
+    .insert({ name: 'Entreprise par défaut', owner_id: userId })
+    .select()
+    .single();
+  if (companyError || !newCompany) throw new Error('Impossible de déterminer ou créer company_id');
+  await supabaseClient.from('company_users').insert({ user_id: userId, company_id: newCompany.id, role: 'owner' });
+  return newCompany.id;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -121,6 +141,24 @@ serve(async (req) => {
       );
     }
 
+    // Résoudre company_id (devis ou company_users ou création par défaut)
+    let companyId: string | null = null;
+    try {
+      companyId = await getCompanyId(supabaseClient, user.id, quote.company_id);
+    } catch (e) {
+      console.error('❌ [create-payment-link-v2] getCompanyId failed:', e);
+      return new Response(
+        JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!companyId || !String(companyId).trim()) {
+      return new Response(
+        JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('✅ Devis trouvé et signé:', quote_id);
 
     // =====================================================
@@ -145,12 +183,18 @@ serve(async (req) => {
       } else {
         const invoiceAmount = quote.estimated_cost || 0;
         const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
-
+        const safeCompanyId = (companyId && String(companyId).trim()) || null;
+        if (!safeCompanyId) {
+          return new Response(
+            JSON.stringify({ error: 'User has no company assigned', details: 'company_id manquant' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         const { data: newInvoice, error: invoiceError } = await supabaseClient
           .from('invoices')
           .insert({
             user_id: user.id,
-            company_id: quote.company_id,
+            company_id: safeCompanyId,
             client_id: quote.client_id,
             quote_id: quote_id,
             invoice_number: invoiceNumber,
@@ -295,7 +339,7 @@ serve(async (req) => {
           .rpc('generate_payment_schedule', {
             p_invoice_id: invoiceId,
             p_user_id: user.id,
-            p_company_id: quote.company_id,
+            p_company_id: companyId,
             p_quote_id: quote_id,
             p_total_amount: remaining,
             p_installments_count: installments_count,
@@ -447,7 +491,7 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_id: user.id,
-        company_id: quote.company_id,
+        company_id: companyId,
         invoice_id: invoiceId,
         quote_id: quote_id,
         client_id: quote.client_id,

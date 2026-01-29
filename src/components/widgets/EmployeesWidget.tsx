@@ -44,7 +44,7 @@ export const EmployeesWidget = () => {
         <div className="flex items-center gap-2">
           <UserCircle className="w-5 h-5 text-primary" />
           <h3 className="text-lg font-semibold text-foreground">
-            Employés & RH
+            Employés
           </h3>
         </div>
         <Link to="/employees-rh">

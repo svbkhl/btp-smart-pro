@@ -489,3 +489,34 @@ export async function markAsOpened(messageId: string): Promise<{ success: boolea
     };
   }
 }
+
+/**
+ * Supprime un ou plusieurs messages
+ */
+export async function deleteMessages(messageIds: string[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Non authentifié");
+    }
+
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .in('id', messageIds)
+      .eq('user_id', session.user.id);
+
+    if (error) {
+      throw error;
+    }
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("❌ [MessageService] Erreur deleteMessages:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}

@@ -152,13 +152,6 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
     const companyName = companyInfo?.company_name || 'Votre Entreprise';
     doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
-    // Forme juridique
-    if (companyInfo?.legal_form) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(companyInfo.legal_form, margin + (logoLoaded ? 40 : 5), yPosition + 22);
-    }
-
     // Titre "FACTURE" à droite
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
@@ -196,20 +189,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
       companyDetails.push('');
     }
     
-    // Informations légales
-    if (companyInfo?.siret) {
-      companyDetails.push(`SIRET: ${companyInfo.siret}`);
-    }
-    if (companyInfo?.vat_number) {
-      companyDetails.push(`TVA intracommunautaire: ${companyInfo.vat_number}`);
-    }
-    
-    // Ligne vide pour séparer
-    if (companyInfo?.siret || companyInfo?.vat_number) {
-      companyDetails.push('');
-    }
-    
-    // Coordonnées
+    // Coordonnées — SIRET/TVA/forme juridique en bas au centre
     if (companyInfo?.phone) {
       companyDetails.push(`Téléphone: ${companyInfo.phone}`);
     }
@@ -566,22 +546,13 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     
-    const footerInfo: string[] = [];
-    
-    if (companyInfo?.siret) {
-      footerInfo.push(`SIRET: ${companyInfo.siret}`);
-    }
-    if (companyInfo?.vat_number) {
-      footerInfo.push(`TVA intracommunautaire: ${companyInfo.vat_number}`);
-    }
-    
-    if (footerInfo.length > 0) {
-      footerInfo.forEach((info, index) => {
-        if (index > 0) {
-          doc.text(' - ', margin + (index * 50), yPosition);
-        }
-        doc.text(info, margin + (index * 50) + (index > 0 ? 5 : 0), yPosition);
-      });
+    const centerX = pageWidth / 2;
+    const footerParts: string[] = [];
+    if (companyInfo?.legal_form) footerParts.push(companyInfo.legal_form);
+    if (companyInfo?.siret) footerParts.push(`SIRET: ${companyInfo.siret}`);
+    if (companyInfo?.vat_number) footerParts.push(`TVA intracommunautaire: ${companyInfo.vat_number}`);
+    if (footerParts.length > 0) {
+      doc.text(footerParts.join(' — '), centerX, yPosition, { align: 'center' });
     }
 
     // ============================================
@@ -699,13 +670,6 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
     const companyName = companyInfo?.company_name || 'Votre Entreprise';
     doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
 
-    // Forme juridique
-    if (companyInfo?.legal_form) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(companyInfo.legal_form, margin + (logoLoaded ? 40 : 5), yPosition + 22);
-    }
-
     // Titre "FACTURE" à droite
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
@@ -738,17 +702,6 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
     }
     
     if (companyDetails.length > 0) {
-      companyDetails.push('');
-    }
-    
-    if (companyInfo?.siret) {
-      companyDetails.push(`SIRET: ${companyInfo.siret}`);
-    }
-    if (companyInfo?.vat_number) {
-      companyDetails.push(`TVA intracommunautaire: ${companyInfo.vat_number}`);
-    }
-    
-    if (companyInfo?.siret || companyInfo?.vat_number) {
       companyDetails.push('');
     }
     

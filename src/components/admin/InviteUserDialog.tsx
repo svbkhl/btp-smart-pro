@@ -48,8 +48,7 @@ export const InviteUserDialog = ({
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [success, setSuccess] = useState(false);
-  // Toujours inviter en tant que dirigeant (owner)
-  const role: 'owner' = 'owner';
+  // Invitations = toujours en tant que dirigeant (owner)
 
   // Vérifier que companyId est chargé avant de permettre l'ouverture du dialog
   const isCompanyIdReady = companyId && companyId.trim() !== '';
@@ -94,11 +93,11 @@ export const InviteUserDialog = ({
       return;
     }
 
-    // Envoyer email + rôle + company_id (format attendu par create-company-invite)
+    // Envoyer email + rôle dirigeant (owner) + company_id (format attendu par create-company-invite)
     const requestBody = { 
       company_id: companyId.trim(),
       email: emailToSend,
-      role: role, // 'admin' ou 'member'
+      role: 'owner' as const, // Invitation en tant que dirigeant
     };
     
     console.log("📤 Sending invitation request - Body:", JSON.stringify(requestBody));

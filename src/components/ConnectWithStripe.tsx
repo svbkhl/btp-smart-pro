@@ -22,7 +22,7 @@ export const ConnectWithStripe = () => {
           .from('user_settings')
           .select('stripe_account_id, stripe_connected')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Error checking Stripe connection:', error);

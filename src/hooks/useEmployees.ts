@@ -66,16 +66,10 @@ export const useEmployees = () => {
             return [];
           }
 
-          // Récupérer tous les employés de l'entreprise
+          // Récupérer tous les employés (sans embed auth.users → 400)
           const { data: employeesData, error: employeesError } = await supabase
             .from("employees" as any)
-            .select(`
-              *,
-              user:user_id (
-                email,
-                email_confirmed_at
-              )
-            `)
+            .select("*")
             .eq("company_id", companyId)
             .order("nom", { ascending: true });
 
@@ -105,21 +99,13 @@ export const useEmployees = () => {
             (companyUsers || []).map((cu: any) => cu.user_id)
           );
 
-          // Filtrer pour exclure les admins (par user_id, email ET membre d'entreprise)
-          const filteredEmployees = (employeesData || []).filter((emp: Employee) => {
-            // Exclure si admin par rôle
-            if (adminUserIds.has(emp.user_id)) {
-              return false;
-            }
-            // Exclure si email admin
-            const empEmail = emp.user?.email?.toLowerCase() || '';
-            if (empEmail && adminEmails.has(empEmail)) {
-              return false;
-            }
-            // Exclure si l'utilisateur n'est membre d'aucune entreprise (admin global)
-            if (!usersWithCompany.has(emp.user_id)) {
-              return false;
-            }
+          // Filtrer pour exclure les admins (par user_id et membre d'entreprise ; email non disponible sans RPC)
+          const filteredEmployees = (employeesData || []).map((row: Record<string, unknown>) => ({
+            ...row,
+            user: { email: '', email_confirmed_at: undefined },
+          })).filter((emp: Employee) => {
+            if (adminUserIds.has(emp.user_id)) return false;
+            if (!usersWithCompany.has(emp.user_id)) return false;
             return true;
           });
 

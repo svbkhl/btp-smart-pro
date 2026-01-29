@@ -33,6 +33,30 @@ const parsedFromEmail = parseFromEmail(RESEND_FROM_EMAIL_RAW);
 const RESEND_FROM_EMAIL = parsedFromEmail.email;
 const RESEND_FROM_NAME = parsedFromEmail.name || FROM_NAME;
 
+/**
+ * Supprime TOUTES les données data:image (base64) d'une chaîne.
+ * Utilisé pour garantir qu'aucun base64 n'apparaisse dans les emails.
+ */
+function stripAllDataImages(input: string): string {
+  if (!input || typeof input !== "string") return input;
+  let out = input;
+  // Boucle pour supprimer toutes les occurrences (y compris très longues)
+  let prev = "";
+  while (prev !== out) {
+    prev = out;
+    // 1) data:image/xxx;base64, suivi du payload base64 (A-Za-z0-9+/= et espaces/sauts de ligne)
+    out = out.replace(/data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s\r\n]*/g, "");
+    // 2) Restes éventuels (data:image sans base64 complet)
+    out = out.replace(/data:image[^"'\s<>]*(?=["'\s<>]|$)/gi, "");
+    // 3) Balises img avec src data:image
+    out = out.replace(/<img[^>]*\ssrc\s*=\s*["']?\s*data:image[^"'>]*["']?[^>]*>/gi, "");
+  }
+  // Nettoyer lignes de caractères base64 orphelines (longues chaînes alphanumériques)
+  out = out.replace(/^[A-Za-z0-9+/=\s]{100,}$/gm, "");
+  out = out.replace(/\n\s*\n\s*\n+/g, "\n\n");
+  return out;
+}
+
 // Log de la configuration au démarrage (une seule fois)
 console.log("🔧 [send-email] Configuration Resend:", {
   RESEND_FROM_EMAIL_RAW: RESEND_FROM_EMAIL_RAW.substring(0, 50) + (RESEND_FROM_EMAIL_RAW.length > 50 ? "..." : ""),
@@ -184,60 +208,16 @@ serve(async (req) => {
 
     // Nettoyer le HTML pour supprimer toutes les données base64 avant l'envoi
     if (htmlContent) {
-      // Supprimer toutes les occurrences de data:image dans le HTML (dans les attributs src, dans le texte, etc.)
-      // Pattern très complet pour capturer toutes les variantes de base64
-      htmlContent = htmlContent
-        // Remplacer les balises img avec base64 dans src
-        .replace(/<img[^>]*src=["']data:image[^"']*["'][^>]*>/gi, '')
-        // Supprimer toutes les data URLs base64 complètes (pattern le plus complet) - plusieurs passes pour être sûr
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=\s\n\r]+/g, '')
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=]+/g, '')
-        // Supprimer les data URLs incomplètes ou partielles
-        .replace(/data:image[^"'\s<>]+/gi, '')
-        // Nettoyer les lignes qui ne contiennent que des caractères base64 (longues chaînes alphanumériques sans espaces)
-        .replace(/^[A-Za-z0-9+/=]{200,}$/gm, '')
-        // Nettoyer les lignes avec beaucoup de caractères base64 même avec quelques espaces
-        .replace(/^[A-Za-z0-9+/=\s]{150,}$/gm, '')
-        // Supprimer les lignes vides multiples créées par les suppressions
-        .replace(/\n\s*\n\s*\n+/g, '\n\n');
-      
+      htmlContent = stripAllDataImages(htmlContent);
       htmlWithSignature = `${htmlContent}\n\n${signatureHtml}`;
     } else if (text) {
       htmlWithSignature = `<pre style="font-family: Arial, sans-serif; white-space: pre-wrap;">${text.replace(/\n/g, '<br>')}</pre>\n\n${signatureHtml}`;
     }
 
     if (text) {
-      // Nettoyer aussi le texte pour supprimer les données base64
-      let cleanedText = text
-        // Supprimer les data URLs base64 complètes - plusieurs passes
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=\s\n\r]+/g, '')
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=]+/g, '')
-        // Supprimer les data URLs incomplètes
-        .replace(/data:image[^"'\s\n]+/gi, '')
-        // Nettoyer les lignes qui ne contiennent que des caractères base64 (longues chaînes alphanumériques)
-        .replace(/^[A-Za-z0-9+/=]{200,}$/gm, '')
-        .replace(/^[A-Za-z0-9+/=\s]{150,}$/gm, '')
-        // Supprimer les lignes vides multiples
-        .replace(/\n\s*\n\s*\n+/g, '\n\n');
-      textWithSignature = `${cleanedText}\n\n${signatureText}`;
+      textWithSignature = `${stripAllDataImages(text)}\n\n${signatureText}`;
     } else if (html) {
-      // Nettoyer le HTML pour extraire le texte, en supprimant les balises img avec data:image
-      let textFromHtml = html
-        // Remplacer les images base64
-        .replace(/<img[^>]*src=["']data:image[^"']*["'][^>]*>/gi, '')
-        // Supprimer les data URLs base64 complètes - plusieurs passes
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=\s<>]+/g, '')
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=]+/g, '')
-        // Supprimer les data URLs incomplètes
-        .replace(/data:image[^"'\s<>]+/gi, '')
-        // Supprimer toutes les balises HTML
-        .replace(/<[^>]*>/g, "")
-        // Nettoyer les lignes qui ne contiennent que des caractères base64
-        .replace(/^[A-Za-z0-9+/=]{200,}$/gm, '')
-        .replace(/^[A-Za-z0-9+/=\s]{150,}$/gm, '')
-        // Nettoyer les sauts de ligne multiples
-        .replace(/\n\s*\n\s*\n+/g, "\n\n")
-        .trim();
+      let textFromHtml = stripAllDataImages(html).replace(/<[^>]*>/g, "").replace(/\n\s*\n\s*\n+/g, "\n\n").trim();
       textWithSignature = `${textFromHtml}\n\n${signatureText}`;
     }
 
@@ -352,32 +332,12 @@ serve(async (req) => {
       subject,
     };
 
-    // Nettoyage final pour supprimer toute donnée base64 restante (y compris dans la signature)
+    // Nettoyage final obligatoire : aucune data:image ne doit partir dans l'email
     if (htmlWithSignature) {
-      // Nettoyage final du HTML avant l'envoi - supprimer complètement les données base64
-      emailData.html = htmlWithSignature
-        // Supprimer toutes les occurrences de data:image restantes - plusieurs passes
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=\s\n\r]+/g, '')
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=]+/g, '')
-        .replace(/data:image[^"'\s<>]+/gi, '')
-        // Supprimer les lignes qui ne contiennent que des caractères base64 (longues chaînes)
-        .replace(/^[A-Za-z0-9+/=]{200,}$/gm, '')
-        .replace(/^[A-Za-z0-9+/=\s]{150,}$/gm, '')
-        // Supprimer les lignes vides multiples créées par les suppressions
-        .replace(/\n\s*\n\s*\n+/g, '\n\n');
+      emailData.html = stripAllDataImages(htmlWithSignature);
     }
     if (textWithSignature) {
-      // Nettoyage final du texte avant l'envoi - supprimer complètement les données base64
-      emailData.text = textWithSignature
-        // Supprimer toutes les occurrences de data:image restantes - plusieurs passes
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=\s\n\r]+/g, '')
-        .replace(/data:image\/[a-zA-Z0-9]+;base64,[A-Za-z0-9+/=]+/g, '')
-        .replace(/data:image[^"'\s\n]+/gi, '')
-        // Supprimer les lignes qui ne contiennent que des caractères base64 (longues chaînes)
-        .replace(/^[A-Za-z0-9+/=]{200,}$/gm, '')
-        .replace(/^[A-Za-z0-9+/=\s]{150,}$/gm, '')
-        // Supprimer les lignes vides multiples
-        .replace(/\n\s*\n\s*\n+/g, '\n\n');
+      emailData.text = stripAllDataImages(textWithSignature);
     }
 
     // Add Reply-To si l'email utilisateur est différent de "from"
@@ -593,16 +553,17 @@ function generateEmailSignature(settings: any): string {
   const customSignature = settings?.signature_data || "";
 
   if (customSignature && customSignature.trim()) {
-    // Vérifier si c'est une image base64 (data:image)
-    if (customSignature.startsWith('data:image')) {
-      // Pour les emails HTML, utiliser une image hébergée ou un placeholder
-      // NE PAS inclure le base64 directement dans le HTML de l'email
-      // Les clients email ne supportent pas toujours les images base64 et cela crée des problèmes
+    // Ne jamais inclure de data:image (base64) dans la signature — ni en entier ni dans du HTML
+    if (/data:image/i.test(customSignature)) {
       return `\n\n<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />\n<div style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280;">[Signature électronique]</div>`;
-    } else {
-      // Si c'est du texte, l'insérer normalement
-      return `\n\n<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />\n<div style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280;">${customSignature.replace(/\n/g, '<br>')}</div>`;
     }
+    // Si c'est du texte (sans base64), l'insérer après nettoyage
+    const safe = stripAllDataImages(customSignature);
+    if (safe.trim()) {
+      return `\n\n<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />\n<div style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280;">${safe.replace(/\n/g, '<br>')}</div>`;
+    }
+    // Si après strip il ne reste rien, placeholder
+    return `\n\n<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />\n<div style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280;">[Signature électronique]</div>`;
   }
 
   let signature = `\n\n<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />\n<div style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280;">`;
@@ -625,12 +586,9 @@ function generateEmailSignatureText(settings: any): string {
   const customSignature = settings?.signature_data || "";
 
   if (customSignature && customSignature.trim()) {
-    // Si c'est une image base64, ne pas l'inclure dans le texte (juste mentionner la signature)
-    if (customSignature.startsWith('data:image')) {
-      return `\n\n--\n${name || companyName}\n[Signature électronique]\n`;
-    } else {
-      return `\n\n--\n${customSignature}\n`;
-    }
+    // Ne jamais inclure de data:image dans la version texte
+    const safe = stripAllDataImages(customSignature);
+    if (safe.trim()) return `\n\n--\n${safe}\n`;
   }
 
   let signature = "\n\n--\n";

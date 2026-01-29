@@ -68,6 +68,7 @@ serve(async (req) => {
     "https://www.btpsmartpro.com",
     "http://localhost:5173",
     "http://localhost:3000",
+    "http://localhost:4000",
   ];
   
   const corsHeaders: Record<string, string> = {
@@ -109,23 +110,51 @@ serve(async (req) => {
       );
     }
 
-    // Vérifier que l'utilisateur est owner ou admin
-    const { data: companyUser, error: roleError } = await supabaseClient
+    // Lire le body une fois pour récupérer action et company_id (évite .single() qui échoue si plusieurs entreprises)
+    let bodyParsed: Record<string, unknown> = {};
+    if (req.method === "POST") {
+      try {
+        const bodyText = await req.text();
+        if (bodyText) bodyParsed = JSON.parse(bodyText) as Record<string, unknown>;
+      } catch (_e) {
+        // ignorer
+      }
+    }
+    const companyIdFromBody = bodyParsed?.company_id as string | undefined;
+    const actionFromBody = bodyParsed?.action as string | undefined;
+
+    // Vérifier que l'utilisateur est owner ou admin pour la société ciblée (company_id du body)
+    // Si pas de company_id en body, on vérifie sur une seule société (premier résultat)
+    const { data: companyUserRows, error: roleError } = await supabaseClient
       .from("company_users")
       .select("company_id, roles(slug)")
       .eq("user_id", user.id)
-      .single();
+      .eq("status", "active")
+      .limit(10);
 
-    if (roleError || !companyUser) {
-      console.error("❌ [Role check] Error or no company user:", roleError);
+    if (roleError) {
+      console.error("❌ [Role check] Error:", roleError);
       return new Response(
         JSON.stringify({ error: "User not associated with a company or insufficient permissions" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const userRoleSlug = companyUser.roles?.slug;
-    if (userRoleSlug !== "owner" && userRoleSlug !== "admin") {
+    const companyUser = companyIdFromBody
+      ? (companyUserRows ?? []).find((r: { company_id: string }) => r.company_id === companyIdFromBody)
+      : (companyUserRows ?? [])[0];
+
+    if (!companyUser) {
+      console.error("❌ [Role check] No company user for company:", companyIdFromBody || "any");
+      return new Response(
+        JSON.stringify({ error: "User not associated with this company or insufficient permissions" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userRoleSlug = (companyUser as { roles?: { slug?: string } }).roles?.slug;
+    const allowedSlugs = ["owner", "admin"];
+    if (!userRoleSlug || !allowedSlugs.includes(userRoleSlug)) {
       console.error("❌ [Role check] User role is not owner or admin:", userRoleSlug);
       return new Response(
         JSON.stringify({ error: "Only company owners or administrators can manage Google Calendar connection" }),
@@ -135,27 +164,10 @@ serve(async (req) => {
 
     console.log("✅ [Role check] User has permission:", userRoleSlug);
 
-    const companyId = companyUser.company_id;
+    const companyId = (companyUser as { company_id: string }).company_id;
 
     const url = new URL(req.url);
-    let action = url.searchParams.get("action");
-    
-    // Si l'action n'est pas dans l'URL, essayer de la récupérer depuis le body
-    // Pour les requêtes POST, l'action est généralement dans le body
-    if (!action && req.method === "POST") {
-      try {
-        // Cloner la requête pour pouvoir la lire plusieurs fois
-        const clonedReq = req.clone();
-        const bodyText = await clonedReq.text();
-        if (bodyText) {
-          const body = JSON.parse(bodyText);
-          action = body.action;
-        }
-      } catch (e) {
-        // Ignorer si le body n'est pas JSON ou vide
-        console.warn("⚠️ [Request] Could not parse body for action:", e);
-      }
-    }
+    let action = url.searchParams.get("action") || actionFromBody;
     
     console.log("🔍 [Request] Action:", action || "not provided");
     console.log("🔍 [Request] Method:", req.method);
@@ -173,18 +185,7 @@ serve(async (req) => {
     // ACTION: get_auth_url - Générer l'URL d'authentification Google avec PKCE
     // ========================================================================
     if (action === "get_auth_url") {
-      // Récupérer le body pour obtenir code_challenge depuis le frontend
-      let body: any = {};
-      try {
-        const bodyText = await req.text();
-        if (bodyText) {
-          body = JSON.parse(bodyText);
-        }
-      } catch (e) {
-        console.warn("⚠️ [get_auth_url] Could not parse body:", e);
-      }
-
-      const codeChallenge = body.code_challenge;
+      const codeChallenge = bodyParsed?.code_challenge as string | undefined;
       
       if (!codeChallenge) {
         return new Response(
@@ -237,19 +238,7 @@ serve(async (req) => {
     // ACTION: exchange_code - Échanger le code d'autorisation contre des tokens (avec PKCE)
     // ========================================================================
     if (action === "exchange_code") {
-      let body: any;
-      try {
-        const bodyText = await req.text();
-        console.log("🔍 [exchange_code] Body raw:", bodyText);
-        body = JSON.parse(bodyText);
-      } catch (e) {
-        console.error("❌ [exchange_code] Erreur lors du parsing du body:", e);
-        return new Response(
-          JSON.stringify({ error: "Invalid request body", details: String(e) }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
+      const body = bodyParsed as Record<string, unknown>;
       const { code, code_verifier, state, company_id: companyIdFromBody } = body;
       
       console.log("🔍 [exchange_code] Body parsé:", {
@@ -760,7 +749,7 @@ serve(async (req) => {
     // ACTION: refresh_token - Rafraîchir le token d'accès automatiquement
     // ========================================================================
     if (action === "refresh_token") {
-      const { connection_id } = await req.json();
+      const connection_id = (bodyParsed?.connection_id ?? (bodyParsed as any)?.connection_id) as string | undefined;
 
       if (!connection_id) {
         return new Response(
@@ -869,7 +858,7 @@ serve(async (req) => {
     // ACTION: disconnect - Déconnecter Google Calendar
     // ========================================================================
     if (action === "disconnect") {
-      const { connection_id } = await req.json();
+      const connection_id = (bodyParsed?.connection_id ?? (bodyParsed as any)?.connection_id) as string | undefined;
 
       if (!connection_id) {
         return new Response(

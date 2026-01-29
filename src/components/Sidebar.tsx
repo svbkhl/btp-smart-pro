@@ -38,7 +38,9 @@ import { Label } from "@/components/ui/label";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { useCompany } from "@/hooks/useCompany";
+import { useCompany, useCompanies } from "@/hooks/useCompany";
+import { useCompanyId } from "@/hooks/useCompanyId";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { isFeatureEnabled } from "@/utils/companyFeatures";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useQueryClient } from "@tanstack/react-query";
@@ -84,8 +86,8 @@ const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null 
   },
   {
     items: [
-      // 6️⃣ Employés & RH
-      { icon: UserCircle, label: "Employés & RH", path: "/employees-rh", feature: "employes" },
+      // 6️⃣ Employés
+      { icon: UserCircle, label: "Employés", path: "/employees-rh", feature: "employes" },
     ],
   },
   {
@@ -161,7 +163,21 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { data: company } = useCompany();
+  const { data: companies } = useCompanies();
+  const { companyId } = useCompanyId();
+  const { data: settings } = useUserSettings();
   const menuGroups = getMenuGroups(company);
+  // Entreprise courante (celle sélectionnée ou la première) pour nom/logo
+  const currentCompany = companyId && companies?.length
+    ? companies.find((c) => c.id === companyId) ?? companies[0]
+    : company ?? null;
+  // Nom choisi par l'admin à la création = companies.name ; cohérent avec Paramètres > Nom de l'entreprise
+  const companyName =
+    currentCompany?.name?.trim() ||
+    settings?.company_name?.trim() ||
+    "BTP Smart Pro";
+  const companyLogoUrl =
+    settings?.company_logo_url?.trim() || currentCompany?.settings?.logo_url?.trim() || undefined;
 
   // Menu paramètres (uniquement le lien vers Settings)
   const settingsMenuGroup: MenuGroup = {
@@ -379,12 +395,25 @@ export default function Sidebar() {
             <Link to="/dashboard" className="flex items-center gap-3 group">
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 5 }}
-                className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+                className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shrink-0",
+                  !companyLogoUrl && "bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20"
+                )}
               >
-                <span className="text-primary-foreground font-bold text-xl">B</span>
+                {companyLogoUrl ? (
+                  <img
+                    src={companyLogoUrl}
+                    alt={companyName}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-primary-foreground font-bold text-xl">B</span>
+                )}
               </motion.div>
-              <div>
-                <h2 className="text-lg font-bold text-foreground">BTP Smart Pro</h2>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-bold text-foreground truncate" title={companyName}>
+                  {companyName}
+                </h2>
               </div>
             </Link>
           ) : (
@@ -394,12 +423,25 @@ export default function Sidebar() {
             >
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 5 }}
-                className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+                className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shrink-0",
+                  !companyLogoUrl && "bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20"
+                )}
               >
-                <span className="text-primary-foreground font-bold text-xl">B</span>
+                {companyLogoUrl ? (
+                  <img
+                    src={companyLogoUrl}
+                    alt={companyName}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-primary-foreground font-bold text-xl">B</span>
+                )}
               </motion.div>
-              <div>
-                <h2 className="text-lg font-bold text-foreground">BTP Smart Pro</h2>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-bold text-foreground truncate" title={companyName}>
+                  {companyName}
+                </h2>
               </div>
             </button>
           )}

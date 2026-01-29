@@ -338,17 +338,6 @@ export default function QuoteDetailView({
               </CardContent>
             </Card>
           )}
-
-          {/* Signature du client */}
-          {quote.signed && (
-            <SignatureDisplay
-              signatureData={quote.signature_data}
-              signedBy={quote.signed_by}
-              signedAt={quote.signed_at}
-              title="Signature du client"
-              showImage={true}
-            />
-          )}
         </TabsContent>
 
         {/* Onglet Timeline */}
@@ -367,37 +356,6 @@ export default function QuoteDetailView({
           </TabsContent>
         )}
       </Tabs>
-
-      {/* Boutons de fermeture et envoi au client */}
-      {onClose && (
-        <div className="flex justify-center gap-3 pt-4 border-t mt-6">
-          {/* Bouton Envoyer au client - masqué si le devis est signé */}
-          {!isSigned && (
-            <Button 
-              variant="outline" 
-              onClick={() => setIsSendToClientOpen(true)}
-              className="gap-2"
-            >
-              <Send className="w-4 h-4" />
-              Envoyer au client
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Fermer
-          </Button>
-        </div>
-      )}
-
-      {/* Modal Envoyer au client */}
-      <SendToClientModal
-        open={isSendToClientOpen}
-        onOpenChange={setIsSendToClientOpen}
-        documentType="quote"
-        document={quote}
-        onSent={() => {
-          setIsSendToClientOpen(false);
-        }}
-      />
     </div>
   );
 }

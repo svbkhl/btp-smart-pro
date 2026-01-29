@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useDecorativeBackground } from "@/contexts/DecorativeBackgroundContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ interface PageLayoutProps {
 
 export const PageLayout = ({ children }: PageLayoutProps) => {
   const { isPinned, isVisible, isHovered } = useSidebar();
+  const { enabled: decorativeBackgroundEnabled } = useDecorativeBackground();
   const isMobile = useIsMobile();
   
   // Calculer si la sidebar prend de l'espace
@@ -21,8 +23,8 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
 
   return (
     <div className="flex min-h-screen bg-background relative overflow-hidden">
-      {/* Animated Background */}
-      <AnimatedBackground />
+      {/* Animated Background (optionnel) */}
+      {decorativeBackgroundEnabled && <AnimatedBackground />}
       
       {/* Sidebar */}
       <Sidebar />

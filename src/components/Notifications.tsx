@@ -230,7 +230,7 @@ export const Notifications = () => {
               variant="ghost"
               className="w-full text-sm"
               onClick={() => {
-                navigate("/settings");
+                navigate("/settings?tab=notifications");
                 setOpen(false);
               }}
             >
