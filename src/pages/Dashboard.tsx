@@ -186,7 +186,7 @@ const Dashboard = () => {
     <PageLayout>
       <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
               Tableau de bord
@@ -195,7 +195,7 @@ const Dashboard = () => {
               Bienvenue ! Voici un aperçu de votre activité
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
             <div className="flex gap-2">
               <Link to="/analytics">
                 <Button
@@ -218,18 +218,18 @@ const Dashboard = () => {
                 </Button>
               </Link>
             </div>
-            <Link to="/projects">
-              <Button className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
+            <Link to="/projects" className="sm:ml-auto">
+              <Button className="gap-2 rounded-xl shadow-lg hover:shadow-xl transition-all">
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Nouveau chantier</span>
-                <span className="sm:hidden">Nouveau</span>
+                <span className="sm:hidden">+ Nouveau</span>
               </Button>
             </Link>
           </div>
         </div>
 
         {/* KPI Blocks */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <KPIBlock
             title="Chiffre d'affaires"
             value={new Intl.NumberFormat('fr-FR', { 
