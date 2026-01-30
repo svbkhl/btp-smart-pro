@@ -101,12 +101,30 @@ export function usePermissions(): UsePermissionsReturn {
         .maybeSingle();
 
       if (error) {
-        console.error('❌ [usePermissions] Error fetching role:', error);
+        console.error('❌ [usePermissions] Error fetching role:', {
+          error,
+          user_id: user.id,
+          company_id: currentCompanyId,
+          error_code: error.code,
+          error_message: error.message
+        });
         return null;
       }
 
       if (data) {
-        console.log('✅ [usePermissions] Role loaded:', data);
+        console.log('✅ [usePermissions] Role loaded:', {
+          role_id: data.role_id,
+          role_slug: data.roles?.slug,
+          role_name: data.roles?.name,
+          user_id: user.id,
+          company_id: currentCompanyId
+        });
+      } else {
+        console.warn('⚠️ [usePermissions] No role data found:', {
+          user_id: user.id,
+          company_id: currentCompanyId,
+          message: 'Aucun enregistrement trouvé dans company_users pour cet utilisateur et cette entreprise'
+        });
       }
       return data;
     },
