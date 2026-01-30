@@ -89,19 +89,25 @@ END $$;
 -- ASSIGNER TOUTES LES PERMISSIONS users.* AUX RÔLES OWNER
 -- ============================================================================
 
-INSERT INTO public.role_permissions (role_id, permission_id)
-SELECT r.id, p.id
-FROM public.roles r
-CROSS JOIN public.permissions p
-WHERE r.slug = 'owner'
-  AND p.key IN ('users.read', 'users.invite', 'users.update', 'users.delete', 'users.update_role')
-  AND NOT EXISTS (
-    SELECT 1 FROM public.role_permissions rp
-    WHERE rp.role_id = r.id AND rp.permission_id = p.id
-  )
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-RAISE NOTICE '✅ Permissions users.* assignées à tous les rôles OWNER';
+DO $$
+DECLARE
+  v_permissions_count INT;
+BEGIN
+  INSERT INTO public.role_permissions (role_id, permission_id)
+  SELECT r.id, p.id
+  FROM public.roles r
+  CROSS JOIN public.permissions p
+  WHERE r.slug = 'owner'
+    AND p.key IN ('users.read', 'users.invite', 'users.update', 'users.delete', 'users.update_role')
+    AND NOT EXISTS (
+      SELECT 1 FROM public.role_permissions rp
+      WHERE rp.role_id = r.id AND rp.permission_id = p.id
+    )
+  ON CONFLICT (role_id, permission_id) DO NOTHING;
+  
+  GET DIAGNOSTICS v_permissions_count = ROW_COUNT;
+  RAISE NOTICE '✅ Permissions users.* assignées à tous les rôles OWNER (% permissions)', v_permissions_count;
+END $$;
 
 -- ============================================================================
 -- VÉRIFICATION : Afficher tous les owners et leurs entreprises
