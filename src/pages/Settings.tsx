@@ -184,89 +184,88 @@ const Settings = () => {
 
   return (
     <PageLayout>
-      <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+      <div className="p-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
-              <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
+              <SettingsIcon className="w-8 h-8 text-primary" />
               Paramètres
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Gérez vos préférences, votre compte et les configurations de l'application
             </p>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-xs sm:text-sm text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap"
+            className="gap-2 text-sm text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap"
             onClick={() => setLegalDialogOpen(true)}
           >
-            <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-            <span className="hidden sm:inline">RGPD, Mentions légales, CGU</span>
-            <span className="sm:hidden">RGPD</span>
+            <FileText className="w-5 h-5 flex-shrink-0" />
+            <span>RGPD, Mentions légales, CGU</span>
           </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
-            <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+          <TabsList className="grid w-full gap-2 mb-6 h-auto grid-cols-8">
+            <TabsTrigger value="company" className="gap-2 text-sm px-4 py-2.5">
+              <Building2 className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">Entreprise</span>
             </TabsTrigger>
-            <TabsTrigger value="employees" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+            <TabsTrigger value="employees" className="gap-2 text-sm px-4 py-2.5">
+              <UserPlus className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">Employés</span>
             </TabsTrigger>
             {(isAdmin || isAdministrator) && (
               <>
-                <TabsTrigger value="companies" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <TabsTrigger value="companies" className="gap-2 text-sm px-4 py-2.5">
+                  <Users className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">Gestion Entreprises</span>
                 </TabsTrigger>
-                <TabsTrigger value="contact-requests" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <TabsTrigger value="contact-requests" className="gap-2 text-sm px-4 py-2.5">
+                  <Mail className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">Demandes de contact</span>
                 </TabsTrigger>
-                <TabsTrigger value="users" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <TabsTrigger value="users" className="gap-2 text-sm px-4 py-2.5">
+                  <UserCog className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">Utilisateurs</span>
                 </TabsTrigger>
-                <TabsTrigger value="roles" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <TabsTrigger value="roles" className="gap-2 text-sm px-4 py-2.5">
+                  <Shield className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">Rôles</span>
                 </TabsTrigger>
                 {canManageDelegations && (
-                  <TabsTrigger value="delegations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                    <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <TabsTrigger value="delegations" className="gap-2 text-sm px-4 py-2.5">
+                    <UserCog className="w-4 h-4 flex-shrink-0" />
                     <span className="truncate">Délégations</span>
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="admin-company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <SettingsIcon2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <TabsTrigger value="admin-company" className="gap-2 text-sm px-4 py-2.5">
+                  <SettingsIcon2 className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">Config Entreprises</span>
                 </TabsTrigger>
               </>
             )}
             {isAdministrator && (
-              <TabsTrigger value="demo" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                <Play className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <TabsTrigger value="demo" className="gap-2 text-sm px-4 py-2.5">
+                <Play className="w-4 h-4 flex-shrink-0" />
                 <span className="truncate">Mode démo</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="stripe" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+            <TabsTrigger value="stripe" className="gap-2 text-sm px-4 py-2.5">
+              <CreditCard className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">Paiements</span>
             </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+            <TabsTrigger value="integrations" className="gap-2 text-sm px-4 py-2.5">
+              <Calendar className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">Intégrations</span>
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Bell className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+            <TabsTrigger value="notifications" className="gap-2 text-sm px-4 py-2.5">
+              <Bell className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">Notifications</span>
             </TabsTrigger>
-            <TabsTrigger value="security" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+            <TabsTrigger value="security" className="gap-2 text-sm px-4 py-2.5">
+              <Shield className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">Sécurité</span>
             </TabsTrigger>
           </TabsList>

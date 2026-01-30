@@ -15,10 +15,11 @@ interface PageLayoutProps {
 export const PageLayout = ({ children }: PageLayoutProps) => {
   const { isPinned, isVisible, isHovered } = useSidebar();
   const { enabled: decorativeBackgroundEnabled } = useDecorativeBackground();
-  const isMobile = useIsMobile();
+  // Désactiver la détection mobile - toujours considérer comme desktop
+  const isMobile = false;
   
   // Calculer si la sidebar prend de l'espace
-  const sidebarVisible = isMobile ? false : (isPinned || isVisible || isHovered);
+  const sidebarVisible = isPinned || isVisible || isHovered;
   const sidebarWidth = 288; // w-72 = 288px
 
   return (
@@ -33,8 +34,8 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
       <motion.main
         className="relative z-10 flex flex-col overflow-hidden"
         animate={{
-          marginLeft: !isMobile && sidebarVisible ? sidebarWidth : 0,
-          width: !isMobile && sidebarVisible 
+          marginLeft: sidebarVisible ? sidebarWidth : 0,
+          width: sidebarVisible 
             ? `calc(100% - ${sidebarWidth}px)` 
             : "100%",
         }}
