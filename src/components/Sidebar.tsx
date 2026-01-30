@@ -147,6 +147,11 @@ export default function Sidebar() {
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
+    // Fermer la sidebar immédiatement sur mobile pour une meilleure UX
+    if (isMobile) {
+      setIsVisible(false);
+    }
+    
     // Si l'utilisateur n'est pas connecté et qu'on est en mode démo, rediriger vers le formulaire
     if (!user && fakeDataEnabled) {
       e?.preventDefault();
@@ -246,6 +251,7 @@ export default function Sidebar() {
       hoverTimeoutRef.current = null;
     }
     
+    // Sur mobile, fermer immédiatement la sidebar au changement de route
     if (isMobile) {
       setIsVisible(false);
     } else if (!isPinned) {
@@ -400,7 +406,16 @@ export default function Sidebar() {
           className="p-6 border-b border-white/20 dark:border-gray-700/30"
         >
           {(user || !fakeDataEnabled) ? (
-            <Link to="/dashboard" className="flex items-center gap-3 group">
+            <Link 
+              to="/dashboard" 
+              className="flex items-center gap-3 group"
+              onClick={() => {
+                // Fermer la sidebar immédiatement sur mobile
+                if (isMobile) {
+                  setIsVisible(false);
+                }
+              }}
+            >
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 5 }}
                 className={cn(
@@ -569,6 +584,12 @@ export default function Sidebar() {
                                         <Link
                                           key={subItem.path}
                                           to={subItem.path}
+                                          onClick={() => {
+                                            // Fermer la sidebar immédiatement sur mobile
+                                            if (isMobile) {
+                                              setIsVisible(false);
+                                            }
+                                          }}
                                           className={cn(
                                             "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                                             subActive
@@ -603,6 +624,12 @@ export default function Sidebar() {
                         ) : (user || !fakeDataEnabled) ? (
                           <Link
                             to={item.path}
+                            onClick={() => {
+                              // Fermer la sidebar immédiatement sur mobile
+                              if (isMobile) {
+                                setIsVisible(false);
+                              }
+                            }}
                             className={cn(
                               "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                               "relative hover:shadow-lg hover:shadow-primary/20",
