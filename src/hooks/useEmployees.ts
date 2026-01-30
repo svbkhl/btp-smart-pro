@@ -16,6 +16,7 @@ export interface Employee {
   prenom?: string;
   poste: string;
   specialites?: string[];
+  email?: string;
   created_at?: string;
   updated_at?: string;
   // Données utilisateur associées
@@ -23,6 +24,11 @@ export interface Employee {
     email?: string;
     email_confirmed_at?: string;
   };
+  // Rôle dans l'entreprise
+  role?: {
+    slug?: string;
+    name?: string;
+  } | null;
 }
 
 export interface CreateEmployeeData {
@@ -118,6 +124,70 @@ export const useEmployees = () => {
     enabled: (!!user && !isLoadingCompanyId && !!companyId) || fakeDataEnabled,
     ...QUERY_CONFIG.MODERATE, // Cache intelligent : 5min staleTime, pas de refetch auto
     throwOnError: false, // Ne pas bloquer l'UI en cas d'erreur
+  });
+};
+
+// Récupérer les employés d'une entreprise spécifique (pour admin)
+export const useEmployeesByCompany = (companyId: string | null) => {
+  const { user } = useAuth();
+  const { fakeDataEnabled } = useFakeDataStore();
+
+  return useQuery({
+    queryKey: ["employees-by-company", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+
+      // Si fake data est activé, retourner directement les fake data
+      if (fakeDataEnabled) {
+        logger.debug("Mode démo activé - Retour des fake employees");
+        return FAKE_EMPLOYEES;
+      }
+
+      // Sinon, faire la vraie requête
+      return queryWithTimeout(
+        async () => {
+          if (!user) throw new Error("User not authenticated");
+
+          // Récupérer tous les employés de cette entreprise
+          const { data: employeesData, error: employeesError } = await supabase
+            .from("employees" as any)
+            .select("*")
+            .eq("company_id", companyId)
+            .order("nom", { ascending: true });
+
+          if (employeesError) throw employeesError;
+
+          // Récupérer les utilisateurs associés via company_users pour avoir les rôles
+          const { data: companyUsers } = await supabase
+            .from("company_users")
+            .select("user_id, roles:role_id(slug, name)")
+            .eq("company_id", companyId);
+
+          const userRolesMap = new Map(
+            (companyUsers || []).map((cu: any) => [cu.user_id, cu.roles])
+          );
+
+          // Créer un Set des user_ids pour récupérer les emails
+          const userIds = new Set((employeesData || []).map((emp: any) => emp.user_id));
+          
+          // Récupérer les emails depuis auth.users via une fonction RPC ou directement
+          // Note: On ne peut pas directement joindre auth.users, donc on utilise l'email de la table employees
+          const employeesWithRoles = (employeesData || []).map((emp: any) => ({
+            ...emp,
+            role: userRolesMap.get(emp.user_id) || null,
+            // Utiliser l'email de la table employees (colonne email si elle existe)
+            email: emp.email || undefined,
+          }));
+
+          return employeesWithRoles as Employee[];
+        },
+        [],
+        "useEmployeesByCompany"
+      );
+    },
+    enabled: !!user && !!companyId,
+    ...QUERY_CONFIG.MODERATE,
+    throwOnError: false,
   });
 };
 

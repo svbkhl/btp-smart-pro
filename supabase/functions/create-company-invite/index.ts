@@ -178,15 +178,55 @@ serve(async (req) => {
     // Créer le client admin pour les opérations sécurisées
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Vérifier que l'utilisateur est owner/admin de la company
+    // Vérifier que l'utilisateur est owner/admin de la company OU admin global
+    let hasPermission = false;
+    
+    // 1. Vérifier si l'utilisateur est owner/admin de cette entreprise spécifique
     const { data: membership, error: membershipError } = await adminClient
       .from('company_users')
       .select('role')
       .eq('company_id', company_id)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (membershipError || !membership || !['owner', 'admin'].includes(membership.role)) {
+    if (!membershipError && membership && ['owner', 'admin'].includes(membership.role)) {
+      hasPermission = true;
+    } else {
+      // 2. Si pas membre de l'entreprise, vérifier si c'est un admin global
+      // Vérifier dans user_roles (si la table existe)
+      try {
+        const { data: userRole, error: userRoleError } = await adminClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!userRoleError && userRole && (userRole.role === 'admin' || userRole.role === 'administrateur' || userRole.role === 'dirigeant')) {
+          hasPermission = true;
+        }
+      } catch (userRoleTableError) {
+        // Table user_roles n'existe peut-être pas, continuer avec les autres vérifications
+        console.log("⚠️ Table user_roles non accessible, vérification via métadonnées");
+      }
+
+      // 3. Vérifier dans les métadonnées utilisateur (fallback)
+      if (!hasPermission) {
+        const metadata = user.user_metadata || {};
+        const role = metadata.role as string | undefined;
+        const statut = metadata.statut as string | undefined;
+        
+        if (role === 'admin' || role === 'administrateur' || statut === 'admin' || statut === 'administrateur') {
+          hasPermission = true;
+        }
+      }
+
+      // 4. Vérifier l'email directement (pour les super admins)
+      if (!hasPermission && user.email?.toLowerCase() === 'sabri.khalfallah6@gmail.com') {
+        hasPermission = true;
+      }
+    }
+
+    if (!hasPermission) {
       return new Response(
         JSON.stringify({ error: "You must be owner or admin of this company to invite users" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

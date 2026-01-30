@@ -14,9 +14,11 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useAllCompanies, useUpdateCompany, useCreateCompany, useDeleteCompany, Company } from "@/hooks/useCompany";
 import { ALL_FEATURES } from "@/utils/companyFeatures";
-import { Loader2, Building2, Save, Plus, Edit, Mail, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Building2, Save, Plus, Edit, Mail, Trash2, AlertTriangle, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { useEmployeesByCompany } from "@/hooks/useEmployees";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +27,72 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+// Composant pour afficher la liste des employés d'une entreprise
+const CompanyEmployeesList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
+  const { data: employees, isLoading, error } = useEmployeesByCompany(companyId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive" className="mt-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Erreur</AlertTitle>
+        <AlertDescription>
+          Impossible de charger les employés de {companyName}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!employees || employees.length === 0) {
+    return (
+      <div className="mt-4 p-4 rounded-lg bg-muted/50 text-center text-sm text-muted-foreground">
+        Aucun employé dans cette entreprise
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-2">
+      <div className="text-sm font-medium text-muted-foreground mb-2">
+        {employees.length} employé{employees.length > 1 ? 's' : ''}
+      </div>
+      <div className="space-y-2">
+        {employees.map((employee) => (
+          <div
+            key={employee.id}
+            className="flex items-center justify-between p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-white/10"
+          >
+            <div className="flex-1">
+              <div className="font-medium">
+                {employee.prenom} {employee.nom}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {employee.poste}
+                {employee.email && (
+                  <span className="ml-2">• {employee.email}</span>
+                )}
+              </div>
+            </div>
+            {employee.role && (
+              <Badge variant="secondary" className="ml-2">
+                {employee.role.slug || employee.role.name}
+              </Badge>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const AdminCompanies = () => {
   const { data: companies = [], isLoading, error } = useAllCompanies();
@@ -37,6 +105,7 @@ const AdminCompanies = () => {
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [newCompanyData, setNewCompanyData] = useState({
     name: "",
     plan: "basic" as Company["plan"],
@@ -148,6 +217,18 @@ const AdminCompanies = () => {
     setCompanyToDelete(company);
     setDeleteConfirmationText("");
     setIsDeleteDialogOpen(true);
+  };
+
+  const toggleCompanyExpansion = (companyId: string) => {
+    setExpandedCompanies((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(companyId)) {
+        newSet.delete(companyId);
+      } else {
+        newSet.add(companyId);
+      }
+      return newSet;
+    });
   };
 
   if (isLoading) {
@@ -564,21 +645,47 @@ const AdminCompanies = () => {
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Modules activés</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {ALL_FEATURES.filter(
-                        (f) => company.features?.[f.key] === true
-                      ).map((feature) => (
-                        <span
-                          key={feature.key}
-                          className="px-2 py-1 text-xs rounded-lg bg-primary/10 text-primary"
-                        >
-                          {feature.label}
-                        </span>
-                      ))}
+                  <>
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Modules activés</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {ALL_FEATURES.filter(
+                          (f) => company.features?.[f.key] === true
+                        ).map((feature) => (
+                          <span
+                            key={feature.key}
+                            className="px-2 py-1 text-xs rounded-lg bg-primary/10 text-primary"
+                          >
+                            {feature.label}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                    
+                    {/* Section Employés */}
+                    <div className="pt-4 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCompanyExpansion(company.id)}
+                        className="w-full justify-between rounded-xl"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>Voir les employés</span>
+                        </div>
+                        {expandedCompanies.has(company.id) ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </Button>
+                      
+                      {expandedCompanies.has(company.id) && (
+                        <CompanyEmployeesList companyId={company.id} companyName={company.name} />
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </GlassCard>

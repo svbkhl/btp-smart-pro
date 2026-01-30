@@ -12,8 +12,14 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
 import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
@@ -37,6 +43,7 @@ const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const exchangeCode = useExchangeGoogleCode();
+  const [legalDialogOpen, setLegalDialogOpen] = useState(false);
   
   // Ref pour éviter les appels multiples
   const hasProcessedOAuth = useRef(false);
@@ -158,11 +165,12 @@ const Settings = () => {
   
   // Ajuster le nombre de colonnes selon les onglets
   // company, companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (si admin), stripe, integrations, notifications, security
+  // Note: "legal" a été déplacé en haut à droite comme bouton
   const tabCount = isAdministrator 
-    ? (canManageDelegations ? 13 : 12) // +1 si delegations
+    ? (canManageDelegations ? 12 : 11) // +1 si delegations
     : isAdmin
-    ? (canManageDelegations ? 10 : 9) // +1 si delegations
-    : 6; // company, stripe, integrations, notifications, security
+    ? (canManageDelegations ? 9 : 8) // +1 si delegations
+    : 5; // company, employees, stripe, integrations, notifications, security
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -177,14 +185,26 @@ const Settings = () => {
   return (
     <PageLayout>
       <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
-            <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-            Paramètres
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Gérez vos préférences, votre compte et les configurations de l'application
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+              Paramètres
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Gérez vos préférences, votre compte et les configurations de l'application
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-xs sm:text-sm text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap"
+            onClick={() => setLegalDialogOpen(true)}
+          >
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="hidden sm:inline">RGPD, Mentions légales, CGU</span>
+            <span className="sm:hidden">RGPD</span>
+          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -248,10 +268,6 @@ const Settings = () => {
             <TabsTrigger value="security" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Sécurité</span>
-            </TabsTrigger>
-            <TabsTrigger value="legal" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">RGPD, Mentions légales, CGU</span>
             </TabsTrigger>
           </TabsList>
 
@@ -317,11 +333,17 @@ const Settings = () => {
           <TabsContent value="security" className="mt-0">
             <SecuritySettings />
           </TabsContent>
-
-          <TabsContent value="legal" className="mt-0">
-            <LegalPagesContent />
-          </TabsContent>
         </Tabs>
+
+        {/* Dialog pour les pages légales */}
+        <Dialog open={legalDialogOpen} onOpenChange={setLegalDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>RGPD, Mentions légales, CGU</DialogTitle>
+            </DialogHeader>
+            <LegalPagesContent />
+          </DialogContent>
+        </Dialog>
       </div>
     </PageLayout>
   );
