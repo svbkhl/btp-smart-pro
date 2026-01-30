@@ -23,7 +23,7 @@ BEGIN
   
   -- Parcourir toutes les entreprises
   FOR v_company_id IN 
-    SELECT DISTINCT id FROM public.companies ORDER BY created_at ASC
+    SELECT id FROM public.companies ORDER BY created_at ASC
   LOOP
     v_companies_processed := v_companies_processed + 1;
     
