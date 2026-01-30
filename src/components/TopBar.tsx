@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,12 +19,16 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const TopBar = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const { fakeDataEnabled } = useFakeDataStore();
+  const { isVisible, setIsVisible } = useSidebar();
+  const isMobile = useIsMobile();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -51,51 +55,62 @@ export const TopBar = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="w-full px-6 pt-2 pb-1"
+            className="w-full px-3 sm:px-4 md:px-6 pt-2 pb-1"
           >
             <Badge 
               variant="outline" 
-              className="w-full justify-center bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/30 text-amber-700 dark:text-amber-400 backdrop-blur-sm py-1.5 text-sm font-medium"
+              className="w-full justify-center bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/30 text-amber-700 dark:text-amber-400 backdrop-blur-sm py-1.5 text-xs sm:text-sm font-medium"
             >
               🎭 MODE DÉMO ACTIVÉ - Données fictives uniquement
             </Badge>
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="flex items-center justify-end gap-3 p-6">
-        {/* Right Actions - Serrés vers la droite avec recherche */}
-        <div className="flex items-center gap-2 w-auto">
-          {/* Search Bar */}
-          <div className="flex-initial max-w-xs min-w-0">
-            <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
-          </div>
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 md:p-6 bg-white/50 dark:bg-gray-900/50 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/30">
+        {/* Mobile Hamburger Menu Button */}
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border border-white/20 dark:border-gray-700/30 shadow-sm hover:shadow-md transition-all"
+            onClick={() => setIsVisible(!isVisible)}
+          >
+            {isVisible ? (
+              <X className="h-5 w-5 text-foreground" />
+            ) : (
+              <Menu className="h-5 w-5 text-foreground" />
+            )}
+          </Button>
+        )}
 
+        {/* Search Bar */}
+        <div className="flex-1 min-w-0 sm:flex-initial sm:max-w-xs lg:max-w-md">
+          <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
+        </div>
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
           {/* Theme Toggle */}
-          <div className="flex-shrink-0">
-            <ThemeToggle />
-          </div>
+          <ThemeToggle />
 
           {/* Notifications */}
-          <div className="flex-shrink-0">
-            <Notifications />
-          </div>
+          <Notifications />
 
           {/* Profile Dropdown */}
-          <div className="flex-shrink-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-10 h-10 rounded-xl"
-                >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl"
+              >
                 <Avatar className="w-8 h-8">
                   <AvatarFallback className="bg-primary text-primary-foreground">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
+              </Button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
@@ -119,7 +134,6 @@ export const TopBar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          </div>
         </div>
       </div>
     </div>

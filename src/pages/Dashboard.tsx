@@ -184,11 +184,11 @@ const Dashboard = () => {
 
   return (
     <PageLayout>
-      <div className="p-8 space-y-8">
+      <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-4 sm:space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex flex-row items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-foreground mb-2">
+            <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
               Tableau de bord
             </h1>
             <p className="text-muted-foreground text-base">
@@ -203,7 +203,8 @@ const Dashboard = () => {
                   className="gap-2 rounded-xl"
                 >
                   <BarChart3 className="w-4 h-4" />
-                  <span>Analyses Avancées</span>
+                  <span className="hidden sm:inline">Analyses Avancées</span>
+                  <span className="sm:hidden">Analyses</span>
                 </Button>
               </Link>
               <Link to="/ai-insights">
@@ -212,21 +213,23 @@ const Dashboard = () => {
                   className="gap-2 rounded-xl"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Insights IA</span>
+                  <span className="hidden sm:inline">Insights IA</span>
+                  <span className="sm:hidden">Insights</span>
                 </Button>
               </Link>
             </div>
             <Link to="/projects">
-              <Button className="gap-2 w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
+              <Button className="gap-2 w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl transition-all">
                 <Plus className="w-4 h-4" />
-                <span>Nouveau chantier</span>
+                <span className="hidden sm:inline">Nouveau chantier</span>
+                <span className="sm:hidden">Nouveau</span>
               </Button>
             </Link>
           </div>
         </div>
 
         {/* KPI Blocks */}
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <KPIBlock
             title="Chiffre d'affaires"
             value={new Intl.NumberFormat('fr-FR', { 
@@ -274,9 +277,9 @@ const Dashboard = () => {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Charts and Projects */}
-          <div className="col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             <ChartCard
               title="Évolution du chiffre d'affaires"
               description="CA mensuel sur les 6 derniers mois"
