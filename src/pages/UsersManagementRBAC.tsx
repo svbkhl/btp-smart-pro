@@ -4,7 +4,7 @@
  * Permissions requises: users.read
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -67,9 +67,19 @@ interface UsersManagementRBACProps {
 
 export default function UsersManagementRBAC({ embedded = false }: UsersManagementRBACProps) {
   const { currentCompanyId, user: currentUser } = useAuth();
-  const { can, isOwner, isAdmin } = usePermissions();
+  const { can, isOwner, isAdmin, roleSlug } = usePermissions();
   const { roles } = useRoles();
   const queryClient = useQueryClient();
+  
+  // Debug: Log pour vérifier les permissions
+  console.log('🔍 [UsersManagementRBAC] Permissions check:', {
+    canRead: can('users.read'),
+    isOwner,
+    isAdmin,
+    roleSlug,
+    currentCompanyId,
+    userId: currentUser?.id
+  });
 
   const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
@@ -151,7 +161,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
       }
       throw error;
     },
-    enabled: !!currentCompanyId && (can('users.read') || isOwner),
+    enabled: !!currentCompanyId && (can('users.read') || isOwner || isOwnerDirect === true),
   });
 
   // Changer le rôle d'un utilisateur
@@ -253,19 +263,70 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
     deleteUserMutation.mutate(selectedUser.user_id);
   };
 
+  // Vérification alternative : vérifier directement dans company_users si l'utilisateur est owner
+  // Cette vérification est nécessaire car usePermissions peut ne pas détecter correctement le rôle owner
+  const [isOwnerDirect, setIsOwnerDirect] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    const checkOwnerDirect = async () => {
+      if (!currentUser?.id || !currentCompanyId) {
+        setIsOwnerDirect(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('company_users')
+          .select('role_id, roles!inner(slug, name)')
+          .eq('user_id', currentUser.id)
+          .eq('company_id', currentCompanyId)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('❌ [UsersManagementRBAC] Error checking owner:', error);
+          setIsOwnerDirect(false);
+          return;
+        }
+        
+        if (data?.roles) {
+          const slug = data.roles.slug;
+          const name = (data.roles.name || '').toLowerCase();
+          const isOwnerCheck = slug === 'owner' || ['patron', 'propriétaire', 'dirigeant', 'owner'].some((s) => name.includes(s));
+          console.log('🔍 [UsersManagementRBAC] Direct owner check:', { slug, name, isOwnerCheck });
+          setIsOwnerDirect(isOwnerCheck);
+        } else {
+          setIsOwnerDirect(false);
+        }
+      } catch (err) {
+        console.error('❌ [UsersManagementRBAC] Exception checking owner:', err);
+        setIsOwnerDirect(false);
+      }
+    };
+    
+    checkOwnerDirect();
+  }, [currentUser?.id, currentCompanyId]);
+  
   // Les owners ont toujours accès à la gestion des employés
-  if (!can('users.read') && !isOwner) {
+  // Utiliser isOwnerDirect comme fallback si isOwner n'est pas détecté correctement
+  const hasAccess = can('users.read') || isOwner || isOwnerDirect === true;
+  
+  if (!hasAccess) {
     return (
       <Card className="p-8 text-center">
         <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
         <p className="text-muted-foreground">
           Vous n'avez pas les permissions nécessaires pour accéder à cette page.
         </p>
+        {process.env.NODE_ENV === 'development' && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Debug: can={can('users.read') ? 'true' : 'false'}, isOwner={isOwner ? 'true' : 'false'}, isOwnerDirect={isOwnerDirect === null ? 'loading' : isOwnerDirect ? 'true' : 'false'}, roleSlug={roleSlug || 'null'}
+          </p>
+        )}
       </Card>
     );
   }
 
-  const canInvite = can('users.invite') || isOwner || isAdmin;
+  const canInvite = can('users.invite') || isOwner || isOwnerDirect === true || isAdmin;
   const inviteButton = canInvite ? (
     <InviteUserDialogRBAC
       onSuccess={() => queryClient.invalidateQueries({ queryKey: ['company-users'] })}
@@ -360,7 +421,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                 {/* Actions */}
                 {!isCurrentUser && (
                   <div className="flex gap-2">
-                    {(can('users.update_role') || isOwner) && (
+                    {(can('users.update_role') || isOwner || isOwnerDirect === true) && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -371,7 +432,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                       </Button>
                     )}
 
-                    {(can('users.delete') || isOwner) && (
+                    {(can('users.delete') || isOwner || isOwnerDirect === true) && (
                       <Button
                         variant="outline"
                         size="sm"
