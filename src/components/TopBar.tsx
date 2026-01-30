@@ -66,7 +66,7 @@ export const TopBar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="flex items-center gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 md:p-6 bg-white/50 dark:bg-gray-900/50 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/30">
+      <div className="flex items-center justify-end gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 md:p-6">
         {/* Mobile Hamburger Menu Button */}
         {isMobile && (
           <Button
@@ -82,58 +82,60 @@ export const TopBar = () => {
             )}
           </Button>
         )}
+        {/* Right Actions - Serrés vers la droite avec recherche */}
+        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 ml-auto">
+          {/* Search Bar */}
+          <div className="flex-initial sm:max-w-xs min-w-0">
+            <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
+          </div>
 
-        {/* Search Bar */}
-        <div className="flex-1 min-w-0 sm:flex-initial sm:max-w-xs lg:max-w-md">
-          <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
-        </div>
+          {/* Right Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
+            {/* Theme Toggle */}
+            <ThemeToggle />
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
-          {/* Theme Toggle */}
-          <ThemeToggle />
+            {/* Notifications */}
+            <Notifications />
 
-          {/* Notifications */}
-          <Notifications />
-
-          {/* Profile Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl"
-              >
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">
-                    {user?.user_metadata?.prenom && user?.user_metadata?.nom
-                      ? `${user.user_metadata.prenom} ${user.user_metadata.nom}`
-                      : user?.email}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {user?.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/settings")}>
-                Paramètres
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
-                Déconnexion
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            {/* Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl"
+                >
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">
+                      {user?.user_metadata?.prenom && user?.user_metadata?.nom
+                        ? `${user.user_metadata.prenom} ${user.user_metadata.nom}`
+                        : user?.email}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  Paramètres
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+                  Déconnexion
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </div>
