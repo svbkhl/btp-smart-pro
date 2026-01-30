@@ -158,7 +158,8 @@ export default function Sidebar() {
   };
   const isMobile = useIsMobile();
   const { isPinned, isVisible, setIsPinned, setIsVisible, setIsHovered: setGlobalIsHovered } = useSidebar();
-  const [isOpen, setIsOpen] = useState(!isMobile);
+  // Utiliser isVisible du contexte pour mobile aussi
+  const isOpen = isMobile ? isVisible : (isPinned || isVisible || isHovered);
   const [isHovered, setIsHovered] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -229,7 +230,7 @@ export default function Sidebar() {
     }
     
     if (isMobile) {
-      setIsOpen(false);
+      setIsVisible(false);
     } else if (!isPinned) {
       // Sur desktop, fermer la sidebar si pas épinglée
       setIsHovered(false);
@@ -285,28 +286,18 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      {isMobile && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="fixed top-4 left-4 z-50 rounded-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/30 dark:border-gray-700/40 shadow-lg"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-      )}
+      {/* Mobile Menu Button - Déplacé dans TopBar pour meilleure intégration */}
 
       {/* Mobile Overlay */}
       <AnimatePresence>
-        {isMobile && isOpen && (
+        {isMobile && isVisible && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-            onClick={() => setIsOpen(false)}
+            onClick={() => setIsVisible(false)}
           />
         )}
       </AnimatePresence>
@@ -342,7 +333,7 @@ export default function Sidebar() {
       <motion.aside
         initial={isMobile ? { x: -320 } : { x: -320 }}
         animate={isMobile 
-          ? { x: isOpen ? 0 : -320 }
+          ? { x: isVisible ? 0 : -320 }
           : {
               x: isPinned || isHovered ? 0 : -320,
             }

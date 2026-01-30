@@ -78,7 +78,7 @@ export const SearchBar = ({
           isFocused && "ring-2 ring-primary/20 shadow-xl",
           variant === "compact" 
             ? "h-9 sm:h-10 px-2 sm:px-3" 
-            : "h-10 sm:h-12 px-3 sm:px-4 w-full"
+            : "h-10 sm:h-11 md:h-12 px-3 sm:px-4 w-full"
         )}
       >
         <Search className={cn(
