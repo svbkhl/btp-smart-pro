@@ -72,8 +72,7 @@ BEGIN
     ON CONFLICT (company_id, user_id)
     DO UPDATE SET 
       role_id = v_owner_role_id,  -- Toujours OWNER, jamais autre chose
-      status = 'active', 
-      updated_at = now();
+      status = 'active';
     
     v_users_updated := v_users_updated + 1;
     RAISE NOTICE '   ✅ Rôle OWNER assigné à % (premier utilisateur de l''entreprise %)', v_user_email, v_company_id;
