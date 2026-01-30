@@ -37,7 +37,7 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 const Settings = () => {
   const { user, isAdmin, userRole, currentCompanyId } = useAuth();
-  const { isOwner, can } = usePermissions();
+  const { isOwner, can, roleSlug } = usePermissions();
   const { fakeDataEnabled } = useFakeDataStore();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -159,18 +159,19 @@ const Settings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleCalendarCode]); // Dépendre uniquement du code pour éviter les re-déclenchements
   
-  // Compter le nombre d'onglets (ajuster selon si admin)
-  const isAdministrator = userRole === 'admin' || isAdmin;
+  // Vérifier si l'utilisateur est vraiment admin (pas owner)
+  // Utiliser roleSlug de usePermissions qui est plus fiable
+  const isReallyAdmin = roleSlug === 'admin' && !isOwner;
+  const isAdministrator = (userRole === 'admin' || isAdmin) && !isOwner && roleSlug === 'admin';
   const canManageDelegations = isOwner || can("delegations.manage");
   
   // Ajuster le nombre de colonnes selon les onglets
-  // company, companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (si admin), stripe, integrations, notifications, security
+  // company, employees, stripe, integrations, notifications, security (pour owners)
+  // + companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (pour admins uniquement)
   // Note: "legal" a été déplacé en haut à droite comme bouton
-  const tabCount = isAdministrator 
+  const tabCount = isReallyAdmin 
     ? (canManageDelegations ? 12 : 11) // +1 si delegations
-    : isAdmin
-    ? (canManageDelegations ? 9 : 8) // +1 si delegations
-    : 5; // company, employees, stripe, integrations, notifications, security
+    : 6; // company, employees, stripe, integrations, notifications, security (pour owners)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -184,10 +185,10 @@ const Settings = () => {
 
   return (
     <PageLayout>
-      <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+      <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
               <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
               Paramètres
             </h1>
@@ -217,7 +218,7 @@ const Settings = () => {
               <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Employés</span>
             </TabsTrigger>
-            {(isAdmin || isAdministrator) && (
+            {isReallyAdmin && (
               <>
                 <TabsTrigger value="companies" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -247,7 +248,7 @@ const Settings = () => {
                 </TabsTrigger>
               </>
             )}
-            {isAdministrator && (
+            {isReallyAdmin && (
               <TabsTrigger value="demo" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                 <Play className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="truncate">Mode démo</span>
@@ -281,7 +282,7 @@ const Settings = () => {
             </div>
           </TabsContent>
 
-          {(isAdmin || isAdministrator) && (
+          {isReallyAdmin && (
             <>
               <TabsContent value="companies" className="mt-0">
                 <AdminCompanies />
@@ -307,13 +308,10 @@ const Settings = () => {
               <TabsContent value="admin-company" className="mt-0">
                 <AdminCompanySettings />
               </TabsContent>
+              <TabsContent value="demo" className="mt-0">
+                <DemoModeSettings />
+              </TabsContent>
             </>
-          )}
-
-          {isAdministrator && (
-            <TabsContent value="demo" className="mt-0">
-              <DemoModeSettings />
-            </TabsContent>
           )}
 
           <TabsContent value="stripe" className="mt-0">
