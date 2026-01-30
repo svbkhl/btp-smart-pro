@@ -151,7 +151,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
       }
       throw error;
     },
-    enabled: !!currentCompanyId && can('users.read'),
+    enabled: !!currentCompanyId && (can('users.read') || isOwner),
   });
 
   // Changer le rôle d'un utilisateur
@@ -253,7 +253,8 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
     deleteUserMutation.mutate(selectedUser.user_id);
   };
 
-  if (!can('users.read')) {
+  // Les owners ont toujours accès à la gestion des employés
+  if (!can('users.read') && !isOwner) {
     return (
       <Card className="p-8 text-center">
         <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
@@ -359,7 +360,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                 {/* Actions */}
                 {!isCurrentUser && (
                   <div className="flex gap-2">
-                    {can('users.update_role') && (
+                    {(can('users.update_role') || isOwner) && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -370,7 +371,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                       </Button>
                     )}
 
-                    {can('users.delete') && (
+                    {(can('users.delete') || isOwner) && (
                       <Button
                         variant="outline"
                         size="sm"
