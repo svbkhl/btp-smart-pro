@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -158,8 +158,6 @@ export default function Sidebar() {
   };
   const isMobile = useIsMobile();
   const { isPinned, isVisible, setIsPinned, setIsVisible, setIsHovered: setGlobalIsHovered } = useSidebar();
-  // Utiliser isVisible du contexte pour mobile aussi
-  const isOpen = isMobile ? isVisible : (isPinned || isVisible || isHovered);
   const [isHovered, setIsHovered] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -167,7 +165,21 @@ export default function Sidebar() {
   const { data: companies } = useCompanies();
   const { companyId } = useCompanyId();
   const { data: settings } = useUserSettings();
+  
+  // Fonction pour vérifier si un chemin est actif
+  const isActive = (path: string) => {
+    if (path === "/dashboard") {
+      return location.pathname === "/dashboard";
+    }
+    return location.pathname.startsWith(path);
+  };
+  
+  // Calculer menuGroups après avoir récupéré company
   const menuGroups = getMenuGroups(company);
+  
+  // Utiliser isVisible du contexte pour mobile aussi
+  const isOpen = isMobile ? isVisible : (isPinned || isVisible || isHovered);
+  
   // Entreprise courante (celle sélectionnée ou la première) pour nom/logo
   const currentCompany = companyId && companies?.length
     ? companies.find((c) => c.id === companyId) ?? companies[0]
@@ -187,17 +199,8 @@ export default function Sidebar() {
     ],
   };
 
-  // Fonction pour vérifier si un chemin est actif
-  const isActive = (path: string) => {
-    if (path === "/dashboard") {
-      return location.pathname === "/dashboard";
-    }
-    return location.pathname.startsWith(path);
-  };
-
-  // Initialiser expandedGroups après la définition de isActive
-  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(() => {
-    // Ouvrir automatiquement les groupes qui contiennent la page active
+  // Initialiser expandedGroups - utiliser useMemo pour éviter les problèmes d'initialisation
+  const initialExpandedGroups = useMemo(() => {
     const expanded: Record<number, boolean> = {};
     const currentPath = location.pathname;
     
@@ -219,7 +222,21 @@ export default function Sidebar() {
       });
     });
     return expanded;
-  });
+  }, [menuGroups, location.pathname]);
+  
+  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(initialExpandedGroups);
+  
+  // Mettre à jour expandedGroups quand menuGroups ou location change (seulement si différent)
+  useEffect(() => {
+    // Comparer les objets pour éviter les mises à jour inutiles
+    const currentStr = JSON.stringify(expandedGroups);
+    const newStr = JSON.stringify(initialExpandedGroups);
+    
+    if (currentStr !== newStr) {
+      setExpandedGroups(initialExpandedGroups);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, menuGroups.length]);
 
   // Fermer la sidebar quand on change de route (sauf si épinglée)
   useEffect(() => {
