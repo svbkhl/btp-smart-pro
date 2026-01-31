@@ -49,10 +49,21 @@ const Settings = () => {
   const hasProcessedOAuth = useRef(false);
   const oauthCodeRef = useRef<string | null>(null);
   
+  // Sections autorisées pour les OWNERS (6 sections uniquement)
+  const ownerAllowedSections = ['company', 'employees', 'stripe', 'integrations', 'notifications', 'security'];
+  
   // Lire le paramètre tab de l'URL (contrôlé pour que ?tab=notifications ouvre le bon onglet)
   const tabFromUrl = searchParams.get("tab");
   const activeTab = tabFromUrl || "company";
   const setActiveTab = (value: string) => setSearchParams({ tab: value }, { replace: true });
+  
+  // Protection : si owner essaye d'accéder à un onglet non autorisé, rediriger vers 'company'
+  useEffect(() => {
+    if (isOwner && tabFromUrl && !ownerAllowedSections.includes(tabFromUrl)) {
+      console.warn('[Settings] Owner tentant d\'accéder à un onglet non autorisé:', tabFromUrl);
+      setSearchParams({ tab: 'company' }, { replace: true });
+    }
+  }, [isOwner, tabFromUrl]);
   
   // Gérer le callback Google Calendar OAuth
   const googleCalendarStatus = searchParams.get("google_calendar_status");
@@ -166,12 +177,12 @@ const Settings = () => {
   const canManageDelegations = isOwner || can("delegations.manage");
   
   // Ajuster le nombre de colonnes selon les onglets
-  // company, employees, stripe, integrations, notifications, security (pour owners)
-  // + companies, contact-requests, users, roles, delegations (si permis), admin-company, demo (pour admins uniquement)
+  // OWNERS (6 onglets) : company, employees, stripe, integrations, notifications, security
+  // ADMINS (11-12 onglets) : 6 de base + companies, contact-requests, users, roles, delegations (optionnel), admin-company, demo
   // Note: "legal" a été déplacé en haut à droite comme bouton
   const tabCount = isReallyAdmin 
-    ? (canManageDelegations ? 12 : 11) // +1 si delegations
-    : 6; // company, employees, stripe, integrations, notifications, security (pour owners)
+    ? (canManageDelegations ? 12 : 11) // Admins: 11 ou 12 onglets
+    : 6; // Owners: 6 onglets uniquement (company, employees, stripe, integrations, notifications, security)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
