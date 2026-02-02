@@ -97,6 +97,11 @@ export const useCompanies = () => {
       return (companies || []) as Company[];
     },
     enabled: !!user,
+    staleTime: 30 * 60 * 1000, // 30 minutes - Cache très agressif pour performance
+    gcTime: 60 * 60 * 1000, // 60 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 };
 

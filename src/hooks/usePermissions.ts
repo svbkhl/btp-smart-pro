@@ -55,11 +55,6 @@ export function usePermissions(): UsePermissionsReturn {
     queryFn: async () => {
       if (!user || !currentCompanyId) return [];
 
-      console.log('🔑 [usePermissions] Fetching permissions for:', { 
-        user_id: user.id, 
-        company_id: currentCompanyId 
-      });
-
       const { data, error } = await supabase.rpc('get_user_permissions', {
         user_uuid: user.id,
         company_uuid: currentCompanyId,
@@ -70,12 +65,14 @@ export function usePermissions(): UsePermissionsReturn {
         throw error;
       }
 
-      console.log('✅ [usePermissions] Permissions loaded:', data);
       return (data as Permission[]) || [];
     },
     enabled: !!user && !!currentCompanyId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes - Cache très agressif
+    gcTime: 60 * 60 * 1000, // 60 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false, // Ne pas re-fetch lors de la reconnexion
   });
 
   // Récupérer le rôle de l'utilisateur
@@ -88,11 +85,6 @@ export function usePermissions(): UsePermissionsReturn {
     queryFn: async () => {
       if (!user || !currentCompanyId) return null;
 
-      console.log('👤 [usePermissions] Fetching role for:', { 
-        user_id: user.id, 
-        company_id: currentCompanyId 
-      });
-
       const { data, error } = await supabase
         .from('company_users')
         .select('role_id, roles(id, slug, name, is_system, color, icon)')
@@ -101,36 +93,21 @@ export function usePermissions(): UsePermissionsReturn {
         .maybeSingle();
 
       if (error) {
-        console.error('❌ [usePermissions] Error fetching role:', {
-          error,
-          user_id: user.id,
-          company_id: currentCompanyId,
-          error_code: error.code,
-          error_message: error.message
-        });
+        console.error('❌ [usePermissions] Error fetching role:', error.message);
         return null;
       }
 
-      if (data) {
-        console.log('✅ [usePermissions] Role loaded:', {
-          role_id: data.role_id,
-          role_slug: data.roles?.slug,
-          role_name: data.roles?.name,
-          user_id: user.id,
-          company_id: currentCompanyId
-        });
-      } else {
-        console.warn('⚠️ [usePermissions] No role data found:', {
-          user_id: user.id,
-          company_id: currentCompanyId,
-          message: 'Aucun enregistrement trouvé dans company_users pour cet utilisateur et cette entreprise'
-        });
+      if (!data) {
+        console.warn('⚠️ [usePermissions] No role data found');
       }
       return data;
     },
     enabled: !!user && !!currentCompanyId,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
+    staleTime: 30 * 60 * 1000, // 30 minutes - Cache très agressif
+    gcTime: 60 * 60 * 1000, // 60 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const roleSlug = roleData?.roles?.slug || null;

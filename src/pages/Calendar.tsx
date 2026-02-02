@@ -55,6 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -72,6 +73,7 @@ const Calendar = () => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+  const [agendaDate, setAgendaDate] = useState(new Date()); // Date pour l'agenda
   const deleteEvent = useDeleteEvent();
   const { toast } = useToast();
 
@@ -522,6 +524,161 @@ const Calendar = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Section Agenda du jour */}
+        <div className="mt-8">
+          <GlassCard className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Mon Agenda
+              </h2>
+              
+              {/* Sélecteur de date */}
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAgendaDate(subDays(agendaDate, 1))}
+                    className="rounded-lg"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAgendaDate(new Date())}
+                    className="rounded-lg min-w-[140px]"
+                  >
+                    {format(agendaDate, "dd MMM yyyy", { locale: fr })}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAgendaDate(addDays(agendaDate, 1))}
+                    className="rounded-lg"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Vue Agenda avec heures (7h - 20h uniquement) */}
+            <div className="max-h-[600px] overflow-y-auto space-y-0 border rounded-lg">
+              {Array.from({ length: 14 }, (_, index) => {
+                const hour = index + 7; // Commencer à 7h
+                
+                // Récupérer les événements de cette heure pour la date sélectionnée
+                const hourEvents = displayEvents.filter((event) => {
+                  const eventStart = parseISO(event.start_date);
+                  return isSameDay(eventStart, agendaDate) && getHours(eventStart) === hour;
+                });
+
+                const isCurrentHour = isToday(agendaDate) && new Date().getHours() === hour;
+
+                return (
+                  <div 
+                    key={hour} 
+                    className={`flex gap-3 min-h-[50px] border-b border-border/30 last:border-0 ${
+                      isCurrentHour ? 'bg-primary/5' : ''
+                    }`}
+                  >
+                    {/* Colonne des heures */}
+                    <div className="w-16 flex-shrink-0 pt-2 px-3">
+                      <span className={`text-xs font-medium ${
+                        isCurrentHour ? 'text-primary font-semibold' : 'text-muted-foreground'
+                      }`}>
+                        {hour.toString().padStart(2, '0')}:00
+                      </span>
+                    </div>
+                    
+                    {/* Colonne des événements */}
+                    <div className="flex-1 py-2 pr-3 space-y-1.5">
+                      {hourEvents.length > 0 ? (
+                        hourEvents.map((event) => {
+                          const eventStart = parseISO(event.start_date);
+                          const eventEnd = event.end_date ? parseISO(event.end_date) : null;
+                          const duration = eventEnd 
+                            ? Math.round((eventEnd.getTime() - eventStart.getTime()) / (1000 * 60))
+                            : 60;
+
+                          return (
+                            <div
+                              key={event.id}
+                              className="p-2 sm:p-3 rounded-lg cursor-pointer transition-all hover:shadow-md group"
+                              style={{
+                                backgroundColor: `${event.color || '#3b82f6'}10`,
+                                borderLeft: `3px solid ${event.color || '#3b82f6'}`,
+                              }}
+                              onClick={() => {
+                                setSelectedEvent(event);
+                                setIsEventFormOpen(true);
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold text-xs sm:text-sm mb-0.5 truncate">
+                                    {event.title}
+                                  </h4>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Clock className="w-3 h-3" />
+                                    <span>
+                                      {format(eventStart, "HH:mm", { locale: fr })}
+                                      {eventEnd && ` - ${format(eventEnd, "HH:mm", { locale: fr })}`}
+                                    </span>
+                                  </div>
+                                  {event.location && (
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 truncate">
+                                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                                      <span className="truncate">{event.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {event.event_type && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-xs flex-shrink-0 hidden sm:flex"
+                                    style={{
+                                      borderColor: event.color || '#3b82f6',
+                                      color: event.color || '#3b82f6',
+                                    }}
+                                  >
+                                    {EVENT_TYPES[event.event_type as keyof typeof EVENT_TYPES]?.label || event.event_type}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Note si aucun événement */}
+            {displayEvents.filter(e => isSameDay(parseISO(e.start_date), agendaDate)).length === 0 && (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="text-sm">Aucun événement prévu pour cette journée</p>
+                <Button
+                  onClick={() => {
+                    setIsEventFormOpen(true);
+                    setSelectedEvent(null);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 gap-2 rounded-xl"
+                >
+                  <Plus className="w-4 h-4" />
+                  Ajouter un événement
+                </Button>
+              </div>
+            )}
+          </GlassCard>
+        </div>
       </div>
     </PageLayout>
   );

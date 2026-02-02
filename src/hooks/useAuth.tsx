@@ -27,7 +27,15 @@ export const useAuth = (): UseAuthReturn => {
     }
 
     // Récupérer la session initiale
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // Gérer les erreurs de refresh token
+      if (error) {
+        console.error('❌ [Auth] Erreur lors de la récupération de la session:', error);
+        if (error.message?.includes('refresh_token_not_found') || error.message?.includes('Invalid Refresh Token')) {
+          handleInvalidToken();
+        }
+      }
+      
       setUser(session?.user ?? null);
       setLoading(false);
       
@@ -39,14 +47,24 @@ export const useAuth = (): UseAuthReturn => {
         setCurrentCompanyId(null);
         localStorage.removeItem('currentCompanyId');
       }
+    }).catch((error) => {
+      console.error('❌ [Auth] Erreur inattendue:', error);
+      handleInvalidToken();
     });
 
     // Écouter les changements d'authentification
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Gérer la déconnexion due à un token invalide
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+        if (event === 'SIGNED_OUT' && !session) {
+          handleSignOut();
+        }
+      }
       
       if (session?.user) {
         checkAdminStatus(session.user);
@@ -62,6 +80,39 @@ export const useAuth = (): UseAuthReturn => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Fonction pour gérer un token invalide
+  const handleInvalidToken = async () => {
+    console.warn('⚠️ [Auth] Token invalide détecté - déconnexion en cours...');
+    try {
+      // Déconnecter l'utilisateur
+      await supabase.auth.signOut();
+      
+      // Nettoyer le localStorage
+      localStorage.removeItem('currentCompanyId');
+      localStorage.removeItem('supabase.auth.token');
+      
+      // Réinitialiser les états
+      setUser(null);
+      setIsAdmin(false);
+      setIsEmployee(false);
+      setUserRole(null);
+      setCurrentCompanyId(null);
+      
+      // Rediriger vers la page de connexion
+      window.location.href = '/auth';
+    } catch (error) {
+      console.error('❌ [Auth] Erreur lors de la déconnexion:', error);
+      // Forcer la redirection même en cas d'erreur
+      window.location.href = '/auth';
+    }
+  };
+
+  // Fonction pour gérer la déconnexion normale
+  const handleSignOut = () => {
+    localStorage.removeItem('currentCompanyId');
+    setCurrentCompanyId(null);
+  };
 
   const checkAdminStatus = async (currentUser: User) => {
     try {

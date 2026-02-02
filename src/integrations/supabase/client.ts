@@ -116,6 +116,31 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
               requestUrl: requestInfo.url,
               requestMethod: requestInfo.method,
             });
+
+            // Détecter les erreurs de refresh token et déconnecter automatiquement
+            if (responseBody && (
+              responseBody.includes('refresh_token_not_found') || 
+              responseBody.includes('Invalid Refresh Token')
+            )) {
+              console.warn('⚠️ [Supabase] Token invalide détecté - nettoyage et redirection...');
+              
+              // Nettoyer immédiatement le localStorage pour éviter les boucles
+              setTimeout(() => {
+                // Nettoyer tous les tokens Supabase du localStorage
+                Object.keys(localStorage).forEach(key => {
+                  if (key.startsWith('sb-')) {
+                    localStorage.removeItem(key);
+                  }
+                });
+                localStorage.removeItem('currentCompanyId');
+                
+                // Rediriger vers la page de connexion
+                if (window.location.pathname !== '/auth') {
+                  console.log('🔄 [Supabase] Redirection vers /auth...');
+                  window.location.href = '/auth';
+                }
+              }, 100);
+            }
           }
         }
 

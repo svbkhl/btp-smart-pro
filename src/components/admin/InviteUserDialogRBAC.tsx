@@ -58,8 +58,8 @@ export const InviteUserDialogRBAC = ({
   const [email, setEmail] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
 
-  // Dirigeant et administrateur peuvent toujours inviter ; sinon permission users.invite
-  const canInvite = can('users.invite') || isOwner || isAdmin;
+  // Dirigeant et administrateur peuvent toujours inviter ; sinon permission employees.access
+  const canInvite = can('employees.access') || isOwner || isAdmin;
 
   if (!canInvite) {
     return null;
@@ -225,22 +225,24 @@ export const InviteUserDialogRBAC = ({
                     <SelectValue placeholder="Sélectionner un rôle" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roles.map((role) => {
-                      const Icon = ROLE_ICONS[role.slug] || User;
-                      return (
-                        <SelectItem key={role.id} value={role.id}>
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4" style={{ color: role.color }} />
-                            <span>{role.name}</span>
-                            {role.is_system && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
-                                Système
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
+                    {roles
+                      .filter((role) => role.slug === 'owner' || role.slug === 'employee')
+                      .map((role) => {
+                        const Icon = ROLE_ICONS[role.slug] || User;
+                        return (
+                          <SelectItem key={role.id} value={role.id}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4" style={{ color: role.color }} />
+                              <span>{role.name}</span>
+                              {role.is_system && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  Système
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
               )}

@@ -109,9 +109,12 @@ export const useCompanyId = (): UseCompanyIdReturn => {
       }
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes - Cache très agressif
+    gcTime: 60 * 60 * 1000, // 60 minutes
     retry: 1,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   return {

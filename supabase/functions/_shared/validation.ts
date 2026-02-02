@@ -62,11 +62,16 @@ export const urlSchema = z.string().url("URL invalide");
 
 /**
  * Schema pour send-invitation
+ * Supporte à la fois l'ancien format (role string) et le nouveau (role_id UUID)
  */
 export const sendInvitationSchema = z.object({
   email: emailSchema,
+  // Ancien format
   role: z.enum(['owner', 'admin', 'member']).optional(),
   companyId: uuidSchema.optional(),
+  // Nouveau format RBAC
+  role_id: uuidSchema.optional(),
+  company_id: uuidSchema.optional(),
 });
 
 /**

@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { FloatingAIAssistant } from './components/ai/FloatingAIAssistant';
 import { DemoModeGuard } from './components/DemoModeGuard';
 import { CompanySelector } from './components/CompanySelector';
+import { TomorrowAssignmentsNotification } from './components/TomorrowAssignmentsNotification';
 import { useAuth } from './hooks/useAuth';
 
 // Pages publiques
@@ -48,6 +49,7 @@ import CompleteProfile from './pages/CompleteProfile';
 import ClientsAndQuotes from './pages/ClientsAndQuotes';
 import EmployeesAndRH from './pages/EmployeesAndRH';
 import EmployeesDashboard from './pages/EmployeesDashboard';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 import Facturation from './pages/Facturation';
 import Sales from './pages/Sales';
 import RHDashboard from './pages/RHDashboard';
@@ -108,6 +110,8 @@ function App() {
       <DemoModeGuard />
       {/* Sélecteur d'entreprise - affiché uniquement si l'utilisateur appartient à plusieurs entreprises */}
       {user && !isPublicPage && <CompanySelector />}
+      {/* Notification des affectations du lendemain - pour les employés */}
+      {user && !isPublicPage && <TomorrowAssignmentsNotification />}
       {/* Widget Agent IA flottant - masqué sur les pages publiques (signature, paiement) */}
       {user && !isPublicPage && <FloatingAIAssistant />}
       <Routes>
@@ -141,6 +145,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-dashboard"
+          element={
+            <ProtectedRoute>
+              <EmployeeDashboard />
             </ProtectedRoute>
           }
         />

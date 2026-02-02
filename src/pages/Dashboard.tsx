@@ -15,13 +15,15 @@ import {
   Plus
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { useUserStats } from "@/hooks/useUserStats";
 import { useProjects } from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useInvoices } from "@/hooks/useInvoices";
+import { usePermissions } from "@/hooks/usePermissions";
 import { RecentProjectsWidget, CalendarWidget, MessagesWidget } from "@/components/widgets";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -30,6 +32,25 @@ import { BarChart3, Sparkles } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isEmployee, loading: permissionsLoading } = usePermissions();
+  
+  // Extraire le prénom de l'utilisateur depuis plusieurs sources possibles
+  const firstName = 
+    user?.user_metadata?.first_name || 
+    user?.user_metadata?.prenom || 
+    user?.user_metadata?.firstName ||
+    (user as any)?.raw_user_meta_data?.first_name ||
+    (user as any)?.raw_user_meta_data?.prenom ||
+    (user as any)?.raw_user_meta_data?.firstName ||
+    '';
+  
+  // Rediriger les employés vers leur dashboard dédié
+  useEffect(() => {
+    if (!permissionsLoading && isEmployee) {
+      navigate('/employee-dashboard', { replace: true });
+    }
+  }, [isEmployee, permissionsLoading, navigate]);
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const { data: clients, isLoading: clientsLoading } = useClients();
@@ -189,10 +210,10 @@ const Dashboard = () => {
         <div className="flex flex-col gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
-              Tableau de bord
+              {firstName ? `Bienvenue ${firstName} !` : 'Bienvenue !'}
             </h1>
             <p className="text-muted-foreground text-base">
-              Bienvenue ! Voici un aperçu de votre activité
+              Tableau de bord - Voici un aperçu de votre activité
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">

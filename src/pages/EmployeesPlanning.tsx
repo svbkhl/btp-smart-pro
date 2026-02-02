@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BackButton } from "@/components/ui/BackButton";
 import {
   Select,
   SelectContent,
@@ -32,6 +33,9 @@ import {
   Loader2,
   Plus,
   Download,
+  TrendingUp,
+  UserPlus,
+  Briefcase,
 } from "lucide-react";
 import { useSyncPlanningWithGoogle } from "@/hooks/usePlanningSync";
 import { useGoogleCalendarConnection } from "@/hooks/useGoogleCalendar";
@@ -175,25 +179,45 @@ const EmployeesPlanning = () => {
       }
 
       // Mode production : charger depuis Supabase
-      // Récupérer les employés
-      const { data: employeesData, error: employeesError } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("nom");
+      // Récupérer les employés depuis company_users
+      const { data: companyUsersData, error: employeesError } = await supabase
+        .rpc('get_company_users_with_profile', {
+          p_company_id: currentCompanyId
+        });
 
       if (employeesError) throw employeesError;
-      setEmployees(employeesData || []);
+      
+      // Mapper les données pour correspondre à l'interface Employee
+      const employeesData = (companyUsersData || []).map((cu: any) => ({
+        id: cu.user_id,
+        nom: cu.raw_user_meta_data?.last_name || cu.email,
+        prenom: cu.raw_user_meta_data?.first_name || '',
+        poste: cu.role_name,
+        specialites: []
+      }));
+      
+      setEmployees(employeesData);
 
       // Récupérer les projets
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("id, name, location")
-        .eq("user_id", user?.id)
+        .select("id, name, address")
+        .eq("company_id", currentCompanyId)
         .order("name");
 
-      if (projectsError) throw projectsError;
-      setProjects(projectsData || []);
+      if (projectsError) {
+        console.error("Error fetching projects:", projectsError);
+        // Continuer même si erreur, juste avec une liste vide
+        setProjects([]);
+      } else {
+        // Mapper "address" vers "location" pour compatibilité
+        const mappedProjects = (projectsData || []).map((proj: any) => ({
+          id: proj.id,
+          name: proj.name,
+          location: proj.address || ''
+        }));
+        setProjects(mappedProjects);
+      }
 
       // Récupérer les affectations de la semaine
       const weekStart = weekDates[0];
@@ -435,83 +459,168 @@ const EmployeesPlanning = () => {
   return (
     <PageLayout>
       <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <BackButton />
+        
         {/* En-tête */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-3">
+              <Calendar className="h-8 w-8 text-primary" />
               Planning Employés
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Gérez les affectations des employés aux chantiers
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button 
               variant="outline"
+              size="sm"
               className="gap-2 rounded-xl"
               onClick={handleExportPDF}
             >
               <Download className="h-4 w-4" />
-              Exporter en PDF
+              <span className="hidden sm:inline">Exporter PDF</span>
             </Button>
             {isAdmin && (
               <Button 
+                size="sm"
                 className="gap-2 rounded-xl"
                 onClick={() => setAddEmployeeDialog(true)}
               >
                 <Plus className="h-4 w-4" />
-                Ajouter un employé
+                <span className="hidden sm:inline">Ajouter employé</span>
               </Button>
             )}
           </div>
         </div>
 
+        {/* Statistiques de la semaine */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <GlassCard className="p-4 sm:p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold">{stats.totalHeures}h</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total heures</p>
+              </div>
+            </div>
+          </GlassCard>
+          
+          <GlassCard className="p-4 sm:p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <Users className="h-6 w-6 text-green-500" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold">{stats.employeesCount}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Employés actifs</p>
+              </div>
+            </div>
+          </GlassCard>
+          
+          <GlassCard className="p-4 sm:p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <Building2 className="h-6 w-6 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold">{stats.projectsCount}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Chantiers actifs</p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+
         {/* Liste des employés */}
         <GlassCard className="p-4 sm:p-6">
-          <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Liste des employés ({employees.length})
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Cliquez sur un nom dans le planning pour affecter/modifier un employé
-          </p>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {employees.map((employee) => (
-              <div
-                key={employee.id}
-                className="p-3 rounded-lg border border-white/20 dark:border-white/10 hover:border-white/30 dark:hover:border-white/15 transition-all cursor-pointer bg-white/10 dark:bg-black/20 backdrop-blur-sm"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">
-                        {employee.prenom} {employee.nom}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {employee.poste}
-                      </p>
-                    </div>
-                  </div>
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {employee.specialites?.slice(0, 3).map((spec, idx) => (
-                    <Badge
-                      key={idx}
-                      variant="secondary"
-                      className="text-xs px-2 py-0.5"
-                    >
-                      {spec}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Employés ({employees.length})
+            </h3>
+            {employees.length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {stats.employeesCount} actifs cette semaine
+              </Badge>
+            )}
           </div>
+          
+          {employees.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="max-w-md mx-auto">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UserPlus className="h-10 w-10 text-primary" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-semibold mb-2">Aucun employé</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Commencez par ajouter des employés à votre équipe pour gérer leurs affectations sur les chantiers.
+                </p>
+                {isAdmin && (
+                  <Button 
+                    className="gap-2 rounded-xl"
+                    onClick={() => setAddEmployeeDialog(true)}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Ajouter votre premier employé
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground mb-4">
+                Cliquez sur un employé dans le planning pour créer ou modifier une affectation
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {employees.map((employee) => (
+                  <div
+                    key={employee.id}
+                    className="p-3 sm:p-4 rounded-xl border border-white/20 dark:border-white/10 hover:border-primary/30 dark:hover:border-primary/20 transition-all cursor-pointer bg-white/5 dark:bg-black/10 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-black/20 group"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:from-primary/30 group-hover:to-primary/20 transition-all">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm sm:text-base">
+                            {employee.prenom} {employee.nom}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {employee.poste}
+                          </p>
+                        </div>
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    {employee.specialites && employee.specialites.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {employee.specialites.slice(0, 3).map((spec, idx) => (
+                          <Badge
+                            key={idx}
+                            variant="secondary"
+                            className="text-xs px-2 py-0.5 rounded-md"
+                          >
+                            {spec}
+                          </Badge>
+                        ))}
+                        {employee.specialites.length > 3 && (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5">
+                            +{employee.specialites.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </GlassCard>
 
         {/* Planning hebdomadaire */}
@@ -565,11 +674,27 @@ const EmployeesPlanning = () => {
 
           {filteredEmployees.length === 0 ? (
             <div className="text-center py-12">
-              <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Aucun employé</h3>
-              <p className="text-muted-foreground">
-                Aucun employé disponible pour ce filtre
-              </p>
+              <div className="max-w-md mx-auto">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                  <Briefcase className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-semibold mb-2">Aucune affectation</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {selectedProject !== "all" 
+                    ? "Aucun employé n'est affecté à ce chantier cette semaine."
+                    : "Aucun employé n'a d'affectation cette semaine."}
+                </p>
+                {selectedProject !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedProject("all")}
+                    className="rounded-xl"
+                  >
+                    Voir tous les employés
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

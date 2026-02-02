@@ -22,6 +22,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
+import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 
 const EmployeesAndRH = () => {
   const { data: stats, isLoading: statsLoading } = useRHStats();
@@ -40,16 +41,6 @@ const EmployeesAndRH = () => {
     tauxCompletion: 0,
   };
 
-  // Employés récents
-  const recentEmployees = useMemo(() => {
-    return employees
-      .sort((a, b) => {
-        const dateA = a.date_entree ? new Date(a.date_entree).getTime() : 0;
-        const dateB = b.date_entree ? new Date(b.date_entree).getTime() : 0;
-        return dateB - dateA;
-      })
-      .slice(0, 5);
-  }, [employees]);
 
   // Contrats expirant bientôt
   const expiringContracts = useMemo(() => {
@@ -73,16 +64,6 @@ const EmployeesAndRH = () => {
     }).slice(0, 5);
   }, [taches]);
 
-  // Candidatures récentes
-  const recentCandidatures = useMemo(() => {
-    return candidatures
-      .sort((a, b) => {
-        const dateA = new Date(a.date_candidature || a.created_at).getTime();
-        const dateB = new Date(b.date_candidature || b.created_at).getTime();
-        return dateB - dateA;
-      })
-      .slice(0, 5);
-  }, [candidatures]);
 
   const getStatutBadge = (statut: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -237,95 +218,18 @@ const EmployeesAndRH = () => {
           </Link>
         </div>
 
-        {/* Grille de contenu */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {/* Employés récents */}
-          <GlassCard className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Employés récents
-              </h3>
-              <Link to="/rh/employees">
-                <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-xl">
-                  Voir tout
-                  <ArrowRight className="w-3 h-3" />
-                </Button>
-              </Link>
-            </div>
-            {recentEmployees.length > 0 ? (
-              <div className="space-y-2">
-                {recentEmployees.map((emp) => (
-                  <div key={emp.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Users className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {emp.prenom || ""} {emp.nom || "N/A"}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {emp.poste || "-"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {getStatutBadge(emp.statut || "actif")}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Aucun employé récent
-              </p>
-            )}
-          </GlassCard>
-
-          {/* Candidatures récentes */}
-          <GlassCard className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-purple-500" />
-                Candidatures récentes
-              </h3>
-              <Link to="/rh/candidatures">
-                <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-xl">
-                  Voir tout
-                  <ArrowRight className="w-3 h-3" />
-                </Button>
-              </Link>
-            </div>
-            {recentCandidatures.length > 0 ? (
-              <div className="space-y-2">
-                {recentCandidatures.map((cand) => (
-                  <div key={cand.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                        <UserCheck className="h-4 w-4 text-purple-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {cand.prenom || ""} {cand.nom || "N/A"}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {cand.poste_souhaite || "-"}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={cand.statut === "accepte" ? "default" : cand.statut === "refuse" ? "destructive" : "secondary"} className="text-xs">
-                      {cand.statut === "accepte" ? "Accepté" : cand.statut === "refuse" ? "Refusé" : "En attente"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Aucune candidature récente
-              </p>
-            )}
-          </GlassCard>
+        {/* Calendrier Google Calendar */}
+        <div className="mb-6">
+          <CalendarWidget />
+          
+          {/* Lien vers Mon Planning */}
+          <Link to="/my-planning" className="block mt-4">
+            <Button variant="outline" className="w-full gap-2 rounded-xl">
+              <Calendar className="w-4 h-4" />
+              Mon planning complet
+              <ArrowRight className="w-4 h-4 ml-auto" />
+            </Button>
+          </Link>
         </div>
 
         {/* Contrats expirant bientôt */}

@@ -1,7 +1,7 @@
 /**
  * Page: UsersManagementRBAC
  * Description: Page de gestion des utilisateurs avec rôles RBAC
- * Permissions requises: users.read
+ * Permissions requises: employees.access
  */
 
 import { useState, useEffect } from 'react';
@@ -29,10 +29,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageLayout } from '@/components/layout/PageLayout';
-import { Users, Shield, Crown, Edit, Trash2, UserPlus, AlertTriangle } from 'lucide-react';
+import { BackButton } from '@/components/ui/BackButton';
+import { Users, Shield, Crown, Edit, Trash2, UserPlus, AlertTriangle, Settings } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { RouteGuard } from '@/components/rbac/RouteGuard';
 import { InviteUserDialogRBAC } from '@/components/admin/InviteUserDialogRBAC';
+import { EmployeePermissionsDialog } from '@/components/admin/EmployeePermissionsDialog';
 import { AuditLogHelpers } from '@/services/auditLogService';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -67,26 +69,22 @@ interface UsersManagementRBACProps {
 
 export default function UsersManagementRBAC({ embedded = false }: UsersManagementRBACProps) {
   const { currentCompanyId, user: currentUser } = useAuth();
-  const { can, isOwner, isAdmin, roleSlug } = usePermissions();
+  const { can, isOwner, isAdmin, roleSlug, loading: permissionsLoading } = usePermissions();
   const { roles } = useRoles();
   const queryClient = useQueryClient();
-  
-  // Debug: Log pour vérifier les permissions
-  console.log('🔍 [UsersManagementRBAC] Permissions check:', {
-    canRead: can('users.read'),
-    isOwner,
-    isAdmin,
-    roleSlug,
-    currentCompanyId,
-    userId: currentUser?.id
-  });
 
   const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<CompanyUser | null>(null);
   const [newRoleId, setNewRoleId] = useState<string>('');
+  
+  // Vérification alternative : vérifier directement dans company_users si l'utilisateur est owner
+  // Cette vérification est nécessaire car usePermissions peut ne pas détecter correctement le rôle owner
+  const [isOwnerDirect, setIsOwnerDirect] = useState<boolean | null>(null);
 
   // Récupérer tous les utilisateurs de l'entreprise (RPC pour éviter embed auth.users → 400)
+  // IMPORTANT: Ce hook doit être appelé AVANT tout return conditionnel (Rules of Hooks)
   const { data: companyUsers = [], isLoading, isError, error: queryError } = useQuery({
     queryKey: ['company-users', currentCompanyId],
     queryFn: async () => {
@@ -161,7 +159,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
       }
       throw error;
     },
-    enabled: !!currentCompanyId && (can('users.read') || isOwner || isOwnerDirect === true),
+    enabled: !!currentCompanyId && (can('employees.access') || isOwner || isOwnerDirect === true),
   });
 
   // Changer le rôle d'un utilisateur
@@ -263,15 +261,11 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
     deleteUserMutation.mutate(selectedUser.user_id);
   };
 
-  // Vérification alternative : vérifier directement dans company_users si l'utilisateur est owner
-  // Cette vérification est nécessaire car usePermissions peut ne pas détecter correctement le rôle owner
-  const [isOwnerDirect, setIsOwnerDirect] = useState<boolean | null>(null);
-  
+  // useEffect pour vérifier si l'utilisateur est owner directement dans company_users
   useEffect(() => {
     const checkOwnerDirect = async () => {
       if (!currentUser?.id || !currentCompanyId) {
-        setIsOwnerDirect(false);
-        return;
+        return; // Ne pas set à false, garder null pendant le chargement
       }
       
       try {
@@ -283,7 +277,6 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
           .maybeSingle();
         
         if (error) {
-          console.error('❌ [UsersManagementRBAC] Error checking owner:', error);
           setIsOwnerDirect(false);
           return;
         }
@@ -292,23 +285,35 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
           const slug = data.roles.slug;
           const name = (data.roles.name || '').toLowerCase();
           const isOwnerCheck = slug === 'owner' || ['patron', 'propriétaire', 'dirigeant', 'owner'].some((s) => name.includes(s));
-          console.log('🔍 [UsersManagementRBAC] Direct owner check:', { slug, name, isOwnerCheck });
           setIsOwnerDirect(isOwnerCheck);
         } else {
           setIsOwnerDirect(false);
         }
       } catch (err) {
-        console.error('❌ [UsersManagementRBAC] Exception checking owner:', err);
         setIsOwnerDirect(false);
       }
     };
     
-    checkOwnerDirect();
+    if (currentUser?.id && currentCompanyId) {
+      checkOwnerDirect();
+    }
   }, [currentUser?.id, currentCompanyId]);
   
   // Les owners ont toujours accès à la gestion des employés
   // Utiliser isOwnerDirect comme fallback si isOwner n'est pas détecté correctement
-  const hasAccess = can('users.read') || isOwner || isOwnerDirect === true;
+  const hasAccess = can('employees.access') || isOwner || isOwnerDirect === true;
+  
+  // Afficher un loader pendant le chargement (company, permissions, owner check)
+  if (!currentCompanyId || permissionsLoading || isOwnerDirect === null) {
+    return (
+      <Card className="p-8 text-center">
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </Card>
+    );
+  }
   
   if (!hasAccess) {
     return (
@@ -319,14 +324,14 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
         </p>
         {process.env.NODE_ENV === 'development' && (
           <p className="text-xs text-muted-foreground mt-2">
-            Debug: can={can('users.read') ? 'true' : 'false'}, isOwner={isOwner ? 'true' : 'false'}, isOwnerDirect={isOwnerDirect === null ? 'loading' : isOwnerDirect ? 'true' : 'false'}, roleSlug={roleSlug || 'null'}
+            Debug: can={can('employees.access') ? 'true' : 'false'}, isOwner={isOwner ? 'true' : 'false'}, isOwnerDirect={isOwnerDirect === null ? 'loading' : isOwnerDirect ? 'true' : 'false'}, roleSlug={roleSlug || 'null'}
           </p>
         )}
       </Card>
     );
   }
 
-  const canInvite = can('users.invite') || isOwner || isOwnerDirect === true || isAdmin;
+  const canInvite = can('employees.access') || isOwner || isOwnerDirect === true || isAdmin;
   const inviteButton = canInvite ? (
     <InviteUserDialogRBAC
       onSuccess={() => queryClient.invalidateQueries({ queryKey: ['company-users'] })}
@@ -349,6 +354,9 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
 
   const content = (
     <>
+      {/* Bouton retour */}
+      {!embedded && <BackButton className="mb-4" />}
+      
       {/* Barre d'action : uniquement le bouton Inviter (pas de recherche en mode embedded) */}
       {!embedded && inviteButton ? (
         <div className="flex justify-end mb-4">
@@ -365,7 +373,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
         {companyUsers.map((companyUser) => {
           const firstName = companyUser.users.raw_user_meta_data?.first_name || '';
           const lastName = companyUser.users.raw_user_meta_data?.last_name || '';
-          const fullName = `${firstName} ${lastName}`.trim() || companyUser.users.email;
+          const displayName = firstName || companyUser.users.email;
           const isCurrentUser = companyUser.user_id === currentUser?.id;
           const isOwnerRole = companyUser.roles.slug === 'owner';
 
@@ -383,7 +391,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{fullName}</h3>
+                      <h3 className="font-semibold">{displayName}</h3>
                       {isCurrentUser && (
                         <Badge variant="secondary">Vous</Badge>
                       )}
@@ -402,11 +410,6 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                         {isOwnerRole && <Crown className="h-3 w-3 mr-1" />}
                         {companyUser.roles.name}
                       </Badge>
-                      {companyUser.roles.is_system && (
-                        <Badge variant="outline" className="text-xs">
-                          Système
-                        </Badge>
-                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Membre depuis{' '}
@@ -429,6 +432,21 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                       >
                         <Shield className="h-4 w-4 mr-2" />
                         Changer le rôle
+                      </Button>
+                    )}
+
+                    {/* Bouton Gérer les permissions (uniquement pour les employés) */}
+                    {(isOwner || isOwnerDirect === true) && companyUser.roles?.slug === 'employee' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUser(companyUser);
+                          setPermissionsDialogOpen(true);
+                        }}
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Permissions
                       </Button>
                     )}
 
@@ -484,19 +502,16 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
                 <SelectValue placeholder="Sélectionner un rôle" />
               </SelectTrigger>
               <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.id}>
-                    <div className="flex items-center gap-2">
-                      {role.slug === 'owner' && <Crown className="h-4 w-4" />}
-                      <span>{role.name}</span>
-                      {role.is_system && (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          Système
-                        </Badge>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
+                {roles
+                  .filter((role) => role.slug === 'owner' || role.slug === 'employee')
+                  .map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      <div className="flex items-center gap-2">
+                        {role.slug === 'owner' && <Crown className="h-4 w-4" />}
+                        <span>{role.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -537,6 +552,20 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog: Gérer les permissions de l'employé */}
+      {selectedUser && currentCompanyId && (
+        <EmployeePermissionsDialog
+          isOpen={permissionsDialogOpen}
+          onClose={() => {
+            setPermissionsDialogOpen(false);
+            setSelectedUser(null);
+          }}
+          employeeId={selectedUser.user_id}
+          employeeName={`${selectedUser.users?.raw_user_meta_data?.first_name || ''} ${selectedUser.users?.raw_user_meta_data?.last_name || ''}`.trim() || selectedUser.users?.email || 'Employé'}
+          companyId={currentCompanyId}
+        />
+      )}
     </>
   );
 
@@ -562,7 +591,7 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
 // Wrapper avec RouteGuard
 export function UsersManagementRBACGuarded() {
   return (
-    <RouteGuard permission="users.read">
+    <RouteGuard permission="employees.access">
       <UsersManagementRBAC />
     </RouteGuard>
   );

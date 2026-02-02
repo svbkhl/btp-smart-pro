@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useProjects } from "@/hooks/useProjects";
 import { useSyncPlanningWithGoogle } from "@/hooks/usePlanningSync";
 import { useGoogleCalendarConnection } from "@/hooks/useGoogleCalendar";
+import { useSyncPlanningToCalendar } from "@/hooks/usePlanningCalendarSync";
 import { format } from "date-fns";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { FAKE_EMPLOYEES } from "@/fakeData/employees";
@@ -49,6 +50,7 @@ const MyPlanning = () => {
   const { data: projects = [] } = useProjects();
   const { data: googleConnection } = useGoogleCalendarConnection();
   const syncPlanning = useSyncPlanningWithGoogle();
+  const syncToCalendar = useSyncPlanningToCalendar();
   const [loading, setLoading] = useState(true);
   const [employee, setEmployee] = useState<any>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -596,6 +598,19 @@ const MyPlanning = () => {
         assignmentId = newAssignment.id;
       }
 
+      // 🔄 SYNCHRONISATION AUTOMATIQUE AVEC LE CALENDRIER
+      // Créer/mettre à jour automatiquement un événement dans le calendrier
+      try {
+        await syncToCalendar.mutateAsync({
+          assignmentId,
+          action: editAssignmentDialog.assignment ? "update" : "create",
+        });
+        console.log("✅ [saveAssignment] Synchronisation calendrier réussie");
+      } catch (syncError) {
+        console.error("⚠️ [saveAssignment] Erreur synchronisation calendrier:", syncError);
+        // Ne pas bloquer si la synchro échoue
+      }
+
       // Synchroniser avec Google Calendar si connecté
       if (googleConnection && googleConnection.sync_planning_enabled && assignmentId) {
         try {
@@ -610,7 +625,7 @@ const MyPlanning = () => {
 
       toast({
         title: "Succès",
-        description: "Affectation enregistrée",
+        description: "Affectation enregistrée et synchronisée avec le calendrier",
       });
 
       setEditAssignmentDialog({ open: false });
@@ -630,6 +645,18 @@ const MyPlanning = () => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette affectation ?")) return;
 
     try {
+      // 🔄 SYNCHRONISATION: Supprimer l'événement lié dans le calendrier
+      try {
+        await syncToCalendar.mutateAsync({
+          assignmentId,
+          action: "delete",
+        });
+        console.log("✅ [deleteAssignment] Événement supprimé du calendrier");
+      } catch (syncError) {
+        console.error("⚠️ [deleteAssignment] Erreur suppression calendrier:", syncError);
+        // Ne pas bloquer si la synchro échoue
+      }
+
       const { error } = await supabase
         .from("employee_assignments")
         .delete()
@@ -651,7 +678,7 @@ const MyPlanning = () => {
 
       toast({
         title: "Succès",
-        description: "Affectation supprimée",
+        description: "Affectation supprimée du planning et du calendrier",
       });
 
       fetchEmployeeData();
@@ -691,6 +718,18 @@ const MyPlanning = () => {
 
       if (error) throw error;
 
+      // 🔄 SYNCHRONISATION AUTOMATIQUE: Mettre à jour l'événement dans le calendrier
+      try {
+        await syncToCalendar.mutateAsync({
+          assignmentId: editingHours.assignmentId,
+          action: "update",
+        });
+        console.log("✅ [handleSaveHours] Événement calendrier mis à jour");
+      } catch (syncError) {
+        console.error("⚠️ [handleSaveHours] Erreur synchronisation calendrier:", syncError);
+        // Ne pas bloquer si la synchro échoue
+      }
+
       // Synchroniser avec Google Calendar
       if (googleConnection && googleConnection.sync_planning_enabled) {
         try {
@@ -717,7 +756,7 @@ const MyPlanning = () => {
 
       setEditingHours(null);
       toast({
-        title: "Horaires enregistrés",
+        title: "Horaires enregistrés et synchronisés",
         description: editingHours.heure_debut && editingHours.heure_fin
           ? `${editingHours.heure_debut} - ${editingHours.heure_fin} (${heures}h)`
           : `${heures}h enregistrées`,

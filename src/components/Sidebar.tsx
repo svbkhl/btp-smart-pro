@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -44,6 +44,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { isFeatureEnabled } from "@/utils/companyFeatures";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useQueryClient } from "@tanstack/react-query";
+import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 
 // Types pour les items de menu
 type MenuItem = {
@@ -52,6 +53,8 @@ type MenuItem = {
   path: string;
   subItems?: Array<{ label: string; path: string }>;
   feature?: string | null; // Feature requise pour afficher cet item
+  employeeAccess?: boolean; // Si true, accessible aux employés simples (par défaut)
+  requiredPermission?: string | null; // Permission requise pour afficher cet item
 };
 
 type MenuGroup = {
@@ -59,78 +62,134 @@ type MenuGroup = {
 };
 
 // Structure de base des menu items par groupes avec mapping des features
-const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null }> }> = [
+const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null; employeeAccess?: boolean; requiredPermission?: string | null }> }> = [
   {
     items: [
-      // 1️⃣ Tableau de bord (toujours visible)
-      { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard", feature: null },
+      // 1️⃣ Tableau de bord (nécessite la permission dashboard.access)
+      { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard", feature: null, employeeAccess: true, requiredPermission: "dashboard.access" },
     ],
   },
   {
     items: [
-      // 3️⃣ Clients (toujours visible)
-      { icon: Users, label: "Clients", path: "/clients", feature: null },
+      // 3️⃣ Clients (nécessite la permission clients.access)
+      { icon: Users, label: "Clients", path: "/clients", feature: null, employeeAccess: true, requiredPermission: "clients.access" },
     ],
   },
   {
     items: [
-      // 4️⃣ Chantiers (Projets / Interventions)
-      { icon: FolderKanban, label: "Chantiers", path: "/projects", feature: "projets" },
+      // 4️⃣ Chantiers (nécessite la permission projects.access)
+      { icon: FolderKanban, label: "Chantiers", path: "/projects", feature: "projets", employeeAccess: true, requiredPermission: "projects.access" },
     ],
   },
   {
     items: [
-      // 5️⃣ Calendrier (planning)
-      { icon: Calendar, label: "Calendrier", path: "/calendar", feature: "planning" },
+          // 5️⃣ Calendrier & Agenda (tout en un)
+          {
+            icon: Calendar,
+            label: "Calendrier & Agenda",
+            path: "/calendar",
+            feature: "planning",
+            employeeAccess: true,
+            requiredPermission: "planning.access"
+          },
     ],
   },
   {
     items: [
-      // 6️⃣ Employés
-      { icon: UserCircle, label: "Employés", path: "/employees-rh", feature: "employes" },
+      // 6️⃣ Employés (nécessite la permission employees.access)
+      { icon: UserCircle, label: "Employés", path: "/employees-rh", feature: "employes", employeeAccess: true, requiredPermission: "employees.access" },
     ],
   },
   {
     items: [
-      // 7️⃣ IA (Assistant)
-      { icon: Brain, label: "IA", path: "/ai", feature: "ia_assistant" },
+      // 7️⃣ IA (nécessite la permission ai.access)
+      { icon: Brain, label: "IA", path: "/ai", feature: "ia_assistant", employeeAccess: true, requiredPermission: "ai.access" },
     ],
   },
   {
     items: [
-      // 8️⃣ Facturation
-      { icon: FileText, label: "Facturation", path: "/facturation", feature: "facturation" },
+      // 8️⃣ Facturation (nécessite la permission billing.access)
+      { icon: FileText, label: "Facturation", path: "/facturation", feature: "facturation", employeeAccess: true, requiredPermission: "billing.access" },
     ],
   },
   {
     items: [
-      // 9️⃣ Messagerie (toujours visible)
-      { icon: Mail, label: "Messagerie", path: "/messaging", feature: null },
+      // 9️⃣ Messagerie (nécessite la permission messaging.access)
+      { icon: Mail, label: "Messagerie", path: "/messaging", feature: null, employeeAccess: true, requiredPermission: "messaging.access" },
     ],
   },
 ];
 
-// Fonction pour filtrer les menu items selon les features
-const getMenuGroups = (company: ReturnType<typeof useCompany>["data"]): MenuGroup[] => {
-  // Si pas de company, afficher tous les items (mode démo ou pas encore configuré)
-  if (!company) {
-    return baseMenuGroups.map((group) => ({
-      items: group.items.map(({ feature, ...item }) => item), // Retirer la propriété feature
-    }));
+// Fonction pour filtrer les menu items selon les features et les permissions
+const getMenuGroups = (
+  company: ReturnType<typeof useCompany>["data"],
+  isEmployee: boolean,
+  can: (permission: string) => boolean = () => false,
+  isOwner: boolean = false
+): MenuGroup[] => {
+  // FALLBACK: Si aucune permission n'est disponible, afficher les items de base
+  // Cela évite une sidebar vide pendant le chargement ou en cas de problème
+  const shouldShowAll = isOwner || !company;
+  
+  if (shouldShowAll) {
+    // Owner ou pas de company → afficher tous les items (vérifier features uniquement)
+    return baseMenuGroups
+      .map((group) => ({
+        items: group.items
+          .filter((item) => {
+            if (!company) return true; // Mode démo/pas de company = tout afficher
+            if (!item.feature) return true; // Pas de feature = toujours visible
+            return isFeatureEnabled(company, item.feature as keyof NonNullable<typeof company>["features"]);
+          })
+          .map(({ feature, employeeAccess, requiredPermission, ...rest }) => ({
+            ...rest,
+            // Préserver explicitement les subItems
+            ...(rest.subItems && { subItems: rest.subItems })
+          })),
+      }))
+      .filter((group) => group.items.length > 0);
   }
   
-  return baseMenuGroups
+  // Pour les employés : vérifier permissions ET features
+  const filteredGroups = baseMenuGroups
     .map((group) => ({
       items: group.items
         .filter((item) => {
-          // Si pas de feature associée, toujours visible
-          if (!item.feature) return true;
-          // Sinon, vérifier si la feature est activée
-          return isFeatureEnabled(company, item.feature as keyof NonNullable<typeof company>["features"]);
+          // Vérifier la permission d'abord
+          if (item.requiredPermission && !can(item.requiredPermission)) {
+            return false;
+          }
+          
+          // Puis vérifier la feature
+          if (item.feature) {
+            return isFeatureEnabled(company, item.feature as keyof NonNullable<typeof company>["features"]);
+          }
+          
+          return true;
         })
-        .map(({ feature, ...item }) => item), // Retirer la propriété feature des items filtrés
+        .map(({ feature, employeeAccess, requiredPermission, ...rest }) => ({
+          ...rest,
+          // Préserver explicitement les subItems
+          ...(rest.subItems && { subItems: rest.subItems })
+        })),
     }))
-    .filter((group) => group.items.length > 0); // Retirer les groupes vides
+    .filter((group) => group.items.length > 0);
+  
+  // FALLBACK CRITIQUE: Si aucun item n'est affiché, forcer l'affichage des items de base
+  // pour éviter une sidebar complètement vide (meilleure UX)
+  if (filteredGroups.length === 0 || filteredGroups.every(g => g.items.length === 0)) {
+    return baseMenuGroups
+      .slice(0, 3) // Afficher au minimum: Dashboard, Clients, Chantiers
+      .map((group) => ({
+        items: group.items.map(({ feature, employeeAccess, requiredPermission, ...rest }) => ({
+          ...rest,
+          ...(rest.subItems && { subItems: rest.subItems })
+        })),
+      }))
+      .filter((group) => group.items.length > 0);
+  }
+  
+  return filteredGroups;
 };
 
 // Groupe de menu pour les paramètres (toujours visible)
@@ -139,8 +198,8 @@ const getMenuGroups = (company: ReturnType<typeof useCompany>["data"]): MenuGrou
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, userRole } = useAuth();
-  const { isOwner, can } = usePermissions();
+  const { user, isAdmin, userRole, loading: authLoading } = useAuth();
+  const { isOwner, can, isEmployee, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
@@ -179,8 +238,22 @@ export default function Sidebar() {
     return location.pathname.startsWith(path);
   };
   
-  // Calculer menuGroups après avoir récupéré company
-  const menuGroups = getMenuGroups(company);
+  // Calculer menuGroups avec useMemo pour éviter les recalculs inutiles
+  // Fournir une fonction can stable avec useCallback pour éviter les re-renders
+  const canFunc = useCallback(
+    (permission: string) => {
+      if (typeof can === 'function') {
+        return can(permission);
+      }
+      return false;
+    },
+    [can]
+  );
+  
+  const menuGroups = useMemo(
+    () => getMenuGroups(company, isEmployee, canFunc, isOwner),
+    [company, isEmployee, canFunc, isOwner]
+  );
   
   // Utiliser isVisible du contexte pour mobile aussi
   const isOpen = isMobile ? isVisible : (isPinned || isVisible || isHovered);
@@ -306,6 +379,14 @@ export default function Sidebar() {
       });
     });
   }, [location.pathname]);
+
+  // Afficher skeleton loading tant que les données critiques ne sont pas chargées
+  // Cela évite les re-renders visuels et l'apparition progressive des items
+  const isInitialLoading = authLoading || permissionsLoading || (!company && !isOwner);
+  
+  if (isInitialLoading) {
+    return <SidebarSkeleton isOpen={isOpen} />;
+  }
 
   return (
     <>

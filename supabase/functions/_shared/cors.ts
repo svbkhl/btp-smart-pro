@@ -27,8 +27,9 @@ function getAllowedOrigin(origin: string | null): string | null {
     return IS_DEVELOPMENT ? "*" : null;
   }
 
-  // En développement, autoriser localhost
-  if (IS_DEVELOPMENT && origin.includes("localhost")) {
+  // Autoriser localhost pour le développement local
+  // (localhost:4000, localhost:3000, etc.)
+  if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
     return origin;
   }
 

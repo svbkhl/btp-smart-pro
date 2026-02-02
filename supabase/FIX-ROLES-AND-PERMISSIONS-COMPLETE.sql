@@ -177,9 +177,7 @@ END $$;
 -- VÉRIFICATION FINALE : Afficher tous les utilisateurs avec leurs rôles
 -- ============================================================================
 
-RAISE NOTICE '';
-RAISE NOTICE '📊 VÉRIFICATION FINALE :';
-RAISE NOTICE '';
+-- 📊 VÉRIFICATION FINALE
 
 SELECT 
   u.email as "Email",

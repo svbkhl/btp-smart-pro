@@ -116,8 +116,12 @@ serve(async (req) => {
     }
 
     const emailToInvite = validateAndNormalizeEmail((validation.data as { email: string }).email);
+    // Support à la fois l'ancien format (role) et le nouveau (role_id)
     const requestedRole = (validation.data as { role?: 'owner' | 'admin' | 'member' }).role;
-    const companyId = (validation.data as { companyId?: string }).companyId;
+    const roleId = (validation.data as { role_id?: string }).role_id;
+    // Support à la fois l'ancien format (companyId) et le nouveau (company_id)
+    const companyId = (validation.data as { companyId?: string; company_id?: string }).companyId || 
+                      (validation.data as { company_id?: string }).company_id;
     
     // Vérifier le cooldown anti-spam
     const cooldownCheck = checkCooldown(emailToInvite);
@@ -437,24 +441,33 @@ serve(async (req) => {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
       
-      // Récupérer le role_id si companyId est fourni
-      let roleId: string | null = null;
-      if (companyId) {
+      // Déterminer le role_id à utiliser
+      let finalRoleId: string | null = null;
+      
+      // Si role_id est fourni directement (nouveau format RBAC), l'utiliser
+      if (roleId) {
+        finalRoleId = roleId;
+        logger.info("Using provided role_id", { requestId, roleId });
+      }
+      // Sinon, si role est fourni (ancien format), le mapper vers un slug puis récupérer role_id
+      else if (companyId && requestedRole) {
         const roleSlugMapping: Record<'owner' | 'admin' | 'member', 'owner' | 'admin' | 'employee'> = {
           owner: 'owner',
           admin: 'admin',
           member: 'employee',
         };
         
-        const targetRoleSlug = roleSlugMapping[requestedRole || 'member'];
+        const targetRoleSlug = roleSlugMapping[requestedRole];
         
         const { data: roleData } = await supabase
           .from('roles')
           .select('id')
           .eq('slug', targetRoleSlug)
+          .eq('company_id', companyId)
           .single();
         
-        roleId = roleData?.id || null;
+        finalRoleId = roleData?.id || null;
+        logger.info("Mapped role to role_id", { requestId, role: requestedRole, targetRoleSlug, roleId: finalRoleId });
       }
 
       // Créer l'invitation dans la table invitations
@@ -464,7 +477,7 @@ serve(async (req) => {
           email: emailToInvite,
           company_id: companyId || null,
           role: requestedRole || 'member',
-          role_id: roleId,
+          role_id: finalRoleId,
           invited_by: invitedByUserId || null,
           token: invitationToken,
           status: 'pending',
