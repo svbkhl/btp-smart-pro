@@ -228,7 +228,7 @@ const EmployeesPlanning = () => {
       // Récupérer les projets
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("id, name, address")
+        .select("id, name, location")
         .eq("company_id", currentCompanyId)
         .order("name");
 
@@ -237,11 +237,11 @@ const EmployeesPlanning = () => {
         // Continuer même si erreur, juste avec une liste vide
         setProjects([]);
       } else {
-        // Mapper "address" vers "location" pour compatibilité
+        // Mapper les projets
         const mappedProjects = (projectsData || []).map((proj: any) => ({
           id: proj.id,
           name: proj.name,
-          location: proj.address || ''
+          location: proj.location || ''
         }));
         setProjects(mappedProjects);
       }
