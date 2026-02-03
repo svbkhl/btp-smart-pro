@@ -168,19 +168,11 @@ const EmployeesAndRH = () => {
             gradient="green"
           />
           <KPIBlock
-            title="Candidatures actives"
-            value={displayStats.activeCandidatures.toString()}
-            icon={UserCheck}
-            description="En cours de traitement"
-            delay={0.3}
-            gradient="purple"
-          />
-          <KPIBlock
             title="Tâches complétées"
             value={`${displayStats.tauxCompletion}%`}
             icon={CheckCircle2}
             description={`${displayStats.completedTaches}/${displayStats.totalTaches} terminées`}
-            delay={0.4}
+            delay={0.3}
             gradient="orange"
           />
         </div>
