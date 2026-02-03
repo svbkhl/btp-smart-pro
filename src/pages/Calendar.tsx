@@ -347,20 +347,20 @@ const Calendar = () => {
           </div>
         </motion.div>
 
-        {/* Tabs - Événements / Agenda / Mon planning */}
+        {/* Tabs - Événements / Mon planning / Agenda */}
         <Tabs defaultValue="events" className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-2xl">
             <TabsTrigger value="events" className="gap-2">
               <CalendarIcon className="w-4 h-4" />
               Événements
             </TabsTrigger>
-            <TabsTrigger value="agenda" className="gap-2">
-              <Clock className="w-4 h-4" />
-              Agenda
-            </TabsTrigger>
             <TabsTrigger value="planning" className="gap-2">
               <User className="w-4 h-4" />
               Mon planning
+            </TabsTrigger>
+            <TabsTrigger value="agenda" className="gap-2">
+              <Clock className="w-4 h-4" />
+              Agenda
             </TabsTrigger>
           </TabsList>
 
@@ -552,6 +552,10 @@ const Calendar = () => {
 
           </TabsContent>
 
+          <TabsContent value="planning" className="mt-6">
+            <MyPlanning embedded />
+          </TabsContent>
+
           <TabsContent value="agenda" className="mt-6">
             {/* Section Agenda du jour */}
             <GlassCard className="p-4 sm:p-6">
@@ -705,10 +709,6 @@ const Calendar = () => {
                 </div>
               )}
             </GlassCard>
-          </TabsContent>
-
-          <TabsContent value="planning" className="mt-6">
-            <MyPlanning embedded />
           </TabsContent>
         </Tabs>
       </div>
