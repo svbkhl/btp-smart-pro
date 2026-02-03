@@ -100,7 +100,7 @@ const EmployeesAndRH = () => {
               Employés
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Gérez vos employés, leurs plannings et les ressources humaines
+              Gérez vos employés et leurs plannings
             </p>
           </div>
           <Link to="/rh/employees">
