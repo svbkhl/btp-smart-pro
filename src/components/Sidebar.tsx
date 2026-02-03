@@ -207,6 +207,8 @@ export default function Sidebar() {
   // Track if we've loaded once to prevent skeleton on route changes
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   
+  // Ref pour ignorer les hover events pendant la navigation
+  const isNavigatingRef = useRef(false);
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
@@ -322,6 +324,9 @@ export default function Sidebar() {
 
   // Fermer la sidebar quand on change de route (sauf si épinglée)
   useEffect(() => {
+    // Marquer qu'on est en train de naviguer pour ignorer les hover events
+    isNavigatingRef.current = true;
+    
     // Nettoyer le timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -337,6 +342,13 @@ export default function Sidebar() {
       setIsVisible(false);
       setGlobalIsHovered(false);
     }
+    
+    // Reset après 500ms pour permettre à nouveau les hover
+    const navigationTimeout = setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 500);
+    
+    return () => clearTimeout(navigationTimeout);
   }, [location.pathname, isMobile, isPinned, setIsVisible, setGlobalIsHovered]);
 
   // ✅ useEffect supprimé - l'initialisation se fait dans SidebarContext
@@ -412,7 +424,8 @@ export default function Sidebar() {
           className="fixed left-0 top-0 bottom-0 w-2 z-30 group cursor-pointer"
           onMouseEnter={() => {
             // Ouverture immédiate quand on se colle à gauche
-            if (!isPinned) {
+            // Ignorer pendant la navigation
+            if (!isPinned && !isNavigatingRef.current) {
               setIsHovered(true);
               setIsVisible(true);
               setGlobalIsHovered(true);
@@ -440,14 +453,15 @@ export default function Sidebar() {
           x: isOpen ? 0 : -320
         }}
         onMouseEnter={() => {
-          if (!isMobile && !isPinned) {
+          // Ignorer les hover events pendant la navigation
+          if (!isMobile && !isPinned && !isNavigatingRef.current) {
             setIsHovered(true);
             setIsVisible(true);
             setGlobalIsHovered(true);
           }
         }}
         onMouseLeave={() => {
-          if (!isMobile && !isPinned) {
+          if (!isMobile && !isPinned && !isNavigatingRef.current) {
             setIsHovered(false);
             setIsVisible(false);
             setGlobalIsHovered(false);
