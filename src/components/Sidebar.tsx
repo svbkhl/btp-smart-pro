@@ -204,6 +204,9 @@ export default function Sidebar() {
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
   
+  // Track if we've loaded once to prevent skeleton on route changes
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
@@ -370,9 +373,16 @@ export default function Sidebar() {
     });
   }, [location.pathname]);
 
-  // Afficher skeleton loading tant que les données critiques ne sont pas chargées
-  // Cela évite les re-renders visuels et l'apparition progressive des items
-  const isInitialLoading = authLoading || permissionsLoading || (!company && !isOwner);
+  // Mark as loaded once auth/permissions are ready
+  useEffect(() => {
+    if (!authLoading && !permissionsLoading && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [authLoading, permissionsLoading, hasLoadedOnce]);
+
+  // Afficher skeleton loading UNIQUEMENT au premier chargement
+  // Pas pendant les navigations pour éviter le "double apparition"
+  const isInitialLoading = !hasLoadedOnce && (authLoading || permissionsLoading || (!company && !isOwner));
   
   if (isInitialLoading) {
     return <SidebarSkeleton isOpen={isOpen} />;
