@@ -4,7 +4,7 @@
  * Permissions: Accessible uniquement aux employés
  */
 
-import { PageLayout } from "@/components/layout/PageLayout";
+import { EmployeePageLayout } from "@/components/layout/EmployeePageLayout";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { KPIBlock } from "@/components/ui/KPIBlock";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ const EmployeeDashboard = () => {
   const fullName = `${firstName} ${lastName}`.trim() || user?.email || 'Employé';
 
   return (
-    <PageLayout>
+    <EmployeePageLayout>
       <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
         {/* En-tête de bienvenue */}
         <motion.div
@@ -260,7 +260,7 @@ const EmployeeDashboard = () => {
           </div>
         </motion.div>
       </div>
-    </PageLayout>
+    </EmployeePageLayout>
   );
 };
 

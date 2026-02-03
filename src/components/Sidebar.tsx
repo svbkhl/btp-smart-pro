@@ -209,8 +209,8 @@ export default function Sidebar() {
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
-    // Fermer la sidebar immédiatement sur mobile pour une meilleure UX
-    if (isMobile) {
+    // Fermer la sidebar immédiatement sur mobile ET si elle n'est pas pinned sur desktop
+    if (isMobile || !isPinned) {
       setIsVisible(false);
     }
     

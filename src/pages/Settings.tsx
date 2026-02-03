@@ -37,7 +37,7 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 const Settings = () => {
   const { user, isAdmin, userRole, currentCompanyId } = useAuth();
-  const { isOwner, can, roleSlug } = usePermissions();
+  const { isOwner, can, roleSlug, isEmployee } = usePermissions();
   const { fakeDataEnabled } = useFakeDataStore();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,18 +52,25 @@ const Settings = () => {
   // Sections autorisées pour les OWNERS (6 sections uniquement)
   const ownerAllowedSections = ['company', 'employees', 'stripe', 'integrations', 'notifications', 'security'];
   
+  // Sections autorisées pour les EMPLOYÉS (3 sections uniquement : sécurité, intégrations pour plannings, notifications)
+  const employeeAllowedSections = ['security', 'integrations', 'notifications'];
+  
   // Lire le paramètre tab de l'URL (contrôlé pour que ?tab=notifications ouvre le bon onglet)
   const tabFromUrl = searchParams.get("tab");
-  const activeTab = tabFromUrl || "company";
+  const defaultTab = isEmployee ? "security" : "company"; // Employé commence sur sécurité
+  const activeTab = tabFromUrl || defaultTab;
   const setActiveTab = (value: string) => setSearchParams({ tab: value }, { replace: true });
   
-  // Protection : si owner essaye d'accéder à un onglet non autorisé, rediriger vers 'company'
+  // Protection : si owner ou employé essaye d'accéder à un onglet non autorisé, rediriger
   useEffect(() => {
-    if (isOwner && tabFromUrl && !ownerAllowedSections.includes(tabFromUrl)) {
+    if (isEmployee && tabFromUrl && !employeeAllowedSections.includes(tabFromUrl)) {
+      console.warn('[Settings] Employé tentant d\'accéder à un onglet non autorisé:', tabFromUrl);
+      setSearchParams({ tab: 'security' }, { replace: true });
+    } else if (isOwner && tabFromUrl && !ownerAllowedSections.includes(tabFromUrl)) {
       console.warn('[Settings] Owner tentant d\'accéder à un onglet non autorisé:', tabFromUrl);
       setSearchParams({ tab: 'company' }, { replace: true });
     }
-  }, [isOwner, tabFromUrl]);
+  }, [isOwner, isEmployee, tabFromUrl]);
   
   // Gérer le callback Google Calendar OAuth
   const googleCalendarStatus = searchParams.get("google_calendar_status");
@@ -177,10 +184,13 @@ const Settings = () => {
   const canManageDelegations = isOwner || can("delegations.manage");
   
   // Ajuster le nombre de colonnes selon les onglets
+  // EMPLOYÉS (3 onglets) : security, integrations, notifications
   // OWNERS (6 onglets) : company, employees, stripe, integrations, notifications, security
   // ADMINS (11-12 onglets) : 6 de base + companies, contact-requests, users, roles, delegations (optionnel), admin-company, demo
   // Note: "legal" a été déplacé en haut à droite comme bouton
-  const tabCount = isReallyAdmin 
+  const tabCount = isEmployee
+    ? 3 // Employés: 3 onglets uniquement (security, integrations, notifications)
+    : isReallyAdmin 
     ? (canManageDelegations ? 12 : 11) // Admins: 11 ou 12 onglets
     : 6; // Owners: 6 onglets uniquement (company, employees, stripe, integrations, notifications, security)
 
@@ -221,14 +231,18 @@ const Settings = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
-            <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">Entreprise</span>
-            </TabsTrigger>
-            <TabsTrigger value="employees" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">Employés</span>
-            </TabsTrigger>
+            {!isEmployee && (
+              <>
+                <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Entreprise</span>
+                </TabsTrigger>
+                <TabsTrigger value="employees" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Employés</span>
+                </TabsTrigger>
+              </>
+            )}
             {isReallyAdmin && (
               <>
                 <TabsTrigger value="companies" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
@@ -265,10 +279,12 @@ const Settings = () => {
                 <span className="truncate">Mode démo</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="stripe" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-              <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">Paiements</span>
-            </TabsTrigger>
+            {!isEmployee && (
+              <TabsTrigger value="stripe" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="truncate">Paiements</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="integrations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Intégrations</span>
@@ -283,15 +299,19 @@ const Settings = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="company" className="mt-0">
-            <CompanySettings />
-          </TabsContent>
+          {!isEmployee && (
+            <>
+              <TabsContent value="company" className="mt-0">
+                <CompanySettings />
+              </TabsContent>
 
-          <TabsContent value="employees" className="mt-0">
-            <div className="[&_div]:!p-0 [&_main]:!p-0">
-              <UsersManagementRBAC embedded />
-            </div>
-          </TabsContent>
+              <TabsContent value="employees" className="mt-0">
+                <div className="[&_div]:!p-0 [&_main]:!p-0">
+                  <UsersManagementRBAC embedded />
+                </div>
+              </TabsContent>
+            </>
+          )}
 
           {isReallyAdmin && (
             <>
@@ -325,9 +345,11 @@ const Settings = () => {
             </>
           )}
 
-          <TabsContent value="stripe" className="mt-0">
-            <StripeSettings />
-          </TabsContent>
+          {!isEmployee && (
+            <TabsContent value="stripe" className="mt-0">
+              <StripeSettings />
+            </TabsContent>
+          )}
 
           <TabsContent value="integrations" className="mt-0">
             <div className="space-y-6">
