@@ -212,12 +212,6 @@ export default function Sidebar() {
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
-    // DEBUG: Alerte pour confirmer le clic
-    if (path === '/calendar') {
-      console.log('🔴 CLIC SUR CALENDRIER DÉTECTÉ - Version avec tous les fixes appliqués');
-      console.log('État actuel:', { isOpen, isVisible, isHovered, isPinned });
-    }
-    
     // Fermer la sidebar immédiatement sur mobile pour une meilleure UX
     if (isMobile) {
       setIsVisible(false);
