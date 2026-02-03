@@ -389,8 +389,8 @@ export default function Sidebar() {
   const isDataReady = !authLoading && !permissionsLoading && (company !== null || isOwner) && totalItems > 4;
   
   if (!isDataReady) {
-    // Afficher un skeleton complet jusqu'à ce que TOUT soit chargé
-    return <SidebarSkeleton isOpen={isOpen} />;
+    // Ne rien afficher pendant le chargement (pas de skeleton, pas de bout de sidebar)
+    return null;
   }
 
   return (
