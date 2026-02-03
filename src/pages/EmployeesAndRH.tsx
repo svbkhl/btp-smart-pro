@@ -188,16 +188,6 @@ const EmployeesAndRH = () => {
               </div>
             </GlassCard>
           </Link>
-
-          <Link to="/my-planning" className="h-full">
-            <GlassCard className="p-4 hover:bg-accent/50 transition-all cursor-pointer h-full">
-              <div className="flex items-center gap-3 min-h-[2.5rem]">
-                <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <span className="font-semibold text-sm flex-1">Mon planning</span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </div>
-            </GlassCard>
-          </Link>
         </div>
 
         {/* Calendrier Google Calendar */}
