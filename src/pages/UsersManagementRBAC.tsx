@@ -363,7 +363,8 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
           {inviteButton}
         </div>
       ) : embedded && inviteButton ? (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 p-3 sm:p-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 mb-4">
+          <BackButton />
           {inviteButton}
         </div>
       ) : null}
