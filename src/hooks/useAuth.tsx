@@ -225,6 +225,8 @@ export const useAuth = (): UseAuthReturn => {
   // Fonction pour récupérer le company_id actuel
   const fetchCurrentCompanyId = async (userId: string) => {
     try {
+      console.log('🔵 [DEBUG useAuth] fetchCurrentCompanyId called for userId:', userId);
+      
       const { data, error } = await supabase
         .from('company_users')
         .select('company_id')
@@ -232,14 +234,25 @@ export const useAuth = (): UseAuthReturn => {
         .limit(1)
         .maybeSingle();
 
+      console.log('🔵 [DEBUG useAuth] company_users query result:', { 
+        data, 
+        error, 
+        hasData: !!data,
+        companyId: data?.company_id 
+      });
+
       if (error || !data) {
+        console.log('❌ [DEBUG useAuth] No company found for user - setting currentCompanyId to NULL');
         setCurrentCompanyId(null);
+        localStorage.removeItem('currentCompanyId');
         return;
       }
 
+      console.log('✅ [DEBUG useAuth] Setting currentCompanyId to:', data.company_id);
       setCurrentCompanyId(data.company_id);
+      localStorage.setItem('currentCompanyId', data.company_id);
     } catch (err) {
-      console.warn('⚠️ Erreur lors de la récupération du company_id:', err);
+      console.error('❌ [DEBUG useAuth] Error fetching company_id:', err);
       setCurrentCompanyId(null);
     }
   };
