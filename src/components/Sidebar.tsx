@@ -476,12 +476,7 @@ export default function Sidebar() {
             <Link 
               to="/dashboard" 
               className="flex items-center gap-3 group"
-              onClick={() => {
-                // Fermer la sidebar immédiatement sur mobile
-                if (isMobile) {
-                  setIsVisible(false);
-                }
-              }}
+              onClick={() => handleNavigation("/dashboard")}
             >
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 5 }}
@@ -651,12 +646,7 @@ export default function Sidebar() {
                                         <Link
                                           key={subItem.path}
                                           to={subItem.path}
-                                          onClick={() => {
-                                            // Fermer la sidebar immédiatement sur mobile
-                                            if (isMobile) {
-                                              setIsVisible(false);
-                                            }
-                                          }}
+                                          onClick={() => handleNavigation(subItem.path)}
                                           className={cn(
                                             "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                                             subActive
@@ -691,12 +681,7 @@ export default function Sidebar() {
                         ) : (user || !fakeDataEnabled) ? (
                           <Link
                             to={item.path}
-                            onClick={() => {
-                              // Fermer la sidebar immédiatement sur mobile
-                              if (isMobile) {
-                                setIsVisible(false);
-                              }
-                            }}
+                            onClick={() => handleNavigation(item.path)}
                             className={cn(
                               "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                               "relative hover:shadow-lg hover:shadow-primary/20",
