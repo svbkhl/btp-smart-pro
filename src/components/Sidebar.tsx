@@ -203,6 +203,7 @@ export default function Sidebar() {
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
+  
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
@@ -335,19 +336,8 @@ export default function Sidebar() {
     }
   }, [location.pathname, isMobile, isPinned, setIsVisible, setGlobalIsHovered]);
 
-  // Initialiser l'état visible selon le pinned
-  useEffect(() => {
-    if (isMobile) {
-      setIsHovered(true);
-      setIsVisible(true);
-    } else if (isPinned) {
-      setIsHovered(true);
-      setIsVisible(true);
-    } else {
-      setIsHovered(false);
-      setIsVisible(false);
-    }
-  }, [isMobile, isPinned, setIsVisible]);
+  // ✅ useEffect supprimé - l'initialisation se fait dans SidebarContext
+  // Cet useEffect causait un conflit avec celui qui ferme la sidebar au changement de route
 
   const toggleGroup = (groupIndex: number) => {
     setExpandedGroups(prev => ({
