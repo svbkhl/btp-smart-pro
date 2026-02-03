@@ -15,8 +15,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Building2, Loader2, Save, FileSignature } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
 export const CompanySettings = () => {
+  const { user } = useAuth();
   const { data: settings, isLoading } = useUserSettings();
   const updateSettings = useUpdateUserSettings();
   const { companyId } = useCompanyId();
@@ -197,9 +199,10 @@ export const CompanySettings = () => {
           .eq("id", companyId);
         
         // Invalider ET refetch immédiatement pour mise à jour instantanée dans la sidebar
-        await queryClient.invalidateQueries({ queryKey: ["companies"] });
-        await queryClient.invalidateQueries({ queryKey: ["company"] });
-        await queryClient.refetchQueries({ queryKey: ["companies"] });
+        // IMPORTANT: Utiliser la même queryKey que useCompanies() avec user?.id
+        await queryClient.invalidateQueries({ queryKey: ["companies", user?.id] });
+        await queryClient.invalidateQueries({ queryKey: ["company", companyId] });
+        await queryClient.refetchQueries({ queryKey: ["companies", user?.id] });
       }
       toast({
         title: "Paramètres sauvegardés",
