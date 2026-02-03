@@ -840,8 +840,8 @@ export default function Sidebar() {
           <div className="pt-2 space-y-1">
             {user ? (
               <>
-                {/* Toggle Mode démo pour les administrateurs */}
-                {userRole === 'admin' && (
+                {/* Toggle Mode démo uniquement pour les admins (pas owner/employee) */}
+                {userRole === 'admin' && !isOwner && !isEmployee && (
                   <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 mb-2">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-primary" />
@@ -855,16 +855,8 @@ export default function Sidebar() {
                       id="demo-mode-sidebar"
                       checked={fakeDataEnabled}
                       onCheckedChange={(checked) => {
-                        console.log("🔄 Toggle mode démo:", checked);
-                        console.log("📊 État actuel fakeDataEnabled:", fakeDataEnabled);
                         setFakeDataEnabled(checked);
-                        console.log("✅ setFakeDataEnabled appelé avec:", checked);
-                        
-                        // Invalider toutes les queries immédiatement pour forcer le rechargement
                         queryClient.invalidateQueries();
-                        console.log("🔄 Toutes les queries invalidées pour recharger les données");
-                        
-                        // Forcer un refetch de toutes les queries actives
                         queryClient.refetchQueries();
                       }}
                     />
