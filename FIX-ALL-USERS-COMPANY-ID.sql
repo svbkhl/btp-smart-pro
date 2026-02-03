@@ -37,7 +37,7 @@ BEGIN
       cu.company_id, 
       cu.role_id, 
       u.email, 
-      u.raw_user_metadata,
+      u.raw_user_meta_data,
       c.name as company_name
     FROM public.company_users cu
     INNER JOIN auth.users u ON u.id = cu.user_id
@@ -65,13 +65,13 @@ BEGIN
         v_user_record.user_id,
         v_user_record.company_id,
         COALESCE(
-          v_user_record.raw_user_metadata->>'last_name',
-          v_user_record.raw_user_metadata->>'nom',
+          v_user_record.raw_user_meta_data->>'last_name',
+          v_user_record.raw_user_meta_data->>'nom',
           'Utilisateur'
         ),
         COALESCE(
-          v_user_record.raw_user_metadata->>'first_name',
-          v_user_record.raw_user_metadata->>'prenom',
+          v_user_record.raw_user_meta_data->>'first_name',
+          v_user_record.raw_user_meta_data->>'prenom',
           ''
         ),
         v_user_record.email,
@@ -111,7 +111,7 @@ DECLARE
   v_owner_role_id UUID;
 BEGIN
   -- Récupérer les infos de l'utilisateur
-  SELECT email, raw_user_metadata
+  SELECT email, raw_user_meta_data
   INTO v_user_email, v_user_metadata
   FROM auth.users
   WHERE id = NEW.user_id;
