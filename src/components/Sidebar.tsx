@@ -253,9 +253,9 @@ export default function Sidebar() {
     [can]
   );
   
-  // SOLUTION RADICALE: Geler les menuGroups après le premier calcul avec données complètes
+  // Geler les menuGroups après le premier calcul avec données complètes
+  // pour éviter que les items disparaissent/réapparaissent
   const frozenMenuGroupsRef = useRef<typeof menuGroups | null>(null);
-  const menuGroupsRecalcCount = useRef(0);
   
   const menuGroups = useMemo(
     () => {
@@ -264,13 +264,11 @@ export default function Sidebar() {
         return frozenMenuGroupsRef.current;
       }
       
-      menuGroupsRecalcCount.current++;
       const result = getMenuGroups(company, isEmployee, canFunc, isOwner);
       
       // Geler si les données sont complètes (company existe OU c'est un admin/owner sans company)
       if (company || isOwner) {
         frozenMenuGroupsRef.current = result;
-        console.log('✅ MenuGroups GELÉS - ne changeront plus jamais');
       }
       
       return result;
@@ -499,12 +497,8 @@ export default function Sidebar() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="p-6 border-b border-white/20 dark:border-gray-700/30 relative"
+          className="p-6 border-b border-white/20 dark:border-gray-700/30"
         >
-          {/* DEBUG: Badge qui montre combien de fois les items changent */}
-          <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs px-2 py-1 rounded font-mono font-bold shadow-lg z-50 animate-pulse">
-            Recalculs: {menuGroupsRecalcCount.current}
-          </div>
           {(user || !fakeDataEnabled) ? (
             <Link 
               to="/dashboard" 
