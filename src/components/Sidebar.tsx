@@ -206,6 +206,10 @@ export default function Sidebar() {
   
   // Ref pour ignorer les hover events pendant la navigation
   const isNavigatingRef = useRef(false);
+  
+  // Ref pour tracker la stabilité des menuGroups (éviter affichage progressif)
+  const menuGroupsStableRef = useRef(false);
+  const [isMenuStable, setIsMenuStable] = useState(false);
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
@@ -383,12 +387,34 @@ export default function Sidebar() {
     });
   }, [location.pathname]);
 
-  // Afficher rapidement avec skeleton pendant chargement initial
-  const isDataReady = !authLoading && !permissionsLoading;
+  // Attendre que menuGroups soit STABLE avant d'afficher (éviter affichage progressif)
+  useEffect(() => {
+    const totalItems = menuGroups.reduce((sum, g) => sum + g.items.length, 0);
+    
+    // Considérer comme stable si :
+    // 1. Auth et permissions sont chargés
+    // 2. On a une company OU on est owner
+    // 3. On a au moins 1 item dans le menu
+    const isStable = 
+      !authLoading && 
+      !permissionsLoading && 
+      (company !== undefined || isOwner) &&
+      totalItems > 0;
+    
+    if (isStable && !menuGroupsStableRef.current) {
+      // Attendre 100ms pour être sûr que tout est chargé (éviter flicker)
+      const stabilityTimeout = setTimeout(() => {
+        menuGroupsStableRef.current = true;
+        setIsMenuStable(true);
+      }, 100);
+      
+      return () => clearTimeout(stabilityTimeout);
+    }
+  }, [authLoading, permissionsLoading, company, isOwner, menuGroups]);
   
-  if (!isDataReady) {
-    // Afficher un skeleton élégant pendant le chargement
-    return <SidebarSkeleton isOpen={isOpen} />;
+  if (!isMenuStable) {
+    // Ne rien afficher pendant le chargement (pas de skeleton, pas de bout de sidebar)
+    return null;
   }
 
   return (
