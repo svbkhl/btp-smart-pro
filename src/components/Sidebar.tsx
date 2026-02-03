@@ -210,6 +210,7 @@ export default function Sidebar() {
   // Ref pour tracker la stabilité des menuGroups (éviter affichage progressif)
   const menuGroupsStableRef = useRef(false);
   const [isMenuStable, setIsMenuStable] = useState(false);
+  const hasInitializedRef = useRef(false);
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
@@ -402,13 +403,9 @@ export default function Sidebar() {
       totalItems > 0;
     
     if (isStable && !menuGroupsStableRef.current) {
-      // Attendre 100ms pour être sûr que tout est chargé (éviter flicker)
-      const stabilityTimeout = setTimeout(() => {
-        menuGroupsStableRef.current = true;
-        setIsMenuStable(true);
-      }, 100);
-      
-      return () => clearTimeout(stabilityTimeout);
+      // Affichage IMMÉDIAT dès que les données sont prêtes
+      menuGroupsStableRef.current = true;
+      setIsMenuStable(true);
     }
   }, [authLoading, permissionsLoading, company, isOwner, menuGroups]);
   
@@ -465,7 +462,7 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -320, opacity: 0 }}
+        initial={false}
         animate={{
           x: isOpen ? 0 : -320,
           opacity: isOpen ? 1 : 0
@@ -641,10 +638,10 @@ export default function Sidebar() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ 
-                          delay: 0.05 + globalIndex * 0.02,
                           type: "spring",
                           stiffness: 300,
-                          damping: 25
+                          damping: 25,
+                          duration: 0.15
                         }}
                         whileHover={{ 
                           scale: 1.02, 
@@ -805,10 +802,10 @@ export default function Sidebar() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ 
-                  delay: 0.1,
                   type: "spring",
                   stiffness: 300,
-                  damping: 25
+                  damping: 25,
+                  duration: 0.15
                 }}
                 whileHover={{ 
                   scale: 1.02, 
@@ -885,7 +882,7 @@ export default function Sidebar() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25, delay: 0.1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25, duration: 0.15 }}
           className="p-4 border-t border-white/20 dark:border-gray-700/30 space-y-3"
         >
 
