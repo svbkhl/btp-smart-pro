@@ -186,7 +186,7 @@ const EmployeesAndRH = () => {
         </div>
 
         {/* Actions rapides */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 [&>*:nth-last-child(2):nth-child(odd)]:sm:col-start-2 [&>*:nth-last-child(2):nth-child(odd)]:lg:col-start-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Link to="/employees-planning" className="h-full">
             <GlassCard className="p-4 hover:bg-accent/50 transition-all cursor-pointer h-full">
               <div className="flex items-center gap-3 min-h-[2.5rem]">
