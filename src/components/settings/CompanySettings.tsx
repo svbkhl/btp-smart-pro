@@ -195,7 +195,18 @@ export const CompanySettings = () => {
       // Garder companies.name en sync avec le nom affiché (sidebar + paramètres)
       if (companyId && formData.company_name?.trim()) {
         console.log('🔵 [CompanySettings] Updating companies table with name:', formData.company_name.trim());
-        const { data: updateResult, error: updateError } = await supabase
+        console.log('🔵 [CompanySettings] Company ID:', companyId);
+        
+        // D'abord, vérifier si la company existe
+        const { data: existingCompany, error: fetchError } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", companyId)
+          .single();
+        
+        console.log('🔵 [CompanySettings] Existing company:', existingCompany, 'Error:', fetchError);
+        
+        const { data: updateResult, error: updateError, count } = await supabase
           .from("companies")
           .update({ name: formData.company_name.trim(), updated_at: new Date().toISOString() })
           .eq("id", companyId)
@@ -205,6 +216,7 @@ export const CompanySettings = () => {
           console.error('❌ [CompanySettings] Error updating companies:', updateError);
         } else {
           console.log('✅ [CompanySettings] Companies updated successfully:', updateResult);
+          console.log('✅ [CompanySettings] Rows affected:', updateResult?.length || 0);
         }
         
         // Invalider ET refetch immédiatement pour mise à jour instantanée dans la sidebar
