@@ -44,7 +44,6 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { isFeatureEnabled } from "@/utils/companyFeatures";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useQueryClient } from "@tanstack/react-query";
-import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 
 // Types pour les items de menu
 type MenuItem = {
@@ -203,9 +202,6 @@ export default function Sidebar() {
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
-  
-  // Track if we've loaded once to prevent skeleton on route changes
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   
   // Ref pour ignorer les hover events pendant la navigation
   const isNavigatingRef = useRef(false);
@@ -385,20 +381,8 @@ export default function Sidebar() {
     });
   }, [location.pathname]);
 
-  // Mark as loaded once auth/permissions are ready
-  useEffect(() => {
-    if (!authLoading && !permissionsLoading && !hasLoadedOnce) {
-      setHasLoadedOnce(true);
-    }
-  }, [authLoading, permissionsLoading, hasLoadedOnce]);
-
-  // Afficher skeleton loading UNIQUEMENT au premier chargement
-  // Pas pendant les navigations pour éviter le "double apparition"
-  const isInitialLoading = !hasLoadedOnce && (authLoading || permissionsLoading || (!company && !isOwner));
-  
-  if (isInitialLoading) {
-    return <SidebarSkeleton isOpen={isOpen} />;
-  }
+  // Skeleton désactivé - affichage immédiat de tous les items
+  // L'utilisateur veut voir tous les items en même temps dès le chargement
 
   return (
     <>
