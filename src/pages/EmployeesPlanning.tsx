@@ -180,15 +180,32 @@ const EmployeesPlanning = () => {
 
       // Mode production : charger depuis Supabase
       // Récupérer les employés directement depuis la table employees
-      console.log("🔵 [EmployeesPlanning] Récupération des employés pour company_id:", currentCompanyId);
+      console.log("🔵 [EmployeesPlanning] Récupération des employés");
+      console.log("🔵 [EmployeesPlanning] - currentCompanyId:", currentCompanyId);
+      console.log("🔵 [EmployeesPlanning] - isAdmin:", isAdmin);
+      console.log("🔵 [EmployeesPlanning] - user.id:", user?.id);
       
-      const { data: employeesData, error: employeesError } = await supabase
+      let query = supabase
         .from("employees")
         .select("id, user_id, nom, prenom, poste, specialites, email, company_id")
-        .eq("company_id", currentCompanyId)
         .order("created_at", { ascending: false });
 
-      console.log("🔵 [EmployeesPlanning] Résultat employees:", { employeesData, employeesError });
+      // Si un company_id est défini, filtrer par celui-ci
+      // Sinon, récupérer tous les employés (pour les admins sans entreprise)
+      if (currentCompanyId) {
+        console.log("🔵 [EmployeesPlanning] Filtre par company_id:", currentCompanyId);
+        query = query.eq("company_id", currentCompanyId);
+      } else {
+        console.log("⚠️ [EmployeesPlanning] Pas de company_id défini - récupération de tous les employés");
+      }
+
+      const { data: employeesData, error: employeesError } = await query;
+
+      console.log("🔵 [EmployeesPlanning] Résultat employees:", { 
+        count: employeesData?.length, 
+        employeesData, 
+        employeesError 
+      });
 
       if (employeesError) {
         console.error("❌ [EmployeesPlanning] Erreur récupération employees:", employeesError);
@@ -205,6 +222,7 @@ const EmployeesPlanning = () => {
       }));
       
       console.log("🔵 [EmployeesPlanning] Employés mappés:", mappedEmployees);
+      console.log("🔵 [EmployeesPlanning] Nombre d'employés:", mappedEmployees.length);
       setEmployees(mappedEmployees);
 
       // Récupérer les projets
