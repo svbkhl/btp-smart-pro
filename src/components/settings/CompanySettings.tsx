@@ -195,7 +195,11 @@ export const CompanySettings = () => {
           .from("companies")
           .update({ name: formData.company_name.trim(), updated_at: new Date().toISOString() })
           .eq("id", companyId);
-        queryClient.invalidateQueries({ queryKey: ["companies"] });
+        
+        // Invalider ET refetch immédiatement pour mise à jour instantanée dans la sidebar
+        await queryClient.invalidateQueries({ queryKey: ["companies"] });
+        await queryClient.invalidateQueries({ queryKey: ["company"] });
+        await queryClient.refetchQueries({ queryKey: ["companies"] });
       }
       toast({
         title: "Paramètres sauvegardés",
