@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from "react";
 import { safeLocalStorage } from "@/utils/isBrowser";
 
 interface SidebarContextType {
@@ -13,23 +13,34 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const SidebarProvider = ({ children }: { children: ReactNode }) => {
-  const [isPinned, setIsPinned] = useState(() => {
+  const [isPinned, setIsPinnedState] = useState(() => {
     const saved = safeLocalStorage.getItem("sidebar-pinned");
     return saved ? saved === "true" : true;
   });
   // Initialiser isVisible avec la même valeur que isPinned pour éviter les flashs
-  const [isVisible, setIsVisible] = useState(() => {
+  const [isVisible, setIsVisibleState] = useState(() => {
     const saved = safeLocalStorage.getItem("sidebar-pinned");
     return saved ? saved === "true" : true;
   });
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHoveredState] = useState(false);
 
   useEffect(() => {
     safeLocalStorage.setItem("sidebar-pinned", isPinned.toString());
   }, [isPinned]);
 
+  // Stabiliser les références des setters avec useCallback
+  const setIsPinned = useCallback((pinned: boolean) => setIsPinnedState(pinned), []);
+  const setIsVisible = useCallback((visible: boolean) => setIsVisibleState(visible), []);
+  const setIsHovered = useCallback((hovered: boolean) => setIsHoveredState(hovered), []);
+
+  // Mémoriser le value pour éviter les re-renders inutiles
+  const value = useMemo(
+    () => ({ isPinned, isVisible, isHovered, setIsPinned, setIsVisible, setIsHovered }),
+    [isPinned, isVisible, isHovered, setIsPinned, setIsVisible, setIsHovered]
+  );
+
   return (
-    <SidebarContext.Provider value={{ isPinned, isVisible, isHovered, setIsPinned, setIsVisible, setIsHovered }}>
+    <SidebarContext.Provider value={value}>
       {children}
     </SidebarContext.Provider>
   );
