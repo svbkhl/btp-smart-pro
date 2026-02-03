@@ -33,10 +33,11 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   const setIsVisible = useCallback((visible: boolean) => setIsVisibleState(visible), []);
   const setIsHovered = useCallback((hovered: boolean) => setIsHoveredState(hovered), []);
 
-  // Mémoriser le value pour éviter les re-renders inutiles
+  // Mémoriser le value - NE PAS mettre les setters en dépendances (déjà stables via useCallback)
   const value = useMemo(
     () => ({ isPinned, isVisible, isHovered, setIsPinned, setIsVisible, setIsHovered }),
-    [isPinned, isVisible, isHovered, setIsPinned, setIsVisible, setIsHovered]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isPinned, isVisible, isHovered]
   );
 
   return (

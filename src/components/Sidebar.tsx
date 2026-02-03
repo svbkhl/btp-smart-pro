@@ -209,13 +209,6 @@ export default function Sidebar() {
   
   // Ref pour ignorer les hover events pendant la navigation
   const isNavigatingRef = useRef(false);
-  
-  // DEBUG: Compteur de renders
-  const renderCount = useRef(0);
-  renderCount.current++;
-  useEffect(() => {
-    console.log(`🟢 Sidebar render #${renderCount.current} | Path: ${location.pathname}`);
-  });
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
   const handleNavigation = (path: string, e?: React.MouseEvent) => {
