@@ -44,6 +44,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { isFeatureEnabled } from "@/utils/companyFeatures";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useQueryClient } from "@tanstack/react-query";
+import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 
 // Types pour les items de menu
 type MenuItem = {
@@ -252,8 +253,15 @@ export default function Sidebar() {
     [can]
   );
   
+  // Compteur de recalculs des menuGroups
+  const menuGroupsRecalcCount = useRef(0);
+  
   const menuGroups = useMemo(
-    () => getMenuGroups(company, isEmployee, canFunc, isOwner),
+    () => {
+      menuGroupsRecalcCount.current++;
+      console.log(`🔄 menuGroups recalculé #${menuGroupsRecalcCount.current}:`, { hasCompany: !!company, isEmployee, isOwner });
+      return getMenuGroups(company, isEmployee, canFunc, isOwner);
+    },
     [company, isEmployee, canFunc, isOwner]
   );
   
@@ -381,8 +389,13 @@ export default function Sidebar() {
     });
   }, [location.pathname]);
 
-  // Skeleton désactivé - affichage immédiat de tous les items
-  // L'utilisateur veut voir tous les items en même temps dès le chargement
+  // Attendre que les données critiques soient chargées pour éviter que les items disparaissent/réapparaissent
+  const isDataReady = !authLoading && !permissionsLoading;
+  
+  if (!isDataReady) {
+    // Afficher un skeleton minimal pendant le chargement initial TRÈS COURT
+    return <SidebarSkeleton isOpen={isOpen} />;
+  }
 
   return (
     <>
@@ -473,8 +486,12 @@ export default function Sidebar() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="p-6 border-b border-white/20 dark:border-gray-700/30"
+          className="p-6 border-b border-white/20 dark:border-gray-700/30 relative"
         >
+          {/* DEBUG: Badge qui montre combien de fois les items changent */}
+          <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs px-2 py-1 rounded font-mono font-bold shadow-lg z-50 animate-pulse">
+            Recalculs: {menuGroupsRecalcCount.current}
+          </div>
           {(user || !fakeDataEnabled) ? (
             <Link 
               to="/dashboard" 
