@@ -447,11 +447,7 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar */}
-      <motion.aside
-        initial={{ x: -320 }}
-        animate={{
-          x: isOpen ? 0 : -320
-        }}
+      <aside
         onMouseEnter={() => {
           // Ignorer les hover events pendant la navigation
           if (!isMobile && !isPinned && !isNavigatingRef.current) {
@@ -467,10 +463,9 @@ export default function Sidebar() {
             setGlobalIsHovered(false);
           }
         }}
-        transition={{ 
-          type: "tween",
-          duration: 0.3,
-          ease: [0.4, 0, 0.2, 1]
+        style={{
+          transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
         className={cn(
           "flex flex-col z-40",
@@ -922,7 +917,7 @@ export default function Sidebar() {
             )}
           </div>
         </motion.div>
-      </motion.aside>
+      </aside>
     </>
   );
 }
