@@ -253,14 +253,27 @@ export default function Sidebar() {
     [can]
   );
   
-  // Compteur de recalculs des menuGroups
+  // SOLUTION RADICALE: Geler les menuGroups après le premier calcul avec données complètes
+  const frozenMenuGroupsRef = useRef<typeof menuGroups | null>(null);
   const menuGroupsRecalcCount = useRef(0);
   
   const menuGroups = useMemo(
     () => {
+      // Si déjà gelé, retourner toujours le même résultat
+      if (frozenMenuGroupsRef.current) {
+        return frozenMenuGroupsRef.current;
+      }
+      
       menuGroupsRecalcCount.current++;
-      console.log(`🔄 menuGroups recalculé #${menuGroupsRecalcCount.current}:`, { hasCompany: !!company, isEmployee, isOwner });
-      return getMenuGroups(company, isEmployee, canFunc, isOwner);
+      const result = getMenuGroups(company, isEmployee, canFunc, isOwner);
+      
+      // Geler si les données sont complètes (company existe OU c'est un admin/owner sans company)
+      if (company || isOwner) {
+        frozenMenuGroupsRef.current = result;
+        console.log('✅ MenuGroups GELÉS - ne changeront plus jamais');
+      }
+      
+      return result;
     },
     [company, isEmployee, canFunc, isOwner]
   );
