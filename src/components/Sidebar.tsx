@@ -383,11 +383,13 @@ export default function Sidebar() {
     });
   }, [location.pathname]);
 
-  // Attendre que les données critiques soient chargées pour éviter que les items disparaissent/réapparaissent
-  const isDataReady = !authLoading && !permissionsLoading;
+  // Attendre que TOUTES les données soient chargées avant d'afficher la sidebar
+  // pour éviter de montrer seulement 4 items puis le reste après
+  const totalItems = menuGroups.reduce((sum, g) => sum + g.items.length, 0);
+  const isDataReady = !authLoading && !permissionsLoading && (company !== null || isOwner) && totalItems > 4;
   
   if (!isDataReady) {
-    // Afficher un skeleton minimal pendant le chargement initial TRÈS COURT
+    // Afficher un skeleton complet jusqu'à ce que TOUT soit chargé
     return <SidebarSkeleton isOpen={isOpen} />;
   }
 
