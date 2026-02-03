@@ -190,38 +190,28 @@ export const CompanySettings = () => {
 
     setSaving(true);
     try {
-      console.log('🔵 [CompanySettings] Saving company name:', formData.company_name);
       await updateSettings.mutateAsync(formData);
       // Garder companies.name en sync avec le nom affiché (sidebar + paramètres)
       if (companyId && formData.company_name?.trim()) {
-        console.log('🔵 [CompanySettings] Updating companies table with name:', formData.company_name.trim());
-        console.log('🔵 [CompanySettings] Company ID:', companyId);
-        
         // Utiliser la fonction RPC pour contourner RLS
-        const { data: rpcResult, error: rpcError } = await supabase
+        const { error: rpcError } = await supabase
           .rpc('update_company_name', {
             p_company_id: companyId,
             p_new_name: formData.company_name.trim()
           });
         
         if (rpcError) {
-          console.error('❌ [CompanySettings] Error updating companies via RPC:', rpcError);
+          console.error('Error updating company name:', rpcError);
           toast({
             title: "Erreur",
             description: "Impossible de mettre à jour le nom de l'entreprise",
             variant: "destructive",
           });
         } else {
-          console.log('✅ [CompanySettings] Company name updated via RPC:', rpcResult);
-          
           // Invalider ET refetch immédiatement pour mise à jour instantanée dans la sidebar
-          // IMPORTANT: Utiliser la même queryKey que useCompanies() avec user?.id
-          console.log('🔵 [CompanySettings] Invalidating queries with keys:', ["companies", user?.id], ["company", companyId]);
           await queryClient.invalidateQueries({ queryKey: ["companies", user?.id] });
           await queryClient.invalidateQueries({ queryKey: ["company", companyId] });
-          console.log('🔵 [CompanySettings] Refetching companies...');
           await queryClient.refetchQueries({ queryKey: ["companies", user?.id] });
-          console.log('✅ [CompanySettings] Cache invalidated and refetched!');
         }
       }
       toast({

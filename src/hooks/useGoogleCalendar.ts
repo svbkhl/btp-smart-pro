@@ -78,18 +78,11 @@ export const useGoogleCalendarConnection = () => {
 export const useGetGoogleAuthUrl = () => {
   const { currentCompanyId } = useAuth();
 
-  console.log('🔵 [DEBUG useGetGoogleAuthUrl] Hook initialized with currentCompanyId:', currentCompanyId);
-
   return useMutation({
     mutationFn: async () => {
-      console.log('🔵 [DEBUG useGetGoogleAuthUrl] mutationFn called with currentCompanyId:', currentCompanyId);
-      
       if (!currentCompanyId) {
-        console.error('❌ [DEBUG useGetGoogleAuthUrl] Company ID is MISSING - throwing error');
         throw new Error("Company ID manquant");
       }
-      
-      console.log('✅ [DEBUG useGetGoogleAuthUrl] Company ID is present, continuing...');
 
       // 1. Générer PKCE côté frontend (RFC 7636)
       const codeVerifier = generateCodeVerifier();

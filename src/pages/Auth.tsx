@@ -443,10 +443,7 @@ const Auth = () => {
 
   // Connexion avec Google - Nécessite une invitation
   const handleGoogleSignIn = async () => {
-    console.log('🔵 [DEBUG] handleGoogleSignIn called', { hasEmail: !!email, emailValue: email?.substring(0, 3) + '***' });
-
     if (!email || email.trim() === "") {
-      console.log('❌ [DEBUG] Email missing - early return');
       toast({
         title: "Email requis",
         description: "Veuillez saisir votre email pour vérifier votre invitation avant de continuer.",
@@ -456,20 +453,16 @@ const Auth = () => {
     }
 
     // Vérifier qu'il y a une invitation valide
-    console.log('🔵 [DEBUG] Checking invitation for email:', email);
     const { data: hasInvitation, error: checkError } = await supabase.rpc(
       'has_valid_invitation',
       { p_email: email }
     );
-
-    console.log('🔵 [DEBUG] Invitation check result:', { hasInvitation, hasError: !!checkError, error: checkError });
 
     if (checkError) {
       console.error('Error checking invitation:', checkError);
     }
 
     if (!hasInvitation) {
-      console.log('❌ [DEBUG] No invitation - early return');
       toast({
         title: "Connexion non autorisée",
         description: "Vous devez avoir reçu une invitation pour vous connecter. Contactez votre administrateur.",
@@ -478,42 +471,20 @@ const Auth = () => {
       return;
     }
 
-    console.log('🔵 [DEBUG] Starting OAuth flow...');
     setLoading(true);
     try {
-      const oauthParams = {
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/complete-profile`,
         },
-      };
-      console.log('🔵 [DEBUG] OAuth params:', oauthParams);
-
-      const { error, data } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/complete-profile`,
-        },
-      });
-
-      console.log('🔵 [DEBUG] OAuth response:', { 
-        hasError: !!error, 
-        errorMessage: error?.message,
-        hasData: !!data, 
-        url: data?.url 
       });
 
       if (error) {
         throw error;
       }
     } catch (error: any) {
-      console.error('❌ [DEBUG] OAuth error caught:', {
-        message: error.message,
-        status: error.status,
-        name: error.name,
-        code: error.code,
-        fullError: error
-      });
+      console.error('OAuth error:', error);
       
       setLoading(false);
       toast({
