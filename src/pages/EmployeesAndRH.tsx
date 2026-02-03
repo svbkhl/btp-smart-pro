@@ -211,15 +211,6 @@ const EmployeesAndRH = () => {
         {/* Calendrier Google Calendar */}
         <div className="mb-6">
           <CalendarWidget />
-          
-          {/* Lien vers Mon Planning */}
-          <Link to="/my-planning" className="block mt-4">
-            <Button variant="outline" className="w-full gap-2 rounded-xl">
-              <Calendar className="w-4 h-4" />
-              Mon planning complet
-              <ArrowRight className="w-4 h-4 ml-auto" />
-            </Button>
-          </Link>
         </div>
 
         {/* Contrats expirant bientôt */}
