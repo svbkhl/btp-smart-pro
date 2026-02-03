@@ -97,11 +97,11 @@ export const useCompanies = () => {
       return (companies || []) as Company[];
     },
     enabled: !!user,
-    staleTime: 5 * 1000, // 5 secondes - Permet de voir les changements rapidement
+    staleTime: 2 * 60 * 1000, // 2 minutes - Cache modéré pour afficher les modifications rapidement
     gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnMount: true, // Actualiser au montage
-    refetchOnWindowFocus: true, // Actualiser au focus
-    refetchOnReconnect: true, // Actualiser à la reconnexion
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 };
 
@@ -212,12 +212,10 @@ export const useUpdateCompany = () => {
       return data as Company;
     },
     onSuccess: () => {
-      // Invalider tous les caches liés aux companies
+      // Invalider TOUS les caches liés aux entreprises pour affichage immédiat
       queryClient.invalidateQueries({ queryKey: ["company"] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       queryClient.invalidateQueries({ queryKey: ["all_companies"] });
-      // Forcer un refetch immédiat
-      queryClient.refetchQueries({ queryKey: ["companies"] });
     },
   });
 };
@@ -291,6 +289,9 @@ export const useCreateCompany = () => {
       return data as Company;
     },
     onSuccess: () => {
+      // Invalider TOUS les caches liés aux entreprises
+      queryClient.invalidateQueries({ queryKey: ["company"] });
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
       queryClient.invalidateQueries({ queryKey: ["all_companies"] });
     },
   });
@@ -330,7 +331,9 @@ export const useDeleteCompany = () => {
       return companyId;
     },
     onSuccess: () => {
+      // Invalider TOUS les caches liés aux entreprises
       queryClient.invalidateQueries({ queryKey: ["company"] });
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
       queryClient.invalidateQueries({ queryKey: ["all_companies"] });
     },
   });
