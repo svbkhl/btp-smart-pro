@@ -383,14 +383,12 @@ export default function Sidebar() {
     });
   }, [location.pathname]);
 
-  // Attendre que TOUTES les données soient chargées avant d'afficher la sidebar
-  // pour éviter de montrer seulement 4 items puis le reste après
-  const totalItems = menuGroups.reduce((sum, g) => sum + g.items.length, 0);
-  const isDataReady = !authLoading && !permissionsLoading && (company !== null || isOwner) && totalItems > 4;
+  // Afficher rapidement avec skeleton pendant chargement initial
+  const isDataReady = !authLoading && !permissionsLoading;
   
   if (!isDataReady) {
-    // Ne rien afficher pendant le chargement (pas de skeleton, pas de bout de sidebar)
-    return null;
+    // Afficher un skeleton élégant pendant le chargement
+    return <SidebarSkeleton isOpen={isOpen} />;
   }
 
   return (

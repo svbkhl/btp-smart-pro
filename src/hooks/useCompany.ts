@@ -97,11 +97,11 @@ export const useCompanies = () => {
       return (companies || []) as Company[];
     },
     enabled: !!user,
-    staleTime: 30 * 60 * 1000, // 30 minutes - Cache très agressif pour performance
-    gcTime: 60 * 60 * 1000, // 60 minutes
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 5 * 1000, // 5 secondes - Permet de voir les changements rapidement
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: true, // Actualiser au montage
+    refetchOnWindowFocus: true, // Actualiser au focus
+    refetchOnReconnect: true, // Actualiser à la reconnexion
   });
 };
 
@@ -212,8 +212,12 @@ export const useUpdateCompany = () => {
       return data as Company;
     },
     onSuccess: () => {
+      // Invalider tous les caches liés aux companies
       queryClient.invalidateQueries({ queryKey: ["company"] });
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
       queryClient.invalidateQueries({ queryKey: ["all_companies"] });
+      // Forcer un refetch immédiat
+      queryClient.refetchQueries({ queryKey: ["companies"] });
     },
   });
 };
