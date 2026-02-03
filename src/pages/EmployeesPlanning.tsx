@@ -179,24 +179,33 @@ const EmployeesPlanning = () => {
       }
 
       // Mode production : charger depuis Supabase
-      // Récupérer les employés depuis company_users
-      const { data: companyUsersData, error: employeesError } = await supabase
-        .rpc('get_company_users_with_profile', {
-          p_company_id: currentCompanyId
-        });
+      // Récupérer les employés directement depuis la table employees
+      console.log("🔵 [EmployeesPlanning] Récupération des employés pour company_id:", currentCompanyId);
+      
+      const { data: employeesData, error: employeesError } = await supabase
+        .from("employees")
+        .select("id, user_id, nom, prenom, poste, specialites, email, company_id")
+        .eq("company_id", currentCompanyId)
+        .order("created_at", { ascending: false });
 
-      if (employeesError) throw employeesError;
+      console.log("🔵 [EmployeesPlanning] Résultat employees:", { employeesData, employeesError });
+
+      if (employeesError) {
+        console.error("❌ [EmployeesPlanning] Erreur récupération employees:", employeesError);
+        throw employeesError;
+      }
       
       // Mapper les données pour correspondre à l'interface Employee
-      const employeesData = (companyUsersData || []).map((cu: any) => ({
-        id: cu.user_id,
-        nom: cu.raw_user_meta_data?.last_name || cu.email,
-        prenom: cu.raw_user_meta_data?.first_name || '',
-        poste: cu.role_name,
-        specialites: []
+      const mappedEmployees = (employeesData || []).map((emp: any) => ({
+        id: emp.id,
+        nom: emp.nom || emp.email,
+        prenom: emp.prenom || '',
+        poste: emp.poste || 'Employé',
+        specialites: emp.specialites || []
       }));
       
-      setEmployees(employeesData);
+      console.log("🔵 [EmployeesPlanning] Employés mappés:", mappedEmployees);
+      setEmployees(mappedEmployees);
 
       // Récupérer les projets
       const { data: projectsData, error: projectsError } = await supabase
