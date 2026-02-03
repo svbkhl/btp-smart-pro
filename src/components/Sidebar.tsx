@@ -465,9 +465,10 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -320 }}
+        initial={{ x: -320, opacity: 0 }}
         animate={{
-          x: isOpen ? 0 : -320
+          x: isOpen ? 0 : -320,
+          opacity: isOpen ? 1 : 0
         }}
         onMouseEnter={() => {
           // Ignorer les hover events pendant la navigation
@@ -485,9 +486,10 @@ export default function Sidebar() {
           }
         }}
         transition={{ 
-          type: "tween",
-          duration: 0.3,
-          ease: [0.4, 0, 0.2, 1]
+          type: "spring",
+          stiffness: 400,
+          damping: 40,
+          mass: 0.8
         }}
         className={cn(
           "flex flex-col z-40",
@@ -510,7 +512,7 @@ export default function Sidebar() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
           className="p-6 border-b border-white/20 dark:border-gray-700/30"
         >
           {(user || !fakeDataEnabled) ? (
@@ -638,13 +640,18 @@ export default function Sidebar() {
                       <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 + globalIndex * 0.03 }}
-                        whileHover={{ 
-                          scale: 1.05, 
-                          x: 8,
-                          transition: { duration: 0.2, ease: "easeOut" }
+                        transition={{ 
+                          delay: 0.05 + globalIndex * 0.02,
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25
                         }}
-                        whileTap={{ scale: 0.95 }}
+                        whileHover={{ 
+                          scale: 1.02, 
+                          x: 4,
+                          transition: { type: "spring", stiffness: 400, damping: 20 }
+                        }}
+                        whileTap={{ scale: 0.98 }}
                       >
                         {hasSubItems ? (
                           <div>
@@ -797,13 +804,18 @@ export default function Sidebar() {
                 key={item.path}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                whileHover={{ 
-                  scale: 1.05, 
-                  x: 8,
-                  transition: { duration: 0.2, ease: "easeOut" }
+                transition={{ 
+                  delay: 0.1,
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25
                 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ 
+                  scale: 1.02, 
+                  x: 4,
+                  transition: { type: "spring", stiffness: 400, damping: 20 }
+                }}
+                whileTap={{ scale: 0.98 }}
               >
                 {(user || !fakeDataEnabled) ? (
                   <Link
@@ -873,7 +885,7 @@ export default function Sidebar() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.5 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25, delay: 0.1 }}
           className="p-4 border-t border-white/20 dark:border-gray-700/30 space-y-3"
         >
 
