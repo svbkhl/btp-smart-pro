@@ -349,7 +349,8 @@ export default function Sidebar() {
     }, 500);
     
     return () => clearTimeout(navigationTimeout);
-  }, [location.pathname, isMobile, isPinned, setIsVisible, setGlobalIsHovered]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, isMobile, isPinned]);
 
   // ✅ useEffect supprimé - l'initialisation se fait dans SidebarContext
   // Cet useEffect causait un conflit avec celui qui ferme la sidebar au changement de route
