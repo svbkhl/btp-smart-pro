@@ -190,19 +190,31 @@ export const CompanySettings = () => {
 
     setSaving(true);
     try {
+      console.log('🔵 [CompanySettings] Saving company name:', formData.company_name);
       await updateSettings.mutateAsync(formData);
       // Garder companies.name en sync avec le nom affiché (sidebar + paramètres)
       if (companyId && formData.company_name?.trim()) {
-        await supabase
+        console.log('🔵 [CompanySettings] Updating companies table with name:', formData.company_name.trim());
+        const { data: updateResult, error: updateError } = await supabase
           .from("companies")
           .update({ name: formData.company_name.trim(), updated_at: new Date().toISOString() })
-          .eq("id", companyId);
+          .eq("id", companyId)
+          .select();
+        
+        if (updateError) {
+          console.error('❌ [CompanySettings] Error updating companies:', updateError);
+        } else {
+          console.log('✅ [CompanySettings] Companies updated successfully:', updateResult);
+        }
         
         // Invalider ET refetch immédiatement pour mise à jour instantanée dans la sidebar
         // IMPORTANT: Utiliser la même queryKey que useCompanies() avec user?.id
+        console.log('🔵 [CompanySettings] Invalidating queries with keys:', ["companies", user?.id], ["company", companyId]);
         await queryClient.invalidateQueries({ queryKey: ["companies", user?.id] });
         await queryClient.invalidateQueries({ queryKey: ["company", companyId] });
+        console.log('🔵 [CompanySettings] Refetching companies...');
         await queryClient.refetchQueries({ queryKey: ["companies", user?.id] });
+        console.log('✅ [CompanySettings] Cache invalidated and refetched!');
       }
       toast({
         title: "Paramètres sauvegardés",

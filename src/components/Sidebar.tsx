@@ -276,6 +276,15 @@ export default function Sidebar() {
     currentCompany?.name?.trim() ||
     settings?.company_name?.trim() ||
     "BTP Smart Pro";
+  
+  // Debug: Log pour voir quelle valeur est utilisée
+  console.log('🔵 [Sidebar] Company name resolution:', {
+    currentCompanyName: currentCompany?.name,
+    settingsCompanyName: settings?.company_name,
+    finalCompanyName: companyName,
+    companyId,
+    companiesCount: companies?.length
+  });
   const companyLogoUrl =
     settings?.company_logo_url?.trim() || currentCompany?.settings?.logo_url?.trim() || undefined;
 
