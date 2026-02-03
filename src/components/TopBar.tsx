@@ -41,8 +41,12 @@ export const TopBar = () => {
     }
   };
 
-  const userInitials = user?.user_metadata?.prenom?.[0] && user?.user_metadata?.nom?.[0]
-    ? `${user.user_metadata.prenom[0]}${user.user_metadata.nom[0]}`
+  // Utiliser first_name/last_name (format standard) avec fallback sur prenom/nom (ancien format)
+  const firstName = user?.user_metadata?.first_name || user?.user_metadata?.prenom;
+  const lastName = user?.user_metadata?.last_name || user?.user_metadata?.nom;
+  
+  const userInitials = firstName?.[0] && lastName?.[0]
+    ? `${firstName[0]}${lastName[0]}`
     : user?.email?.[0]?.toUpperCase() || "U";
 
   return (
@@ -116,8 +120,8 @@ export const TopBar = () => {
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium">
-                      {user?.user_metadata?.prenom && user?.user_metadata?.nom
-                        ? `${user.user_metadata.prenom} ${user.user_metadata.nom}`
+                      {firstName && lastName
+                        ? `${firstName} ${lastName}`
                         : user?.email}
                     </p>
                     <p className="text-xs text-muted-foreground">

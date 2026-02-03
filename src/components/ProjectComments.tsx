@@ -67,14 +67,18 @@ export const ProjectComments = ({ projectId }: ProjectCommentsProps) => {
     try {
       // En production, on sauvegarderait dans Supabase
       // Pour l'instant, on ajoute juste localement
+      // Utiliser first_name/last_name (format standard) avec fallback sur prenom/nom (ancien format)
+      const firstName = user.user_metadata?.first_name || user.user_metadata?.prenom;
+      const lastName = user.user_metadata?.last_name || user.user_metadata?.nom;
+      
       const comment: Comment = {
         id: `comment-${Date.now()}`,
         project_id: projectId,
         user_id: user.id,
         content: newComment.trim(),
         created_at: new Date().toISOString(),
-        author_name: user.user_metadata?.prenom && user.user_metadata?.nom
-          ? `${user.user_metadata.prenom} ${user.user_metadata.nom}`
+        author_name: firstName && lastName
+          ? `${firstName} ${lastName}`
           : user.email?.split("@")[0] || "Utilisateur",
         author_email: user.email || "",
       };
