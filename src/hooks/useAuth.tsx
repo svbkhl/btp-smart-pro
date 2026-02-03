@@ -118,10 +118,19 @@ export const useAuth = (): UseAuthReturn => {
     try {
       // Vérifier dans les métadonnées de l'utilisateur (fallback)
       const metadata = currentUser.user_metadata || {};
+      const rawMetadata = currentUser.raw_user_meta_data || {};
       const statut = metadata.statut as string | undefined;
       const role = metadata.role as string | undefined;
       
-      // Vérifier dans la table user_roles
+      // PRIORITÉ 1 : Vérifier si c'est un admin système
+      if (rawMetadata.is_system_admin === true || rawMetadata.is_system_admin === 'true') {
+        setUserRole('admin');
+        setIsAdmin(true);
+        setIsEmployee(false);
+        return;
+      }
+      
+      // PRIORITÉ 2 : Vérifier dans la table user_roles
       try {
         const { data, error } = await supabase
           .from('user_roles')
@@ -225,6 +234,16 @@ export const useAuth = (): UseAuthReturn => {
   // Fonction pour récupérer le company_id actuel
   const fetchCurrentCompanyId = async (userId: string) => {
     try {
+      // Vérifier si l'utilisateur est admin système
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser?.raw_user_meta_data?.is_system_admin === true || 
+          currentUser?.raw_user_meta_data?.is_system_admin === 'true') {
+        // Admin système n'a pas besoin de company_id
+        setCurrentCompanyId(null);
+        localStorage.removeItem('currentCompanyId');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('company_users')
         .select('company_id')
