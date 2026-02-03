@@ -253,26 +253,9 @@ export default function Sidebar() {
     [can]
   );
   
-  // Geler les menuGroups après le premier calcul avec données complètes
-  // pour éviter que les items disparaissent/réapparaissent
-  const frozenMenuGroupsRef = useRef<typeof menuGroups | null>(null);
-  
+  // Calcul normal des menuGroups - pas de gel pour éviter de perdre des items
   const menuGroups = useMemo(
-    () => {
-      // Si déjà gelé, retourner toujours le même résultat
-      if (frozenMenuGroupsRef.current) {
-        return frozenMenuGroupsRef.current;
-      }
-      
-      const result = getMenuGroups(company, isEmployee, canFunc, isOwner);
-      
-      // Geler si les données sont complètes (company existe OU c'est un admin/owner sans company)
-      if (company || isOwner) {
-        frozenMenuGroupsRef.current = result;
-      }
-      
-      return result;
-    },
+    () => getMenuGroups(company, isEmployee, canFunc, isOwner),
     [company, isEmployee, canFunc, isOwner]
   );
   
