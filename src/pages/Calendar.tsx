@@ -3,6 +3,8 @@ import { PageLayout } from "@/components/layout/PageLayout";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import MyPlanning from "@/pages/MyPlanning";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,6 +14,7 @@ import {
   MapPin,
   Tag,
   Loader2,
+  User,
 } from "lucide-react";
 import { useEvents, Event, useDeleteEvent } from "@/hooks/useEvents";
 import { EventForm } from "@/components/EventForm";
@@ -342,19 +345,37 @@ const Calendar = () => {
               Gérez vos événements et rendez-vous
             </p>
           </div>
-          <Button 
-            onClick={() => {
-              console.log("🔵 [Calendar] Click bouton Nouvel événement");
-              setSelectedEvent(null);
-              setIsEventFormOpen(true);
-              console.log("🔵 [Calendar] isEventFormOpen défini à true");
-            }} 
-            className="rounded-xl shadow-lg hover:shadow-xl transition-all"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nouvel événement
-          </Button>
         </motion.div>
+
+        {/* Tabs - Événements / Mon planning */}
+        <Tabs defaultValue="events" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="events" className="gap-2">
+              <CalendarIcon className="w-4 h-4" />
+              Événements
+            </TabsTrigger>
+            <TabsTrigger value="planning" className="gap-2">
+              <User className="w-4 h-4" />
+              Mon planning
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="events" className="space-y-4 mt-6">
+            {/* Bouton Nouvel événement */}
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => {
+                  console.log("🔵 [Calendar] Click bouton Nouvel événement");
+                  setSelectedEvent(null);
+                  setIsEventFormOpen(true);
+                  console.log("🔵 [Calendar] isEventFormOpen défini à true");
+                }} 
+                className="rounded-xl shadow-lg hover:shadow-xl transition-all"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nouvel événement
+              </Button>
+            </div>
 
         {/* Controls */}
         <GlassCard delay={0.2} className="p-6">
@@ -679,6 +700,12 @@ const Calendar = () => {
             )}
           </GlassCard>
         </div>
+          </TabsContent>
+
+          <TabsContent value="planning" className="mt-6">
+            <MyPlanning embedded />
+          </TabsContent>
+        </Tabs>
       </div>
     </PageLayout>
   );

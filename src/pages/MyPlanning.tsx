@@ -43,7 +43,12 @@ interface Assignment {
 
 const joursSemaine = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
 
-const MyPlanning = () => {
+interface MyPlanningProps {
+  /** Quand true, le composant est affiché sans PageLayout (ex: dans Calendar) */
+  embedded?: boolean;
+}
+
+const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
   const { user, currentCompanyId, isAdmin } = useAuth();
   const { toast } = useToast();
   const { fakeDataEnabled } = useFakeDataStore();
@@ -772,21 +777,20 @@ const MyPlanning = () => {
   };
 
   if (loading) {
-    return (
-      <PageLayout>
-        <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <Clock className="h-12 w-12 mx-auto mb-4 animate-pulse text-primary" />
-            <p className="text-muted-foreground">Chargement...</p>
-          </div>
+    const content = (
+      <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Clock className="h-12 w-12 mx-auto mb-4 animate-pulse text-primary" />
+          <p className="text-muted-foreground">Chargement...</p>
         </div>
-      </PageLayout>
+      </div>
     );
+    
+    return embedded ? content : <PageLayout>{content}</PageLayout>;
   }
 
-  return (
-    <PageLayout>
-      <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+  const content = (
+    <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
         {/* En-tête */}
         <div className="space-y-2">
           <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
@@ -1255,11 +1259,12 @@ const MyPlanning = () => {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
-        </div>
-      </PageLayout>
+        </Dialog>
+      </div>
     );
-  };
+    
+  return embedded ? content : <PageLayout>{content}</PageLayout>;
+};
 
 export default MyPlanning;
 
