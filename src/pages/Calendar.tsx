@@ -518,38 +518,6 @@ const Calendar = () => {
             </div>
           </GlassCard>
         )}
-
-        <EventForm
-          open={isEventFormOpen}
-          onOpenChange={(open) => {
-            console.log("🔵 [Calendar] EventForm onOpenChange:", open);
-            console.log("🔵 [Calendar] selectedEvent:", selectedEvent);
-            console.log("🔵 [Calendar] selectedEvent?.title:", selectedEvent?.title);
-            setIsEventFormOpen(open);
-            // Réinitialiser selectedEvent quand on ferme le formulaire
-            if (!open) {
-              setSelectedEvent(null);
-            }
-          }}
-          event={selectedEvent || undefined}
-          defaultDate={currentDate}
-        />
-
-        <AlertDialog open={!!eventToDelete} onOpenChange={(open) => !open && setEventToDelete(null)}>
-          <AlertDialogContent className="rounded-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer l'événement</AlertDialogTitle>
-              <AlertDialogDescription>
-                Êtes-vous sûr de vouloir supprimer l'événement "{eventToDelete?.title}" ? Cette action est irréversible.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="rounded-xl">Annuler</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteEvent} className="rounded-xl">Supprimer</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
           </TabsContent>
 
           <TabsContent value="planning" className="mt-6">
@@ -597,7 +565,7 @@ const Calendar = () => {
               </div>
 
               {/* Vue Agenda avec heures (7h - 20h uniquement) */}
-              <div className="max-h-[600px] overflow-y-auto space-y-0 border rounded-lg">
+              <div className="max-h-[400px] overflow-y-auto space-y-0 border rounded-lg">
                 {Array.from({ length: 14 }, (_, index) => {
                   const hour = index + 7; // Commencer à 7h
                   
@@ -711,6 +679,39 @@ const Calendar = () => {
             </GlassCard>
           </TabsContent>
         </Tabs>
+
+        {/* EventForm - En dehors des onglets pour être accessible partout */}
+        <EventForm
+          open={isEventFormOpen}
+          onOpenChange={(open) => {
+            console.log("🔵 [Calendar] EventForm onOpenChange:", open);
+            console.log("🔵 [Calendar] selectedEvent:", selectedEvent);
+            console.log("🔵 [Calendar] selectedEvent?.title:", selectedEvent?.title);
+            setIsEventFormOpen(open);
+            // Réinitialiser selectedEvent quand on ferme le formulaire
+            if (!open) {
+              setSelectedEvent(null);
+            }
+          }}
+          event={selectedEvent || undefined}
+          defaultDate={currentDate}
+        />
+
+        {/* AlertDialog - En dehors des onglets pour être accessible partout */}
+        <AlertDialog open={!!eventToDelete} onOpenChange={(open) => !open && setEventToDelete(null)}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer l'événement</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer l'événement "{eventToDelete?.title}" ? Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteEvent} className="rounded-xl">Supprimer</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </PageLayout>
   );
