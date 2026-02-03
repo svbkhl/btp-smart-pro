@@ -17,7 +17,11 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
     const saved = safeLocalStorage.getItem("sidebar-pinned");
     return saved ? saved === "true" : true;
   });
-  const [isVisible, setIsVisible] = useState(true);
+  // Initialiser isVisible avec la même valeur que isPinned pour éviter les flashs
+  const [isVisible, setIsVisible] = useState(() => {
+    const saved = safeLocalStorage.getItem("sidebar-pinned");
+    return saved ? saved === "true" : true;
+  });
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {

@@ -435,13 +435,10 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <motion.aside
-        initial={isMobile ? { x: -320 } : { x: -320 }}
-        animate={isMobile 
-          ? { x: isVisible ? 0 : -320 }
-          : {
-              x: isPinned || isHovered ? 0 : -320,
-            }
-        }
+        initial={{ x: -320 }}
+        animate={{
+          x: isOpen ? 0 : -320
+        }}
         onMouseEnter={() => {
           if (!isMobile && !isPinned) {
             setIsHovered(true);
@@ -457,10 +454,9 @@ export default function Sidebar() {
           }
         }}
         transition={{ 
-          type: "spring", 
-          stiffness: 1000, 
-          damping: 30, 
-          mass: 0.2,
+          type: "tween",
+          duration: 0.3,
+          ease: [0.4, 0, 0.2, 1]
         }}
         className={cn(
           "flex flex-col z-40",
@@ -471,7 +467,7 @@ export default function Sidebar() {
           "hover:shadow-[0_25px_70px_-20px_rgba(59,130,246,0.4)] dark:hover:shadow-[0_25px_70px_-20px_rgba(139,92,246,0.4)]",
           "rounded-2xl",
           isMobile 
-            ? "fixed w-80 h-screen" 
+            ? "fixed w-80 h-screen left-0 top-0" 
             : "fixed w-72 h-[calc(100vh-2rem)] top-4 left-4 bottom-4"
         )}
         style={{ 
