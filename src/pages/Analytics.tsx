@@ -5,7 +5,6 @@
  */
 
 import { AdvancedAnalytics } from "@/components/analytics/AdvancedAnalytics";
-import { AIInsightsDashboard } from "@/components/ai/AIInsightsDashboard";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -27,9 +26,6 @@ export default function Analytics() {
         </Button>
         <div className="container mx-auto px-4 py-8">
           <AdvancedAnalytics />
-        </div>
-        <div className="border-t pt-8">
-          <AIInsightsDashboard />
         </div>
       </div>
     </PageLayout>

@@ -41,7 +41,8 @@ export const useTomorrowAssignments = () => {
         .maybeSingle();
 
       if (employeeError || !employee) {
-        console.warn("⚠️ [useTomorrowAssignments] Pas d'employé trouvé pour cet utilisateur");
+        // Pas d'employé trouvé : l'utilisateur est probablement admin/owner (pas un employé)
+        // Retourner un tableau vide sans warning (comportement normal)
         return [];
       }
 

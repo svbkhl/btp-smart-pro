@@ -207,26 +207,25 @@ const Settings = () => {
   return (
     <PageLayout>
       <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
-              <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-              Paramètres
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Gérez vos préférences, votre compte et les configurations de l'application
-            </p>
+        <div className="space-y-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+            <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
+            Paramètres
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Gérez vos préférences, votre compte et les configurations de l'application
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setLegalDialogOpen(true)}
+            >
+              <FileText className="w-4 h-4" />
+              RGPD, Mentions légales, CGU
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-xs sm:text-sm text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap"
-            onClick={() => setLegalDialogOpen(true)}
-          >
-            <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-            <span className="hidden sm:inline">RGPD, Mentions légales, CGU</span>
-            <span className="sm:hidden">RGPD</span>
-          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

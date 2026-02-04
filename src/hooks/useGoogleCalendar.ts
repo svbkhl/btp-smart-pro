@@ -24,6 +24,7 @@ export interface GoogleCalendarConnection {
   google_email: string;
   calendar_id: string;
   calendar_name: string;
+  calendar_type: "planning" | "agenda" | "events";
   sync_direction: "app_to_google" | "bidirectional" | "google_to_app";
   sync_planning_enabled: boolean;
   enabled: boolean;
@@ -38,7 +39,8 @@ export interface GoogleCalendarConnection {
 // ============================================================================
 
 /**
- * Récupère la connexion Google Calendar active de l'entreprise
+ * Récupère la connexion Google Calendar active de l'entreprise (legacy - planning uniquement)
+ * @deprecated Utilisez useGoogleCalendarConnections pour gérer les 3 calendriers
  */
 export const useGoogleCalendarConnection = () => {
   const { currentCompanyId } = useAuth();
@@ -54,6 +56,7 @@ export const useGoogleCalendarConnection = () => {
         .from("google_calendar_connections")
         .select("*")
         .eq("company_id", currentCompanyId)
+        .eq("calendar_type", "planning") // Legacy: retourne uniquement le calendrier Planning
         // Ne pas filtrer par enabled=true pour voir toutes les connexions
         // Le composant affichera le statut même si enabled=false
         .maybeSingle();
@@ -71,11 +74,74 @@ export const useGoogleCalendarConnection = () => {
 };
 
 /**
+ * Récupère TOUTES les connexions Google Calendar de l'entreprise (Planning, Agenda, Événements)
+ */
+export const useGoogleCalendarConnections = () => {
+  const { currentCompanyId } = useAuth();
+
+  return useQuery({
+    queryKey: ["google_calendar_connections_all", currentCompanyId],
+    queryFn: async () => {
+      if (!currentCompanyId) {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from("google_calendar_connections")
+        .select("*")
+        .eq("company_id", currentCompanyId)
+        .order("calendar_type");
+
+      if (error) {
+        console.error("❌ [useGoogleCalendarConnections] Erreur:", error);
+        throw error;
+      }
+
+      return (data || []) as GoogleCalendarConnection[];
+    },
+    enabled: !!currentCompanyId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+/**
+ * Récupère une connexion Google Calendar par type
+ */
+export const useGoogleCalendarConnectionByType = (calendarType: "planning" | "agenda" | "events") => {
+  const { currentCompanyId } = useAuth();
+
+  return useQuery({
+    queryKey: ["google_calendar_connection", currentCompanyId, calendarType],
+    queryFn: async () => {
+      if (!currentCompanyId) {
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from("google_calendar_connections")
+        .select("*")
+        .eq("company_id", currentCompanyId)
+        .eq("calendar_type", calendarType)
+        .maybeSingle();
+
+      if (error) {
+        console.error(`❌ [useGoogleCalendarConnectionByType(${calendarType})] Erreur:`, error);
+        throw error;
+      }
+
+      return data as GoogleCalendarConnection | null;
+    },
+    enabled: !!currentCompanyId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+/**
  * Obtient l'URL d'authentification Google avec PKCE
  * Génère code_verifier et code_challenge côté frontend (RFC 7636)
  * Stocke code_verifier dans sessionStorage pour l'échange
  */
-export const useGetGoogleAuthUrl = () => {
+export const useGetGoogleAuthUrl = (calendarType: "planning" | "agenda" | "events" = "planning") => {
   const { currentCompanyId } = useAuth();
 
   return useMutation({
@@ -88,21 +154,23 @@ export const useGetGoogleAuthUrl = () => {
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-      // 2. Stocker code_verifier dans sessionStorage pour l'échange
-      storeCodeVerifier(codeVerifier);
+      // 2. Stocker code_verifier dans sessionStorage pour l'échange (avec le type de calendrier)
+      storeCodeVerifier(codeVerifier, calendarType);
 
       if (process.env.NODE_ENV === 'development') {
         console.log("🔐 [useGetGoogleAuthUrl] PKCE généré:");
+        console.log("  - calendar_type:", calendarType);
         console.log("  - code_verifier:", codeVerifier.substring(0, 20) + "...");
         console.log("  - code_challenge:", codeChallenge.substring(0, 20) + "...");
       }
 
-      // 3. Appeler l'Edge Function avec code_challenge
+      // 3. Appeler l'Edge Function avec code_challenge et calendar_type
       const { data, error } = await supabase.functions.invoke("google-calendar-oauth-entreprise-pkce", {
         body: {
           action: "get_auth_url",
           code_challenge: codeChallenge,
           company_id: currentCompanyId,
+          calendar_type: calendarType,
         },
       });
 

@@ -13,6 +13,7 @@ export interface GoogleCalendarConnection {
   google_email: string;
   calendar_id: string;
   calendar_name: string;
+  calendar_type?: "planning" | "agenda" | "events";
   sync_direction: "app_to_google" | "bidirectional" | "google_to_app";
   sync_planning_enabled: boolean;
   enabled: boolean;
@@ -28,25 +29,35 @@ export interface SyncEventParams {
   companyId: string;
 }
 
+export type GoogleCalendarType = "planning" | "agenda" | "events";
+
 /**
- * Récupère la connexion Google Calendar active de l'entreprise
+ * Récupère la connexion Google Calendar active de l'entreprise pour un type donné
+ * (planning → Planning, events → Événements). Compatible avec ou sans colonne calendar_type.
  */
 export async function getCompanyGoogleCalendarConnection(
-  companyId: string
+  companyId: string,
+  calendarType?: GoogleCalendarType
 ): Promise<GoogleCalendarConnection | null> {
-  const { data, error } = await supabase
+  const { data: list, error } = await supabase
     .from("google_calendar_connections")
     .select("*")
     .eq("company_id", companyId)
-    .eq("enabled", true)
-    .maybeSingle();
+    .eq("enabled", true);
 
   if (error) {
     console.error("❌ [getCompanyGoogleCalendarConnection] Erreur:", error);
     throw error;
   }
 
-  return data as GoogleCalendarConnection | null;
+  const rows = (list || []) as GoogleCalendarConnection[];
+  if (rows.length === 0) return null;
+
+  if (calendarType) {
+    const byType = rows.find((c) => c.calendar_type === calendarType);
+    if (byType) return byType;
+  }
+  return rows[0];
 }
 
 /**
@@ -55,8 +66,9 @@ export async function getCompanyGoogleCalendarConnection(
 export async function syncWithGoogleCalendar(params: SyncEventParams): Promise<void> {
   const { action, eventId, assignmentId, eventType, companyId } = params;
 
-  // Vérifier que la connexion existe
-  const connection = await getCompanyGoogleCalendarConnection(companyId);
+  // Récupérer la connexion du bon type de calendrier (planning ou events)
+  const calendarType: GoogleCalendarType = eventType === "planning" ? "planning" : "events";
+  const connection = await getCompanyGoogleCalendarConnection(companyId, calendarType);
   if (!connection) {
     console.warn("⚠️ [syncWithGoogleCalendar] Aucune connexion Google Calendar active");
     return;
@@ -97,7 +109,7 @@ export async function syncWithGoogleCalendar(params: SyncEventParams): Promise<v
  * Synchronise tous les plannings d'une entreprise vers Google Calendar
  */
 export async function syncAllPlanningsToGoogle(companyId: string): Promise<void> {
-  const connection = await getCompanyGoogleCalendarConnection(companyId);
+  const connection = await getCompanyGoogleCalendarConnection(companyId, "planning");
   if (!connection || !connection.sync_planning_enabled) {
     console.warn("⚠️ [syncAllPlanningsToGoogle] Connexion non disponible ou sync désactivée");
     return;

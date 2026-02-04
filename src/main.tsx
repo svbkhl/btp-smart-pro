@@ -5,6 +5,8 @@ import App from './App';
 import { ThemeProvider } from './components/ThemeProvider';
 import { DecorativeBackgroundProvider } from './contexts/DecorativeBackgroundContext';
 import { SidebarProvider } from './contexts/SidebarContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { OnboardingProvider } from './contexts/OnboardingContext';
 import { initEnv } from './lib/env';
 import './index.css';
 
@@ -25,15 +27,19 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider defaultTheme="system" storageKey="btp-smart-pro-theme">
       <DecorativeBackgroundProvider>
         <SidebarProvider>
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <App />
-        </BrowserRouter>
-      </SidebarProvider>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <AuthProvider>
+              <OnboardingProvider>
+                <App />
+              </OnboardingProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </SidebarProvider>
       </DecorativeBackgroundProvider>
     </ThemeProvider>
   </QueryClientProvider>

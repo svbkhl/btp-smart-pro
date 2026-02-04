@@ -30,6 +30,7 @@ export interface UserSettings {
   auto_signature?: boolean;
   auto_send_email?: boolean;
   app_base_url?: string;
+  onboarding_completed?: boolean;
   created_at: string;
   updated_at: string;
 }

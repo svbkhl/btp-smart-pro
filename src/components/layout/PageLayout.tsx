@@ -3,11 +3,12 @@ import { motion } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useDecorativeBackground } from "@/contexts/DecorativeBackgroundContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { cn } from "@/lib/utils";
-
 interface PageLayoutProps {
   children: ReactNode;
 }
@@ -16,7 +17,8 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
   const { isPinned, isVisible, isHovered } = useSidebar();
   const { enabled: decorativeBackgroundEnabled } = useDecorativeBackground();
   const isMobile = useIsMobile();
-  
+  const { showOnboarding, completeOnboarding, isReplay } = useOnboarding();
+
   // Calculer si la sidebar prend de l'espace
   const sidebarVisible = isMobile ? false : (isPinned || isVisible || isHovered);
   const sidebarWidth = 288; // w-72 = 288px
@@ -60,6 +62,14 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
           {children}
         </motion.div>
       </motion.main>
+
+      {/* Guide de première connexion (une seule fois) */}
+      {showOnboarding && (
+        <OnboardingTour
+          onComplete={() => completeOnboarding(isReplay)}
+          onSkip={() => completeOnboarding(isReplay)}
+        />
+      )}
     </div>
   );
 };

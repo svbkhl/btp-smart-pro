@@ -8,11 +8,12 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { GoogleCalendarMultipleConnections } from "@/components/GoogleCalendarMultipleConnections";
+import { Card, CardContent } from "@/components/ui/card";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
 import { useAuth } from "@/hooks/useAuth";
+import { getCalendarType } from "@/utils/pkce";
 
 export const GoogleCalendarIntegration = () => {
   const { currentCompanyId } = useAuth();
@@ -49,14 +50,22 @@ export const GoogleCalendarIntegration = () => {
     }
 
     if (status === "success" && code && currentCompanyId) {
+      // Récupérer le calendar_type depuis sessionStorage
+      const calendarType = getCalendarType() || "planning";
+      const calendarNames = {
+        planning: "Planning",
+        agenda: "Agenda",
+        events: "Événements"
+      };
+      
       // Échanger le code contre des tokens
       exchangeCode.mutate(
-        { code, state: state || "" },
+        { code, state: state || "", companyId: currentCompanyId },
         {
           onSuccess: () => {
             toast({
               title: "✅ Connexion réussie",
-              description: "Google Calendar a été connecté avec succès",
+              description: `Calendrier ${calendarNames[calendarType as keyof typeof calendarNames]} connecté avec succès`,
             });
             
             // Nettoyer l'URL
@@ -107,30 +116,15 @@ export const GoogleCalendarIntegration = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            <CardTitle>Intégration Google Calendar</CardTitle>
-          </div>
-          <CardDescription>
-            Connectez votre compte Google Calendar pour synchroniser automatiquement vos événements et plannings
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GoogleCalendarConnection />
-        </CardContent>
-      </Card>
-
+    <div className="space-y-6 p-6">
       {/* Afficher un message de succès si la connexion vient d'être établie */}
       {status === "success" && !code && !exchangeCode.isPending && (
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-green-700">
+            <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
               <CheckCircle2 className="h-5 w-5" />
               <p className="text-sm font-medium">
-                Google Calendar connecté avec succès
+                Calendrier Google connecté avec succès
               </p>
             </div>
           </CardContent>
@@ -139,9 +133,9 @@ export const GoogleCalendarIntegration = () => {
 
       {/* Afficher un message d'erreur si une erreur est survenue */}
       {status === "error" && !exchangeCode.isPending && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-700">
+            <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
               <XCircle className="h-5 w-5" />
               <p className="text-sm font-medium">
                 Erreur lors de la connexion Google Calendar
@@ -150,6 +144,9 @@ export const GoogleCalendarIntegration = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Composant principal avec les 3 calendriers */}
+      <GoogleCalendarMultipleConnections />
     </div>
   );
 };

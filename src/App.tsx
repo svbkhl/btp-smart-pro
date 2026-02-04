@@ -7,7 +7,7 @@ import { FloatingAIAssistant } from './components/ai/FloatingAIAssistant';
 import { DemoModeGuard } from './components/DemoModeGuard';
 import { CompanySelector } from './components/CompanySelector';
 import { TomorrowAssignmentsNotification } from './components/TomorrowAssignmentsNotification';
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from './contexts/AuthContext';
 
 // Pages publiques
 import Index from './pages/Index';

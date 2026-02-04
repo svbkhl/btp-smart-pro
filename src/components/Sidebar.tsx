@@ -45,7 +45,6 @@ import { isFeatureEnabled } from "@/utils/companyFeatures";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
-
 // Types pour les items de menu
 type MenuItem = {
   icon: React.ComponentType<{ className?: string }>;
@@ -207,9 +206,13 @@ export default function Sidebar() {
   // Ref pour ignorer les hover events pendant la navigation
   const isNavigatingRef = useRef(false);
   
+  const isMobile = useIsMobile();
+  const { isPinned, isVisible, hasBeenStable, setIsPinned, setIsVisible, setIsHovered: setGlobalIsHovered, setHasBeenStable } = useSidebar();
+  
   // Ref pour tracker la stabilité des menuGroups (éviter affichage progressif)
   const menuGroupsStableRef = useRef(false);
-  const [isMenuStable, setIsMenuStable] = useState(false);
+  // Si la sidebar a déjà été stable (ex. après un changement de page), l'afficher tout de suite pour ne rien faire disparaître
+  const [isMenuStable, setIsMenuStable] = useState(hasBeenStable);
   const hasInitializedRef = useRef(false);
 
   // Fonction pour gérer la navigation : rediriger vers formulaire d'essai si pas connecté en mode démo
@@ -228,8 +231,6 @@ export default function Sidebar() {
     // Sinon, navigation normale
     navigate(path);
   };
-  const isMobile = useIsMobile();
-  const { isPinned, isVisible, setIsPinned, setIsVisible, setIsHovered: setGlobalIsHovered } = useSidebar();
   const [isHovered, setIsHovered] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -325,32 +326,23 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, menuGroups.length]);
 
-  // Fermer la sidebar quand on change de route (sauf si épinglée)
+  // Fermer la sidebar quand on change de route (sauf si épinglée) — ne rien faire si épinglée pour garder la fluidité
   useEffect(() => {
-    // Marquer qu'on est en train de naviguer pour ignorer les hover events
     isNavigatingRef.current = true;
-    
-    // Nettoyer le timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-    
-    // Sur mobile, fermer immédiatement la sidebar au changement de route
     if (isMobile) {
       setIsVisible(false);
     } else if (!isPinned) {
-      // Sur desktop, fermer la sidebar si pas épinglée
       setIsHovered(false);
       setIsVisible(false);
       setGlobalIsHovered(false);
     }
-    
-    // Reset après 500ms pour permettre à nouveau les hover
     const navigationTimeout = setTimeout(() => {
       isNavigatingRef.current = false;
-    }, 500);
-    
+    }, 300);
     return () => clearTimeout(navigationTimeout);
   }, [location.pathname, isMobile, isPinned, setIsVisible, setGlobalIsHovered]);
 
@@ -389,6 +381,7 @@ export default function Sidebar() {
   }, [location.pathname]);
 
   // Attendre que menuGroups soit STABLE avant d'afficher (éviter affichage progressif)
+  // Une fois stable, persister dans le contexte pour que la sidebar ne disparaisse plus au changement de page
   useEffect(() => {
     const totalItems = menuGroups.reduce((sum, g) => sum + g.items.length, 0);
     
@@ -403,14 +396,14 @@ export default function Sidebar() {
       totalItems > 0;
     
     if (isStable && !menuGroupsStableRef.current) {
-      // Affichage IMMÉDIAT dès que les données sont prêtes
       menuGroupsStableRef.current = true;
       setIsMenuStable(true);
+      setHasBeenStable(true); // Ne plus jamais faire disparaître la sidebar au remontage (navigation)
     }
-  }, [authLoading, permissionsLoading, company, isOwner, menuGroups]);
+  }, [authLoading, permissionsLoading, company, isOwner, menuGroups, setHasBeenStable]);
   
+  // Afficher la sidebar dès qu'elle a déjà été stable (ex. après clic sur un autre lien) pour garder une navigation fluide
   if (!isMenuStable) {
-    // Ne rien afficher pendant le chargement (pas de skeleton, pas de bout de sidebar)
     return null;
   }
 
@@ -726,6 +719,7 @@ export default function Sidebar() {
                         ) : (user || !fakeDataEnabled) ? (
                           <Link
                             to={item.path}
+                            data-onboarding={item.path ? `menu-${item.path.replace("/", "")}` : undefined}
                             onClick={() => handleNavigation(item.path)}
                             className={cn(
                               "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
@@ -755,6 +749,7 @@ export default function Sidebar() {
                           </Link>
                         ) : (
                           <button
+                            data-onboarding={item.path ? `menu-${item.path.replace("/", "")}` : undefined}
                             onClick={(e) => handleNavigation(item.path, e)}
                             className={cn(
                               "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full text-left",
@@ -817,6 +812,7 @@ export default function Sidebar() {
                 {(user || !fakeDataEnabled) ? (
                   <Link
                     to={item.path}
+                    data-onboarding={item.path ? `menu-${item.path.replace("/", "")}` : undefined}
                     className={cn(
                       "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
                       "hover:shadow-lg hover:shadow-primary/20",

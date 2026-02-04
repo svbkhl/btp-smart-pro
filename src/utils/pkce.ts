@@ -36,10 +36,13 @@ function base64URLEncode(array: Uint8Array): string {
 }
 
 /**
- * Stocke le code verifier dans sessionStorage
+ * Stocke le code verifier dans sessionStorage (avec calendar_type optionnel)
  */
-export function storeCodeVerifier(verifier: string): void {
+export function storeCodeVerifier(verifier: string, calendarType?: string): void {
   safeSessionStorage.setItem("google_oauth_code_verifier", verifier);
+  if (calendarType) {
+    safeSessionStorage.setItem("google_oauth_calendar_type", calendarType);
+  }
 }
 
 /**
@@ -50,10 +53,18 @@ export function getCodeVerifier(): string | null {
 }
 
 /**
- * Supprime le code verifier de sessionStorage
+ * Récupère le calendar_type depuis sessionStorage
+ */
+export function getCalendarType(): string | null {
+  return safeSessionStorage.getItem("google_oauth_calendar_type");
+}
+
+/**
+ * Supprime le code verifier et calendar_type de sessionStorage
  */
 export function clearCodeVerifier(): void {
   safeSessionStorage.removeItem("google_oauth_code_verifier");
+  safeSessionStorage.removeItem("google_oauth_calendar_type");
 }
 
 

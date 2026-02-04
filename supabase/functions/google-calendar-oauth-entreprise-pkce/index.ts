@@ -186,6 +186,7 @@ serve(async (req) => {
     // ========================================================================
     if (action === "get_auth_url") {
       const codeChallenge = bodyParsed?.code_challenge as string | undefined;
+      const calendarType = (bodyParsed?.calendar_type as string) || "planning";
       
       if (!codeChallenge) {
         return new Response(
@@ -197,6 +198,7 @@ serve(async (req) => {
       }
 
       console.log("🔐 [get_auth_url] PKCE code_challenge reçu depuis le frontend");
+      console.log("📅 [get_auth_url] Calendar type:", calendarType);
 
       const scopes = [
         "https://www.googleapis.com/auth/calendar",
@@ -205,10 +207,11 @@ serve(async (req) => {
         "https://www.googleapis.com/auth/userinfo.profile",
       ].join(" ");
 
-      // Créer le state avec user_id et company_id (sans code_verifier pour sécurité)
+      // Créer le state avec user_id, company_id et calendar_type
       const state = btoa(JSON.stringify({ 
         user_id: user.id, 
         company_id: companyId,
+        calendar_type: calendarType,
         // Ne PAS inclure code_verifier dans le state - il doit rester côté client
       }));
       
@@ -225,6 +228,7 @@ serve(async (req) => {
 
       console.log("✅ [get_auth_url] URL OAuth générée avec PKCE");
       console.log("🔗 [get_auth_url] Redirect URI:", GOOGLE_REDIRECT_URI);
+      console.log("📅 [get_auth_url] Calendar type:", calendarType);
 
       return new Response(
         JSON.stringify({ 
@@ -589,9 +593,37 @@ serve(async (req) => {
 
       console.log("✅ [exchange_code] Entreprise trouvée:", company.name);
 
-      // Créer un calendrier Google dédié pour l'entreprise
-      const calendarName = `Planning – ${company.name}`;
+      // Récupérer le calendar_type depuis le state
+      let calendarType = "planning"; // Valeur par défaut
+      try {
+        const decodedState = JSON.parse(atob(state || ""));
+        calendarType = decodedState.calendar_type || "planning";
+      } catch (e) {
+        console.warn("⚠️ [exchange_code] Impossible de décoder calendar_type depuis state, utilisation de 'planning' par défaut");
+      }
+
+      // Définir le nom et description du calendrier selon le type
+      const calendarConfig = {
+        planning: {
+          name: `Planning – ${company.name}`,
+          description: `Planning et affectations des employés pour ${company.name}`,
+        },
+        agenda: {
+          name: `Agenda – ${company.name}`,
+          description: `Agenda et événements généraux de ${company.name}`,
+        },
+        events: {
+          name: `Événements – ${company.name}`,
+          description: `Réunions, deadlines et rappels pour ${company.name}`,
+        },
+      };
+
+      const config = calendarConfig[calendarType as keyof typeof calendarConfig] || calendarConfig.planning;
+      const calendarName = config.name;
+      const calendarDescription = config.description;
+
       console.log("🔄 [exchange_code] Création du calendrier Google:", calendarName);
+      console.log("📅 [exchange_code] Type de calendrier:", calendarType);
       
       const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/calendars", {
         method: "POST",
@@ -601,7 +633,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           summary: calendarName,
-          description: `Calendrier de planning pour ${company.name}`,
+          description: calendarDescription,
           timeZone: "Europe/Paris",
         }),
       });
@@ -642,12 +674,13 @@ serve(async (req) => {
         );
       }
 
-      // Enregistrer ou mettre à jour la connexion
-      console.log("🔄 [exchange_code] Vérification connexion existante...");
+      // Enregistrer ou mettre à jour la connexion (avec calendar_type)
+      console.log("🔄 [exchange_code] Vérification connexion existante pour ce type...");
       const { data: existingConnection, error: fetchError } = await supabaseClient
         .from("google_calendar_connections")
         .select("*")
         .eq("company_id", finalCompanyId)
+        .eq("calendar_type", calendarType)
         .maybeSingle();
 
       if (fetchError) {
@@ -658,15 +691,15 @@ serve(async (req) => {
         );
       }
 
-      console.log("📊 [exchange_code] Connexion existante:", existingConnection ? "Oui" : "Non");
+      console.log("📊 [exchange_code] Connexion existante pour type", calendarType, ":", existingConnection ? "Oui" : "Non");
 
       const connectionData = {
         company_id: finalCompanyId,
-        user_id: user.id, // Colonne NOT NULL dans la table
-        owner_user_id: user.id, // Colonne optionnelle pour référence
+        owner_user_id: user.id,
         google_email: userInfo.email,
         calendar_id: googleCalendar.id,
         calendar_name: calendarName,
+        calendar_type: calendarType,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token || null,
         expires_at: expiresAt.toISOString(),

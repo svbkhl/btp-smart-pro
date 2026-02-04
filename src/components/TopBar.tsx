@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Search, Menu, X } from "lucide-react";
+import { Menu, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Notifications } from "@/components/Notifications";
 import { GlobalSearchWrapper } from "@/components/GlobalSearchWrapper";
@@ -20,14 +21,19 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useOnboardingReplay } from "@/contexts/OnboardingContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/components/ui/use-toast";
 
 export const TopBar = () => {
   const { user } = useAuth();
+  const { isOwner } = usePermissions();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const { fakeDataEnabled } = useFakeDataStore();
   const { isVisible, setIsVisible } = useSidebar();
+  const { requestReplay } = useOnboardingReplay();
+  const { toast } = useToast();
   const isMobile = useIsMobile();
 
   const handleSignOut = async () => {
@@ -94,7 +100,7 @@ export const TopBar = () => {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0 min-w-0">
             {/* Theme Toggle */}
             <ThemeToggle />
 
@@ -130,6 +136,17 @@ export const TopBar = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {isOwner && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      requestReplay();
+                      toast({ title: "Guide affiché", description: "Le guide de bienvenue s'affiche." });
+                    }}
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Revoir le guide
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => navigate("/settings")}>
                   Paramètres
                 </DropdownMenuItem>

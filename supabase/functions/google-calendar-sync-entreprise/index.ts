@@ -86,17 +86,41 @@ serve(async (req) => {
       );
     }
 
-    // Récupérer la connexion Google Calendar de l'entreprise
-    const { data: connection, error: connError } = await supabaseClient
+    // Type de calendrier : planning → calendrier Planning, sinon événements → calendrier Événements
+    const calendarType = (event_type === "planning" || action === "sync_all_plannings") ? "planning" : "events";
+
+    // Récupérer les connexions Google Calendar de l'entreprise (compatible avec ou sans colonne calendar_type)
+    const { data: connections, error: connError } = await supabaseClient
       .from("google_calendar_connections")
       .select("*")
       .eq("company_id", company_id)
-      .eq("enabled", true)
-      .single();
+      .eq("enabled", true);
 
-    if (connError || !connection) {
+    if (connError) {
       return new Response(
-        JSON.stringify({ error: "No active Google Calendar connection found for this company" }),
+        JSON.stringify({ error: "Failed to fetch Google Calendar connection", details: connError }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const list = Array.isArray(connections) ? connections : [];
+    let connection = list.find((c: { calendar_type?: string }) => c.calendar_type === calendarType);
+    if (!connection && list.length === 1) {
+      connection = list[0]; // Une seule connexion (ancienne BDD sans calendar_type) = on l'utilise
+    }
+    if (!connection && list.length > 0 && calendarType === "planning") {
+      connection = list.find((c: { calendar_type?: string }) => c.calendar_type === "planning") || list[0];
+    }
+    if (!connection) {
+      connection = list[0]; // Fallback: première connexion
+    }
+
+    if (!connection) {
+      return new Response(
+        JSON.stringify({
+          error: "No active Google Calendar connection found for this company",
+          hint: "Connect Google Calendar in Settings → Google Calendar (Planning card).",
+        }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -153,6 +177,121 @@ serve(async (req) => {
 
     const calendarId = encodeURIComponent(connection.calendar_id);
     const baseUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`;
+
+    // ========================================================================
+    // ACTION: sync_all_plannings - Envoyer tous les plannings vers Google Calendar
+    // ========================================================================
+    if (action === "sync_all_plannings") {
+      const { data: assignments, error: listError } = await supabaseClient
+        .from("employee_assignments")
+        .select(`
+          id,
+          company_id,
+          date,
+          heure_debut,
+          heure_fin,
+          heures,
+          employee_id,
+          project_id,
+          google_event_id,
+          employees:employee_id (id, nom, prenom, poste),
+          projects:project_id (id, name, location)
+        `)
+        .eq("company_id", company_id);
+
+      if (listError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch assignments", details: listError }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const list = assignments || [];
+      let created = 0;
+      let updated = 0;
+      let errors = 0;
+
+      for (const a of list) {
+        const employee = a.employees;
+        const project = a.projects;
+        const dateStr = a.date;
+        const heureDebut = a.heure_debut || "08:00";
+        const heureFin = a.heure_fin || "17:00";
+        const googleEvent: GoogleEvent = {
+          summary: `${employee?.prenom || ""} ${employee?.nom || ""} – ${project?.name || employee?.poste || "Planning"}`,
+          description: `Planning employé\nPoste: ${employee?.poste || ""}\nChantier: ${project?.name || "Non assigné"}\nHeures: ${a.heures || 0}h`,
+          location: project?.location || undefined,
+          start: { dateTime: `${dateStr}T${heureDebut}:00`, timeZone: "Europe/Paris" },
+          end: { dateTime: `${dateStr}T${heureFin}:00`, timeZone: "Europe/Paris" },
+          extendedProperties: {
+            private: {
+              employee_id: a.employee_id,
+              company_id: company_id,
+              assignment_id: a.id,
+              event_type: "planning",
+            },
+          },
+        };
+
+        if (a.google_event_id) {
+          const putRes = await fetch(`${baseUrl}/${a.google_event_id}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(googleEvent),
+          });
+          if (putRes.ok) {
+            updated++;
+            await supabaseClient
+              .from("employee_assignments")
+              .update({ synced_with_google: true, google_sync_error: null })
+              .eq("id", a.id);
+          } else {
+            errors++;
+          }
+        } else {
+          const postRes = await fetch(baseUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(googleEvent),
+          });
+          if (postRes.ok) {
+            const createdEvent = await postRes.json();
+            await supabaseClient
+              .from("employee_assignments")
+              .update({
+                google_event_id: createdEvent.id,
+                synced_with_google: true,
+                google_sync_error: null,
+              })
+              .eq("id", a.id);
+            created++;
+          } else {
+            errors++;
+          }
+        }
+      }
+
+      await supabaseClient.rpc("update_google_calendar_sync_time", {
+        connection_uuid: connection.id,
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          created,
+          updated,
+          errors,
+          total: list.length,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ========================================================================
     // ACTION: create - Créer un événement dans Google Calendar
