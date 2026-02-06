@@ -55,7 +55,7 @@ export default function Start() {
     const body: { price_id?: string; invitation_id?: string; trial_period_days?: number } = {};
     if (invitationId) body.invitation_id = invitationId;
     if (selectedPlan) {
-      body.price_id = selectedPlan.price_id;
+      body.price_id = selectedPlan.price_id?.trim() || undefined;
       body.trial_period_days = selectedPlan.trial_days;
     } else if (DEFAULT_PRICE_ID) {
       body.price_id = DEFAULT_PRICE_ID;
@@ -63,24 +63,38 @@ export default function Start() {
     }
     if (!body.price_id && !body.invitation_id) {
       toast({
-        title: "Configuration manquante",
-        description: "Le plan d'abonnement n'est pas configuré. Contactez le support.",
+        title: "Paiement non configuré",
+        description:
+          "Configurez les variables d'environnement Stripe dans Vercel (VITE_STRIPE_PRICE_ID_ANNUEL et VITE_STRIPE_PRICE_ID_MENSUEL) puis redéployez pour activer le paiement.",
         variant: "destructive",
       });
       return;
     }
     setCreatingCheckout(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Session expirée",
+          description: "Veuillez vous reconnecter puis réessayer.",
+          variant: "destructive",
+        });
+        return;
+      }
       const { data, error } = await supabase.functions.invoke("stripe-billing-create-checkout", {
         body,
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (error) throw error;
+      if (error) {
+        const errMsg = (data as { error?: string })?.error || error.message || "Erreur serveur";
+        throw new Error(errMsg);
+      }
       const url = data?.url;
       if (url) {
         window.location.href = url;
         return;
       }
-      throw new Error("Aucune URL de paiement reçue");
+      throw new Error((data as { error?: string })?.error || "Aucune URL de paiement reçue");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Erreur lors de l'ouverture du paiement";
       toast({
