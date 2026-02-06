@@ -44,9 +44,20 @@ const AuthCallback = () => {
   };
 
   /**
-   * Redirige l'utilisateur après authentification réussie
+   * Redirige l'utilisateur après authentification réussie.
+   * Si l'utilisateur a accepté une invitation (déjà membre d'une entreprise), on envoie vers les offres Stripe.
    */
-  const handlePostAuthNavigation = (user: User) => {
+  const handlePostAuthNavigation = async (user: User) => {
+    const { data: companyMembership } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    if (companyMembership) {
+      navigate("/start", { replace: true });
+      return;
+    }
     if (requiresProfileCompletion(user)) {
       navigate("/complete-profile", { replace: true });
     } else {

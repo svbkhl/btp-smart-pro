@@ -157,9 +157,19 @@ export const InviteUserDialog = ({
 
         // Si la réponse n'est pas OK, extraire l'erreur
         if (!response.ok) {
-          const errorMessage = responseData?.message || responseData?.error || `Erreur ${response.status}: ${response.statusText}`;
+          const errorMessage = (responseData?.message || responseData?.error || response.statusText || '').toString();
           
-          // Gérer les erreurs spécifiques
+          // Déjà membre = info, pas une erreur bloquante
+          if (errorMessage.toLowerCase().includes('already a member') || errorMessage.toLowerCase().includes('déjà membre')) {
+            toast({
+              title: 'Déjà membre',
+              description: 'Cet utilisateur est déjà membre de cette entreprise. Aucune action nécessaire.',
+            });
+            setLoading(false);
+            return;
+          }
+
+          // Autres erreurs
           let userMessage = errorMessage;
           if (errorMessage.includes('Missing required field: company_id') || errorMessage.includes('company_id')) {
             userMessage = 'L\'ID de l\'entreprise est manquant. Veuillez réessayer.';
@@ -171,8 +181,6 @@ export const InviteUserDialog = ({
             userMessage = 'Entreprise non trouvée. Vérifiez que vous avez sélectionné une entreprise valide';
           } else if (errorMessage.includes('already pending')) {
             userMessage = 'Une invitation est déjà en attente pour cet email';
-          } else if (errorMessage.includes('already a member')) {
-            userMessage = 'Cet utilisateur est déjà membre de cette entreprise';
           } else if (errorMessage.includes('Unauthorized') || response.status === 401) {
             userMessage = 'Non autorisé. Veuillez vous reconnecter.';
           } else if (errorMessage.includes('Invalid JSON') || errorMessage.includes('parsing')) {

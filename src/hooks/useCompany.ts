@@ -167,6 +167,43 @@ export const useAllCompanies = () => {
   });
 };
 
+/** Membre d'entreprise retourné par admin_get_company_users (company_users + roles + employees) */
+export interface CompanyMemberForAdmin {
+  user_id: string;
+  company_id: string;
+  role_id: string | null;
+  role_slug: string | null;
+  role_name: string | null;
+  nom: string | null;
+  prenom: string | null;
+  email: string | null;
+  poste: string | null;
+  created_at: string;
+}
+
+/**
+ * Récupère tous les membres d'une entreprise (company_users), y compris les "déjà membres"
+ * sans fiche employé. Utilise la RPC admin_get_company_users (SECURITY DEFINER).
+ */
+export const useCompanyMembersForAdmin = (companyId: string | null) => {
+  const { user, isAdmin } = useAuth();
+
+  return useQuery<CompanyMemberForAdmin[], Error>({
+    queryKey: ["company-members-admin", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const { data, error } = await supabase.rpc("admin_get_company_users", {
+        target_company_id: companyId,
+      });
+      if (error) throw error;
+      return (data ?? []) as CompanyMemberForAdmin[];
+    },
+    enabled: !!user && !!isAdmin && !!companyId,
+    staleTime: 2 * 60 * 1000,
+    throwOnError: false,
+  });
+};
+
 /**
  * Met à jour une company
  */

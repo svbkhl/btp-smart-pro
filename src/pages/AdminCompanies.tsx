@@ -12,10 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { useAllCompanies, useUpdateCompany, useCreateCompany, useDeleteCompany, Company } from "@/hooks/useCompany";
+import { useAllCompanies, useUpdateCompany, useCreateCompany, useDeleteCompany, Company, useCompanyMembersForAdmin } from "@/hooks/useCompany";
 import { ALL_FEATURES } from "@/utils/companyFeatures";
 import { Loader2, Building2, Save, Plus, Edit, Mail, Trash2, AlertTriangle, Users, ChevronDown, ChevronUp } from "lucide-react";
-import { useEmployeesByCompany } from "@/hooks/useEmployees";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -28,9 +27,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-// Composant pour afficher la liste des employés d'une entreprise
+// Composant pour afficher la liste des membres d'une entreprise (company_users, y compris "déjà membres")
 const CompanyEmployeesList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
-  const { data: employees, isLoading, error } = useEmployeesByCompany(companyId);
+  const { data: members, isLoading, error } = useCompanyMembersForAdmin(companyId);
 
   if (isLoading) {
     return (
@@ -46,16 +45,16 @@ const CompanyEmployeesList = ({ companyId, companyName }: { companyId: string; c
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Erreur</AlertTitle>
         <AlertDescription>
-          Impossible de charger les employés de {companyName}
+          Impossible de charger les membres de {companyName}
         </AlertDescription>
       </Alert>
     );
   }
 
-  if (!employees || employees.length === 0) {
+  if (!members || members.length === 0) {
     return (
       <div className="mt-4 p-4 rounded-lg bg-muted/50 text-center text-sm text-muted-foreground">
-        Aucun employé dans cette entreprise
+        Aucun membre dans cette entreprise
       </div>
     );
   }
@@ -63,28 +62,28 @@ const CompanyEmployeesList = ({ companyId, companyName }: { companyId: string; c
   return (
     <div className="mt-4 space-y-2">
       <div className="text-sm font-medium text-muted-foreground mb-2">
-        {employees.length} employé{employees.length > 1 ? 's' : ''}
+        {members.length} membre{members.length > 1 ? "s" : ""}
       </div>
       <div className="space-y-2">
-        {employees.map((employee) => (
+        {members.map((member) => (
           <div
-            key={employee.id}
+            key={member.user_id}
             className="flex items-center justify-between p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-white/10"
           >
             <div className="flex-1">
               <div className="font-medium">
-                {employee.prenom} {employee.nom}
+                {[member.prenom, member.nom].filter(Boolean).join(" ") || "—"}
               </div>
               <div className="text-sm text-muted-foreground">
-                {employee.poste}
-                {employee.email && (
-                  <span className="ml-2">• {employee.email}</span>
+                {member.poste || "—"}
+                {member.email && (
+                  <span className="ml-2">• {member.email}</span>
                 )}
               </div>
             </div>
-            {employee.role && (
+            {(member.role_slug || member.role_name) && (
               <Badge variant="secondary" className="ml-2">
-                {employee.role.slug || employee.role.name}
+                {member.role_slug || member.role_name}
               </Badge>
             )}
           </div>

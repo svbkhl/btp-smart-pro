@@ -100,10 +100,21 @@ const Auth = () => {
       }
     }
 
-    const handlePostAuthNavigation = (sessionUser: User) => {
+    const handlePostAuthNavigation = async (sessionUser: User) => {
       const invitationId = searchParams.get("invitation_id");
       if (invitationId) {
         navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
+        return;
+      }
+      // Si l'utilisateur a accepté une invitation (déjà membre d'une entreprise), aller aux offres Stripe
+      const { data: companyMembership } = await supabase
+        .from("company_users")
+        .select("company_id")
+        .eq("user_id", sessionUser.id)
+        .limit(1)
+        .maybeSingle();
+      if (companyMembership) {
+        navigate("/start", { replace: true });
         return;
       }
       if (requiresProfileCompletion(sessionUser)) {
@@ -158,7 +169,7 @@ const Auth = () => {
 
           if (session?.user) {
             console.log('[Auth] Session created successfully, redirecting...');
-            handlePostAuthNavigation(session.user);
+            await handlePostAuthNavigation(session.user);
             // Nettoyer l'URL après redirection
             navigate(window.location.pathname, { replace: true });
           } else {
@@ -184,12 +195,12 @@ const Auth = () => {
         if (wasInviteAccepted) {
           await refetchCurrentCompanyId();
         }
-        handlePostAuthNavigation(session.user);
+        await handlePostAuthNavigation(session.user);
       }
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] Auth state changed:', { event, hasSession: !!session, hasUser: !!session?.user });
       
       // CRITIQUE : Gérer l'événement PASSWORD_RECOVERY en premier
@@ -240,7 +251,7 @@ const Auth = () => {
             return;
           }
           
-          handlePostAuthNavigation(session.user);
+          await handlePostAuthNavigation(session.user);
           // Nettoyer l'URL si on est sur /auth/callback
           if (window.location.pathname === '/auth/callback') {
             navigate(window.location.pathname, { replace: true });
@@ -260,7 +271,7 @@ const Auth = () => {
           return;
         }
         
-        handlePostAuthNavigation(session.user);
+        await handlePostAuthNavigation(session.user);
       }
     });
 
