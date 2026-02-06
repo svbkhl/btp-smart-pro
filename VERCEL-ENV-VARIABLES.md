@@ -102,6 +102,22 @@ STRIPE_WEBHOOK_SECRET
 **Valeur** : `whsec_xxxxxxxxxxxxx`  
 **Où trouver** : https://dashboard.stripe.com/webhooks → Créer un webhook → Copier le Signing secret
 
+**⚠️ Pour que le bouton « Démarrer mon essai gratuit » redirige vers Stripe en production**, ajoute aussi (mêmes valeurs que dans ton `.env` local) :
+
+```
+VITE_STRIPE_PRICE_ID_ANNUEL
+```
+**Valeur** : `price_xxxxxxxxxxxxx` (ID du prix Stripe pour l’offre annuelle)  
+**Où trouver** : Stripe Dashboard → Produits → ton produit SMART PRO Annuel → copier le Price ID
+
+```
+VITE_STRIPE_PRICE_ID_MENSUEL
+```
+**Valeur** : `price_xxxxxxxxxxxxx` (ID du prix Stripe pour l’offre mensuelle)  
+**Où trouver** : Stripe Dashboard → Produits → ton produit SMART PRO Mensuel → copier le Price ID
+
+Sans ces deux variables, le bouton fonctionne en local (grâce au `.env`) mais **pas sur le site déployé**. Après les avoir ajoutées, redéploie le projet (Deployments → Redeploy ou push sur `main`).
+
 ---
 
 ## 🔐 Variables OAUTH (si tu utilises OAuth)

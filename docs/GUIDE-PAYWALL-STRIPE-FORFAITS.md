@@ -176,6 +176,7 @@ VITE_STRIPE_PRICE_ID_MENSUEL=price_yyy
 
 | Problème | Solution |
 |----------|----------|
+| **Bouton « Démarrer » marche en local mais pas sur le web** | En production les variables sont prises au **build**. Ajoute dans **Vercel** → Settings → Environment Variables : `VITE_STRIPE_PRICE_ID_ANNUEL` et `VITE_STRIPE_PRICE_ID_MENSUEL` (mêmes valeurs que dans ton `.env`), puis **Redeploy** le projet. |
 | Page de paiement ne s'affiche pas | Vérifier que la migration est exécutée et que l’entreprise de test a `stripe_onboarding_required = true` |
 | Un seul bouton "Démarrer l'essai gratuit" | Configurer `VITE_STRIPE_PLANS` ou `VITE_STRIPE_PRICE_ID` dans `.env` |
 | Admin ne voit pas le paywall | Comportement normal : les admins système sont exclus |
