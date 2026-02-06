@@ -20,11 +20,12 @@ const PRICE_ANNUEL = ENV.VITE_STRIPE_PRICE_ID_ANNUEL || "";
 const PRICE_MENSUEL = ENV.VITE_STRIPE_PRICE_ID_MENSUEL || "";
 const DEFAULT_PRICE_ID = ENV.VITE_STRIPE_PRICE_ID || "";
 
-/** Plans officiels SMART PRO (texte de la page pricing) */
+/** Plans officiels SMART PRO (texte de la page pricing). Toujours 2 offres si au moins un price_id est configuré. */
 function buildOfficialPlans(): StripePlanOption[] {
   const plans: StripePlanOption[] = [];
   const priceAnnuel = PRICE_ANNUEL || (PRICE_MENSUEL ? "" : DEFAULT_PRICE_ID);
-  const priceMensuel = PRICE_MENSUEL || "";
+  const priceMensuel = PRICE_MENSUEL || (PRICE_ANNUEL ? "" : DEFAULT_PRICE_ID);
+  const hasAny = priceAnnuel || priceMensuel;
   if (priceAnnuel) {
     plans.push({
       label: "SMART PRO – ANNUEL",
@@ -46,6 +47,31 @@ function buildOfficialPlans(): StripePlanOption[] {
       recommended: false,
       features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
     });
+  }
+  // Si un seul price ID est défini (ANNUEL ou MENSUEL), afficher quand même les 2 cartes (2e avec le même price_id)
+  if (hasAny && plans.length === 1) {
+    const singlePriceId = plans[0].price_id;
+    if (plans[0].label.includes("ANNUEL")) {
+      plans.push({
+        label: "SMART PRO – MENSUEL",
+        price_id: singlePriceId,
+        trial_days: 30,
+        price_display: "199 € / mois",
+        recommended: false,
+        features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
+      });
+    } else {
+      plans.unshift({
+        label: "SMART PRO – ANNUEL",
+        price_id: singlePriceId,
+        trial_days: 30,
+        price_display: "1 788 € / an",
+        price_subline: "149 € / mois",
+        recommended: true,
+        badge: "Économisez 600 €",
+        features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
+      });
+    }
   }
   return plans;
 }
@@ -83,6 +109,7 @@ function parsePlansFromEnv(): StripePlanOption[] {
   }
   const official = buildOfficialPlans();
   if (official.length > 0) return official;
+  // Un seul price ID configuré (ex. VITE_STRIPE_PRICE_ID) : afficher quand même les 2 offres (Annuel + Mensuel)
   if (DEFAULT_PRICE_ID) {
     return [
       {
@@ -93,6 +120,14 @@ function parsePlansFromEnv(): StripePlanOption[] {
         price_subline: "149 € / mois",
         recommended: true,
         badge: "Économisez 600 €",
+        features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
+      },
+      {
+        label: "SMART PRO – MENSUEL",
+        price_id: DEFAULT_PRICE_ID,
+        trial_days: 30,
+        price_display: "199 € / mois",
+        recommended: false,
         features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
       },
     ];
