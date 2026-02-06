@@ -79,14 +79,9 @@ export function useSubscription() {
   });
 
   const data = query.data ?? null;
-  // Nouvelles entreprises (stripe_onboarding_required) : actif uniquement si trialing/active
-  // Anciennes entreprises (legacy) : null ou trialing/active = actif (pas de paywall)
+  // Strict : accès uniquement si abonnement actif (trialing ou active). Pas d'accès sans souscription.
   const isActive =
-    data == null
-      ? true
-      : data.stripe_onboarding_required
-        ? ACTIVE_STATUSES.includes(data.subscription_status)
-        : data.subscription_status == null || ACTIVE_STATUSES.includes(data.subscription_status);
+    data != null && data.subscription_status != null && ACTIVE_STATUSES.includes(data.subscription_status);
 
   return {
     ...query,
