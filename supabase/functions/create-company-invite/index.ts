@@ -60,11 +60,18 @@ serve(async (req) => {
       );
     }
 
-    // Récupérer l'utilisateur depuis le JWT
+    // Récupérer l'utilisateur depuis le JWT (passer le token explicitement pour éviter 401)
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const jwt = authHeader.replace("Bearer ", "").trim();
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -79,10 +86,11 @@ serve(async (req) => {
       }
     );
 
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    const { data: { user }, error: userError } = await userClient.auth.getUser(jwt);
     if (userError || !user) {
+      console.error("Auth getUser error:", userError?.message ?? "no user");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", details: userError?.message ?? "Invalid or expired token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -209,13 +217,14 @@ serve(async (req) => {
         console.log("⚠️ Table user_roles non accessible, vérification via métadonnées");
       }
 
-      // 3. Vérifier dans les métadonnées utilisateur (fallback)
+      // 3. Vérifier dans les métadonnées utilisateur (fallback) + is_system_admin
       if (!hasPermission) {
         const metadata = user.user_metadata || {};
         const role = metadata.role as string | undefined;
         const statut = metadata.statut as string | undefined;
+        const isSystemAdmin = metadata.is_system_admin === true || metadata.is_system_admin === 'true';
         
-        if (role === 'admin' || role === 'administrateur' || statut === 'admin' || statut === 'administrateur') {
+        if (isSystemAdmin || role === 'admin' || role === 'administrateur' || statut === 'admin' || statut === 'administrateur') {
           hasPermission = true;
         }
       }

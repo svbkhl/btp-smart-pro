@@ -64,6 +64,9 @@ import StripeCallback from './pages/StripeCallback';
 import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
 import NotFound from './pages/NotFound';
+import Start from './pages/Start';
+import StartSuccess from './pages/StartSuccess';
+import StartCancel from './pages/StartCancel';
 
 // Pages RBAC (Gestion des rôles et utilisateurs)
 import { RolesManagementGuarded } from './pages/RolesManagement';
@@ -138,6 +141,11 @@ function App() {
         <Route path="/payment/final" element={<PaymentFinal />} />
         <Route path="/payment/quote/:id" element={<PaymentPage />} />
         <Route path="/payment/invoice/:id" element={<PaymentPage />} />
+
+        {/* Paywall / souscription B2B (protégé auth, pas de gate abonnement) */}
+        <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
+        <Route path="/start/success" element={<ProtectedRoute><StartSuccess /></ProtectedRoute>} />
+        <Route path="/start/cancel" element={<ProtectedRoute><StartCancel /></ProtectedRoute>} />
 
         {/* Routes protégées */}
         <Route

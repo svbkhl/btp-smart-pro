@@ -1,5 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -7,17 +8,43 @@ import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useDecorativeBackground } from "@/contexts/DecorativeBackgroundContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { cn } from "@/lib/utils";
+import { isSystemAdmin, isAdminEmail } from "@/config/admin";
 interface PageLayoutProps {
   children: ReactNode;
 }
 
 export const PageLayout = ({ children }: PageLayoutProps) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, isAdmin } = useAuth();
   const { isPinned, isVisible, isHovered } = useSidebar();
   const { enabled: decorativeBackgroundEnabled } = useDecorativeBackground();
   const isMobile = useIsMobile();
   const { showOnboarding, completeOnboarding, isReplay } = useOnboarding();
+
+  // Vérification centralisée + email en dur : guide jamais affiché pour l'admin
+  const isAdminSystem = isSystemAdmin(user);
+  const isAdminByEmail = isAdminEmail(user?.email);
+  const neverShowGuide = !!isAdmin || !!isAdminSystem || !!isAdminByEmail;
+
+  useEffect(() => {
+    if (neverShowGuide && searchParams.has("onboarding_step")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("onboarding_step");
+      setSearchParams(next, { replace: true });
+    }
+  }, [neverShowGuide, searchParams, setSearchParams]);
+
+  const handleOnboardingComplete = () => {
+    completeOnboarding(isReplay);
+    if (searchParams.has("onboarding_step")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("onboarding_step");
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   // Calculer si la sidebar prend de l'espace
   const sidebarVisible = isMobile ? false : (isPinned || isVisible || isHovered);
@@ -63,11 +90,11 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
         </motion.div>
       </motion.main>
 
-      {/* Guide de première connexion (une seule fois) */}
-      {showOnboarding && (
+      {/* Guide de première connexion (une seule fois) — jamais pour l'admin */}
+      {showOnboarding && !neverShowGuide && (
         <OnboardingTour
-          onComplete={() => completeOnboarding(isReplay)}
-          onSkip={() => completeOnboarding(isReplay)}
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingComplete}
         />
       )}
     </div>

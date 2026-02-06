@@ -6,6 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { X, ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 import { onboardingSteps, type OnboardingStep } from "@/config/onboarding-steps";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdminEmail } from "@/config/admin";
 
 interface OnboardingTourProps {
   steps?: OnboardingStep[];
@@ -23,6 +25,25 @@ export function OnboardingTour({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAdmin = isAdminEmail(user?.email);
+
+  // Ne jamais afficher le guide pour les comptes admin : fermer et nettoyer l'URL dès le montage
+  useEffect(() => {
+    if (isAdmin) {
+      onSkip();
+      setSearchParams(
+        (p) => {
+          const next = new URLSearchParams(p);
+          next.delete("onboarding_step");
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [isAdmin, onSkip, setSearchParams]);
+
+  if (isAdmin) return null;
 
   // Persister l'étape dans l'URL pour survivre aux remontages (chaque page a son propre PageLayout)
   const stepFromUrl = parseInt(searchParams.get("onboarding_step") ?? "0", 10);

@@ -365,28 +365,29 @@ const InviteAccept = () => {
 
           toast({
             title: 'Invitation acceptée !',
-            description: `Bienvenue chez ${data.company_name || inviteInfo?.company_name || 'l\'entreprise'}`,
+            description: `Bienvenue chez ${data.company_name || inviteInfo?.company_name || 'l\'entreprise'}. Choisissez votre abonnement si besoin.`,
           });
 
-          // Rediriger vers le dashboard
+          // Rediriger vers la page de souscription (offre liée à l'invitation)
           setTimeout(() => {
-            navigate('/dashboard');
+            navigate(`/start?invitation_id=${encodeURIComponent(inviteId || '')}`);
           }, 1500);
         } else if (data.already_member) {
           // L'utilisateur était déjà membre
+          setSubmitting(false);
           toast({
-            title: 'Invitation acceptée',
-            description: data.message || 'Vous êtes déjà membre de cette entreprise',
+            title: 'Invitation acceptée avec succès',
+            description: data.message || 'Vous êtes déjà membre de cette entreprise. Redirection vers la connexion...',
           });
-          navigate('/auth?message=already-member');
+          setTimeout(() => navigate('/auth?message=already-member'), 2000);
         } else {
-          // Compte existant mais pas membre - ajouté à l'entreprise
-          // L'utilisateur doit se connecter
+          // Compte existant mais pas membre - ajouté à l'entreprise → message puis redirection connexion
+          setSubmitting(false);
           toast({
-            title: 'Invitation acceptée',
-            description: 'Vous avez été ajouté à l\'entreprise. Veuillez vous connecter.',
+            title: 'Invitation acceptée avec succès',
+            description: `Vous avez été ajouté à ${data.company_name || 'l\'entreprise'}. Redirection vers la page de connexion...`,
           });
-          navigate('/auth?message=invite-accepted');
+          setTimeout(() => navigate('/auth?message=invite-accepted'), 2000);
         }
       } else {
         toast({

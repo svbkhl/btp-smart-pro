@@ -120,8 +120,12 @@ serve(async (req) => {
     const requestedRole = (validation.data as { role?: 'owner' | 'admin' | 'member' }).role;
     const roleId = (validation.data as { role_id?: string }).role_id;
     // Support à la fois l'ancien format (companyId) et le nouveau (company_id)
-    const companyId = (validation.data as { companyId?: string; company_id?: string }).companyId || 
+    const companyId = (validation.data as { companyId?: string; company_id?: string }).companyId ||
                       (validation.data as { company_id?: string }).company_id;
+    // Offre / prix / période d'essai (choisis avant envoi)
+    const stripePriceId = (validation.data as { stripe_price_id?: string }).stripe_price_id;
+    const trialDays = (validation.data as { trial_days?: number }).trial_days;
+    const offerLabel = (validation.data as { offer_label?: string }).offer_label;
     
     // Vérifier le cooldown anti-spam
     const cooldownCheck = checkCooldown(emailToInvite);
@@ -470,7 +474,7 @@ serve(async (req) => {
         logger.info("Mapped role to role_id", { requestId, role: requestedRole, targetRoleSlug, roleId: finalRoleId });
       }
 
-      // Créer l'invitation dans la table invitations
+      // Créer l'invitation dans la table invitations (avec offre/prix/essai si fournis)
       const { data: invitationData, error: invitationError } = await supabase
         .from('invitations')
         .insert({
@@ -482,6 +486,9 @@ serve(async (req) => {
           token: invitationToken,
           status: 'pending',
           expires_at: expiresAt.toISOString(),
+          stripe_price_id: stripePriceId || null,
+          trial_days: trialDays ?? null,
+          offer_label: offerLabel || null,
         })
         .select()
         .single();

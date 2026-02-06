@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,9 @@ declare global {
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { refetchCurrentCompanyId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,6 +67,23 @@ const Auth = () => {
       return;
     }
 
+    // Message après acceptation d'invitation : redirection vers connexion
+    const urlMessage = searchParams.get('message');
+    const wasInviteAccepted = urlMessage === 'invite-accepted' || urlMessage === 'already-member';
+    if (urlMessage === 'invite-accepted') {
+      toast({
+        title: "Invitation acceptée avec succès",
+        description: "Connectez-vous pour accéder à votre espace entreprise.",
+      });
+      window.history.replaceState({}, '', '/auth');
+    } else if (urlMessage === 'already-member') {
+      toast({
+        title: "Invitation acceptée avec succès",
+        description: "Vous êtes déjà membre. Connectez-vous pour accéder à votre espace.",
+      });
+      window.history.replaceState({}, '', '/auth');
+    }
+
     // Pré-remplir l'email depuis l'URL (pour les comptes créés via invitation)
     // Note: Le paramètre reset=success est déjà géré ci-dessus
     if (searchParams.has('email')) {
@@ -71,7 +91,7 @@ const Auth = () => {
       if (emailParam) {
         setEmail(emailParam);
         // Afficher un message si c'est pour un compte créé
-        if (searchParams.has('message') && searchParams.get('message') === 'account-created') {
+        if (urlMessage === 'account-created') {
           toast({
             title: "Compte créé avec succès !",
             description: `Votre compte a été créé avec l'email ${emailParam}. Veuillez vous connecter avec votre mot de passe.`,
@@ -81,6 +101,11 @@ const Auth = () => {
     }
 
     const handlePostAuthNavigation = (sessionUser: User) => {
+      const invitationId = searchParams.get("invitation_id");
+      if (invitationId) {
+        navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
+        return;
+      }
       if (requiresProfileCompletion(sessionUser)) {
         navigate("/complete-profile");
       } else {
@@ -153,9 +178,12 @@ const Auth = () => {
     // Exécuter le handler de callback si nécessaire
     handleAuthCallback();
 
-    // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Check if user is already logged in (e.g. after accepting an invitation)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
+        if (wasInviteAccepted) {
+          await refetchCurrentCompanyId();
+        }
         handlePostAuthNavigation(session.user);
       }
     });
@@ -237,7 +265,7 @@ const Auth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, toast]);
+  }, [navigate, toast, refetchCurrentCompanyId]);
 
 
   const handleSignIn = async (e: React.FormEvent) => {

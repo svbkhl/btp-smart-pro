@@ -2,10 +2,18 @@
  * Configuration CORS sécurisée pour Edge Functions
  */
 
-const ALLOWED_ORIGINS = Deno.env.get("ALLOWED_ORIGINS")?.split(",") || [
+const ENV_ORIGINS = Deno.env.get("ALLOWED_ORIGINS")?.split(",").map((o) => o.trim()).filter(Boolean) || [];
+const DEFAULT_ORIGINS = [
   "https://btpsmartpro.com",
   "https://www.btpsmartpro.com",
+  "http://localhost:3000",
+  "http://localhost:4000",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:4000",
+  "http://127.0.0.1:5173",
 ];
+const ALLOWED_ORIGINS = ENV_ORIGINS.length > 0 ? ENV_ORIGINS : DEFAULT_ORIGINS;
 
 const IS_DEVELOPMENT = Deno.env.get("ENVIRONMENT") !== "production";
 
@@ -27,13 +35,12 @@ function getAllowedOrigin(origin: string | null): string | null {
     return IS_DEVELOPMENT ? "*" : null;
   }
 
-  // Autoriser localhost pour le développement local
-  // (localhost:4000, localhost:3000, etc.)
-  if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
+  // Autoriser localhost / 127.0.0.1 pour le développement local
+  if (origin.startsWith("http://localhost") || origin.startsWith("https://localhost") ||
+      origin.startsWith("http://127.0.0.1") || origin.startsWith("https://127.0.0.1")) {
     return origin;
   }
 
-  // Vérifier si l'origine est dans la liste autorisée
   if (ALLOWED_ORIGINS.includes(origin)) {
     return origin;
   }
@@ -55,12 +62,13 @@ export function getCorsHeaders(origin: string | null): HeadersInit {
 
 /**
  * Gère les requêtes OPTIONS (preflight)
+ * Status 200 utilisé pour une meilleure compatibilité avec certains proxies/gateways
  */
 export function handleCorsPreflight(req: Request): Response | null {
   if (req.method === "OPTIONS") {
     const origin = req.headers.get("Origin");
     return new Response(null, {
-      status: 204,
+      status: 200,
       headers: getCorsHeaders(origin),
     });
   }

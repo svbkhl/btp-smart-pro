@@ -21,11 +21,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar } from "lucide-react";
+import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
+import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminContactRequests from "@/pages/AdminContactRequests";
@@ -34,6 +35,7 @@ import RolesManagement from "@/pages/RolesManagement";
 import UsersManagementRBAC from "@/pages/UsersManagementRBAC";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { isSystemAdmin, isAdminEmail } from "@/config/admin";
 
 const Settings = () => {
   const { user, isAdmin, userRole, currentCompanyId } = useAuth();
@@ -49,8 +51,8 @@ const Settings = () => {
   const hasProcessedOAuth = useRef(false);
   const oauthCodeRef = useRef<string | null>(null);
   
-  // Sections autorisées pour les OWNERS (6 sections uniquement)
-  const ownerAllowedSections = ['company', 'employees', 'stripe', 'integrations', 'notifications', 'security'];
+  // Sections autorisées pour les OWNERS (7 sections : company, employees, billing, stripe, integrations, notifications, security)
+  const ownerAllowedSections = ['company', 'employees', 'billing', 'stripe', 'integrations', 'notifications', 'security'];
   
   // Sections autorisées pour les EMPLOYÉS (3 sections uniquement : sécurité, intégrations pour plannings, notifications)
   const employeeAllowedSections = ['security', 'integrations', 'notifications'];
@@ -61,16 +63,22 @@ const Settings = () => {
   const activeTab = tabFromUrl || defaultTab;
   const setActiveTab = (value: string) => setSearchParams({ tab: value }, { replace: true });
   
-  // Protection : si owner ou employé essaye d'accéder à un onglet non autorisé, rediriger
+  // Admin système : email + metadata — onglets admin toujours visibles (fallback littéral pour déploiement)
+  const isAdminSystem = isSystemAdmin(user);
+  const isAdminByEmail = isAdminEmail(user?.email);
+  const isAdminEmailLiteral = user?.email?.toLowerCase() === "sabri.khalfallah6@gmail.com";
+  const isReallyAdmin = isAdmin || isAdminSystem || isAdminByEmail || isAdminEmailLiteral || (roleSlug === 'admin' && !isOwner);
+
+  // Protection : si owner ou employé essaye d'accéder à un onglet non autorisé, rediriger (pas pour les admins système)
   useEffect(() => {
     if (isEmployee && tabFromUrl && !employeeAllowedSections.includes(tabFromUrl)) {
       console.warn('[Settings] Employé tentant d\'accéder à un onglet non autorisé:', tabFromUrl);
       setSearchParams({ tab: 'security' }, { replace: true });
-    } else if (isOwner && tabFromUrl && !ownerAllowedSections.includes(tabFromUrl)) {
+    } else if (isOwner && !isReallyAdmin && tabFromUrl && !ownerAllowedSections.includes(tabFromUrl)) {
       console.warn('[Settings] Owner tentant d\'accéder à un onglet non autorisé:', tabFromUrl);
       setSearchParams({ tab: 'company' }, { replace: true });
     }
-  }, [isOwner, isEmployee, tabFromUrl]);
+  }, [isOwner, isEmployee, isReallyAdmin, tabFromUrl]);
   
   // Gérer le callback Google Calendar OAuth
   const googleCalendarStatus = searchParams.get("google_calendar_status");
@@ -177,22 +185,19 @@ const Settings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleCalendarCode]); // Dépendre uniquement du code pour éviter les re-déclenchements
   
-  // Vérifier si l'utilisateur est vraiment admin (pas owner)
-  // Utiliser roleSlug de usePermissions qui est plus fiable
-  const isReallyAdmin = roleSlug === 'admin' && !isOwner;
   const isAdministrator = (userRole === 'admin' || isAdmin) && !isOwner && roleSlug === 'admin';
   const canManageDelegations = isOwner || can("delegations.manage");
   
   // Ajuster le nombre de colonnes selon les onglets
   // EMPLOYÉS (3 onglets) : security, integrations, notifications
-  // OWNERS (6 onglets) : company, employees, stripe, integrations, notifications, security
-  // ADMINS (11-12 onglets) : 6 de base + companies, contact-requests, users, roles, delegations (optionnel), admin-company, demo
+  // OWNERS (7 onglets) : company, employees, billing, stripe, integrations, notifications, security
+  // ADMINS (12-13 onglets) : 7 de base + companies, contact-requests, users, roles, delegations (optionnel), admin-company, demo
   // Note: "legal" a été déplacé en haut à droite comme bouton
   const tabCount = isEmployee
     ? 3 // Employés: 3 onglets uniquement (security, integrations, notifications)
     : isReallyAdmin 
-    ? (canManageDelegations ? 12 : 11) // Admins: 11 ou 12 onglets
-    : 6; // Owners: 6 onglets uniquement (company, employees, stripe, integrations, notifications, security)
+    ? (canManageDelegations ? 13 : 12) // Admins: 12 ou 13 onglets
+    : 7; // Owners: 7 onglets (company, employees, billing, stripe, integrations, notifications, security)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -239,6 +244,10 @@ const Settings = () => {
                 <TabsTrigger value="employees" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Employés</span>
+                </TabsTrigger>
+                <TabsTrigger value="billing" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Receipt className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Abonnement</span>
                 </TabsTrigger>
               </>
             )}
@@ -308,6 +317,9 @@ const Settings = () => {
                 <div className="[&_div]:!p-0 [&_main]:!p-0">
                   <UsersManagementRBAC embedded />
                 </div>
+              </TabsContent>
+              <TabsContent value="billing" className="mt-0">
+                <BillingSettings />
               </TabsContent>
             </>
           )}

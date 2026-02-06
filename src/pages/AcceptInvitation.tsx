@@ -170,12 +170,13 @@ const AcceptInvitation = () => {
 
       toast({
         title: 'Compte créé avec succès !',
-        description: `Vous avez rejoint ${invitation.companies?.name || 'l\'entreprise'}`,
+        description: `Vous avez rejoint ${invitation.companies?.name || 'l\'entreprise'}. Connectez-vous puis choisissez votre abonnement si besoin.`,
       });
 
-      // Rediriger vers la connexion
+      // Rediriger vers la connexion (avec invitation_id pour /start après login)
+      const invitationIdParam = invitation.id ? `&invitation_id=${encodeURIComponent(invitation.id)}` : '';
       setTimeout(() => {
-        navigate('/auth?message=account-created');
+        navigate(`/auth?message=account-created${invitationIdParam}`);
       }, 2000);
     } catch (err: any) {
       console.error('Error accepting invitation:', err);

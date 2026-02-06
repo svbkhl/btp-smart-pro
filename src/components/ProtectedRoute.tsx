@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { useSubscription } from "@/hooks/useSubscription";
+import { isSystemAdmin } from "@/config/admin";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
 }
 
+const PAYWALL_PATHS = ["/start", "/start/success", "/start/cancel"];
+
 export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
-  const { user, loading, isAdmin, userRole } = useAuth();
+  const location = useLocation();
+  const { user, loading, isAdmin, userRole, currentCompanyId } = useAuth();
   const { fakeDataEnabled, setFakeDataEnabled } = useFakeDataStore();
+  const { isActive: subscriptionActive, isLoading: subscriptionLoading } = useSubscription();
+  const isPaywallPath = PAYWALL_PATHS.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
 
   // Timeout de sécurité : après 5 secondes, afficher le contenu même si loading
   // pour éviter les chargements infinis
@@ -107,18 +114,50 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     return () => clearTimeout(timeoutId);
   }, [user, loading, isAdmin, requireAdmin, navigate, showContent, fakeDataEnabled]);
 
+  // Redirection Settings en mode démo (dans un effet pour éviter setState pendant le render)
+  useEffect(() => {
+    if (fakeDataEnabled && user && userRole !== 'admin') {
+      const isSettingsPage = location.pathname === '/settings' || location.pathname.startsWith('/settings');
+      if (isSettingsPage) {
+        navigate("/dashboard", { replace: true });
+      }
+    }
+  }, [fakeDataEnabled, user, userRole, location.pathname, navigate]);
+
+  // Après timeout, si toujours pas d'utilisateur : redirection (en effet pour éviter setState pendant render)
+  useEffect(() => {
+    if (!user && showContent) {
+      if (fakeDataEnabled) {
+        navigate("/?openTrialForm=true", { replace: true });
+      } else if (window.location.pathname !== "/auth") {
+        window.location.replace("/auth");
+      }
+    }
+  }, [user, showContent, fakeDataEnabled, navigate]);
+
+  // Gate abonnement B2B : rediriger vers /start dans un effet (pas pendant le render)
+  // Ne jamais rediriger les admins système (même sans company) pour éviter /start au refresh
+  useEffect(() => {
+    const adminSystem = isSystemAdmin(user);
+    const skipGate = isPaywallPath || !user || isAdmin || adminSystem;
+    if (skipGate) return;
+    if (currentCompanyId && !subscriptionLoading && !subscriptionActive) {
+      navigate("/start", { replace: true });
+      return;
+    }
+    if (!currentCompanyId && !subscriptionLoading) {
+      navigate("/start", { replace: true });
+    }
+  }, [isPaywallPath, user, isAdmin, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
+
   // En mode démo (fakeDataEnabled), permettre l'accès SEULEMENT si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
   // 2. OU l'utilisateur est administrateur (démo dans l'app)
-  // EXCEPTION : Bloquer l'accès à Settings en mode démo
+  // EXCEPTION : Bloquer l'accès à Settings en mode démo (redirection gérée dans l'effet ci-dessus)
   if (fakeDataEnabled) {
-    // Bloquer Settings en mode démo
-    const isSettingsPage = window.location.pathname === '/settings' || 
-                          window.location.pathname.startsWith('/settings');
-    if (isSettingsPage) {
-      console.log("🚫 [ProtectedRoute] Accès à Settings bloqué en mode démo");
-      navigate("/dashboard", { replace: true });
-      return null;
+    const isSettingsPage = location.pathname === '/settings' || location.pathname.startsWith('/settings');
+    if (isSettingsPage && user && userRole !== 'admin') {
+      return null; // l'effet redirige vers dashboard
     }
     
     // Si l'utilisateur n'est pas connecté, permettre l'accès (démo publique depuis landing page)
@@ -133,8 +172,17 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     // (le mode démo sera désactivé par le useEffect ci-dessus)
   }
 
-  // Afficher le spinner seulement si loading ET pas encore de timeout
-  if (loading && !showContent) {
+  // Si on doit rediriger vers /start (gate abo), ne pas afficher les children pendant la redirection
+  const shouldRedirectToStart =
+    !isPaywallPath && user && !isAdmin && !subscriptionLoading &&
+    ((currentCompanyId && !subscriptionActive) || !currentCompanyId);
+  if (shouldRedirectToStart) {
+    return null; // l'effet ci-dessus fait la redirection
+  }
+
+  // Afficher le spinner seulement si loading ET pas encore de timeout (ou attente abonnement)
+  const waitingSubscription = !isPaywallPath && user && currentCompanyId && subscriptionLoading;
+  if ((loading && !showContent) || waitingSubscription) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -145,14 +193,9 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     );
   }
 
-  // Si pas d'utilisateur après timeout, rediriger
+  // Si pas d'utilisateur après timeout, redirection gérée dans le useEffect principal (ligne ~89)
   if (!user && showContent) {
-    // Si on est en mode démo, rediriger vers le formulaire d'essai
-    if (fakeDataEnabled) {
-      console.log("🎮 [ProtectedRoute] Timeout - Mode démo actif, redirection vers formulaire d'essai");
-      navigate("/?openTrialForm=true", { replace: true });
-    }
-    return null; // Le useEffect gère la redirection
+    return null;
   }
   
   // Si requireAdmin mais pas admin ET après timeout, permettre l'accès quand même

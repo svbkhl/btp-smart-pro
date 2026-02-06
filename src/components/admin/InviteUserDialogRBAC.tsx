@@ -4,7 +4,7 @@
  * Version améliorée avec support du système de rôles RBAC
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,12 +26,13 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Mail, UserPlus, Shield, Crown, Users, User } from 'lucide-react';
+import { Loader2, Mail, UserPlus, Shield, Crown, Users, User, Receipt } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
 import { usePermissions } from '@/hooks/usePermissions';
 import { AuditLogHelpers } from '@/services/auditLogService';
+import { getStripePlanOptions, type StripePlanOption } from '@/config/stripePlans';
 
 interface InviteUserDialogRBACProps {
   trigger?: React.ReactNode;
@@ -57,6 +58,9 @@ export const InviteUserDialogRBAC = ({
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [selectedPlan, setSelectedPlan] = useState<StripePlanOption | null>(null);
+
+  const planOptions = useMemo(() => getStripePlanOptions(), []);
 
   // Dirigeant et administrateur peuvent toujours inviter ; sinon permission employees.access
   const canInvite = can('employees.access') || isOwner || isAdmin;
@@ -88,6 +92,16 @@ export const InviteUserDialogRBAC = ({
       return;
     }
 
+    // Validation offre / plan (obligatoire avant envoi)
+    if (!selectedPlan || !selectedPlan.price_id) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez choisir une offre (prix et période d\'essai) avant d\'envoyer l\'invitation',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validation company
     if (!currentCompanyId) {
       toast({
@@ -110,12 +124,15 @@ export const InviteUserDialogRBAC = ({
       // Récupérer le rôle sélectionné pour le log
       const selectedRole = roles.find(r => r.id === selectedRoleId);
 
-      // Créer l'invitation
+      // Créer l'invitation (avec offre / prix / période d'essai choisis)
       const { data, error } = await supabase.functions.invoke('send-invitation', {
         body: {
           email: email.trim().toLowerCase(),
-          role_id: selectedRoleId, // Utiliser role_id au lieu de role
+          role_id: selectedRoleId,
           company_id: currentCompanyId,
+          stripe_price_id: selectedPlan.price_id,
+          trial_days: selectedPlan.trial_days,
+          offer_label: selectedPlan.label,
         },
       });
 
@@ -143,6 +160,7 @@ export const InviteUserDialogRBAC = ({
       // Reset et fermer
       setEmail('');
       setSelectedRoleId('');
+      setSelectedPlan(null);
       setOpen(false);
 
       // Callback de succès
@@ -185,6 +203,44 @@ export const InviteUserDialogRBAC = ({
 
         <form onSubmit={handleInvite}>
           <div className="grid gap-4 py-4">
+            {/* Offre / Plan (prix + période d'essai) - à choisir avant envoi */}
+            {planOptions.length > 0 && (
+              <div className="grid gap-2">
+                <Label>
+                  Offre / Plan <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={selectedPlan ? selectedPlan.price_id : ""}
+                  onValueChange={(value) => {
+                    const plan = planOptions.find((p) => p.price_id === value) ?? null;
+                    setSelectedPlan(plan);
+                  }}
+                  disabled={loading}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir l'offre, le prix et la période d'essai" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {planOptions.map((plan) => (
+                      <SelectItem key={plan.price_id} value={plan.price_id}>
+                        <div className="flex items-center gap-2">
+                          <Receipt className="h-4 w-4 text-muted-foreground" />
+                          <span>{plan.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            — {plan.trial_days} j. d'essai
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  L'invité pourra souscrire à cette offre à l'acceptation de l'invitation.
+                </p>
+              </div>
+            )}
+
             {/* Email */}
             <div className="grid gap-2">
               <Label htmlFor="email">
@@ -265,7 +321,10 @@ export const InviteUserDialogRBAC = ({
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading || !selectedRoleId}>
+            <Button
+              type="submit"
+              disabled={loading || !selectedRoleId || (planOptions.length > 0 && !selectedPlan)}
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

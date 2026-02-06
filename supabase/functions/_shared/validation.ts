@@ -63,6 +63,7 @@ export const urlSchema = z.string().url("URL invalide");
 /**
  * Schema pour send-invitation
  * Supporte à la fois l'ancien format (role string) et le nouveau (role_id UUID)
+ * + offre/prix/période d'essai (stripe_price_id, trial_days, offer_label)
  */
 export const sendInvitationSchema = z.object({
   email: emailSchema,
@@ -72,6 +73,10 @@ export const sendInvitationSchema = z.object({
   // Nouveau format RBAC
   role_id: uuidSchema.optional(),
   company_id: uuidSchema.optional(),
+  // Offre / prix / période d'essai (choisis avant envoi)
+  stripe_price_id: z.string().min(1).optional(),
+  trial_days: z.number().int().min(0).max(365).optional(),
+  offer_label: z.string().max(255).optional(),
 });
 
 /**

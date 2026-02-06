@@ -9,6 +9,8 @@ interface AuthContextValue {
   isEmployee: boolean;
   userRole: 'admin' | 'member' | null;
   currentCompanyId: string | null;
+  /** Force refetch current company (e.g. after accepting an invitation). */
+  refetchCurrentCompanyId: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -248,6 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('company_users')
         .select('company_id')
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       
@@ -277,6 +280,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refetchCurrentCompanyId = async () => {
+    if (user) await fetchCurrentCompanyId(user.id);
+  };
+
   const value: AuthContextValue = {
     user,
     loading,
@@ -284,6 +291,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isEmployee,
     userRole,
     currentCompanyId,
+    refetchCurrentCompanyId,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

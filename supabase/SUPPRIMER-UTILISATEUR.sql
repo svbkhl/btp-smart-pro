@@ -1,12 +1,8 @@
 -- =====================================================
--- SCRIPT DE SUPPRESSION D'UTILISATEUR
+-- SUPPRESSION DÉFINITIVE : sabbg.du73100@gmail.com
 -- =====================================================
--- Ce script supprime toutes les données publiques associées à un utilisateur
--- 
--- IMPORTANT : 
--- 1. Exécutez ce script dans Supabase Dashboard → SQL Editor
--- 2. Remplacez 'sabbg.du73100@gmail.com' par l'email de l'utilisateur à supprimer
--- 3. Après exécution, supprimez l'utilisateur Auth via Dashboard ou Edge Function
+-- Supprime toutes les données (public + auth) pour ce compte.
+-- Exécuter dans Supabase Dashboard → SQL Editor (une seule fois).
 -- =====================================================
 
 DO $$
@@ -27,6 +23,13 @@ BEGIN
   
   RAISE NOTICE '✅ Utilisateur trouvé: % (ID: %)', v_user_email, v_user_id;
   RAISE NOTICE '🗑️  Suppression des données associées...';
+  
+  -- company_invites : retirer accepted_by pour éviter FK avant suppression auth
+  UPDATE public.company_invites SET accepted_by = NULL WHERE accepted_by = v_user_id;
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+  IF v_deleted_count > 0 THEN
+    RAISE NOTICE '   - company_invites (accepted_by): % lignes mises à jour', v_deleted_count;
+  END IF;
   
   -- Supprimer dans company_users
   DELETE FROM public.company_users WHERE user_id = v_user_id;
@@ -52,6 +55,11 @@ BEGIN
   DELETE FROM public.user_roles WHERE user_id = v_user_id;
   GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
   RAISE NOTICE '   - user_roles: % lignes supprimées', v_deleted_count;
+  
+  -- Supprimer dans user_stats
+  DELETE FROM public.user_stats WHERE user_id = v_user_id;
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+  RAISE NOTICE '   - user_stats: % lignes supprimées', v_deleted_count;
   
   -- Supprimer dans user_settings
   DELETE FROM public.user_settings WHERE user_id = v_user_id;
@@ -115,12 +123,18 @@ BEGIN
   
   RAISE NOTICE '';
   RAISE NOTICE '✅ Nettoyage des données publiques terminé pour: %', v_user_email;
-  RAISE NOTICE '';
-  RAISE NOTICE '⚠️  ÉTAPE SUIVANTE REQUISE:';
-  RAISE NOTICE '   Supprimez maintenant l''utilisateur Auth via:';
-  RAISE NOTICE '   1. Supabase Dashboard → Authentication → Users → Supprimer';
-  RAISE NOTICE '   2. OU exécutez la Edge Function delete-user avec l''email: %', v_user_email;
-  RAISE NOTICE '';
-  RAISE NOTICE '   User ID à supprimer: %', v_user_id;
+  RAISE NOTICE '🗑️  Suppression du compte Auth...';
   
+  -- Suppression définitive dans auth.users (compte de connexion)
+  DELETE FROM auth.users WHERE id = v_user_id;
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+  
+  IF v_deleted_count > 0 THEN
+    RAISE NOTICE '✅ Compte Auth supprimé définitivement: %', v_user_email;
+  ELSE
+    RAISE NOTICE '⚠️  auth.users non modifié (droits insuffisants). Supprimez manuellement:';
+    RAISE NOTICE '   Dashboard → Authentication → Users → chercher % → Supprimer', v_user_email;
+    RAISE NOTICE '   User ID: %', v_user_id;
+  END IF;
+  RAISE NOTICE '';
 END $$;

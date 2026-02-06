@@ -87,7 +87,7 @@ export function usePermissions(): UsePermissionsReturn {
 
       const { data, error } = await supabase
         .from('company_users')
-        .select('role_id, roles(id, slug, name, is_system, color, icon)')
+        .select('role_id, role, roles(id, slug, name, is_system, color, icon)')
         .eq('user_id', user.id)
         .eq('company_id', currentCompanyId)
         .maybeSingle();
@@ -110,8 +110,12 @@ export function usePermissions(): UsePermissionsReturn {
     refetchOnReconnect: false,
   });
 
-  const roleSlug = roleData?.roles?.slug || null;
-  const roleName = roleData?.roles?.name || null;
+  // Prefer roles.slug; fallback to company_users.role when role_id is null (e.g. new company)
+  const roleSlug =
+    roleData?.roles?.slug ??
+    (roleData?.role === 'owner' ? 'owner' : roleData?.role === 'member' ? 'employee' : null) ??
+    null;
+  const roleName = roleData?.roles?.name ?? null;
 
   // Propriétaire : slug 'owner' ou nom de rôle équivalent (Patron, Dirigeant, Propriétaire)
   const isOwnerRole = useMemo(() => {
