@@ -132,7 +132,27 @@ function parsePlansFromEnv(): StripePlanOption[] {
       },
     ];
   }
-  return [];
+  // Aucune config : afficher quand même les 2 cartes (après invitation, etc.). Clic → toast "Configuration manquante".
+  return [
+    {
+      label: "SMART PRO – ANNUEL",
+      price_id: "",
+      trial_days: 30,
+      price_display: "1 788 € / an",
+      price_subline: "149 € / mois",
+      recommended: true,
+      badge: "Économisez 600 €",
+      features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
+    },
+    {
+      label: "SMART PRO – MENSUEL",
+      price_id: "",
+      trial_days: 30,
+      price_display: "199 € / mois",
+      recommended: false,
+      features: ["Frais d'entrée 1000€ offert", "1 mois d'essai offert", "Aucun paiement aujourd'hui"],
+    },
+  ];
 }
 
 let cached: StripePlanOption[] | null = null;

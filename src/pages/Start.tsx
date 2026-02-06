@@ -189,111 +189,87 @@ export default function Start() {
           </Label>
         </div>
 
-        {planOptions.length > 0 ? (
-          <div className="grid gap-5 sm:grid-cols-2 items-stretch">
-            {planOptions.map((plan) => (
-              <Card
-                key={plan.price_id}
-                className={`relative overflow-visible flex flex-col transition-transform duration-200 hover:scale-105 ${
-                  plan.recommended
-                    ? "border-primary bg-primary/5"
-                    : "border border-border bg-muted/60"
-                }`}
-              >
-                {plan.recommended && (
-                  <span className="absolute top-4 right-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Recommandé
-                  </span>
-                )}
-                <CardHeader className="pb-2 pt-6 px-6 min-h-[140px]">
-                  <CardTitle className="text-lg font-semibold">{plan.label}</CardTitle>
-                  {plan.price_display && (
-                    <div>
-                      <p className="text-2xl font-semibold text-primary">{plan.price_display}</p>
-                      {plan.price_subline ? (
-                        <p className="text-base text-muted-foreground">({plan.price_subline})</p>
-                      ) : (
-                        <div className="h-6" aria-hidden />
-                      )}
-                    </div>
-                  )}
-                  <div className="min-h-[1.25rem]">
-                    {plan.badge && <p className="text-sm font-medium text-primary">{plan.badge}</p>}
+        <div className="grid gap-5 sm:grid-cols-2 items-stretch">
+          {planOptions.map((plan, index) => (
+            <Card
+              key={plan.price_id || plan.label + index}
+              className={`relative overflow-visible flex flex-col transition-transform duration-200 hover:scale-105 ${
+                plan.recommended
+                  ? "border-primary bg-primary/5"
+                  : "border border-border bg-muted/60"
+              }`}
+            >
+              {plan.recommended && (
+                <span className="absolute top-4 right-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Recommandé
+                </span>
+              )}
+              <CardHeader className="pb-2 pt-6 px-6 min-h-[140px]">
+                <CardTitle className="text-lg font-semibold">{plan.label}</CardTitle>
+                {plan.price_display && (
+                  <div>
+                    <p className="text-2xl font-semibold text-primary">{plan.price_display}</p>
+                    {plan.price_subline ? (
+                      <p className="text-base text-muted-foreground">({plan.price_subline})</p>
+                    ) : (
+                      <div className="h-6" aria-hidden />
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-5 px-6 pb-6 pt-3 flex-1 flex flex-col">
-                  {plan.features && plan.features.length > 0 && (
-                    <ul className="space-y-2 text-base">
-                      {plan.features.map((f, i) => {
-                        const fraisEntree = f.startsWith("Frais d'entrée");
-                        if (fraisEntree) {
-                          return (
-                            <li key={i} className="flex items-center gap-2">
-                              <span className="text-green-600">•</span>
-                              <span className="text-muted-foreground">
-                                <span className="line-through">Frais d&apos;entrée 1000€</span>{" "}
-                                <span className="text-green-600">offert</span>
-                              </span>
-                            </li>
-                          );
-                        }
-                        const highlight = f.includes("essai");
+                )}
+                <div className="min-h-[1.25rem]">
+                  {plan.badge && <p className="text-sm font-medium text-primary">{plan.badge}</p>}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5 px-6 pb-6 pt-3 flex-1 flex flex-col">
+                {plan.features && plan.features.length > 0 && (
+                  <ul className="space-y-2 text-base">
+                    {plan.features.map((f, i) => {
+                      const fraisEntree = f.startsWith("Frais d'entrée");
+                      if (fraisEntree) {
                         return (
                           <li key={i} className="flex items-center gap-2">
-                            <span className={highlight ? "text-green-600" : ""}>•</span>
-                            <span className={highlight ? "text-green-600" : "text-muted-foreground"}>{f}</span>
+                            <span className="text-green-600">•</span>
+                            <span className="text-muted-foreground">
+                              <span className="line-through">Frais d&apos;entrée 1000€</span>{" "}
+                              <span className="text-green-600">offert</span>
+                            </span>
                           </li>
                         );
-                      })}
-                    </ul>
-                  )}
-                  <div className="mt-auto space-y-2">
-                    <Button
-                      className="w-full h-11 text-base"
-                      variant={plan.recommended ? "default" : "outline"}
-                      disabled={creatingCheckout || !acceptedTerms}
-                      onClick={() => handleStartSubscription(plan)}
-                    >
-                      {creatingCheckout ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Redirection...
-                        </>
-                      ) : (
-                        "Démarrer mon essai gratuit"
-                      )}
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Résiliation possible pendant l'essai
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="max-w-md mx-auto">
-            <CardContent className="pt-8 pb-8 space-y-4 px-8">
-              <Button
-                className="w-full h-11 text-base"
-                disabled={creatingCheckout || !acceptedTerms}
-                onClick={() => handleStartSubscription()}
-              >
-                {creatingCheckout ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirection...
-                  </>
-                ) : (
-                  "Démarrer mon essai gratuit"
+                      }
+                      const highlight = f.includes("essai");
+                      return (
+                        <li key={i} className="flex items-center gap-2">
+                          <span className={highlight ? "text-green-600" : ""}>•</span>
+                          <span className={highlight ? "text-green-600" : "text-muted-foreground"}>{f}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-              </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Résiliation possible pendant l'essai
-              </p>
-            </CardContent>
-          </Card>
-        )}
+                <div className="mt-auto space-y-2">
+                  <Button
+                    className="w-full h-11 text-base"
+                    variant={plan.recommended ? "default" : "outline"}
+                    disabled={creatingCheckout || !acceptedTerms}
+                    onClick={() => handleStartSubscription(plan)}
+                  >
+                    {creatingCheckout ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Redirection...
+                      </>
+                    ) : (
+                      "Démarrer mon essai gratuit"
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Résiliation possible pendant l&apos;essai
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
