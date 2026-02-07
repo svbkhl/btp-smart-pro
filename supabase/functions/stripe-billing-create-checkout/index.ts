@@ -143,7 +143,7 @@ serve(async (req) => {
         .eq("id", companyId);
     }
 
-    const successUrl = `${SITE_URL}/dashboard`;
+    const successUrl = `${SITE_URL}/dashboard?onboarding_step=0`;
     const cancelUrl = `${SITE_URL}/start`;
 
     const session = await stripe.checkout.sessions.create({

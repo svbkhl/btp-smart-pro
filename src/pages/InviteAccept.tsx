@@ -25,7 +25,7 @@ import { motion } from 'framer-motion';
 interface InviteInfo {
   company_name: string;
   email: string;
-  role: 'admin' | 'member';
+  role: 'owner' | 'admin' | 'member';
   expires_at: string;
 }
 
@@ -517,8 +517,8 @@ const InviteAccept = () => {
                   </p>
                 </div>
                 <div className="flex items-center justify-center gap-2 pt-2">
-                  <Badge variant={inviteInfo.role === 'admin' ? 'default' : 'secondary'} className="text-sm px-3 py-1">
-                    {inviteInfo.role === 'admin' ? 'Administrateur' : 'Membre'}
+                  <Badge variant={inviteInfo.role === 'owner' || inviteInfo.role === 'admin' ? 'default' : 'secondary'} className="text-sm px-3 py-1">
+                    {inviteInfo.role === 'owner' ? 'Dirigeant' : inviteInfo.role === 'admin' ? 'Administrateur' : 'Membre'}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground pt-2">

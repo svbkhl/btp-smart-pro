@@ -90,8 +90,8 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
         </motion.div>
       </motion.main>
 
-      {/* Guide de première connexion (une seule fois) — jamais pour l'admin */}
-      {showOnboarding && !neverShowGuide && (
+      {/* Guide de première connexion (une seule fois) — aussi après paiement Stripe (?onboarding_step=0) — jamais pour l'admin */}
+      {(showOnboarding || searchParams.has("onboarding_step")) && !neverShowGuide && (
         <OnboardingTour
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingComplete}
