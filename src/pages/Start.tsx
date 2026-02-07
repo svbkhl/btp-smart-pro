@@ -11,8 +11,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -32,7 +30,6 @@ export default function Start() {
   const { isOwner } = usePermissions();
   const { subscription, isActive, isLoading: subLoading } = useSubscription();
   const [creatingCheckout, setCreatingCheckout] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const planOptions = getStripePlanOptions();
 
@@ -321,20 +318,6 @@ export default function Start() {
           </p>
         </div>
 
-        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4 max-w-2xl mx-auto">
-          <Checkbox
-            id="terms-engagement"
-            checked={acceptedTerms}
-            onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
-          />
-          <Label
-            htmlFor="terms-engagement"
-            className="text-sm font-medium leading-relaxed cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            Je reconnais qu&apos;à l&apos;issue de la période d&apos;essai, mon abonnement est engagé pour 12 mois et non résiliable avant échéance.
-          </Label>
-        </div>
-
         <div className="grid gap-5 sm:grid-cols-2 items-stretch">
           {planOptions.map((plan, index) => (
             <Card
@@ -396,7 +379,7 @@ export default function Start() {
                   <Button
                     className="w-full h-11 text-base"
                     variant={plan.recommended ? "default" : "outline"}
-                    disabled={creatingCheckout || !acceptedTerms}
+                    disabled={creatingCheckout}
                     onClick={() => handleStartSubscription(plan)}
                   >
                     {creatingCheckout ? (

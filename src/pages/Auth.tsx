@@ -106,17 +106,8 @@ const Auth = () => {
         navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
         return;
       }
-      // Si l'utilisateur a accepté une invitation (déjà membre d'une entreprise), aller aux offres Stripe
-      const { data: companyMembership } = await supabase
-        .from("company_users")
-        .select("company_id")
-        .eq("user_id", sessionUser.id)
-        .limit(1)
-        .maybeSingle();
-      if (companyMembership) {
-        navigate("/start", { replace: true });
-        return;
-      }
+      // Autoriser la connexion puis rediriger : on envoie vers dashboard/complete-profile.
+      // Si l'entreprise n'a pas d'abonnement, ProtectedRoute redirigera vers /start.
       if (requiresProfileCompletion(sessionUser)) {
         navigate("/complete-profile");
       } else {
