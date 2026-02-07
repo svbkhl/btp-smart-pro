@@ -49,6 +49,10 @@ export default function Start() {
   }, [user, currentCompanyId, isActive, subLoading, authLoading, navigate]);
 
   const handleStartSubscription = async (plan?: StripePlanOption) => {
+    // #region agent log
+    console.log('[DEBUG] Start.tsx:entry click', { planLabel: plan?.label });
+    fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:entry',message:'click Demarrer',data:{planLabel:plan?.label},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     const selectedPlan = plan ?? (planOptions.length > 0 ? planOptions[0] : null);
     const body: { price_id?: string; invitation_id?: string; trial_period_days?: number } = {};
     if (invitationId) body.invitation_id = invitationId;
@@ -59,7 +63,13 @@ export default function Start() {
       body.price_id = DEFAULT_PRICE_ID;
       body.trial_period_days = 14;
     }
+    // #region agent log
+    console.log('[DEBUG] Start.tsx:beforeCheck', { hasPriceId: !!body.price_id, hasInvitationId: !!body.invitation_id });
+    fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:beforeCheck',message:'body',data:{hasPriceId:!!body.price_id,hasInvitationId:!!body.invitation_id},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     if (!body.price_id && !body.invitation_id) {
+      console.log('[DEBUG] Start.tsx:skipNoPrice early return');
+      fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:skipNoPrice',message:'early return',data:{},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
       toast({
         title: "Paiement non configuré",
         description:
@@ -71,6 +81,10 @@ export default function Start() {
     setCreatingCheckout(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      // #region agent log
+      console.log('[DEBUG] Start.tsx:afterSession', { hasSession: !!session, hasToken: !!session?.access_token });
+      fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:afterSession',message:'session',data:{hasSession:!!session,hasToken:!!session?.access_token},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       if (!session?.access_token) {
         toast({
           title: "Session expirée",
@@ -83,12 +97,18 @@ export default function Start() {
         body,
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      // #region agent log
+      console.log('[DEBUG] Start.tsx:afterInvoke', { hasError: !!error, hasUrl: !!data?.url, dataError: (data as { error?: string })?.error });
+      fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:afterInvoke',message:'invoke',data:{hasError:!!error,hasUrl:!!data?.url,dataError:(data as {error?:string})?.error},timestamp:Date.now(),hypothesisId:'C,D'})}).catch(()=>{});
+      // #endregion
       if (error) {
         const errMsg = (data as { error?: string })?.error || error.message || "Erreur serveur";
         throw new Error(errMsg);
       }
       const url = data?.url;
       if (url) {
+        console.log('[DEBUG] Start.tsx:beforeRedirect', { urlLen: url.length });
+        fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:beforeRedirect',message:'href',data:{urlLen:url.length},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
         setCheckoutUrl(url);
         setCreatingCheckout(false);
         window.location.href = url;
@@ -97,6 +117,8 @@ export default function Start() {
       throw new Error((data as { error?: string })?.error || "Aucune URL de paiement reçue");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Erreur lors de l'ouverture du paiement";
+      console.log('[DEBUG] Start.tsx:catch', { message });
+      fetch('http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Start.tsx:catch',message:'catch',data:{message},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
       toast({
         title: "Erreur",
         description: message,

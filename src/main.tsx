@@ -7,6 +7,7 @@ import { DecorativeBackgroundProvider } from './contexts/DecorativeBackgroundCon
 import { SidebarProvider } from './contexts/SidebarContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { OnboardingProvider } from './contexts/OnboardingContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { initEnv } from './lib/env';
 import './index.css';
 
@@ -22,27 +23,32 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById('root')!).render(
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" storageKey="btp-smart-pro-theme">
-      <DecorativeBackgroundProvider>
-        <SidebarProvider>
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <AuthProvider>
-              <OnboardingProvider>
-                <App />
-              </OnboardingProvider>
-            </AuthProvider>
-          </BrowserRouter>
-        </SidebarProvider>
-      </DecorativeBackgroundProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+const rootEl = document.getElementById('root');
+if (!rootEl) throw new Error('Root element #root not found');
+
+createRoot(rootEl).render(
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="system" storageKey="btp-smart-pro-theme">
+        <DecorativeBackgroundProvider>
+          <SidebarProvider>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <AuthProvider>
+                <OnboardingProvider>
+                  <App />
+                </OnboardingProvider>
+              </AuthProvider>
+            </BrowserRouter>
+          </SidebarProvider>
+        </DecorativeBackgroundProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 
