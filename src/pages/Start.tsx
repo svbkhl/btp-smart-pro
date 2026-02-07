@@ -200,21 +200,6 @@ export default function Start() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6 pt-4">
       <div className="w-full max-w-4xl space-y-6">
-        {checkoutUrl && (
-          <div className="rounded-lg border border-primary/50 bg-primary/10 p-4 text-center max-w-2xl mx-auto">
-            <p className="text-sm text-muted-foreground mb-2">
-              Si la page de paiement ne s&apos;ouvre pas, cliquez sur le lien ci-dessous (notamment sur Safari) :
-            </p>
-            <a
-              href={checkoutUrl}
-              target="_self"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Accéder à la page de paiement Stripe
-            </a>
-          </div>
-        )}
         <div className="text-center space-y-1">
           <p className="text-2xl font-bold text-primary uppercase tracking-wide">BTP SMART PRO</p>
           <p className="text-lg text-muted-foreground font-medium">
@@ -222,7 +207,7 @@ export default function Start() {
           </p>
           <h1 className="text-2xl font-bold pt-1">Choisissez votre forfait</h1>
           <p className="text-sm text-muted-foreground/90">
-            Conçu pour artisans, PME et indépendants du BTP
+            Support & accompagnement inclus
           </p>
         </div>
 
