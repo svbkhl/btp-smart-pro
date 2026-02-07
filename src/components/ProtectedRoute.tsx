@@ -173,8 +173,10 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
   }
 
   // Si on doit rediriger vers /start (gate abo), ne pas afficher les children pendant la redirection
+  // Exclure aussi les admins système (ex. sabri.khalfallah6@gmail.com) qui n'ont pas de company
+  const adminSystem = isSystemAdmin(user);
   const shouldRedirectToStart =
-    !isPaywallPath && user && !isAdmin && !subscriptionLoading &&
+    !isPaywallPath && user && !isAdmin && !adminSystem && !subscriptionLoading &&
     ((currentCompanyId && !subscriptionActive) || !currentCompanyId);
   if (shouldRedirectToStart) {
     return null; // l'effet ci-dessus fait la redirection

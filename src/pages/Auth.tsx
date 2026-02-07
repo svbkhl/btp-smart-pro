@@ -24,7 +24,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { user, loading: authLoading, refetchCurrentCompanyId } = useAuth();
+  const { refetchCurrentCompanyId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -597,17 +597,6 @@ const Auth = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Bienvenue</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Connectez-vous pour accéder à votre espace</p>
         </div>
-
-        {!authLoading && user && (
-          <Alert className="bg-primary/10 border-primary/20">
-            <AlertDescription className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <span>Vous êtes déjà connecté.</span>
-              <Button variant="default" size="sm" onClick={() => navigate("/dashboard")}>
-                Continuer vers l&apos;app
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
 
         <Card className="bg-card/80 backdrop-blur-xl border border-border/50">
           <CardHeader>
