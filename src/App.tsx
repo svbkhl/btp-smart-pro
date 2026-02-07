@@ -97,15 +97,20 @@ function App() {
     }
   }, [location.pathname, location.search, location.hash]);
   
-  // Pages publiques où l'agent IA ne doit PAS être visible
+  // Pages publiques où l'agent IA ne doit PAS être visible (accueil, auth, démo, signature, paiement...)
   const isPublicPage = 
+    location.pathname === '/' ||
+    location.pathname === '/auth' ||
+    location.pathname === '/demo' ||
     location.pathname.startsWith('/sign/') ||
     location.pathname.startsWith('/signature/') ||
     location.pathname.startsWith('/payment/') ||
     location.pathname.startsWith('/candidature/') ||
     location.pathname.startsWith('/quote/') ||
     location.pathname.startsWith('/reset-password') ||
-    location.pathname.startsWith('/forgot-password');
+    location.pathname.startsWith('/forgot-password') ||
+    location.pathname.startsWith('/invite/') ||
+    location.pathname.startsWith('/accept-invitation');
   
   return (
     <ErrorBoundary>

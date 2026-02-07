@@ -139,17 +139,6 @@ const Index = () => {
                   </Button>
                 </Link>
               </div>
-              
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 pt-2 md:pt-4 animate-fade-in-up delay-600">
-                <div className="flex items-center gap-2 group">
-                  <CheckCircle className="w-4 md:w-5 h-4 md:h-5 text-primary group-hover:scale-110 transition-transform" />
-                  <span className="text-xs md:text-sm text-muted-foreground">Sans engagement</span>
-                </div>
-                <div className="flex items-center gap-2 group">
-                  <CheckCircle className="w-4 md:w-5 h-4 md:h-5 text-primary group-hover:scale-110 transition-transform" />
-                  <span className="text-xs md:text-sm text-muted-foreground">Installation rapide</span>
-                </div>
-              </div>
             </div>
             
             {/* Hero Image avec effet 3D et animations optimisées */}
@@ -291,17 +280,16 @@ const Index = () => {
                 L'IA prend en charge vos tâches répétitives : génération de devis, analyse de photos, 
                 conseils personnalisés. Vous vous concentrez sur ce qui compte vraiment : votre métier.
               </p>
-              <Link to="/demo">
-                <Button 
-                  size="lg" 
-                  variant="ghost" 
-                  className="gap-2 text-base md:text-lg px-6 md:px-8 hover:scale-105 transition-all duration-200 hover:shadow-xl relative overflow-hidden group/btn"
-                >
-                  <span className="relative z-10">Découvrir l'IA en action</span>
-                  <ArrowRight className="w-4 md:w-5 h-4 md:h-5 group-hover/btn:translate-x-1 transition-transform relative z-10" />
-                  <div className="absolute inset-0 shimmer opacity-0 group-hover/btn:opacity-100 transition-opacity" />
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                variant="ghost" 
+                onClick={() => setContactFormOpen(true)}
+                className="gap-2 text-base md:text-lg px-6 md:px-8 hover:scale-105 transition-all duration-200 hover:shadow-xl relative overflow-hidden group/btn"
+              >
+                <span className="relative z-10">Découvrir l'IA en action</span>
+                <ArrowRight className="w-4 md:w-5 h-4 md:h-5 group-hover/btn:translate-x-1 transition-transform relative z-10" />
+                <div className="absolute inset-0 shimmer opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+              </Button>
             </div>
           </div>
         </div>
@@ -462,17 +450,16 @@ const Index = () => {
               <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-4 sm:mb-6 md:mb-8 text-white/90 px-2">
                 Rejoignez les centaines d'entreprises qui utilisent déjà l'intelligence artificielle pour optimiser leur productivité
               </p>
-              <Link to="/demo">
-                <Button 
-                  size="lg" 
-                  variant="ghost" 
-                  className="gap-2 text-base md:text-lg px-6 md:px-8 hover:scale-105 transition-all duration-200 hover:shadow-xl relative overflow-hidden group/btn"
-                >
-                  <span className="relative z-10">Démarrer maintenant</span>
-                  <ArrowRight className="w-4 md:w-5 h-4 md:h-5 group-hover/btn:translate-x-1 transition-transform relative z-10" />
-                  <div className="absolute inset-0 shimmer opacity-0 group-hover/btn:opacity-100 transition-opacity" />
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                variant="ghost" 
+                onClick={() => setContactFormOpen(true)}
+                className="gap-2 text-base md:text-lg px-6 md:px-8 hover:scale-105 transition-all duration-200 hover:shadow-xl relative overflow-hidden group/btn"
+              >
+                <span className="relative z-10">Démarrer maintenant</span>
+                <ArrowRight className="w-4 md:w-5 h-4 md:h-5 group-hover/btn:translate-x-1 transition-transform relative z-10" />
+                <div className="absolute inset-0 shimmer opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+              </Button>
             </div>
           </div>
         </div>
@@ -481,7 +468,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="py-6 md:py-8 px-4">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p className="text-sm md:text-base">&copy; 2024 BTP Smart Pro. Tous droits réservés.</p>
+          <p className="text-sm md:text-base">&copy; 2026 BTP Smart Pro. Tous droits réservés.</p>
         </div>
       </footer>
 

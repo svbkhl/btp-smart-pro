@@ -41,21 +41,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Récupérer l'email de l'admin (premier utilisateur avec rôle administrateur)
-    const { data: adminRoles } = await supabaseClient
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'administrateur')
-      .limit(1);
+    // Email admin : ADMIN_EMAIL > sabri.khalfallah6@gmail.com > user_roles administrateur/admin
+    let adminEmail = Deno.env.get('ADMIN_EMAIL') || 'sabri.khalfallah6@gmail.com';
 
-    let adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@btp-smartpro.fr';
+    try {
+      const { data: adminRoles } = await supabaseClient
+        .from('user_roles')
+        .select('user_id')
+        .or('role.eq.administrateur,role.eq.admin')
+        .limit(1);
 
-    if (adminRoles && adminRoles.length > 0) {
-      // Récupérer l'email depuis auth.users via l'API admin
-      const { data: adminUser } = await supabaseClient.auth.admin.getUserById(adminRoles[0].user_id);
-      if (adminUser?.user?.email) {
-        adminEmail = adminUser.user.email;
+      if (adminRoles && adminRoles.length > 0) {
+        const { data: adminUser } = await supabaseClient.auth.admin.getUserById(adminRoles[0].user_id);
+        if (adminUser?.user?.email) {
+          adminEmail = adminUser.user.email;
+        }
       }
+    } catch (_) {
+      // Fallback sur sabri.khalfallah6@gmail.com
     }
 
     // Construire le sujet et le contenu de l'email
@@ -74,7 +77,7 @@ serve(async (req) => {
         ${entreprise ? `<p><strong>Entreprise :</strong> ${entreprise}</p>` : ''}
         ${message ? `<p><strong>Message :</strong><br>${message.replace(/\n/g, '<br>')}</p>` : ''}
         <p><strong>Type de demande :</strong> ${request_type === 'essai_gratuit' ? 'Essai gratuit' : request_type === 'contact' ? 'Contact' : 'Information'}</p>
-        ${trial_requested ? '<p style="color: #059669; font-weight: bold;">✅ Essai gratuit de 2 semaines demandé</p>' : ''}
+        ${trial_requested ? '<p style="color: #059669; font-weight: bold;">✅ Essai gratuit de 30 jours demandé</p>' : ''}
       </div>
 
       ${trial_requested ? `

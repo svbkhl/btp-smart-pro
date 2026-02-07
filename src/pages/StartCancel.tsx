@@ -42,7 +42,7 @@ export default function StartCancel() {
             <Link to="/start">Choisir un abonnement</Link>
           </Button>
           <Button asChild variant="outline" className="w-full">
-            <Link to="/dashboard">Retour à l'accueil</Link>
+            <Link to="/">Retour à l'accueil</Link>
           </Button>
         </CardContent>
       </Card>

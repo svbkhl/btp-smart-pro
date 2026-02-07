@@ -38,10 +38,10 @@ export const TopBar = () => {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    // Si on est en mode démo, rediriger vers le formulaire d'essai
+    // Si on est en mode démo, rediriger vers l'accueil
     const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
     if (fakeDataEnabled) {
-      navigate("/?openTrialForm=true");
+      navigate("/");
     } else {
       navigate("/auth");
     }

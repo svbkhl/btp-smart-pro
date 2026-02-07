@@ -72,43 +72,30 @@ export const ContactForm = ({
     setLoading(true);
 
     try {
-      // Créer la demande via la fonction SQL
-      const { data: requestId, error: createError } = await supabase.rpc(
-        'create_contact_request',
-        {
-          p_nom: formData.nom,
-          p_prenom: formData.prenom,
-          p_email: formData.email,
-          p_telephone: formData.telephone || null,
-          p_entreprise: formData.entreprise || null,
-          p_message: formData.message || null,
-          p_request_type: formData.request_type,
-          p_trial_requested: formData.trial_requested,
-        }
-      );
+      // Créer la demande via Edge Function (contourne RLS, pas d'auth requise)
+      const { data, error: createError } = await supabase.functions.invoke('create-contact-request', {
+        body: {
+          nom: formData.nom.trim(),
+          prenom: formData.prenom.trim(),
+          email: formData.email.trim(),
+          telephone: formData.telephone?.trim() || null,
+          entreprise: formData.entreprise?.trim() || null,
+          message: formData.message?.trim() || null,
+          request_type: formData.request_type,
+          trial_requested: formData.trial_requested,
+        },
+      });
 
       if (createError) {
         throw createError;
       }
 
-      // Envoyer une notification à l'admin via Edge Function
-      try {
-        await supabase.functions.invoke('notify-contact-request', {
-          body: {
-            request_id: requestId,
-            nom: formData.nom,
-            prenom: formData.prenom,
-            email: formData.email,
-            telephone: formData.telephone,
-            entreprise: formData.entreprise,
-            message: formData.message,
-            trial_requested: formData.trial_requested,
-            request_type: formData.request_type,
-          },
-        });
-      } catch (notifyError) {
-        console.error('Error sending notification:', notifyError);
-        // Ne pas bloquer si la notification échoue
+      const responseData = data as { success?: boolean; error?: string; details?: string } | null;
+      if (responseData?.error) {
+        throw new Error(responseData.details || responseData.error);
+      }
+      if (responseData && responseData.success === false) {
+        throw new Error(responseData.error || 'La demande n\'a pas pu être créée');
       }
 
       toast({
@@ -153,7 +140,7 @@ export const ContactForm = ({
           </DialogTitle>
           <DialogDescription>
             {formData.trial_requested
-              ? 'Remplissez le formulaire ci-dessous pour demander un essai gratuit de 2 semaines. Nous vous contacterons rapidement.'
+              ? 'Remplissez le formulaire ci-dessous pour demander un essai gratuit de 30 jours. Nous vous contacterons rapidement.'
               : 'Remplissez le formulaire ci-dessous et nous vous répondrons rapidement.'}
           </DialogDescription>
         </DialogHeader>
@@ -265,7 +252,7 @@ export const ContactForm = ({
               htmlFor="trial_requested"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
-              Je souhaite bénéficier d'un essai gratuit de 2 semaines
+              Je souhaite bénéficier d'un essai gratuit de 30 jours
             </Label>
           </div>
 

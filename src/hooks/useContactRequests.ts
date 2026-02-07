@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { isAdminEmail } from '@/config/admin';
 
 export interface ContactRequest {
   id: string;
@@ -29,11 +30,13 @@ export interface ContactRequest {
  */
 export const useContactRequests = () => {
   const { user, isAdmin } = useAuth();
+  const isAdminByEmail = isAdminEmail(user?.email);
+  const canView = !!user && (isAdmin || isAdminByEmail);
 
   return useQuery<ContactRequest[], Error>({
     queryKey: ['contact_requests'],
     queryFn: async () => {
-      if (!user || !isAdmin) {
+      if (!canView) {
         throw new Error('Unauthorized');
       }
 
@@ -48,7 +51,7 @@ export const useContactRequests = () => {
 
       return (data || []) as ContactRequest[];
     },
-    enabled: !!user && !!isAdmin,
+    enabled: canView,
     refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
   });
 };
@@ -59,6 +62,8 @@ export const useContactRequests = () => {
 export const useUpdateContactRequest = () => {
   const queryClient = useQueryClient();
   const { user, isAdmin } = useAuth();
+  const isAdminByEmail = isAdminEmail(user?.email);
+  const canUpdate = !!user && (isAdmin || isAdminByEmail);
 
   return useMutation({
     mutationFn: async ({
@@ -68,7 +73,7 @@ export const useUpdateContactRequest = () => {
       requestId: string;
       updates: Partial<ContactRequest>;
     }) => {
-      if (!user || !isAdmin) {
+      if (!canUpdate) {
         throw new Error('Unauthorized');
       }
 

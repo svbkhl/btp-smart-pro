@@ -358,9 +358,9 @@ export default function Sidebar() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    // Si on est en mode démo et pas connecté, rediriger vers le formulaire d'essai
-    if (!user && fakeDataEnabled) {
-      navigate("/?openTrialForm=true");
+    // Si on est en mode démo, rediriger vers l'accueil
+    if (fakeDataEnabled) {
+      navigate("/");
     } else {
       navigate("/auth");
     }
@@ -926,10 +926,10 @@ export default function Sidebar() {
                 <Button
                   variant="ghost"
                   className="w-full gap-2"
-                  onClick={() => navigate("/auth")}
+                  onClick={() => navigate("/?openTrialForm=true")}
                 >
                   <LogIn className="w-4 h-4" />
-                  {isOpen && "Se connecter"}
+                  {isOpen && "Demander un essai"}
                 </Button>
               </div>
             ) : (

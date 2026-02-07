@@ -169,3 +169,9 @@ verify_jwt = false
 
 [functions.get-public-document]
 verify_jwt = false
+
+[functions.create-contact-request]
+verify_jwt = false
+
+[functions.notify-contact-request]
+verify_jwt = false
