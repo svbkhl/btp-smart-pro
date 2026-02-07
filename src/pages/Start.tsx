@@ -49,20 +49,6 @@ export default function Start() {
   }, [user, currentCompanyId, isActive, subLoading, authLoading, navigate]);
 
   const handleStartSubscription = async (plan?: StripePlanOption) => {
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "Start.tsx:handleStartSubscription:entry",
-        message: "click Demarrer",
-        data: { planLabel: plan?.label, hasInvitationId: !!invitationId },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "A",
-      }),
-    }).catch(() => {});
-    // #endregion
     const selectedPlan = plan ?? (planOptions.length > 0 ? planOptions[0] : null);
     const body: { price_id?: string; invitation_id?: string; trial_period_days?: number } = {};
     if (invitationId) body.invitation_id = invitationId;
@@ -73,39 +59,11 @@ export default function Start() {
       body.price_id = DEFAULT_PRICE_ID;
       body.trial_period_days = 14;
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "Start.tsx:beforeCheck",
-        message: "body before guard",
-        data: { hasPriceId: !!body.price_id, hasInvitationId: !!body.invitation_id },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "A",
-      }),
-    }).catch(() => {});
-    // #endregion
-      if (!body.price_id && !body.invitation_id) {
-      // #region agent log
-      fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: "Start.tsx:skipNoPrice",
-          message: "early return no price_id",
-          data: {},
-          timestamp: Date.now(),
-          sessionId: "debug-session",
-          hypothesisId: "A",
-        }),
-      }).catch(() => {});
-      // #endregion
+    if (!body.price_id && !body.invitation_id) {
       toast({
         title: "Paiement non configuré",
         description:
-          "Configurez les variables d'environnement Stripe dans Vercel (VITE_STRIPE_PRICE_ID_ANNUEL et VITE_STRIPE_PRICE_ID_MENSUEL) puis redéployez. [diagnostic: price_id manquant]",
+          "Configurez les variables d'environnement Stripe dans Vercel (VITE_STRIPE_PRICE_ID_ANNUEL et VITE_STRIPE_PRICE_ID_MENSUEL) puis redéployez.",
         variant: "destructive",
       });
       return;
@@ -113,20 +71,6 @@ export default function Start() {
     setCreatingCheckout(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      // #region agent log
-      fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: "Start.tsx:afterGetSession",
-          message: "session check",
-          data: { hasSession: !!session, hasToken: !!session?.access_token },
-          timestamp: Date.now(),
-          sessionId: "debug-session",
-          hypothesisId: "B",
-        }),
-      }).catch(() => {});
-      // #endregion
       if (!session?.access_token) {
         toast({
           title: "Session expirée",
@@ -139,78 +83,20 @@ export default function Start() {
         body,
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      // #region agent log
-      fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: "Start.tsx:afterInvoke",
-          message: "invoke result",
-          data: {
-            hasError: !!error,
-            errorMsg: error?.message ?? null,
-            dataError: (data as { error?: string })?.error ?? null,
-            hasUrl: !!(data?.url),
-            urlPrefix: data?.url ? String(data.url).slice(0, 40) : null,
-          },
-          timestamp: Date.now(),
-          sessionId: "debug-session",
-          hypothesisId: "C,E",
-        }),
-      }).catch(() => {});
-      // #endregion
       if (error) {
         const errMsg = (data as { error?: string })?.error || error.message || "Erreur serveur";
         throw new Error(errMsg);
       }
       const url = data?.url;
       if (url) {
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "Start.tsx:beforeRedirect",
-            message: "redirect via form submit (Safari)",
-            data: { urlLen: url.length },
-            timestamp: Date.now(),
-            sessionId: "debug-session",
-            hypothesisId: "D",
-            runId: "post-fix",
-          }),
-        }).catch(() => {});
-        // #endregion
         setCheckoutUrl(url);
         setCreatingCheckout(false);
-        // Safari bloque souvent la redirection après async. On tente formulaire + replace, et on affiche un lien de secours (clic = geste utilisateur).
-        const form = document.createElement("form");
-        form.method = "GET";
-        form.action = url;
-        form.style.display = "none";
-        document.body.appendChild(form);
-        form.submit();
-        setTimeout(() => {
-          window.location.replace(url);
-        }, 150);
+        window.location.href = url;
         return;
       }
       throw new Error((data as { error?: string })?.error || "Aucune URL de paiement reçue");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Erreur lors de l'ouverture du paiement";
-      // #region agent log
-      fetch("http://127.0.0.1:7242/ingest/d6bbbe4a-4bc0-448c-8c46-34c6f74033bf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: "Start.tsx:catch",
-          message: "catch",
-          data: { message },
-          timestamp: Date.now(),
-          sessionId: "debug-session",
-          hypothesisId: "C,D,E",
-        }),
-      }).catch(() => {});
-      // #endregion
       toast({
         title: "Erreur",
         description: message,
