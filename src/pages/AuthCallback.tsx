@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { User } from "@supabase/supabase-js";
+import { isSystemAdmin } from "@/config/admin";
+import { hasActiveSubscription } from "@/lib/checkSubscription";
 
 // Déclaration de type pour la propriété globale window
 declare global {
@@ -45,14 +47,23 @@ const AuthCallback = () => {
 
   /**
    * Redirige l'utilisateur après authentification réussie.
-   * Autorise la connexion puis ProtectedRoute redirige vers /start si l'entreprise n'a pas d'abonnement.
+   * Si pas de forfait actif → /start (choix forfait). Sinon → /dashboard.
    */
   const handlePostAuthNavigation = async (user: User) => {
     if (requiresProfileCompletion(user)) {
       navigate("/complete-profile", { replace: true });
-    } else {
-      navigate("/dashboard", { replace: true });
+      return;
     }
+    if (isSystemAdmin(user)) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+    const hasSub = await hasActiveSubscription(user.id);
+    if (!hasSub) {
+      navigate("/start", { replace: true });
+      return;
+    }
+    navigate("/dashboard", { replace: true });
   };
 
   useEffect(() => {

@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { isSystemAdmin } from "@/config/admin";
+import { hasActiveSubscription } from "@/lib/checkSubscription";
 
 // Déclaration de type pour la propriété globale window
 declare global {
@@ -106,13 +108,22 @@ const Auth = () => {
         navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
         return;
       }
-      // Autoriser la connexion puis rediriger : on envoie vers dashboard/complete-profile.
-      // Si l'entreprise n'a pas d'abonnement, ProtectedRoute redirigera vers /start.
       if (requiresProfileCompletion(sessionUser)) {
-        navigate("/complete-profile");
-      } else {
-        navigate("/dashboard");
+        navigate("/complete-profile", { replace: true });
+        return;
       }
+      // Admin système : dashboard directement
+      if (isSystemAdmin(sessionUser)) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+      // Pas de forfait actif → /start (choix forfait)
+      const hasSub = await hasActiveSubscription(sessionUser.id);
+      if (!hasSub) {
+        navigate("/start", { replace: true });
+        return;
+      }
+      navigate("/dashboard", { replace: true });
     };
 
     // Gérer explicitement les callbacks Supabase Auth (invitation, magic link, etc.)
