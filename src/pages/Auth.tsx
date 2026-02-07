@@ -24,7 +24,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { refetchCurrentCompanyId } = useAuth();
+  const { user, loading: authLoading, refetchCurrentCompanyId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -191,15 +191,9 @@ const Auth = () => {
     // Exécuter le handler de callback si nécessaire
     handleAuthCallback();
 
-    // Check if user is already logged in (e.g. after accepting an invitation)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        if (wasInviteAccepted) {
-          await refetchCurrentCompanyId();
-        }
-        await handlePostAuthNavigation(session.user);
-      }
-    });
+    // Ne PAS auto-rediriger les utilisateurs déjà connectés : ils doivent voir /auth
+    // et choisir de continuer. Redirection uniquement après login explicite (callback, onAuthStateChange).
+    // Supabase getSession() supprimé ici pour éviter le bounce direct vers /start.
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -224,7 +218,9 @@ const Auth = () => {
         return;
       }
 
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      // Rediriger uniquement après login explicite (SIGNED_IN), pas au chargement (TOKEN_REFRESHED)
+      // pour que l'utilisateur voie toujours /auth en premier
+      if (event === "SIGNED_IN") {
         if (session?.user) {
           // Vérifications multiples pour détecter une session de réinitialisation
           const isResetPasswordPage = window.location.pathname === '/reset-password' || 
@@ -273,7 +269,7 @@ const Auth = () => {
           return;
         }
         
-        await handlePostAuthNavigation(session.user);
+        // Ne pas rediriger ici : TOKEN_REFRESHED/INITIAL_SESSION peuvent faire rebondir vers /start
       }
     });
 
@@ -601,6 +597,17 @@ const Auth = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Bienvenue</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Connectez-vous pour accéder à votre espace</p>
         </div>
+
+        {!authLoading && user && (
+          <Alert className="bg-primary/10 border-primary/20">
+            <AlertDescription className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <span>Vous êtes déjà connecté.</span>
+              <Button variant="default" size="sm" onClick={() => navigate("/dashboard")}>
+                Continuer vers l&apos;app
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card className="bg-card/80 backdrop-blur-xl border border-border/50">
           <CardHeader>
