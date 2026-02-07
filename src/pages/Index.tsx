@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle, Building2, Brain, Zap, Image, Bell } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { useAuth } from "@/hooks/useAuth";
 import { ContactForm } from "@/components/ContactForm";
 
 // Déclaration de type pour la propriété globale window
@@ -21,8 +20,6 @@ import {
 } from "@/components/ui/carousel";
 
 const Index = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const [contactFormOpen, setContactFormOpen] = useState(false);
   
   // Vérifier si on doit ouvrir le formulaire d'essai depuis l'URL
@@ -49,32 +46,8 @@ const Index = () => {
     setHeroInitialized(true);
   }, []);
 
-  // Si l'utilisateur est connecté, rediriger vers le dashboard
-  useEffect(() => {
-    if (user) {
-      // Ne pas rediriger si on est sur la page de réinitialisation de mot de passe
-      // Vérifier le pathname, le flag global, et le hash/query params pour type=recovery
-      const isResetPasswordPage = window.location.pathname === '/reset-password' || 
-                                  window.location.pathname.startsWith('/reset-password');
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const urlParams = new URLSearchParams(window.location.search);
-      const isRecoveryToken = hashParams.get('type') === 'recovery' || 
-                              urlParams.get('type') === 'recovery' ||
-                              window.__IS_PASSWORD_RESET_PAGE__ === true ||
-                              window.location.href.includes('type=recovery');
-      
-      if (isResetPasswordPage || isRecoveryToken) {
-        console.log('[Index] Ignoring redirect - recovery session detected:', {
-          isResetPasswordPage,
-          isRecoveryToken,
-          pathname: window.location.pathname,
-          flag: window.__IS_PASSWORD_RESET_PAGE__
-        });
-        return;
-      }
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, navigate]);
+  // Ne jamais rediriger automatiquement : la landing reste toujours accessible
+  // L'utilisateur clique "Accéder à l'app" pour aller vers l'app (auth, start ou dashboard)
 
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden" style={{ scrollBehavior: 'smooth' }}>
@@ -95,7 +68,7 @@ const Index = () => {
             </div>
             <span className="font-bold text-base sm:text-lg md:text-xl text-foreground">BTP Smart Pro</span>
           </div>
-          <Link to="/dashboard" className="group">
+          <Link to="/auth" className="group">
             <Button variant="ghost" className="gap-2 text-sm md:text-base hover:scale-105 transition-all duration-200 hover:shadow-lg">
               <span className="hidden sm:inline">Accéder à l'app</span>
               <span className="sm:hidden">App</span>

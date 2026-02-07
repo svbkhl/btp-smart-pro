@@ -29,7 +29,8 @@
     "seed:demo:force": "tsx scripts/seed-demo.ts --force",
     "purge:demo": "tsx scripts/purge-demo.ts",
     "create:client": "tsx scripts/create-client.ts",
-    "stripe:create-plans": "tsx scripts/create-stripe-smart-pro-plans.ts"
+    "stripe:create-plans": "tsx scripts/create-stripe-smart-pro-plans.ts",
+    "vercel:add-stripe-env": "tsx scripts/vercel-add-stripe-env.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
