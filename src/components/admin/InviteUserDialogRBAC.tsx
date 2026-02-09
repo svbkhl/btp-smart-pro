@@ -54,7 +54,7 @@ export const InviteUserDialogRBAC = ({
   const { user, currentCompanyId } = useAuth();
   const { can, isOwner, isAdmin } = usePermissions();
   const { roles, isLoading: rolesLoading } = useRoles();
-  const { isActive: companyHasSubscription } = useSubscription();
+  const { isActive: companyHasSubscription, isLoading: subscriptionLoading } = useSubscription();
 
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,8 +63,8 @@ export const InviteUserDialogRBAC = ({
   const [selectedPlan, setSelectedPlan] = useState<StripePlanOption | null>(null);
 
   const planOptions = useMemo(() => getStripePlanOptions(), []);
-  // Si l'entreprise a déjà un abonnement actif, l'invité a accès sans payer
-  const requirePlan = !companyHasSubscription && planOptions.length > 0;
+  // Si l'entreprise a déjà un abonnement actif, l'invité a accès sans payer. Pendant le chargement, on ne demande pas de plan.
+  const requirePlan = !subscriptionLoading && !companyHasSubscription && planOptions.length > 0;
 
   // Dirigeant et administrateur peuvent toujours inviter ; sinon permission employees.access
   const canInvite = can('employees.access') || isOwner || isAdmin;
@@ -211,8 +211,13 @@ export const InviteUserDialogRBAC = ({
 
         <form onSubmit={handleInvite}>
           <div className="grid gap-4 py-4">
-            {/* Offre / Plan : affiché uniquement si l'entreprise n'a pas encore d'abonnement */}
-            {companyHasSubscription ? (
+            {/* Offre / Plan : masqué pendant chargement ; si entreprise abonnée → message ; sinon → sélecteur */}
+            {subscriptionLoading ? (
+              <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                Vérification de l'abonnement...
+              </div>
+            ) : companyHasSubscription ? (
               <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-3 text-sm text-green-700 dark:text-green-400">
                 Votre entreprise est déjà abonnée. L'invité aura accès directement sans souscription.
               </div>
@@ -335,7 +340,7 @@ export const InviteUserDialogRBAC = ({
             </Button>
             <Button
               type="submit"
-              disabled={loading || !selectedRoleId || (requirePlan && !selectedPlan)}
+              disabled={loading || subscriptionLoading || !selectedRoleId || (requirePlan && !selectedPlan)}
             >
               {loading ? (
                 <>
