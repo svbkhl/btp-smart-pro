@@ -428,7 +428,7 @@ export const BillingSettings = () => {
                     </Dialog>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Configurez VITE_STRIPE_PUBLISHABLE_KEY pour modifier la carte depuis cette page.
+                      Clé publique Stripe manquante : ajoutez VITE_STRIPE_PUBLISHABLE_KEY dans .env.local (local) ou dans Vercel (production).
                     </p>
                   )}
                 </div>
@@ -469,7 +469,7 @@ export const BillingSettings = () => {
                     </Dialog>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Configurez VITE_STRIPE_PUBLISHABLE_KEY pour ajouter une carte.
+                      Clé publique Stripe manquante : ajoutez VITE_STRIPE_PUBLISHABLE_KEY dans .env.local (local) ou dans Vercel (production).
                     </p>
                   )}
                 </div>
