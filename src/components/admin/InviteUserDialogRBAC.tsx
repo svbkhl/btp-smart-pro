@@ -31,6 +31,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useSubscription } from '@/hooks/useSubscription';
 import { AuditLogHelpers } from '@/services/auditLogService';
 import { getStripePlanOptions, type StripePlanOption } from '@/config/stripePlans';
 
@@ -53,7 +54,8 @@ export const InviteUserDialogRBAC = ({
   const { user, currentCompanyId } = useAuth();
   const { can, isOwner, isAdmin } = usePermissions();
   const { roles, isLoading: rolesLoading } = useRoles();
-  
+  const { isActive: companyHasSubscription } = useSubscription();
+
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -61,6 +63,8 @@ export const InviteUserDialogRBAC = ({
   const [selectedPlan, setSelectedPlan] = useState<StripePlanOption | null>(null);
 
   const planOptions = useMemo(() => getStripePlanOptions(), []);
+  // Si l'entreprise a déjà un abonnement actif, l'invité a accès sans payer
+  const requirePlan = !companyHasSubscription && planOptions.length > 0;
 
   // Dirigeant et administrateur peuvent toujours inviter ; sinon permission employees.access
   const canInvite = can('employees.access') || isOwner || isAdmin;
@@ -92,8 +96,8 @@ export const InviteUserDialogRBAC = ({
       return;
     }
 
-    // Validation offre / plan (obligatoire avant envoi)
-    if (!selectedPlan || !selectedPlan.price_id) {
+    // Validation offre / plan uniquement si l'entreprise n'a pas encore d'abonnement
+    if (requirePlan && (!selectedPlan || !selectedPlan.price_id)) {
       toast({
         title: 'Erreur',
         description: 'Veuillez choisir une offre (prix et période d\'essai) avant d\'envoyer l\'invitation',
@@ -124,15 +128,19 @@ export const InviteUserDialogRBAC = ({
       // Récupérer le rôle sélectionné pour le log
       const selectedRole = roles.find(r => r.id === selectedRoleId);
 
-      // Créer l'invitation (avec offre / prix / période d'essai choisis)
+      // Créer l'invitation (offre/prix uniquement si entreprise pas encore abonnée)
       const { data, error } = await supabase.functions.invoke('send-invitation', {
         body: {
           email: email.trim().toLowerCase(),
           role_id: selectedRoleId,
           company_id: currentCompanyId,
-          stripe_price_id: selectedPlan.price_id,
-          trial_days: selectedPlan.trial_days,
-          offer_label: selectedPlan.label,
+          ...(requirePlan && selectedPlan
+            ? {
+                stripe_price_id: selectedPlan.price_id,
+                trial_days: selectedPlan.trial_days,
+                offer_label: selectedPlan.label,
+              }
+            : {}),
         },
       });
 
@@ -203,8 +211,12 @@ export const InviteUserDialogRBAC = ({
 
         <form onSubmit={handleInvite}>
           <div className="grid gap-4 py-4">
-            {/* Offre / Plan (prix + période d'essai) - à choisir avant envoi */}
-            {planOptions.length > 0 && (
+            {/* Offre / Plan : affiché uniquement si l'entreprise n'a pas encore d'abonnement */}
+            {companyHasSubscription ? (
+              <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-3 text-sm text-green-700 dark:text-green-400">
+                Votre entreprise est déjà abonnée. L'invité aura accès directement sans souscription.
+              </div>
+            ) : planOptions.length > 0 ? (
               <div className="grid gap-2">
                 <Label>
                   Offre / Plan <span className="text-destructive">*</span>
@@ -239,7 +251,7 @@ export const InviteUserDialogRBAC = ({
                   L'invité pourra souscrire à cette offre à l'acceptation de l'invitation.
                 </p>
               </div>
-            )}
+            ) : null}
 
             {/* Email */}
             <div className="grid gap-2">
@@ -323,7 +335,7 @@ export const InviteUserDialogRBAC = ({
             </Button>
             <Button
               type="submit"
-              disabled={loading || !selectedRoleId || (planOptions.length > 0 && !selectedPlan)}
+              disabled={loading || !selectedRoleId || (requirePlan && !selectedPlan)}
             >
               {loading ? (
                 <>
