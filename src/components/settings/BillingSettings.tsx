@@ -203,11 +203,39 @@ export const BillingSettings = () => {
     }
   };
 
+  const openPortalForResiliation = async () => {
+    setResiliateAnnualLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stripe-billing-portal", {});
+      if (error) throw error;
+      const url = (data as { url?: string })?.url;
+      if (url) window.location.href = url;
+      else throw new Error("Aucune URL reçue");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Impossible d'ouvrir le portail";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    } finally {
+      setResiliateAnnualLoading(false);
+    }
+  };
+
   const resiliateAnnual = async () => {
     setResiliateAnnualLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("stripe-billing-resiliate-annual", {});
-      if (error) throw error;
+      if (error) {
+        const errMsg = String((error as { message?: string })?.message ?? "");
+        const is404 = errMsg.includes("404") || errMsg.includes("Not Found") || (error as { status?: number })?.status === 404;
+        if (is404) {
+          toast({
+            title: "Ouverture du portail Stripe",
+            description: "Vous allez être redirigé pour résilier depuis le portail.",
+          });
+          await openPortalForResiliation();
+          return;
+        }
+        throw error;
+      }
       const msg = (data as { message?: string })?.message ?? "Résiliation programmée en fin de période.";
       toast({ title: "Résiliation programmée", description: msg });
       await refetch();
@@ -428,7 +456,7 @@ export const BillingSettings = () => {
                     </Dialog>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Clé publique Stripe manquante : ajoutez VITE_STRIPE_PUBLISHABLE_KEY dans .env.local (local) ou dans Vercel (production).
+                      En production : Vercel → Settings → Environment Variables → ajoutez VITE_STRIPE_PUBLISHABLE_KEY pour Production, puis redéployez (obligatoire : les variables Vite sont lues au build).
                     </p>
                   )}
                 </div>
@@ -469,7 +497,7 @@ export const BillingSettings = () => {
                     </Dialog>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Clé publique Stripe manquante : ajoutez VITE_STRIPE_PUBLISHABLE_KEY dans .env.local (local) ou dans Vercel (production).
+                      En production : Vercel → Settings → Environment Variables → ajoutez VITE_STRIPE_PUBLISHABLE_KEY pour Production, puis redéployez (obligatoire : les variables Vite sont lues au build).
                     </p>
                   )}
                 </div>

@@ -22,8 +22,7 @@ export default defineConfig({
   },
   // Préfixe pour les variables d'environnement accessibles côté client
   envPrefix: 'VITE_',
-  // Désactiver le chargement automatique des fichiers .env
-  // Vercel fournit les variables via process.env
-  envDir: undefined,
+  // Charger .env et .env.local en dev ; sur Vercel les variables sont injectées au build
+  envDir: process.env.VERCEL ? undefined : '.',
 });
 
