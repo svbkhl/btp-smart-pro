@@ -1,9 +1,10 @@
 /**
- * Pousse VITE_STRIPE_PRICE_ID_ANNUEL et VITE_STRIPE_PRICE_ID_MENSUEL vers Vercel.
+ * Pousse les variables Stripe vers Vercel (Price IDs + clé publique).
  * Lit les valeurs depuis .env.local / .env (mêmes que Supabase Secrets).
  *
  * Usage: npx tsx scripts/vercel-add-stripe-env.ts
  * Prérequis: vercel link (projet lié) et .env.local avec les Price IDs Stripe
+ * Optionnel: VITE_STRIPE_PUBLISHABLE_KEY (pk_test_... ou pk_live_...) pour le formulaire carte sur la page Abonnement
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -52,6 +53,16 @@ if (!annuel || !mensuel) {
 }
 
 function run(name: string, value: string) {
+  // Supprimer d'abord si elle existe (évite "already exists"), puis ajouter
+  try {
+    execSync(`npx vercel env rm ${name} production --yes`, {
+      encoding: "utf-8",
+      stdio: "pipe",
+      cwd: root,
+    });
+  } catch {
+    // La variable n'existait pas, on continue
+  }
   try {
     execSync(`npx vercel env add ${name} production`, {
       input: value,
@@ -59,13 +70,13 @@ function run(name: string, value: string) {
       stdio: ["pipe", "inherit", "inherit"],
       cwd: root,
     });
-    console.log(`✅ ${name} ajouté`);
+    console.log(`✅ ${name} ajouté ou mis à jour`);
   } catch (e: unknown) {
-    const msg = (e as { stderr?: string; message?: string })?.stderr ?? (e as Error)?.message ?? "";
+    const msg = String((e as Error)?.message ?? "");
     if (msg.includes("isn't linked") || msg.includes("Run `vercel link`")) {
       console.error("❌ Projet non lié. Lance: npx vercel link (puis réessaie)");
     } else {
-      console.error(`❌ Échec pour ${name}. Si la variable existe déjà, modifie-la dans Vercel Dashboard.`);
+      console.error(`❌ Échec pour ${name}. Vérifie Vercel Dashboard.`);
     }
     throw e;
   }
@@ -85,8 +96,15 @@ if (!linked) {
   process.exit(1);
 }
 
+const publishable = vars.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
+
 console.log("📤 Ajout des variables Stripe vers Vercel (production)...\n");
 run("VITE_STRIPE_PRICE_ID_ANNUEL", annuel);
 run("VITE_STRIPE_PRICE_ID_MENSUEL", mensuel);
+if (publishable) {
+  run("VITE_STRIPE_PUBLISHABLE_KEY", publishable);
+} else {
+  console.log("ℹ️ VITE_STRIPE_PUBLISHABLE_KEY non défini : ajoute-la dans .env.local pour activer le formulaire carte sur la page Abonnement.");
+}
 console.log("\n✅ Terminé. Redéploie avec: npx vercel --prod");
 console.log("   Ou push sur main pour déclencher un déploiement automatique.");

@@ -30,7 +30,6 @@ export const BackButton = () => {
   const hideOnPages = [
     "/",
     "/auth",
-    "/complete-profile",
     "/dashboard",
     "/clients",
     "/projects",

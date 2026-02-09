@@ -23,8 +23,10 @@ export interface SubscriptionData {
   trial_end: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  cancel_at: string | null;
   stripe_customer_id: string | null;
   stripe_onboarding_required: boolean;
+  stripe_price_id: string | null;
 }
 
 const ACTIVE_STATUSES: SubscriptionStatus[] = ["trialing", "active"];
@@ -39,15 +41,15 @@ export function useSubscription() {
       try {
         const { data, error } = await supabase
           .from("companies")
-          .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_onboarding_required")
+          .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, cancel_at, stripe_customer_id, stripe_onboarding_required, stripe_price_id")
           .eq("id", currentCompanyId)
           .single();
         if (error || !data) {
-          const needsFallback = error && (error?.message?.includes("stripe_onboarding_required") || error?.code === "42703");
+          const needsFallback = error && (error?.message?.includes("stripe_onboarding_required") || error?.message?.includes("stripe_price_id") || error?.message?.includes("cancel_at") || error?.code === "42703");
           if (needsFallback) {
             const { data: fallback, error: fallbackErr } = await supabase
               .from("companies")
-              .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, stripe_customer_id")
+              .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_price_id")
               .eq("id", currentCompanyId)
               .single();
             if (fallbackErr || !fallback) return null;
@@ -56,8 +58,10 @@ export function useSubscription() {
               trial_end: fallback.trial_end ?? null,
               current_period_end: fallback.current_period_end ?? null,
               cancel_at_period_end: Boolean(fallback.cancel_at_period_end),
+              cancel_at: null,
               stripe_customer_id: fallback.stripe_customer_id ?? null,
               stripe_onboarding_required: false,
+              stripe_price_id: (fallback as { stripe_price_id?: string | null }).stripe_price_id ?? null,
             };
           }
           return null;
@@ -67,8 +71,10 @@ export function useSubscription() {
           trial_end: data.trial_end ?? null,
           current_period_end: data.current_period_end ?? null,
           cancel_at_period_end: Boolean(data.cancel_at_period_end),
+          cancel_at: (data as { cancel_at?: string | null }).cancel_at ?? null,
           stripe_customer_id: data.stripe_customer_id ?? null,
           stripe_onboarding_required: data.stripe_onboarding_required === true,
+          stripe_price_id: (data as { stripe_price_id?: string | null }).stripe_price_id ?? null,
         };
       } catch {
         return null;

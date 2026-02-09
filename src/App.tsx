@@ -45,7 +45,6 @@ import PaymentReminders from './pages/PaymentReminders';
 import AIInsights from './pages/AIInsights';
 import Settings from './pages/Settings';
 import { GoogleCalendarIntegration } from './pages/GoogleCalendarIntegration';
-import CompleteProfile from './pages/CompleteProfile';
 import ClientsAndQuotes from './pages/ClientsAndQuotes';
 import EmployeesAndRH from './pages/EmployeesAndRH';
 import EmployeesDashboard from './pages/EmployeesDashboard';
@@ -318,14 +317,6 @@ function App() {
           element={
             <ProtectedRoute>
               <GoogleCalendarIntegration />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/complete-profile"
-          element={
-            <ProtectedRoute>
-              <CompleteProfile />
             </ProtectedRoute>
           }
         />

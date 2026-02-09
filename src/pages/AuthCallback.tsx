@@ -27,7 +27,7 @@ declare global {
  * Flow :
  * 1. Lit les paramètres URL (code, token, error, etc.)
  * 2. Établit la session Supabase
- * 3. Redirige vers /dashboard ou /complete-profile
+ * 3. Redirige vers /dashboard ou /start
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -37,23 +37,10 @@ const AuthCallback = () => {
   const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
 
   /**
-   * Vérifie si l'utilisateur doit compléter son profil
-   */
-  const requiresProfileCompletion = (user: User | null): boolean => {
-    if (!user) return false;
-    const metadata = user.user_metadata || {};
-    return !metadata.nom || !metadata.prenom || !metadata.statut;
-  };
-
-  /**
    * Redirige l'utilisateur après authentification réussie.
    * Si pas de forfait actif → /start (choix forfait). Sinon → /dashboard.
    */
   const handlePostAuthNavigation = async (user: User) => {
-    if (requiresProfileCompletion(user)) {
-      navigate("/complete-profile", { replace: true });
-      return;
-    }
     if (isSystemAdmin(user)) {
       navigate("/dashboard", { replace: true });
       return;

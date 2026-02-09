@@ -30,11 +30,6 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const requiresProfileCompletion = (user?: User | null) => {
-    const metadata = user?.user_metadata || {};
-    return !metadata.nom || !metadata.prenom || !metadata.statut;
-  };
-
   useEffect(() => {
     // Déclarer searchParams une seule fois pour tout le useEffect
     const searchParams = new URLSearchParams(window.location.search);
@@ -106,10 +101,6 @@ const Auth = () => {
       const invitationId = searchParams.get("invitation_id");
       if (invitationId) {
         navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
-        return;
-      }
-      if (requiresProfileCompletion(sessionUser)) {
-        navigate("/complete-profile", { replace: true });
         return;
       }
       // Admin système : dashboard directement
@@ -513,7 +504,7 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/complete-profile`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -567,7 +558,7 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: {
-          redirectTo: `${window.location.origin}/complete-profile`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

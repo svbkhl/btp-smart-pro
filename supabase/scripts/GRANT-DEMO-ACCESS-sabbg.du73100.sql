@@ -38,7 +38,7 @@ BEGIN
   -- 3. Créer l'entreprise si elle n'existe pas
   IF v_company_id IS NULL THEN
     INSERT INTO public.companies (name, owner_id, subscription_status, trial_end, current_period_end, cancel_at_period_end)
-    VALUES ('Démo BTP Smart Pro', v_user_id, 'active', (NOW() + INTERVAL '30 days')::timestamptz, (NOW() + INTERVAL '1 year')::timestamptz, false)
+    VALUES ('Démo BTP Smart Pro', v_user_id, 'active', (NOW() + INTERVAL '30 days')::timestamptz, (NOW() + INTERVAL '30 days' + INTERVAL '1 year')::timestamptz, false)
     RETURNING id INTO v_company_id;
     RAISE NOTICE '✅ Entreprise créée: %', v_company_id;
   ELSE
@@ -50,7 +50,7 @@ BEGIN
   SET
     subscription_status = 'active',
     trial_end = (NOW() + INTERVAL '30 days')::timestamptz,
-    current_period_end = (NOW() + INTERVAL '1 year')::timestamptz,
+    current_period_end = (NOW() + INTERVAL '30 days' + INTERVAL '1 year')::timestamptz,
     cancel_at_period_end = false
   WHERE id = v_company_id;
 

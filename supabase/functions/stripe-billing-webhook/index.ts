@@ -76,6 +76,7 @@ serve(async (req) => {
         const status = sub.status as string;
         const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
         const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
+        const cancelAt = sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
         const priceId = sub.items.data[0]?.price?.id ?? null;
         await supabase
           .from("companies")
@@ -86,6 +87,7 @@ serve(async (req) => {
             current_period_end: periodEnd,
             stripe_price_id: priceId,
             cancel_at_period_end: sub.cancel_at_period_end ?? false,
+            cancel_at: cancelAt,
             updated_at: new Date().toISOString(),
           })
           .eq("id", companyId);
@@ -99,6 +101,7 @@ serve(async (req) => {
         if (!companyId) break;
         const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
         const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
+        const cancelAt = sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
         const priceId = sub.items.data[0]?.price?.id ?? null;
         await supabase
           .from("companies")
@@ -109,6 +112,7 @@ serve(async (req) => {
             current_period_end: periodEnd,
             stripe_price_id: priceId,
             cancel_at_period_end: sub.cancel_at_period_end ?? false,
+            cancel_at: cancelAt,
             updated_at: new Date().toISOString(),
           })
           .eq("id", companyId);
