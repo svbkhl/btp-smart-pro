@@ -8,13 +8,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { handleCorsPreflight, getCorsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
+const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "3600",
+  "Access-Control-Max-Age": "86400",
 };
 
 interface CreateContactRequestBody {
@@ -29,14 +28,14 @@ interface CreateContactRequestBody {
 }
 
 serve(async (req) => {
-  const origin = req.headers.get("Origin");
-  const preflight = handleCorsPreflight(req);
-  if (preflight) return preflight;
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
 
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" } }
+      { status: 405, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   }
 
@@ -47,7 +46,7 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceRoleKey) {
       return new Response(
         JSON.stringify({ error: "Configuration serveur manquante" }),
-        { status: 500, headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" } }
+        { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
@@ -65,14 +64,14 @@ serve(async (req) => {
     if (!nom || !prenom || !email) {
       return new Response(
         JSON.stringify({ error: "Champs requis : nom, prénom et email" }),
-        { status: 400, headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" } }
+        { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
     if (!email.includes("@")) {
       return new Response(
         JSON.stringify({ error: "Email invalide" }),
-        { status: 400, headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" } }
+        { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
@@ -98,7 +97,7 @@ serve(async (req) => {
       console.error("create-contact-request insert error:", insertError);
       return new Response(
         JSON.stringify({ error: "Impossible de créer la demande", details: insertError.message }),
-        { status: 500, headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" } }
+        { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
@@ -126,14 +125,14 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: true, request_id: requestId }),
-      { status: 200, headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" } }
+      { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erreur serveur";
     console.error("create-contact-request:", message);
     return new Response(
       JSON.stringify({ error: message }),
-      { status: 500, headers: { ...getCorsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } }
+      { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   }
 });

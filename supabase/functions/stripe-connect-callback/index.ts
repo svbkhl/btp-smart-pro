@@ -95,7 +95,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ Verifying Stripe Connect account:', account_id, 'for user:', user.id);
+    console.log('✅ Verifying Stripe Connect account:', account_id);
 
     // Récupérer les informations du compte Stripe
     const account = await stripe.accounts.retrieve(account_id);
@@ -111,23 +111,21 @@ serve(async (req) => {
     const isFullyConfigured = account.charges_enabled && account.details_submitted;
     const canReceivePayments = account.charges_enabled;
 
-    // Mettre à jour la base de données
+    // Mettre à jour companies (niveau entreprise - le compte est lié à la company)
     const { error: updateError } = await supabaseClient
-      .from('user_settings')
-      .upsert({
-        user_id: user.id,
-        stripe_account_id: account_id,
-        stripe_connected: canReceivePayments,
-        stripe_charges_enabled: account.charges_enabled || false,
-        stripe_payouts_enabled: account.payouts_enabled || false,
-        stripe_details_submitted: account.details_submitted || false,
+      .from('companies')
+      .update({
+        stripe_connect_account_id: account_id,
+        stripe_connect_connected: canReceivePayments,
+        stripe_connect_charges_enabled: account.charges_enabled || false,
+        stripe_connect_payouts_enabled: account.payouts_enabled || false,
+        stripe_connect_details_submitted: account.details_submitted || false,
         updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      });
+      })
+      .eq('stripe_connect_account_id', account_id);
 
     if (updateError) {
-      console.error('❌ Error updating user_settings:', updateError);
+      console.error('❌ Error updating companies:', updateError);
       throw updateError;
     }
 

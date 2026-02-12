@@ -24,6 +24,7 @@ import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
 import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
+import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
 import { BillingSettings } from "@/components/settings/BillingSettings";
@@ -369,7 +370,10 @@ const Settings = () => {
           </TabsContent>
 
           <TabsContent value="notifications" className="mt-0">
-            <NotificationSettings />
+            <div className="space-y-8">
+              <NotificationSettings />
+              <RelanceTemplatesSettings />
+            </div>
           </TabsContent>
 
           <TabsContent value="security" className="mt-0">

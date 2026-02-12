@@ -12,16 +12,27 @@ export const ConnectWithStripe = () => {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
 
-  // Vérifier si Stripe est connecté en récupérant les données de Supabase
+  // Vérifier si Stripe est connecté via la company (niveau entreprise - 1 Stripe par entreprise)
   useEffect(() => {
     const checkStripeConnection = async () => {
       if (!user) return;
 
       try {
-        const { data, error } = await supabase
-          .from('user_settings')
-          .select('stripe_account_id, stripe_connected')
+        const { data: membership } = await supabase
+          .from('company_users')
+          .select('company_id')
           .eq('user_id', user.id)
+          .eq('role', 'owner')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (!membership?.company_id) return;
+
+        const { data: company, error } = await supabase
+          .from('companies')
+          .select('stripe_connect_account_id, stripe_connect_connected')
+          .eq('id', membership.company_id)
           .maybeSingle();
 
         if (error) {
@@ -29,9 +40,9 @@ export const ConnectWithStripe = () => {
           return;
         }
 
-        if (data?.stripe_account_id && data?.stripe_connected) {
+        if (company?.stripe_connect_account_id && company?.stripe_connect_connected) {
           setStripeConnected(true);
-          setStripeAccountId(data.stripe_account_id);
+          setStripeAccountId(company.stripe_connect_account_id);
         }
       } catch (error) {
         console.error('Error checking Stripe connection:', error);
@@ -91,14 +102,31 @@ export const ConnectWithStripe = () => {
 
     setLoading(true);
     try {
-      // Mettre à jour la base de données pour marquer la déconnexion
+      const { data: membership } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .limit(1)
+        .maybeSingle();
+
+      if (!membership?.company_id) {
+        toast({
+          title: "Erreur",
+          description: "Vous devez être propriétaire d'une entreprise",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase
-        .from('user_settings')
+        .from('companies')
         .update({
-          stripe_connected: false,
+          stripe_connect_connected: false,
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id);
+        .eq('id', membership.company_id);
 
       if (error) throw error;
 

@@ -126,7 +126,7 @@ export default function AIQuotesTab() {
             }
           }}
         >
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[90vh] overflow-y-auto w-full">
             <DialogHeader>
               <DialogTitle>
                 {quoteKind === "simple"
@@ -141,11 +141,12 @@ export default function AIQuotesTab() {
             </DialogHeader>
 
             {quoteKind === "simple" ? (
-              // Flow simple : SimpleQuoteForm (inchangé)
               <SimpleQuoteForm
                 key="simple-quote-form"
                 onSuccess={() => {
-                  // Ne pas fermer automatiquement
+                  setShowCreateForm(false);
+                  setQuoteKind(null);
+                  setIsPreviewOpen(false);
                 }}
                 onPreviewStateChange={(isOpen) => {
                   setIsPreviewOpen(isOpen);

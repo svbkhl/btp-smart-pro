@@ -329,63 +329,47 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
   if (invoice && showPreview) {
     return (
       <div className="space-y-6">
-        {/* Message de succès */}
+        {/* Message de succès + barre d'actions en haut */}
         <GlassCard className="p-6 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-green-900 dark:text-green-100">
-                Facture créée avec succès !
-              </h3>
-              <p className="text-sm text-green-700 dark:text-green-300">
-                La facture {invoice.invoice_number} a été enregistrée et est disponible dans la section Facturation.
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400 shrink-0" />
+              <div className="min-w-0">
+                <h3 className="font-semibold text-green-900 dark:text-green-100">
+                  Facture créée avec succès !
+                </h3>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  La facture {invoice.invoice_number} a été enregistrée.
+                </p>
+              </div>
             </div>
-          </div>
-        </GlassCard>
-
-        {/* Affichage de la facture */}
-        <GlassCard className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Facture {invoice.invoice_number}
-            </h2>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="gap-1.5">
                 <Download className="w-4 h-4" />
-                Télécharger PDF
+                PDF
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsSendToClientOpen(true)}
-                className="gap-2"
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsSendToClientOpen(true)} className="gap-1.5">
                 <Send className="w-4 h-4" />
-                Envoyer au client
+                Envoyer
               </Button>
-              <Button onClick={handleGoToFacturation} className="gap-2 rounded-xl">
-                Voir dans Facturation
+              <Button size="sm" onClick={handleGoToFacturation} className="gap-1.5 rounded-xl">
+                Facturation
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
+                Nouvelle facture
+              </Button>
+              <Button size="sm" onClick={handleClosePreview} className="gap-1.5">
+                Fermer
               </Button>
             </div>
           </div>
-
-          <InvoiceDisplay
-            invoice={invoice}
-            showActions={true}
-            onClose={handleClosePreview}
-          />
         </GlassCard>
 
-        {/* Boutons d'action */}
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={handleReset} className="gap-2">
-            Créer une nouvelle facture
-          </Button>
-          <Button onClick={handleClosePreview} className="gap-2" variant="outline">
-            Fermer l'aperçu
-          </Button>
-        </div>
+        {/* Affichage de la facture (sans boutons en double) */}
+        <InvoiceDisplay
+          invoice={invoice}
+          showActions={false}
+        />
 
         {/* Modal Envoyer au client */}
         <SendToClientModal

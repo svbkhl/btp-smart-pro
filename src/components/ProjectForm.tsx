@@ -25,6 +25,7 @@ import {
 import { useCreateProject, useUpdateProject, CreateProjectData } from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
 import { Loader2, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Project } from "@/fakeData/projects";
 
 const projectSchema = z.object({
@@ -144,7 +145,7 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {project ? "Modifier le chantier" : "Nouveau chantier"}
@@ -203,7 +204,7 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Statut</Label>
               <Select
@@ -223,43 +224,49 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
               </Select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="budget">Budget prévu (€)</Label>
-                <Input
-                  id="budget"
-                  type="number"
-                  {...register("budget")}
-                  placeholder="10000"
-                />
-                <p className="text-xs text-muted-foreground">Montant estimé du devis</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="costs">Coûts engagés (€)</Label>
-                <Input
-                  id="costs"
-                  type="number"
-                  {...register("costs")}
-                  placeholder="7000"
-                />
-                <p className="text-xs text-muted-foreground">Dépenses réelles</p>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="budget">Budget prévu (€)</Label>
+              <Input
+                id="budget"
+                type="number"
+                {...register("budget")}
+                placeholder="10000"
+              />
+              <p className="text-xs text-muted-foreground">Montant estimé du devis</p>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="actual_revenue">CA réel (€)</Label>
-                <Input
-                  id="actual_revenue"
-                  type="number"
-                  {...register("actual_revenue")}
-                  placeholder="10000"
-                />
-                <p className="text-xs text-muted-foreground">Montant réellement facturé</p>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="costs">Coûts engagés (€)</Label>
+              <Input
+                id="costs"
+                type="number"
+                {...register("costs")}
+                placeholder="7000"
+              />
+              <p className="text-xs text-muted-foreground">Dépenses réelles</p>
+            </div>
+
+            <div className={cn("space-y-2", watch("status") === "planifié" && "opacity-60")}>
+              <Label htmlFor="actual_revenue" className={watch("status") === "planifié" ? "text-muted-foreground" : ""}>
+                CA réel (€)
+              </Label>
+              <Input
+                id="actual_revenue"
+                type="number"
+                {...register("actual_revenue")}
+                placeholder="10000"
+                disabled={watch("status") === "planifié"}
+                className={watch("status") === "planifié" ? "cursor-not-allowed bg-muted" : ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                {watch("status") === "planifié"
+                  ? "Disponible lorsque le chantier n’est plus planifié"
+                  : "Montant réellement facturé"}
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_date">Date de début</Label>
               <Input

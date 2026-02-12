@@ -355,39 +355,60 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
     const displayQuote = quote || quoteRef.current;
     return (
       <div className="space-y-6">
-        {/* Message de succès */}
+        {/* Message de succès + barre d'actions en haut */}
         <GlassCard className="p-6 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-green-900 dark:text-green-100">
-                Devis créé avec succès !
-              </h3>
-              <p className="text-sm text-green-700 dark:text-green-300">
-                Le devis {displayQuote.quote_number} a été enregistré et est disponible dans la section Facturation.
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400 shrink-0" />
+              <div className="min-w-0">
+                <h3 className="font-semibold text-green-900 dark:text-green-100">
+                  Devis créé avec succès !
+                </h3>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Le devis {displayQuote.quote_number} a été enregistré.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="gap-1.5">
+                <Download className="w-4 h-4" />
+                PDF
+              </Button>
+              <Button size="sm" onClick={handleGoToFacturation} className="gap-1.5 rounded-xl">
+                Facturation
+              </Button>
+              {displayQuote && !displayQuote.signed && displayQuote.status !== "signed" && (
+                <Button variant="outline" size="sm" onClick={() => setIsSendToClientOpen(true)} className="gap-1.5">
+                  <Send className="w-4 h-4" />
+                  Envoyer
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
+                Nouveau devis
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  handleClosePreview();
+                  onSuccess?.();
+                }}
+                className="gap-1.5"
+              >
+                Fermer
+              </Button>
             </div>
           </div>
         </GlassCard>
 
-        {/* Affichage du devis */}
-        <GlassCard className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
+        {/* Affichage du devis - zone large et lisible (sans boutons en double) */}
+        <GlassCard className="p-4 sm:p-6 w-full min-w-0 overflow-x-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
               <FileText className="w-5 h-5" />
               Devis {displayQuote.quote_number}
             </h2>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
-                <Download className="w-4 h-4" />
-                Télécharger PDF
-              </Button>
-              <Button onClick={handleGoToFacturation} className="gap-2 rounded-xl">
-                Voir dans Facturation
-              </Button>
-            </div>
           </div>
-
+          <div className="w-full min-w-0 [&_.quote-display]:text-base [&_.quote-display_.text-sm]:text-base [&_.quote-display_.text-xs]:text-sm [&_.quote-display]:max-w-5xl [&_.quote-display]:mx-auto">
           <QuoteDisplay
             result={displayQuote.details}
             companyInfo={companyInfo}
@@ -404,36 +425,8 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
             tvaRate={displayQuote.tva_rate ?? tvaRate}
             tva293b={displayQuote.tva_non_applicable_293b ?? tva293b}
           />
+          </div>
         </GlassCard>
-
-        {/* Boutons d'action */}
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={handleReset} className="gap-2">
-            Créer un nouveau devis
-          </Button>
-          {/* Bouton Envoyer au client - masqué si le devis est signé */}
-          {displayQuote && !displayQuote.signed && displayQuote.status !== "signed" && (
-            <Button 
-              variant="outline" 
-              onClick={() => setIsSendToClientOpen(true)} 
-              className="gap-2"
-            >
-              <Send className="w-4 h-4" />
-              Envoyer au client
-            </Button>
-          )}
-          <Button onClick={handleClosePreview} className="gap-2" variant="outline">
-            Fermer l'aperçu
-          </Button>
-          {onSuccess && (
-            <Button onClick={() => {
-              handleClosePreview();
-              onSuccess();
-            }} className="gap-2">
-              Fermer
-            </Button>
-          )}
-        </div>
 
         {/* Modal Envoyer au client */}
         {displayQuote && (

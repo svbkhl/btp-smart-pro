@@ -40,10 +40,8 @@ export const useContactRequests = () => {
         throw new Error('Unauthorized');
       }
 
-      const { data, error } = await supabase
-        .from('contact_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // RPC SECURITY DEFINER contourne RLS (admin par email ou user_roles)
+      const { data, error } = await supabase.rpc('get_contact_requests_admin');
 
       if (error) {
         throw error;
@@ -77,21 +75,56 @@ export const useUpdateContactRequest = () => {
         throw new Error('Unauthorized');
       }
 
-      const { data, error } = await supabase
-        .from('contact_requests')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', requestId)
-        .select()
-        .single();
+      // RPC SECURITY DEFINER contourne RLS
+      const { data, error } = await supabase.rpc('update_contact_request_admin', {
+        p_id: requestId,
+        p_updates: {
+          status: updates.status,
+          admin_notes: updates.admin_notes,
+          invited_by: updates.invited_by,
+          invitation_id: updates.invitation_id,
+        },
+      });
 
       if (error) {
         throw error;
       }
 
       return data as ContactRequest;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact_requests'] });
+    },
+  });
+};
+
+/**
+ * Supprime définitivement des demandes de contact (admin seulement)
+ */
+export const useDeleteContactRequests = () => {
+  const queryClient = useQueryClient();
+  const { user, isAdmin } = useAuth();
+  const isAdminByEmail = isAdminEmail(user?.email);
+  const canDelete = !!user && (isAdmin || isAdminByEmail);
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!canDelete) {
+        throw new Error('Unauthorized');
+      }
+      if (ids.length === 0) {
+        throw new Error('Aucune demande sélectionnée');
+      }
+
+      const { data, error } = await supabase.rpc('delete_contact_requests_admin', {
+        p_ids: ids,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return data as number;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contact_requests'] });

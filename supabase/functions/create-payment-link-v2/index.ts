@@ -421,13 +421,14 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    const { data: userSettings } = await supabaseClient
-      .from('user_settings')
-      .select('stripe_account_id, stripe_connected')
-      .eq('user_id', user.id)
-      .single();
+    const { data: companyData } = await supabaseClient
+      .from('companies')
+      .select('stripe_connect_account_id, stripe_connect_connected')
+      .eq('id', companyId)
+      .maybeSingle();
 
-    const stripeAccountId = userSettings?.stripe_account_id;
+    const stripeAccountId = companyData?.stripe_connect_account_id;
+    const stripeConnected = companyData?.stripe_connect_connected;
 
     // Description selon le type
     let description = `Facture ${invoice.invoice_number}`;
@@ -468,7 +469,7 @@ serve(async (req) => {
       customer_email: invoice.client_email || quote.client_email || client_email,
     };
 
-    if (stripeAccountId && userSettings?.stripe_connected) {
+    if (stripeAccountId && stripeConnected) {
       console.log('✅ Utilisation Stripe Connect:', stripeAccountId);
       // @ts-ignore
       sessionParams.payment_intent_data = {

@@ -142,7 +142,7 @@ export function OnboardingTour({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] pointer-events-auto"
+        className="fixed inset-0 z-[100] pointer-events-auto overflow-x-hidden"
         aria-modal="true"
         role="dialog"
         aria-label="Guide de bienvenue"
@@ -205,7 +205,7 @@ export function OnboardingTour({
         </div>
 
         {/* Carte flottante (contenu du step) */}
-        <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-x-hidden">
           <motion.div
             key={stepIndex}
             initial={{ opacity: 0, y: 12 }}
@@ -213,7 +213,7 @@ export function OnboardingTour({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
             className={cn(
-              "pointer-events-auto w-full max-w-md rounded-2xl border bg-card shadow-xl p-6",
+              "pointer-events-auto w-full max-w-md max-md:max-w-[calc(100vw-2rem)] max-md:p-4 min-w-0 overflow-hidden rounded-2xl border bg-card shadow-xl p-6",
               "border-border/50 backdrop-blur-sm"
             )}
           >
@@ -242,20 +242,25 @@ export function OnboardingTour({
 
             <Progress value={progress} className="h-1.5 mb-6 rounded-full" />
 
-            <div className="flex items-center justify-between gap-3">
-              <Button variant="ghost" size="sm" onClick={handleSkip} className="text-muted-foreground">
+            <div className="flex flex-col max-md:gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSkip}
+                className="max-md:order-2 md:order-none text-muted-foreground max-md:w-full max-md:py-2"
+              >
                 Passer le guide
               </Button>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap max-md:justify-end">
                 {!isFirst && (
-                  <Button variant="outline" size="sm" onClick={handlePrev}>
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Précédent
+                  <Button variant="outline" size="sm" onClick={handlePrev} className="max-md:flex-1 max-md:min-w-0">
+                    <ChevronLeft className="h-4 w-4 mr-1 shrink-0" />
+                    <span className="truncate">Précédent</span>
                   </Button>
                 )}
-                <Button size="sm" onClick={handleNext}>
-                  {isLast ? "C'est parti" : "Suivant"}
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                <Button size="sm" onClick={handleNext} className="max-md:flex-1 max-md:min-w-0">
+                  <span className="truncate">{isLast ? "C'est parti" : "Suivant"}</span>
+                  <ChevronRight className="h-4 w-4 ml-1 shrink-0" />
                 </Button>
               </div>
             </div>

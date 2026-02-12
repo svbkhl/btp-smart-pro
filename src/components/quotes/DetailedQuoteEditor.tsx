@@ -491,7 +491,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
       try {
         const { data: existingData, error: existingError } = await supabase
           .from("text_snippets")
-          .select("content")
+          .select("title")
           .eq("company_id", companyId);
         const err = existingError;
         if (err) {

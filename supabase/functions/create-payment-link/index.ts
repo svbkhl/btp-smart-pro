@@ -602,15 +602,16 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // Récupérer le stripe_account_id de l'utilisateur (Stripe Connect)
-    // Note: user_settings n'a pas company_id, on utilise user_id
-    const { data: userSettings } = await supabaseClient
-      .from('user_settings')
-      .select('stripe_account_id, stripe_connected')
-      .eq('user_id', user.id)
+    // Récupérer stripe_connect depuis la company (niveau entreprise - 1 Stripe par entreprise)
+    const effectiveCompanyId = invoice.company_id || quote.company_id || companyId;
+    const { data: companyData } = await supabaseClient
+      .from('companies')
+      .select('stripe_connect_account_id, stripe_connect_connected')
+      .eq('id', effectiveCompanyId)
       .maybeSingle();
 
-    const stripeAccountId = userSettings?.stripe_account_id;
+    const stripeAccountId = companyData?.stripe_connect_account_id;
+    const stripeConnected = companyData?.stripe_connect_connected;
 
     // Vérifier que le montant est valide pour Stripe (minimum 0.50€)
     const amountInCents = Math.round(paymentAmount * 100);
@@ -675,7 +676,7 @@ serve(async (req) => {
     });
 
     // Si Stripe Connect est configuré, ajouter le connected account
-    if (stripeAccountId && userSettings?.stripe_connected) {
+    if (stripeAccountId && stripeConnected) {
       console.log('✅ Utilisation Stripe Connect:', stripeAccountId);
       // @ts-ignore - Stripe types
       sessionParams.payment_intent_data = {

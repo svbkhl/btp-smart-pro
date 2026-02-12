@@ -99,6 +99,7 @@ serve(async (req) => {
         const sub = event.data.object as Stripe.Subscription;
         const companyId = sub.metadata?.company_id;
         if (!companyId) break;
+        // Sync uniquement : trial_end reste la date d'origine (passée après la 1re année). Aucun nouvel essai aux renouvellements.
         const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
         const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
         const cancelAt = sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
@@ -134,6 +135,7 @@ serve(async (req) => {
       }
 
       case "invoice.payment_succeeded": {
+        // Renouvellement (2e année, etc.) : on met à jour la période uniquement. Aucun nouvel essai.
         const invoice = event.data.object as Stripe.Invoice;
         const subId = invoice.subscription as string | null;
         if (!subId) break;

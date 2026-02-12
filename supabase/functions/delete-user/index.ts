@@ -1,17 +1,20 @@
 /**
  * Edge Function pour supprimer un utilisateur Auth
- * 
- * Permet à un utilisateur de supprimer son propre compte ou à un admin de supprimer n'importe quel compte
- * 
+ *
+ * Permet à un utilisateur de supprimer son propre compte ou à un admin de supprimer n'importe quel compte.
+ * Si le compte a un abonnement Stripe actif, celui-ci est programmé pour s'arrêter à la fin de la période
+ * en cours (cancel_at_period_end) avant suppression du compte.
+ *
  * Usage:
  * POST /functions/v1/delete-user
  * Body: { "email": "user@example.com" } (optionnel si utilisateur supprime son propre compte)
- * 
+ *
  * Headers: Authorization: Bearer <user_token> ou <service_role_key>
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -114,6 +117,66 @@ serve(async (req) => {
         JSON.stringify({ error: "Forbidden: You can only delete your own account" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Programmer l'arrêt des abonnements Stripe à la fin de l'engagement
+    // - Mensuel : engagement 1 an → annulation à trial_end + 12 mois (comme résiliation manuelle)
+    // - Annuel : annulation en fin de période en cours (cancel_at_period_end)
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (stripeSecretKey) {
+      const { data: companies, error: companiesError } = await supabaseAdmin
+        .from("companies")
+        .select("id, stripe_subscription_id")
+        .eq("owner_id", targetUser.id)
+        .not("stripe_subscription_id", "is", null);
+
+      if (!companiesError && companies?.length) {
+        const stripe = new Stripe(stripeSecretKey, {
+          apiVersion: "2023-10-16",
+          httpClient: Stripe.createFetchHttpClient(),
+        });
+        for (const company of companies) {
+          if (!company.stripe_subscription_id) continue;
+          try {
+            const sub = await stripe.subscriptions.retrieve(company.stripe_subscription_id);
+            if (sub.status !== "active" && sub.status !== "trialing") continue;
+            const interval = sub.items.data[0]?.price?.recurring?.interval;
+
+            if (interval === "month") {
+              // Offre mensuelle : engagement 12 mois après la fin de l'essai → résilier à cette date
+              if (sub.cancel_at) continue; // déjà programmée
+              const trialEndMs = sub.trial_end ? sub.trial_end * 1000 : Date.now();
+              const commitmentEnd = new Date(trialEndMs);
+              commitmentEnd.setFullYear(commitmentEnd.getFullYear() + 1);
+              const cancelAtUnix = Math.floor(commitmentEnd.getTime() / 1000);
+              await stripe.subscriptions.update(company.stripe_subscription_id, { cancel_at: cancelAtUnix });
+              await supabaseAdmin
+                .from("companies")
+                .update({
+                  cancel_at: commitmentEnd.toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", company.id);
+            } else {
+              // Offre annuelle (ou autre) : arrêt en fin de période en cours
+              if (!sub.cancel_at_period_end) {
+                await stripe.subscriptions.update(company.stripe_subscription_id, {
+                  cancel_at_period_end: true,
+                });
+                await supabaseAdmin
+                  .from("companies")
+                  .update({
+                    cancel_at_period_end: true,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", company.id);
+              }
+            }
+          } catch (stripeErr) {
+            console.error("[delete-user] Stripe update failed for company", company.id, stripeErr);
+          }
+        }
+      }
     }
 
     // Supprimer les données associées (via RLS, les suppressions en cascade s'occupent du reste)

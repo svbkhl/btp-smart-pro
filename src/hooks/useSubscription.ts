@@ -31,6 +31,15 @@ export interface SubscriptionData {
 
 const ACTIVE_STATUSES: SubscriptionStatus[] = ["trialing", "active"];
 
+/** Entreprises qui ont accès sans abonnement (ex: partenaires). Match par inclusion (ex: "First Payout SARL" → ok) */
+const SUBSCRIPTION_BYPASS_PATTERNS = ["first payout"];
+
+function isBypassCompany(name: string | null | undefined): boolean {
+  if (!name || typeof name !== "string") return false;
+  const n = name.trim().toLowerCase();
+  return SUBSCRIPTION_BYPASS_PATTERNS.some((p) => n.includes(p));
+}
+
 export function useSubscription() {
   const { user, currentCompanyId } = useAuth();
 
@@ -41,7 +50,7 @@ export function useSubscription() {
       try {
         const { data, error } = await supabase
           .from("companies")
-          .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, cancel_at, stripe_customer_id, stripe_onboarding_required, stripe_price_id")
+          .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, cancel_at, stripe_customer_id, stripe_onboarding_required, stripe_price_id, name")
           .eq("id", currentCompanyId)
           .single();
         if (error || !data) {
@@ -49,11 +58,11 @@ export function useSubscription() {
           if (needsFallback) {
             const { data: fallback, error: fallbackErr } = await supabase
               .from("companies")
-              .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_price_id")
+              .select("subscription_status, trial_end, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_price_id, name")
               .eq("id", currentCompanyId)
               .single();
             if (fallbackErr || !fallback) return null;
-            return {
+            const result = {
               subscription_status: (fallback.subscription_status as SubscriptionStatus) ?? null,
               trial_end: fallback.trial_end ?? null,
               current_period_end: fallback.current_period_end ?? null,
@@ -62,7 +71,9 @@ export function useSubscription() {
               stripe_customer_id: fallback.stripe_customer_id ?? null,
               stripe_onboarding_required: false,
               stripe_price_id: (fallback as { stripe_price_id?: string | null }).stripe_price_id ?? null,
+              name: (fallback as { name?: string | null }).name ?? null,
             };
+            return result;
           }
           return null;
         }
@@ -75,6 +86,7 @@ export function useSubscription() {
           stripe_customer_id: data.stripe_customer_id ?? null,
           stripe_onboarding_required: data.stripe_onboarding_required === true,
           stripe_price_id: (data as { stripe_price_id?: string | null }).stripe_price_id ?? null,
+          name: (data as { name?: string | null }).name ?? null,
         };
       } catch {
         return null;
@@ -85,9 +97,12 @@ export function useSubscription() {
   });
 
   const data = query.data ?? null;
-  // Strict : accès uniquement si abonnement actif (trialing ou active). Pas d'accès sans souscription.
+  const companyName = data && "name" in data ? (data as { name?: string | null }).name : null;
+  const bypassSubscription = isBypassCompany(companyName);
+  // Strict : accès si abonnement actif (trialing ou active) OU si entreprise partenaire (ex: first payout)
   const isActive =
-    data != null && data.subscription_status != null && ACTIVE_STATUSES.includes(data.subscription_status);
+    bypassSubscription ||
+    (data != null && data.subscription_status != null && ACTIVE_STATUSES.includes(data.subscription_status));
 
   return {
     ...query,

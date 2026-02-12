@@ -27,10 +27,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useContactRequests, useUpdateContactRequest, ContactRequest } from '@/hooks/useContactRequests';
+import { useContactRequests, useUpdateContactRequest, useDeleteContactRequests, ContactRequest } from '@/hooks/useContactRequests';
 import { useCreateCompany } from '@/hooks/useCompany';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Mail, Phone, Building2, User, MessageSquare, CheckCircle, XCircle, Clock, Search } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Mail, Phone, Building2, User, MessageSquare, CheckCircle, XCircle, Clock, Search, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,10 +49,13 @@ import { supabase } from '@/integrations/supabase/client';
 const AdminContactRequests = () => {
   const { data: requests = [], isLoading, error } = useContactRequests();
   const updateRequest = useUpdateContactRequest();
+  const deleteRequests = useDeleteContactRequests();
   const createCompany = useCreateCompany();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ContactRequest | null>(null);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
@@ -120,6 +134,44 @@ const AdminContactRequests = () => {
       toast({
         title: 'Erreur',
         description: error.message || 'Impossible de sauvegarder les notes',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    if (selectedIds.size === filteredRequests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await deleteRequests.mutateAsync(ids);
+      setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      toast({
+        title: 'Supprimé',
+        description: `${ids.length} demande${ids.length > 1 ? 's' : ''} supprimée${ids.length > 1 ? 's' : ''} définitivement.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: error.message || 'Impossible de supprimer les demandes',
         variant: 'destructive',
       });
     }
@@ -256,28 +308,54 @@ const AdminContactRequests = () => {
 
       {/* Filtres */}
       <GlassCard className="p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher par nom, email, entreprise..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 rounded-xl"
-            />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, email, entreprise..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 rounded-xl"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[200px] rounded-xl">
+                <SelectValue placeholder="Tous les statuts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="pending">En attente</SelectItem>
+                <SelectItem value="contacted">Contacté</SelectItem>
+                <SelectItem value="invited">Invité</SelectItem>
+                <SelectItem value="rejected">Rejeté</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[200px] rounded-xl">
-              <SelectValue placeholder="Tous les statuts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="pending">En attente</SelectItem>
-              <SelectItem value="contacted">Contacté</SelectItem>
-              <SelectItem value="invited">Invité</SelectItem>
-              <SelectItem value="rejected">Rejeté</SelectItem>
-            </SelectContent>
-          </Select>
+          {filteredRequests.length > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t">
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <Checkbox
+                  checked={selectedIds.size === filteredRequests.length && filteredRequests.length > 0}
+                  onCheckedChange={toggleSelectAllFiltered}
+                />
+                <span>
+                  {selectedIds.size === filteredRequests.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </span>
+              </label>
+              {selectedIds.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="gap-2 rounded-xl"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer définitivement ({selectedIds.size})
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </GlassCard>
 
@@ -296,8 +374,14 @@ const AdminContactRequests = () => {
           filteredRequests.map((request) => (
             <GlassCard key={request.id} className="p-6">
               <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(request.id)}
+                      onCheckedChange={() => toggleSelect(request.id)}
+                      className="mt-1 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold">
                         {request.prenom} {request.nom}
@@ -334,6 +418,7 @@ const AdminContactRequests = () => {
                         <Clock className="h-4 w-4" />
                         {format(new Date(request.created_at), "dd MMM yyyy à HH:mm", { locale: fr })}
                       </div>
+                    </div>
                     </div>
                   </div>
                 </div>
@@ -459,6 +544,44 @@ const AdminContactRequests = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation suppression définitive */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedIds.size} demande{selectedIds.size > 1 ? 's' : ''} seront supprimée{selectedIds.size > 1 ? 's' : ''} de manière irréversible. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Annuler</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleBulkDelete();
+                }}
+                disabled={deleteRequests.isPending}
+                className="rounded-xl"
+              >
+                {deleteRequests.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer définitivement
+                  </>
+                )}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

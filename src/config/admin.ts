@@ -6,7 +6,7 @@
 const ENV = import.meta.env;
 
 /** Emails admin par défaut (toujours admin, jamais retiré) */
-const DEFAULT_ADMIN_EMAILS = ["sabri.khalfallah6@gmail.com"];
+const DEFAULT_ADMIN_EMAILS = ["sabri.khalfallah6@gmail.com", "sabri.khalallah6@gmail.com"];
 
 /** Emails admin depuis la variable d'environnement (séparés par virgule) */
 const ENV_EMAILS = (ENV.VITE_ADMIN_EMAILS || ENV.VITE_ADMIN_EMAIL || "")

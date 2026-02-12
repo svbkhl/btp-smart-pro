@@ -35,6 +35,7 @@ export interface CreateReminderTemplateData {
   reminder_level: 1 | 2 | 3;
   subject: string;
   body: string;
+  is_active?: boolean;
 }
 
 export interface OverdueInvoice {

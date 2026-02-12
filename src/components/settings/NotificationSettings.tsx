@@ -17,6 +17,9 @@ interface NotificationPreferences {
   maintenance_reminders: boolean;
   quote_reminder_days: number;
   payment_reminder_days: number;
+  signed_quote_notifications: boolean;
+  payment_received_notifications: boolean;
+  planning_assignment_notifications: boolean;
 }
 
 export const NotificationSettings = () => {
@@ -34,6 +37,9 @@ export const NotificationSettings = () => {
     maintenance_reminders: true,
     quote_reminder_days: 3,
     payment_reminder_days: 3,
+    signed_quote_notifications: true,
+    payment_received_notifications: true,
+    planning_assignment_notifications: true,
   });
 
   // Charger les préférences au montage
@@ -58,6 +64,9 @@ export const NotificationSettings = () => {
             maintenance_reminders: data.maintenance_reminders ?? true,
             quote_reminder_days: data.quote_reminder_days ?? 3,
             payment_reminder_days: data.payment_reminder_days ?? 3,
+            signed_quote_notifications: (data as Record<string, unknown>).signed_quote_notifications ?? true,
+            payment_received_notifications: (data as Record<string, unknown>).payment_received_notifications ?? true,
+            planning_assignment_notifications: (data as Record<string, unknown>).planning_assignment_notifications ?? true,
           });
         }
         setTableError(null);
@@ -208,9 +217,9 @@ export const NotificationSettings = () => {
         <div className="flex items-center gap-3 mb-4 sm:mb-6">
           <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-semibold">Paramètres de Notifications</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold">Notifications et rappels</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Configurez les notifications push et les rappels
+              Configurez les notifications push, les rappels automatiques et les délais. Les modèles d’emails de relance sont réglés dans la section « Configuration des relances » ci-dessous.
             </p>
           </div>
         </div>
@@ -275,6 +284,64 @@ export const NotificationSettings = () => {
                   Les notifications sont bloquées. Autorisez-les dans les paramètres du site (icône cadenas dans la barre d&apos;adresse).
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Notifications pour les responsables (owners) */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Pour les responsables</h3>
+            <p className="text-sm text-muted-foreground">Alertes lorsque des événements importants se produisent.</p>
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                <div className="space-y-0.5 min-w-0">
+                  <Label htmlFor="signed_quote_notifications">Devis signé</Label>
+                  <p className="text-xs text-muted-foreground">Être notifié quand un client signe un devis</p>
+                </div>
+                <Switch
+                  id="signed_quote_notifications"
+                  checked={preferences.signed_quote_notifications}
+                  onCheckedChange={(checked) =>
+                    setPreferences({ ...preferences, signed_quote_notifications: checked })
+                  }
+                  className="sm:flex-shrink-0"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                <div className="space-y-0.5 min-w-0">
+                  <Label htmlFor="payment_received_notifications">Paiement reçu</Label>
+                  <p className="text-xs text-muted-foreground">Être notifié quand un paiement est enregistré</p>
+                </div>
+                <Switch
+                  id="payment_received_notifications"
+                  checked={preferences.payment_received_notifications}
+                  onCheckedChange={(checked) =>
+                    setPreferences({ ...preferences, payment_received_notifications: checked })
+                  }
+                  className="sm:flex-shrink-0"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Notifications pour les employés */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Pour les employés</h3>
+            <p className="text-sm text-muted-foreground">Alertes liées à votre planning et vos affectations.</p>
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                <div className="space-y-0.5 min-w-0">
+                  <Label htmlFor="planning_assignment_notifications">Affectations planning</Label>
+                  <p className="text-xs text-muted-foreground">Être notifié lors d&apos;une affectation ou modification sur votre planning</p>
+                </div>
+                <Switch
+                  id="planning_assignment_notifications"
+                  checked={preferences.planning_assignment_notifications}
+                  onCheckedChange={(checked) =>
+                    setPreferences({ ...preferences, planning_assignment_notifications: checked })
+                  }
+                  className="sm:flex-shrink-0"
+                />
+              </div>
             </div>
           </div>
 

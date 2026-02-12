@@ -179,7 +179,7 @@ const Projects = () => {
 
   return (
     <PageLayout>
-      <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-4 sm:space-y-6 md:space-y-8 bg-transparent">
+      <div className="w-full max-w-full px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8 xl:px-10 2xl:px-12 space-y-4 sm:space-y-6 md:space-y-8 bg-transparent">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -339,7 +339,7 @@ const Projects = () => {
           </GlassCard>
         ) : filteredProjects.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6 gap-4 md:gap-5 lg:gap-6">
               {paginatedProjects.map((project, index) => {
                 const imageUrl = project.image_url || "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=400";
                 

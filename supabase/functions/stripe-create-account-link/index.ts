@@ -82,27 +82,41 @@ serve(async (req) => {
       );
     }
 
-    // Parser le body
-    const body = await req.json();
-    const { company_id } = body;
-
-    console.log('🔗 Creating Stripe Connect account link for user:', user.id);
-
-    // Vérifier si l'utilisateur a déjà un compte Stripe Connect
-    const { data: existingSettings } = await supabaseClient
-      .from('user_settings')
-      .select('stripe_account_id')
+    // Récupérer la company de l'utilisateur (owner)
+    const { data: membership } = await supabaseClient
+      .from('company_users')
+      .select('company_id')
       .eq('user_id', user.id)
+      .eq('role', 'owner')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!membership?.company_id) {
+      return new Response(
+        JSON.stringify({ error: 'Vous devez être propriétaire d\'une entreprise pour connecter Stripe' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      );
+    }
+
+    const companyId = membership.company_id;
+    console.log('🔗 Creating Stripe Connect account link for company:', companyId);
+
+    // Vérifier si la company a déjà un compte Stripe Connect (premier owner qui configure = pour toute l'entreprise)
+    const { data: company } = await supabaseClient
+      .from('companies')
+      .select('stripe_connect_account_id')
+      .eq('id', companyId)
       .single();
 
-    let accountId = existingSettings?.stripe_account_id;
+    let accountId = company?.stripe_connect_account_id;
 
     // Si pas de compte existant, en créer un nouveau
     if (!accountId) {
-      console.log('📝 Creating new Stripe Connect account...');
+      console.log('📝 Creating new Stripe Connect account for company...');
       
       const account = await stripe.accounts.create({
-        type: 'express', // Type Express pour onboarding simplifié
+        type: 'express',
         country: 'FR',
         email: user.email,
         capabilities: {
@@ -110,25 +124,24 @@ serve(async (req) => {
           transfers: { requested: true },
         },
         business_type: 'company',
+        metadata: { company_id: companyId },
       });
 
       accountId = account.id;
       console.log('✅ Stripe account created:', accountId);
 
-      // Sauvegarder l'account_id dans la base de données
+      // Sauvegarder dans companies (niveau entreprise)
       await supabaseClient
-        .from('user_settings')
-        .upsert({
-          user_id: user.id,
-          stripe_account_id: accountId,
+        .from('companies')
+        .update({
+          stripe_connect_account_id: accountId,
           updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id',
-        });
+        })
+        .eq('id', companyId);
 
-      console.log('✅ Account ID saved to database');
+      console.log('✅ Account ID saved to company');
     } else {
-      console.log('ℹ️ Using existing Stripe account:', accountId);
+      console.log('ℹ️ Using existing Stripe account for company:', accountId);
     }
 
     // Créer un lien d'onboarding/dashboard Stripe

@@ -2,6 +2,11 @@
  * Stripe Billing B2B - Création Checkout Session (abonnement + essai gratuit)
  * 1 company = 1 Customer Stripe = 1 Subscription
  * Seul l'owner de l'entreprise peut initier la souscription.
+ *
+ * IMPORTANT - Essai gratuit une seule fois :
+ * L'essai (trial_period_days) est appliqué UNIQUEMENT à la création de l'abonnement (ce checkout).
+ * Les renouvellements (2e année, 3e année, etc.) sont gérés par Stripe automatiquement :
+ * aucun nouvel essai n'est jamais ajouté ; le client est prélevé chaque période.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -9,7 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { handleCorsPreflight, getCorsHeaders } from "../_shared/cors.ts";
 
-const TRIAL_DAYS = 14; // Essai gratuit 14 jours (configurable 2 semaines à 1 mois)
+const TRIAL_DAYS = 14; // Essai gratuit 14 jours (configurable ; 1 mois = 30 si besoin). Uniquement à la 1re souscription.
 
 serve(async (req) => {
   const origin = req.headers.get("Origin");
@@ -146,6 +151,7 @@ serve(async (req) => {
     const successUrl = `${SITE_URL}/dashboard?onboarding_step=0`;
     const cancelUrl = `${SITE_URL}/start`;
 
+    // trial_period_days : uniquement à la création. Stripe renouvelle ensuite sans jamais réappliquer d'essai.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",

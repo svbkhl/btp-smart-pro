@@ -28,26 +28,40 @@ const StripeCallback = () => {
         return;
       }
 
-      // Récupérer les informations du compte depuis user_settings
-      const { data: settings, error: settingsError } = await supabase
-        .from('user_settings')
-        .select('stripe_account_id')
+      // Récupérer stripe_connect_account_id depuis la company de l'utilisateur (owner)
+      const { data: membership } = await supabase
+        .from('company_users')
+        .select('company_id')
         .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (!membership?.company_id) {
+        setStatus('error');
+        setMessage('Vous devez être propriétaire d\'une entreprise');
+        return;
+      }
+
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('stripe_connect_account_id')
+        .eq('id', membership.company_id)
         .single();
 
-      if (settingsError || !settings?.stripe_account_id) {
+      if (companyError || !company?.stripe_connect_account_id) {
         setStatus('error');
-        setMessage('Impossible de récupérer les informations de votre compte Stripe');
+        setMessage('Impossible de récupérer les informations Stripe de votre entreprise');
         return;
       }
 
       try {
-        console.log('✅ Processing Stripe callback for account:', settings.stripe_account_id);
+        console.log('✅ Processing Stripe callback for company account:', company.stripe_connect_account_id);
 
-        // Appeler l'Edge Function pour vérifier et mettre à jour le statut
         const { data, error } = await supabase.functions.invoke('stripe-connect-callback', {
           body: {
-            account_id: settings.stripe_account_id,
+            account_id: company.stripe_connect_account_id,
           },
         });
 

@@ -24,10 +24,10 @@ const AI = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("assistant");
 
-  // Ouvrir l'onglet spécifié dans l'URL
+  // Ouvrir l'onglet spécifié dans l'URL (assistant, quotes, invoices, library)
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["assistant", "quotes", "invoices"].includes(tab)) {
+    if (tab && ["assistant", "quotes", "invoices", "library"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);

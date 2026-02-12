@@ -1,15 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <defs>
-    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:0.8" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
     </linearGradient>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
-    </filter>
   </defs>
-  <!-- Fond avec coins arrondis -->
-  <rect width="64" height="64" rx="14" fill="url(#gradient)" filter="url(#shadow)"/>
-  <!-- Lettre B stylisée -->
+  <rect width="64" height="64" rx="12" fill="url(#bg)"/>
   <text x="32" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="40" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">B</text>
 </svg>
