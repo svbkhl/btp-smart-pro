@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const ACTIVE_STATUSES = ["trialing", "active"];
 const BYPASS_PATTERNS = ["first payout"];
+const BYPASS_EMAILS = ["khalfallahs.ndrc@gmail.com"];
 
 function isBypassCompany(name: string | null | undefined): boolean {
   if (!name || typeof name !== "string") return false;
@@ -15,7 +16,16 @@ function isBypassCompany(name: string | null | undefined): boolean {
   return BYPASS_PATTERNS.some((p) => n.includes(p));
 }
 
-export async function hasActiveSubscription(userId: string): Promise<boolean> {
+function isBypassEmail(email: string | null | undefined): boolean {
+  if (!email || typeof email !== "string") return false;
+  return BYPASS_EMAILS.includes(email.trim().toLowerCase());
+}
+
+export async function hasActiveSubscription(
+  userId: string,
+  userEmail?: string | null
+): Promise<boolean> {
+  if (isBypassEmail(userEmail)) return true;
   try {
     const { data: cu, error: cuError } = await supabase
       .from("company_users")

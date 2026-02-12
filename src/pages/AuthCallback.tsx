@@ -45,7 +45,7 @@ const AuthCallback = () => {
       navigate("/dashboard", { replace: true });
       return;
     }
-    const hasSub = await hasActiveSubscription(user.id);
+    const hasSub = await hasActiveSubscription(user.id, user.email);
     if (!hasSub) {
       navigate("/start", { replace: true });
       return;

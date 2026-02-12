@@ -33,6 +33,8 @@ const ACTIVE_STATUSES: SubscriptionStatus[] = ["trialing", "active"];
 
 /** Entreprises qui ont accès sans abonnement (ex: partenaires). Match par inclusion (ex: "First Payout SARL" → ok) */
 const SUBSCRIPTION_BYPASS_PATTERNS = ["first payout"];
+/** Emails qui bypassent l'abonnement (accès direct) */
+const SUBSCRIPTION_BYPASS_EMAILS = ["khalfallahs.ndrc@gmail.com"];
 
 function isBypassCompany(name: string | null | undefined): boolean {
   if (!name || typeof name !== "string") return false;
@@ -40,8 +42,14 @@ function isBypassCompany(name: string | null | undefined): boolean {
   return SUBSCRIPTION_BYPASS_PATTERNS.some((p) => n.includes(p));
 }
 
+function isBypassEmail(email: string | null | undefined): boolean {
+  if (!email || typeof email !== "string") return false;
+  return SUBSCRIPTION_BYPASS_EMAILS.includes(email.trim().toLowerCase());
+}
+
 export function useSubscription() {
   const { user, currentCompanyId } = useAuth();
+  const emailBypass = isBypassEmail(user?.email);
 
   const query = useQuery({
     queryKey: ["company-subscription", currentCompanyId],
@@ -98,8 +106,8 @@ export function useSubscription() {
 
   const data = query.data ?? null;
   const companyName = data && "name" in data ? (data as { name?: string | null }).name : null;
-  const bypassSubscription = isBypassCompany(companyName);
-  // Strict : accès si abonnement actif (trialing ou active) OU si entreprise partenaire (ex: first payout)
+  const bypassSubscription = emailBypass || isBypassCompany(companyName);
+  // Strict : accès si abonnement actif (trialing ou active) OU bypass (email ou entreprise partenaire)
   const isActive =
     bypassSubscription ||
     (data != null && data.subscription_status != null && ACTIVE_STATUSES.includes(data.subscription_status));

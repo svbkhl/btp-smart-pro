@@ -40,13 +40,13 @@ export default function Start() {
     }
   }, [user, authLoading, navigate]);
 
-  // Déjà abonnement actif (et a une company) → dashboard
+  // Déjà abonnement actif ou bypass (email/company) → dashboard
   useEffect(() => {
     if (authLoading || subLoading || !user) return;
-    if (currentCompanyId && isActive) {
+    if (isActive) {
       navigate("/dashboard", { replace: true });
     }
-  }, [user, currentCompanyId, isActive, subLoading, authLoading, navigate]);
+  }, [user, isActive, subLoading, authLoading, navigate]);
 
   const handleStartSubscription = async (plan?: StripePlanOption) => {
     // #region agent log
@@ -172,106 +172,33 @@ export default function Start() {
     );
   }
 
-  // Pas owner : afficher les 2 forfaits (seul le propriétaire peut souscrire)
+  // Employé (pas owner) : message simple, pas d'offres affichées
   if (!isOwner) {
-    const handleNonOwnerPlanClick = (plan: StripePlanOption) => {
-      toast({
-        title: "Souscription réservée au propriétaire",
-        description: "Contactez le propriétaire de votre espace pour souscrire à l'un de ces forfaits.",
-        variant: "default",
-      });
-    };
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6 pt-4">
-        <div className="w-full max-w-4xl space-y-6">
-          <div className="text-center space-y-1">
-            <p className="text-2xl font-bold text-primary uppercase tracking-wide">BTP SMART PRO</p>
-            <p className="text-lg text-muted-foreground font-medium">
-              L&apos;outil tout-en-un pour les pros du BTP.
-            </p>
-            <h1 className="text-2xl font-bold pt-1">Choisissez votre forfait</h1>
-            <p className="text-sm text-muted-foreground/90">
-              Contactez le propriétaire de votre espace pour souscrire à l&apos;un de ces forfaits.
-            </p>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2 items-stretch">
-            {planOptions.map((plan, index) => (
-              <Card
-                key={plan.price_id || plan.label + index}
-                className={`relative overflow-visible flex flex-col transition-transform duration-200 hover:scale-[1.02] ${
-                  plan.recommended
-                    ? "border-primary bg-primary/5"
-                    : "border border-border bg-muted/60"
-                }`}
-              >
-                {plan.recommended && (
-                  <span className="absolute top-4 right-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Recommandé
-                  </span>
-                )}
-                <CardHeader className="pb-2 pt-6 px-6 min-h-[140px]">
-                  <CardTitle className="text-lg font-semibold">{plan.label}</CardTitle>
-                  {plan.price_display && (
-                    <div>
-                      <p className="text-2xl font-semibold text-primary">{plan.price_display}</p>
-                      {plan.price_subline ? (
-                        <p className="text-base text-muted-foreground">({plan.price_subline})</p>
-                      ) : (
-                        <div className="h-6" aria-hidden />
-                      )}
-                    </div>
-                  )}
-                  <div className="min-h-[1.25rem]">
-                    {plan.badge && <p className="text-sm font-medium text-primary">{plan.badge}</p>}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-5 px-6 pb-6 pt-3 flex-1 flex flex-col">
-                  {plan.features && plan.features.length > 0 && (
-                    <ul className="space-y-2 text-base">
-                      {plan.features.map((f, i) => {
-                        const fraisEntree = f.startsWith("Frais d'entrée");
-                        if (fraisEntree) {
-                          return (
-                            <li key={i} className="flex items-center gap-2">
-                              <span className="text-green-600">•</span>
-                              <span className="text-muted-foreground">
-                                <span className="line-through">Frais d&apos;entrée 1000€</span>{" "}
-                                <span className="text-green-600">offert</span>
-                              </span>
-                            </li>
-                          );
-                        }
-                        const highlight = f.includes("essai");
-                        return (
-                          <li key={i} className="flex items-center gap-2">
-                            <span className={highlight ? "text-green-600" : ""}>•</span>
-                            <span className={highlight ? "text-green-600" : "text-muted-foreground"}>{f}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  <div className="mt-auto space-y-2">
-                    <Button
-                      className="w-full h-11 text-base"
-                      variant={plan.recommended ? "default" : "outline"}
-                      onClick={() => handleNonOwnerPlanClick(plan)}
-                    >
-                      Contacter le propriétaire pour souscrire
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="flex justify-center">
-            <Button variant="ghost" onClick={() => navigate("/auth", { replace: true })}>
-              Retour
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">
+              <Building2 className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <CardTitle>Souscription à BTP Smart Pro</CardTitle>
+            <CardDescription>
+              L&apos;abonnement est géré par le propriétaire de votre entreprise. Contactez-le pour souscrire ou obtenir un accès.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => navigate("/dashboard", { replace: true })}
+            >
+              Retour à l&apos;application
             </Button>
-          </div>
-        </div>
+            <Button variant="ghost" className="w-full" onClick={() => navigate("/auth", { replace: true })}>
+              Se déconnecter
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

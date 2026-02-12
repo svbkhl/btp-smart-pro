@@ -109,7 +109,7 @@ const Auth = () => {
         return;
       }
       // Pas de forfait actif → /start (choix forfait)
-      const hasSub = await hasActiveSubscription(sessionUser.id);
+      const hasSub = await hasActiveSubscription(sessionUser.id, sessionUser.email);
       if (!hasSub) {
         navigate("/start", { replace: true });
         return;
