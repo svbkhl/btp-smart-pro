@@ -331,7 +331,7 @@ const ResetPassword = () => {
                   required
                   minLength={8}
                   disabled={loading}
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pr-10"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 pr-10"
                 />
                 <button
                   type="button"
@@ -366,7 +366,7 @@ const ResetPassword = () => {
                   required
                   minLength={8}
                   disabled={loading}
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pr-10"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 pr-10"
                 />
                 <button
                   type="button"

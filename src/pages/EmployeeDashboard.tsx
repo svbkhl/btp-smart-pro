@@ -19,16 +19,14 @@ import {
   FileText,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserDisplayName } from "@/hooks/useCurrentUserDisplayName";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
-  
-  const firstName = user?.user_metadata?.first_name || '';
-  const lastName = user?.user_metadata?.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim() || user?.email || 'Employé';
+  const { firstName, fullName } = useCurrentUserDisplayName();
 
   return (
     <EmployeePageLayout>
@@ -38,14 +36,15 @@ const EmployeeDashboard = () => {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="space-y-2"
+          className="space-y-1"
         >
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
-            Bonjour {firstName || 'Employé'} 👋
+            Bonjour {firstName || 'Employé'} !
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Voici un aperçu de votre journée
+          <p className="text-muted-foreground">
+            {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
+          <p className="text-sm text-muted-foreground/80">Voici un aperçu de votre journée</p>
         </motion.div>
 
         {/* KPIs Employé */}

@@ -435,7 +435,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
               >
                 <SelectTrigger
                   id="quote"
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 >
                   <SelectValue placeholder="Sélectionner un devis pour générer la facture" />
                 </SelectTrigger>
@@ -482,7 +482,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
             >
               <SelectTrigger
                 id="client"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               >
                 <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
@@ -527,7 +527,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Facture pour rénovation salle de bains"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               disabled={loading}
             />
           </div>
@@ -546,7 +546,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
               value={amountHt}
               onChange={(e) => setAmountHt(e.target.value)}
               placeholder="Ex: 4500"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
@@ -586,7 +586,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
                 onChange={(e) => handleTvaRateInputChange(e.target.value)}
                 onBlur={handleTvaRateBlur}
                 placeholder="20"
-                className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="w-32 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">

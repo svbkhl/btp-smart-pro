@@ -141,7 +141,7 @@ export const EmailAccountsManager = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="p-8 text-center rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50"
+            className="p-8 text-center rounded-lg bg-transparent backdrop-blur-xl border border-border/50"
           >
             <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
@@ -156,7 +156,7 @@ export const EmailAccountsManager = () => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="flex items-center justify-between p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50"
+                className="flex items-center justify-between p-4 rounded-lg bg-transparent backdrop-blur-xl border border-border/50"
               >
                 <div className="flex items-center gap-3">
                   <Mail className="h-5 w-5 text-muted-foreground" />

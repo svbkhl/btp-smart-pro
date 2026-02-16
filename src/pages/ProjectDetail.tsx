@@ -19,10 +19,12 @@ import {
   Clock
 } from "lucide-react";
 import { useProject, useDeleteProject } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/usePermissions";
 import { safeAction } from "@/utils/safeAction";
 import { ProjectForm } from "@/components/ProjectForm";
 import { ProjectTimeline } from "@/components/ProjectTimeline";
 import { ProjectComments } from "@/components/ProjectComments";
+import { ProjectAssignEmployees } from "@/components/ProjectAssignEmployees";
 import { useState, useMemo } from "react";
 import {
   AlertDialog,
@@ -41,6 +43,7 @@ import { motion } from "framer-motion";
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isEmployee } = usePermissions();
   const { data: project, isLoading, error } = useProject(id);
   const deleteProject = useDeleteProject();
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -172,6 +175,7 @@ const ProjectDetail = () => {
               </div>
             </div>
           </div>
+          {!isEmployee && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -188,9 +192,10 @@ const ProjectDetail = () => {
               Supprimer
             </Button>
           </div>
+          )}
         </motion.div>
 
-        {/* KPI Stats */}
+        {/* KPI Stats — Budget masqué pour employés */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <KPIBlock
             title="Progression"
@@ -200,6 +205,7 @@ const ProjectDetail = () => {
             delay={0.1}
             gradient="blue"
           />
+          {!isEmployee && (
           <KPIBlock
             title="Budget"
             value={new Intl.NumberFormat('fr-FR', { 
@@ -212,6 +218,7 @@ const ProjectDetail = () => {
             delay={0.2}
             gradient="green"
           />
+          )}
           <KPIBlock
             title={daysRemaining !== null ? (daysRemaining > 0 ? "Jours restants" : "Jours de retard") : "Date de fin"}
             value={daysRemaining !== null ? Math.abs(daysRemaining).toString() : formatDate(project.end_date)}
@@ -225,7 +232,7 @@ const ProjectDetail = () => {
             value={typeof project.client === "string" ? project.client : project.client?.name || "Non assigné"}
             icon={Users}
             description="Client assigné"
-            delay={0.4}
+            delay={isEmployee ? 0.2 : 0.4}
             gradient="orange"
           />
         </div>
@@ -301,7 +308,11 @@ const ProjectDetail = () => {
 
           {/* Right Column - Info Cards */}
           <div className="space-y-6">
-            {/* Client Info */}
+            {/* Affecter des employés (owner uniquement) */}
+            {!isEmployee && (
+              <ProjectAssignEmployees projectId={project.id} />
+            )}
+
             {project.client && (
               <GlassCard delay={0.8} className="p-6">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -331,12 +342,13 @@ const ProjectDetail = () => {
             <GlassCard delay={0.9} className="p-6">
               <h3 className="font-semibold mb-4">Actions rapides</h3>
               <div className="space-y-2">
-                <Link to={`/quotes?project=${project.id}`}>
+                <Link to={`/facturation`}>
                   <Button variant="outline" className="w-full justify-start">
                     <FileText className="w-4 h-4 mr-2" />
-                    Voir les devis
+                    {isEmployee ? "Mes devis" : "Voir les devis"}
                   </Button>
                 </Link>
+                {!isEmployee && (
                 <Button
                   variant="outline"
                   className="w-full justify-start"
@@ -345,6 +357,7 @@ const ProjectDetail = () => {
                   <Edit className="w-4 h-4 mr-2" />
                   Modifier le projet
                 </Button>
+                )}
               </div>
             </GlassCard>
           </div>

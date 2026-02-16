@@ -154,7 +154,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
               id="client_name"
               {...register("client_name")}
               placeholder="M. Martin"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             {errors.client_name && (
               <p className="text-sm text-red-500">{errors.client_name.message}</p>
@@ -171,7 +171,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
               step="0.01"
               {...register("estimated_cost")}
               placeholder="0.00"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             {errors.estimated_cost && (
               <p className="text-sm text-red-500">{errors.estimated_cost.message}</p>
@@ -184,7 +184,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
               value={watch("status")}
               onValueChange={(value) => setValue("status", value as Quote["status"])}
             >
-              <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+              <SelectTrigger className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -203,7 +203,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
               value={watch("mode") || "simple"}
               onValueChange={(value) => setValue("mode", value as "simple" | "detailed")}
             >
-              <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+              <SelectTrigger className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -241,7 +241,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
                   value={(watch("tva_rate") ?? 0.20).toString()}
                   onValueChange={(value) => setValue("tva_rate", parseFloat(value))}
                 >
-                  <SelectTrigger className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                  <SelectTrigger className="w-32 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -263,7 +263,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
                       setValue("tva_rate", value / 100);
                     }
                   }}
-                  className="w-24 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                  className="w-24 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                   placeholder="Taux personnalisé"
                 />
                 <span className="text-sm text-muted-foreground">%</span>

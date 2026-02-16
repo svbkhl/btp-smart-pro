@@ -662,7 +662,7 @@ export default function SignaturePage() {
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Aperçu PDF - Colonne gauche */}
           <div className="order-2 lg:order-1">
-            <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-800/70 border-border/50 h-full">
+            <Card className="backdrop-blur-md bg-white/5 dark:bg-white/5 border-white/20 dark:border-white/10 h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -709,7 +709,7 @@ export default function SignaturePage() {
 
           {/* Formulaire de signature - Colonne droite */}
           <div className="order-1 lg:order-2">
-            <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-800/70 border-border/50">
+            <Card className="backdrop-blur-md bg-white/5 dark:bg-white/5 border-white/20 dark:border-white/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5" />

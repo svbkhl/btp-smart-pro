@@ -98,8 +98,8 @@ export const SearchBar = ({
           className={cn(
             "border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0",
             variant === "compact"
-              ? "pl-9 sm:pl-10 pr-7 sm:pr-9 text-xs sm:text-sm"
-              : "pl-10 sm:pl-12 pr-8 sm:pr-10 text-sm sm:text-base",
+              ? "pl-10 sm:pl-11 pr-7 sm:pr-9 text-xs sm:text-sm"
+              : "pl-11 sm:pl-12 pr-8 sm:pr-10 text-sm sm:text-base",
             "h-full",
             !placeholder && "placeholder:text-transparent"
           )}

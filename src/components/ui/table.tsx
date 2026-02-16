@@ -25,7 +25,7 @@ TableBody.displayName = "TableBody";
 
 const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <tfoot ref={ref} className={cn("border-t border-white/10 dark:border-white/5 bg-white/5 dark:bg-black/10 backdrop-blur-sm font-medium [&>tr]:last:border-b-0", className)} {...props} />
+    <tfoot ref={ref} className={cn("border-t border-white/10 dark:border-white/5 bg-transparent backdrop-blur-sm font-medium [&>tr]:last:border-b-0", className)} {...props} />
   ),
 );
 TableFooter.displayName = "TableFooter";
@@ -34,7 +34,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
-      className={cn("border-b border-white/10 dark:border-white/5 transition-colors data-[state=selected]:bg-white/5 dark:data-[state=selected]:bg-black/10 hover:bg-white/5 dark:hover:bg-black/10", className)}
+      className={cn("border-b border-white/10 dark:border-white/5 transition-colors data-[state=selected]:bg-white/10 dark:data-[state=selected]:bg-white/5 hover:bg-white/10 dark:hover:bg-white/5", className)}
       {...props}
     />
   ),

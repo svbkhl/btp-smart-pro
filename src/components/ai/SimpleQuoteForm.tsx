@@ -473,7 +473,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
             >
               <SelectTrigger
                 id="client"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               >
                 <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
@@ -513,7 +513,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
               value={prestation}
               onChange={(e) => setPrestation(e.target.value)}
               placeholder="Ex: Rénovation salle de bains"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               disabled={loading}
             />
           </div>
@@ -532,7 +532,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
               value={surface}
               onChange={(e) => setSurface(e.target.value)}
               placeholder="Ex: 15"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               disabled={loading}
             />
           </div>
@@ -551,7 +551,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
               value={prix}
               onChange={(e) => setPrix(e.target.value)}
               placeholder="Ex: 2000"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
@@ -588,7 +588,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
                 onChange={(e) => handleTvaRateInputChange(e.target.value)}
                 onBlur={handleTvaRateBlur}
                 placeholder="20"
-                className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="w-32 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">

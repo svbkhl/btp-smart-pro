@@ -101,7 +101,7 @@ Nom de l'entreprise
 Email: contact@entreprise.fr
 Tél: +33 1 23 45 67 89"
           rows={6}
-          className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 font-mono text-sm"
+          className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground">
           Cette signature sera automatiquement ajoutée à la fin de vos emails

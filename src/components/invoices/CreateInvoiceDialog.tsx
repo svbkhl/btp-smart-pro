@@ -241,7 +241,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                     }
                   }}
                 >
-                  <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                  <SelectTrigger className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                     <SelectValue placeholder="Sélectionner un client" />
                   </SelectTrigger>
                   <SelectContent>
@@ -274,7 +274,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                     id="client_name"
                     {...register("client_name")}
                     placeholder="M. Martin"
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
                   />
                   {errors.client_name && (
                     <p className="text-xs sm:text-sm text-red-500">{errors.client_name.message}</p>
@@ -287,7 +287,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                     type="email"
                     {...register("client_email")}
                     placeholder="client@example.com"
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
                   />
                 </div>
               </div>
@@ -300,7 +300,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                   id="client_address"
                   {...register("client_address")}
                   placeholder="123 Rue Example, 75001 Paris"
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 />
               </div>
             )}
@@ -314,7 +314,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                 value={selectedQuoteId || ""}
                 onValueChange={(value) => setValue("quote_id", value)}
               >
-                <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                <SelectTrigger className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                   <SelectValue placeholder="Sélectionner un devis" />
                 </SelectTrigger>
                 <SelectContent>
@@ -338,7 +338,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
               {...register("description")}
               placeholder="Décrivez les travaux effectués..."
               rows={3}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             {errors.description && (
               <p className="text-sm text-red-500">{errors.description.message}</p>
@@ -356,7 +356,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
               step="0.01"
               {...register("amount_ttc")}
               placeholder="0.00"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             {errors.amount_ttc && (
               <p className="text-sm text-red-500">{errors.amount_ttc.message}</p>
@@ -370,7 +370,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
               id="due_date"
               type="date"
               {...register("due_date")}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
           </div>
 

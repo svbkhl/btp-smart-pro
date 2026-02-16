@@ -179,7 +179,7 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
         {invoice.service_lines && invoice.service_lines.length > 0 && (
           <div>
             <h3 className="font-semibold mb-3">Détail des prestations</h3>
-            <div className="border border-white/20 dark:border-white/10 rounded-lg overflow-hidden bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+            <div className="border border-white/20 dark:border-white/10 rounded-lg overflow-hidden bg-transparent backdrop-blur-xl">
               <table className="w-full text-sm">
                 <thead className="bg-primary/10 dark:bg-primary/20">
                   <tr>

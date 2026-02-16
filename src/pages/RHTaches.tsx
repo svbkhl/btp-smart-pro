@@ -157,7 +157,7 @@ const RHTaches = () => {
               placeholder="Rechercher une tâche (titre, description)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 sm:pl-12 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+              className="pl-11 sm:pl-12 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
             />
           </div>
         </GlassCard>

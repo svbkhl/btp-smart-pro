@@ -176,7 +176,7 @@ export const TextLibraryManager = () => {
             placeholder="Rechercher un texte..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-11 sm:pl-12"
           />
         </div>
       </div>

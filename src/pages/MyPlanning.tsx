@@ -790,7 +790,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
   }
 
   const content = (
-    <div className="p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6">
+    <div className={`space-y-4 sm:space-y-6 ${embedded ? "pt-0" : "p-4 sm:p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8"}`}>
         {/* En-tête */}
         <div className="space-y-2">
           <h1 className="text-2xl sm:text-2xl sm:text-3xl md:text-4xl font-bold text-foreground flex items-center gap-2 sm:gap-3">

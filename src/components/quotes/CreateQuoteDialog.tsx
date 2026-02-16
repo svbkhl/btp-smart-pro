@@ -133,7 +133,7 @@ export const CreateQuoteDialog = ({ open, onOpenChange }: CreateQuoteDialogProps
       };
 
       if (finalClientId) {
-        quoteData.project_id = finalClientId; // Utiliser client_id comme project_id temporairement
+        quoteData.client_id = finalClientId;
       }
 
       await createQuote.mutateAsync(quoteData);

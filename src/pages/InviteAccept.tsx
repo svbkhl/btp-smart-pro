@@ -506,7 +506,7 @@ const InviteAccept = () => {
               </motion.div>
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                  Bienvenue ! 👋
+                  Bienvenue !
                 </h1>
                 <div className="space-y-1">
                   <p className="text-lg font-semibold text-foreground">
@@ -538,7 +538,7 @@ const InviteAccept = () => {
                     type="email"
                     value={inviteInfo.email}
                     disabled
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pr-10 text-sm sm:text-base"
+                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 pr-10 text-sm sm:text-base"
                   />
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 </div>
@@ -560,7 +560,7 @@ const InviteAccept = () => {
                     required
                     placeholder="Votre prénom"
                     disabled={submitting}
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
                   />
                 </div>
 
@@ -575,7 +575,7 @@ const InviteAccept = () => {
                     required
                     placeholder="Votre nom"
                     disabled={submitting}
-                    className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
                   />
                 </div>
               </div>
@@ -594,7 +594,7 @@ const InviteAccept = () => {
                   placeholder="Minimum 8 caractères"
                   minLength={8}
                   disabled={submitting}
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
                 />
                 <p className="text-xs text-muted-foreground">
                   Le mot de passe doit contenir au moins 8 caractères. Choisissez un mot de passe sécurisé.
@@ -615,7 +615,7 @@ const InviteAccept = () => {
                   placeholder="Répétez le mot de passe"
                   minLength={8}
                   disabled={submitting}
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base"
                 />
               </div>
 

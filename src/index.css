@@ -493,6 +493,11 @@ button,
    RESPONSIVE GLOBAL - MOBILE FIRST
    ============================================ */
 @layer utilities {
+  /* Apple Motion Glass - verre transparent type Apple */
+  .apple-glass {
+    @apply bg-transparent backdrop-blur-2xl border-white/20 dark:border-white/10;
+  }
+
   /* Container responsive avec max-width */
   .container-responsive {
     width: 100%;

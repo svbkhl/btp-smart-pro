@@ -316,7 +316,7 @@ const AdminContactRequests = () => {
                 placeholder="Rechercher par nom, email, entreprise..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 rounded-xl"
+                className="pl-11 sm:pl-12 rounded-xl"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>

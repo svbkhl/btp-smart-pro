@@ -183,7 +183,7 @@ export default function SignaturePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-2xl mx-auto pt-8">
-        <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-800/70 border-border/50">
+        <Card className="backdrop-blur-md bg-white/5 dark:bg-white/5 border-white/20 dark:border-white/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />

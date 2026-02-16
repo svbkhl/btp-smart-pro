@@ -134,13 +134,13 @@ export const QuoteSignatureDialog = ({
               onChange={(e) => setSignerName(e.target.value)}
               placeholder="Votre nom complet"
               disabled={loading}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
           </div>
 
           <div className="space-y-2">
             <Label>Signature</Label>
-            <div className="border border-white/20 dark:border-white/10 rounded-lg bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+            <div className="border border-white/20 dark:border-white/10 rounded-lg bg-transparent backdrop-blur-xl">
               <canvas
                 ref={canvasRef}
                 width={400}

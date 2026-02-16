@@ -351,7 +351,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
               onValueChange={setClientId}
               disabled={clientsLoading || !!invoiceId}
             >
-              <SelectTrigger id="client" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+              <SelectTrigger id="client" className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                 <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
               <SelectContent>
@@ -390,7 +390,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
                 onChange={(e) => handleTvaRateInputChange(e.target.value)}
                 onBlur={handleTvaRateBlur}
                 placeholder="20"
-                className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="w-32 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
           )}
@@ -420,7 +420,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
               )}
 
               {localSections.map((section) => (
-                <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+                <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3 bg-transparent backdrop-blur-xl">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                     <SectionTitleInput
                       value={section.title}
@@ -479,7 +479,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
                                   value={line.unit}
                                   onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
                                 >
-                                  <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                                  <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -492,7 +492,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
                                 </Select>
                                 <Input
                                   type="number"
-                                  className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                  className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                                   value={line.quantity ?? ""}
                                   onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
                                   placeholder="Qté"
@@ -501,7 +501,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
                               <div className="flex gap-2 items-center flex-1 sm:flex-initial">
                                 <Input
                                   type="number"
-                                  className="flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                  className="flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                                   value={line.unit_price_ht ?? ""}
                                   onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
                                   placeholder="Prix HT"

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TextLibraryButton } from "@/components/facturation/TextLibraryButton";
-import { PaymentRemindersManager } from "@/components/reminders/PaymentRemindersManager";
+import { QuoteRemindersManager } from "@/components/reminders/QuoteRemindersManager";
 import { 
   Search, 
   FileText, 
@@ -62,9 +62,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { CreateQuoteDialog } from "@/components/quotes/CreateQuoteDialog";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const Facturation = () => {
   const navigate = useNavigate();
+  const { isEmployee } = usePermissions();
+  const [isCreateQuoteOpen, setIsCreateQuoteOpen] = useState(false);
   const { data: quotes = [], isLoading: quotesLoading } = useQuotes();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const { data: payments = [], isLoading: paymentsLoading } = usePaymentsQuery();
@@ -98,10 +102,6 @@ const Facturation = () => {
     invoice.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     invoice.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // ✅ DEBUG: Log pour vérifier les factures récupérées (après déclaration)
-  console.log("📊 [Facturation] Factures récupérées:", invoices.length, invoices);
-  console.log("📊 [Facturation] Factures filtrées:", filteredInvoices.length, filteredInvoices);
 
   const filteredPayments = payments.filter((payment) =>
     payment.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -314,8 +314,8 @@ const Facturation = () => {
           <TextLibraryButton />
         </div>
 
-        <Tabs defaultValue="quotes" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 gap-2 bg-transparent p-1">
+        <Tabs defaultValue="quotes" className="space-y-0">
+          <TabsList className={`grid w-full gap-2 bg-transparent p-1 shrink-0 mb-0 ${isEmployee ? "grid-cols-2" : "grid-cols-4"}`}>
             <TabsTrigger 
               value="quotes" 
               className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
@@ -328,6 +328,8 @@ const Facturation = () => {
             >
               Factures
             </TabsTrigger>
+            {!isEmployee && (
+            <>
             <TabsTrigger 
               value="payments" 
               className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
@@ -340,29 +342,39 @@ const Facturation = () => {
             >
               Relances
             </TabsTrigger>
+            </>
+            )}
           </TabsList>
 
-          <TabsContent value="quotes" className="mt-0 space-y-6">
+          <TabsContent value="quotes" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 space-y-6 focus-visible:outline-none">
             {/* Recherche et Actions */}
             <GlassCard className="p-4 sm:p-6">
               <div className="flex flex-col gap-3 sm:gap-4">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none shrink-0" />
                     <Input
                       placeholder="Rechercher un devis..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                      className="pl-12 sm:pl-14 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                   </div>
-                  <Link to="/ai?tab=quotes" className="w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto gap-2">
+                  {isEmployee ? (
+                    <Button className="w-full sm:w-auto gap-2" onClick={() => setIsCreateQuoteOpen(true)}>
                       <Plus className="w-4 h-4" />
                       <span className="hidden sm:inline">Nouveau devis</span>
                       <span className="sm:hidden">Nouveau</span>
                     </Button>
-                  </Link>
+                  ) : (
+                    <Link to="/ai?tab=quotes" className="w-full sm:w-auto">
+                      <Button className="w-full sm:w-auto gap-2">
+                        <Plus className="w-4 h-4" />
+                        <span className="hidden sm:inline">Nouveau devis</span>
+                        <span className="sm:hidden">Nouveau</span>
+                      </Button>
+                    </Link>
+                  )}
                 </div>
                 
                 {/* Barre d'actions de sélection */}
@@ -637,21 +649,24 @@ const Facturation = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="invoices" className="mt-0 space-y-6">
+          <TabsContent value="invoices" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 space-y-6 focus-visible:outline-none">
             {/* Recherche et Actions */}
             <GlassCard className="p-4 sm:p-6">
               <div className="flex flex-col gap-3 sm:gap-4">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none shrink-0" />
                     <Input
                       placeholder="Rechercher une facture..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 text-sm sm:text-base"
+                      className="pl-12 sm:pl-14 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 text-sm sm:text-base ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                   </div>
-                  <Button onClick={() => navigate("/ai?tab=invoices")} className="w-full sm:w-auto gap-2">
+                  <Button 
+                    onClick={() => (isEmployee ? setIsCreateInvoiceOpen(true) : navigate("/ai?tab=invoices"))} 
+                    className="w-full sm:w-auto gap-2"
+                  >
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">Nouvelle facture</span>
                     <span className="sm:hidden">Nouvelle</span>
@@ -898,17 +913,20 @@ const Facturation = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="payments" className="mt-0">
-            <PaymentsTab
-              payments={payments}
-              quotes={quotes}
-              loading={paymentsLoading}
-            />
-          </TabsContent>
-
-          <TabsContent value="reminders" className="mt-0">
-            <PaymentRemindersManager />
-          </TabsContent>
+          {!isEmployee && (
+          <>
+            <TabsContent value="payments" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none">
+              <PaymentsTab
+                payments={payments}
+                quotes={quotes}
+                loading={paymentsLoading}
+              />
+            </TabsContent>
+            <TabsContent value="reminders" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none">
+              <QuoteRemindersManager />
+            </TabsContent>
+          </>
+          )}
         </Tabs>
 
         {/* Dialogs */}
@@ -939,6 +957,10 @@ const Facturation = () => {
           onOpenChange={setIsCreateInvoiceOpen}
         />
 
+        <CreateQuoteDialog
+          open={isCreateQuoteOpen}
+          onOpenChange={setIsCreateQuoteOpen}
+        />
 
         {/* Modal Envoyer au client */}
         {sendToClientDocument && (

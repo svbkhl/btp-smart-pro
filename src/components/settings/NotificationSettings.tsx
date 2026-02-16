@@ -22,7 +22,11 @@ interface NotificationPreferences {
   planning_assignment_notifications: boolean;
 }
 
-export const NotificationSettings = () => {
+interface NotificationSettingsProps {
+  isEmployee?: boolean;
+}
+
+export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -234,7 +238,7 @@ export const NotificationSettings = () => {
         <div className="space-y-6">
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Notifications push</h3>
-            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <Label htmlFor="push_notifications" className="text-base">Notifications dans le navigateur</Label>
@@ -287,11 +291,12 @@ export const NotificationSettings = () => {
             </div>
           </div>
 
-          {/* Notifications pour les responsables (owners) */}
+          {/* Notifications pour les responsables (owners) — masqué aux employés */}
+          {!isEmployee && (
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Pour les responsables</h3>
             <p className="text-sm text-muted-foreground">Alertes lorsque des événements importants se produisent.</p>
-            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <Label htmlFor="signed_quote_notifications">Devis signé</Label>
@@ -322,12 +327,13 @@ export const NotificationSettings = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Notifications pour les employés */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Pour les employés</h3>
             <p className="text-sm text-muted-foreground">Alertes liées à votre planning et vos affectations.</p>
-            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <Label htmlFor="planning_assignment_notifications">Affectations planning</Label>
@@ -345,10 +351,11 @@ export const NotificationSettings = () => {
             </div>
           </div>
 
-          {/* Rappels spécifiques */}
+          {/* Rappels spécifiques — masqué aux employés (relances devis/paiements) */}
+          {!isEmployee && (
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Rappels automatiques</h3>
-            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               {[
                 { id: "quote_reminders", label: "Rappels de devis", desc: "Rappels pour les devis en attente", key: "quote_reminders" as const },
                 { id: "payment_reminders", label: "Rappels de paiement", desc: "Rappels pour les paiements dus ou en retard", key: "payment_reminders" as const },
@@ -372,11 +379,13 @@ export const NotificationSettings = () => {
               ))}
             </div>
           </div>
+          )}
 
-          {/* Délais de rappel */}
+          {/* Délais de rappel — masqué aux employés */}
+          {!isEmployee && (
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Délais de rappel</h3>
-            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="space-y-4 p-4 sm:p-5 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="quote_reminder_days">Rappeler les devis en attente après (jours)</Label>
@@ -415,6 +424,7 @@ export const NotificationSettings = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Bouton de sauvegarde */}
           <Button

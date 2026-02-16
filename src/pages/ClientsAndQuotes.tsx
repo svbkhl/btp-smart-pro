@@ -99,7 +99,7 @@ const ClientsAndQuotes = () => {
                   placeholder="Rechercher un client..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-11 sm:pl-12"
                 />
               </div>
             </GlassCard>
@@ -223,7 +223,7 @@ const ClientsAndQuotes = () => {
                   placeholder="Rechercher un devis..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-11 sm:pl-12"
                 />
               </div>
             </GlassCard>

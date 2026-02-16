@@ -772,7 +772,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                           <h4 className="font-semibold text-base mb-3 text-primary">
                             {sectionIdx + 1}. {section.title}
                           </h4>
-                          <div className="overflow-x-auto border border-white/20 dark:border-white/10 rounded-lg bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+                          <div className="overflow-x-auto border border-white/20 dark:border-white/10 rounded-lg bg-transparent backdrop-blur-xl">
                             <table className="w-full text-sm">
                               <thead className="bg-primary text-white">
                                 <tr>
@@ -911,7 +911,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
               onValueChange={setClientId}
               disabled={clientsLoading || !!quoteId}
             >
-              <SelectTrigger id="client" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+              <SelectTrigger id="client" className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                 <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
               <SelectContent>
@@ -958,7 +958,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                 onChange={(e) => handleTvaRateInputChange(e.target.value)}
                 onBlur={handleTvaRateBlur}
                 placeholder="20"
-                className="w-32 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="w-32 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
               <p className="text-xs text-muted-foreground">
                 Le taux saisi sera sauvegardé comme préférence pour les prochains devis
@@ -1004,7 +1004,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                 )}
 
                 {localSections.map((section, sectionIdx) => (
-                  <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+                  <div key={section.id} className="border border-white/20 dark:border-white/10 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3 bg-transparent backdrop-blur-xl">
                     {/* En-tête section */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                       <SectionTitleInput
@@ -1064,7 +1064,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                                     value={line.unit}
                                     onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
                                   >
-                                    <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+                                    <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1077,7 +1077,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                                   </Select>
                                   <Input
                                     type="number"
-                                    className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                    className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                                     value={line.quantity ?? ""}
                                     onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
                                     placeholder="Qté"
@@ -1086,7 +1086,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                                 <div className="flex gap-2 items-center flex-1 sm:flex-initial">
                                   <Input
                                     type="number"
-                                    className="flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                                    className="flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                                     value={line.unit_price_ht ?? ""}
                                     onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
                                     placeholder="Prix HT"

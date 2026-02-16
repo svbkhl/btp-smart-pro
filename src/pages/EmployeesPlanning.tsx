@@ -607,7 +607,7 @@ const EmployeesPlanning = () => {
                 {employees.map((employee) => (
                   <div
                     key={employee.id}
-                    className="p-3 sm:p-4 rounded-xl border border-white/20 dark:border-white/10 hover:border-primary/30 dark:hover:border-primary/20 transition-all cursor-pointer bg-white/5 dark:bg-black/10 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-black/20 group"
+                    className="p-3 sm:p-4 rounded-xl border border-white/20 dark:border-white/10 hover:border-primary/30 dark:hover:border-primary/20 transition-all cursor-pointer bg-transparent backdrop-blur-xl hover:bg-white/5 dark:hover:bg-white/5 group"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-3">

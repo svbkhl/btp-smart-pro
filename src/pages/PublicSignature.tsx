@@ -403,7 +403,7 @@ const PublicSignature = () => {
                   onChange={(e) => setSignerName(e.target.value)}
                   placeholder="Votre nom complet"
                   disabled={signing}
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 />
               </div>
 

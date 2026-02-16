@@ -1,28 +1,27 @@
 -- =====================================================
 -- Changer le prénom de khalfallahs.ndrc@gmail.com
--- de "wanys" à "Henry" (auth + employees)
+-- Mise à jour : Islam Slimani (auth + employees)
 -- =====================================================
--- Supabase Dashboard → SQL Editor → New query → Coller et exécuter
+-- Utiliser docs/FIX-ISLAM-SLIMANI-NAME-AND-ROLE.sql à la place
 -- =====================================================
 
--- 1. auth.users : first_name et prenom dans raw_user_meta_data
+-- 1. auth.users : first_name, prenom, nom
 UPDATE auth.users
 SET raw_user_meta_data = jsonb_set(
   jsonb_set(
-    COALESCE(raw_user_meta_data, '{}'::jsonb),
-    '{first_name}',
-    '"Henry"',
-    true
+    jsonb_set(
+      COALESCE(raw_user_meta_data, '{}'::jsonb),
+      '{first_name}', '"Islam"', true
+    ),
+    '{prenom}', '"Islam"', true
   ),
-  '{prenom}',
-  '"Henry"',
-  true
+  '{nom}', '"Slimani"', true
 )
 WHERE email = 'khalfallahs.ndrc@gmail.com';
 
--- 2. employees : prenom pour toutes les lignes de cet utilisateur
+-- 2. employees : prenom et nom
 UPDATE public.employees
-SET prenom = 'Henry'
+SET prenom = 'Islam', nom = 'Slimani'
 WHERE user_id = (SELECT id FROM auth.users WHERE email = 'khalfallahs.ndrc@gmail.com');
 
 -- 3. Vérification

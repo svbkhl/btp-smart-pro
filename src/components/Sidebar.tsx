@@ -7,6 +7,7 @@ import {
   FileText, 
   FolderKanban, 
   Calendar,
+  CalendarDays,
   Mail,
   Brain,
   Settings,
@@ -117,6 +118,18 @@ const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null;
       { icon: Mail, label: "Messagerie", path: "/messaging", feature: null, employeeAccess: true, requiredPermission: "messaging.access" },
     ],
   },
+];
+
+// Menu fixe pour les EMPLOYÉS : leurs outils de travail (inclut IA)
+// Pas d'Employés, pas d'Analytics, pas de stats (CA, nb chantiers)
+const employeeMenuGroups: MenuGroup[] = [
+  { items: [{ icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" }] },
+  { items: [{ icon: FolderKanban, label: "Mes chantiers", path: "/projects" }] },
+  { items: [{ icon: Calendar, label: "Calendrier", path: "/calendar" }] },
+  { items: [{ icon: Mail, label: "Messagerie", path: "/messaging" }] },
+  { items: [{ icon: FileText, label: "Facturation", path: "/facturation" }] },
+  { items: [{ icon: Brain, label: "IA", path: "/ai" }] },
+  { items: [{ icon: Users, label: "Clients", path: "/clients" }] },
 ];
 
 // Fonction pour filtrer les menu items selon les features et les permissions
@@ -259,9 +272,9 @@ export default function Sidebar() {
     [can]
   );
   
-  // Calcul normal des menuGroups - pas de gel pour éviter de perdre des items
+  // Calcul des menuGroups : employés = menu fixe (inclut forceEmployeeView via usePermissions)
   const menuGroups = useMemo(
-    () => getMenuGroups(company, isEmployee, canFunc, isOwner),
+    () => (isEmployee ? employeeMenuGroups : getMenuGroups(company, isEmployee, canFunc, isOwner)),
     [company, isEmployee, canFunc, isOwner]
   );
   
@@ -483,8 +496,8 @@ export default function Sidebar() {
         }}
         className={cn(
           "flex flex-col z-40",
-          "bg-white/90 dark:bg-gray-900/90 backdrop-blur-3xl",
-          "border border-white/40 dark:border-gray-700/50",
+          "bg-transparent backdrop-blur-xl",
+          "border border-white/20 dark:border-white/10",
           "shadow-2xl shadow-black/10 dark:shadow-black/30",
           "transition-shadow duration-300 ease-out",
           "hover:shadow-[0_25px_70px_-20px_rgba(59,130,246,0.4)] dark:hover:shadow-[0_25px_70px_-20px_rgba(139,92,246,0.4)]",
@@ -503,7 +516,7 @@ export default function Sidebar() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="p-6 border-b border-white/20 dark:border-gray-700/30"
+          className="p-6 border-b border-white/20 dark:border-white/10"
         >
           {(user || !fakeDataEnabled) ? (
             <Link 
@@ -586,10 +599,10 @@ export default function Sidebar() {
             }}
             className={cn(
               "absolute top-4 right-4 z-50 w-10 h-10 rounded-xl",
-              "bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl",
-              "border-2 border-white/40 dark:border-gray-700/40",
+              "bg-white/5 dark:bg-white/5 backdrop-blur-xl",
+              "border border-white/20 dark:border-white/10",
               "flex items-center justify-center",
-              "hover:bg-white dark:hover:bg-gray-700",
+              "hover:bg-white/50 dark:hover:bg-white/20",
               "transition-all duration-200 shadow-lg",
               isPinned 
                 ? "bg-primary/10 border-primary/30 text-primary" 
@@ -879,7 +892,7 @@ export default function Sidebar() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25, duration: 0.15 }}
-          className="p-4 border-t border-white/20 dark:border-gray-700/30 space-y-3"
+          className="p-4 border-t border-white/20 dark:border-white/10 space-y-3"
         >
 
           {/* User Actions */}

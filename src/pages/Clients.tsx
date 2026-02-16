@@ -21,8 +21,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const Clients = () => {
+  const { isEmployee } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
@@ -123,7 +125,7 @@ const Clients = () => {
               placeholder="Rechercher un client..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-11 sm:pl-12"
             />
           </div>
         </GlassCard>
@@ -134,7 +136,7 @@ const Clients = () => {
             <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">Aucun client</h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery ? "Aucun client ne correspond à votre recherche" : "Créez votre premier client pour commencer"}
+              {searchQuery ? "Aucun client ne correspond à votre recherche" : isEmployee ? "Consultez les clients pour créer des devis dans Facturation" : "Créez votre premier client pour commencer"}
             </p>
             {!searchQuery && (
               <Button onClick={() => setIsFormOpen(true)}>
@@ -156,6 +158,7 @@ const Clients = () => {
                       {client.status}
                     </Badge>
                   </div>
+                  {!isEmployee && (
                   <div className="flex gap-1">
                     <Button
                       variant="ghost"
@@ -177,6 +180,7 @@ const Clients = () => {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 text-sm">
@@ -198,7 +202,7 @@ const Clients = () => {
                       <span>{client.location}</span>
                     </div>
                   )}
-                  {client.total_spent !== undefined && (
+                  {!isEmployee && client.total_spent !== undefined && (
                     <div className="pt-2 border-t">
                       <p className="font-semibold text-foreground">
                         Total dépensé: {new Intl.NumberFormat('fr-FR', {

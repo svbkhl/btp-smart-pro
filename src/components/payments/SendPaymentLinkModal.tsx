@@ -311,7 +311,7 @@ export default function SendPaymentLinkModal({
                 </p>
 
                 {customMessage && (
-                  <div className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border">
+                  <div className="p-3 bg-transparent backdrop-blur-xl rounded-lg border">
                     <p className="text-sm italic">{customMessage}</p>
                   </div>
                 )}

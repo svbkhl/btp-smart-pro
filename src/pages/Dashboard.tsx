@@ -12,17 +12,21 @@ import {
   Users, 
   TrendingUp, 
   AlertCircle,
-  Plus
+  Plus,
+  Calendar,
+  Mail,
+  FileText
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserDisplayName } from "@/hooks/useCurrentUserDisplayName";
 import { useUserStats } from "@/hooks/useUserStats";
 import { useProjects } from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePermissions } from "@/hooks/usePermissions";
-import { RecentProjectsWidget, CalendarWidget, MessagesWidget } from "@/components/widgets";
+import { RecentProjectsWidget, CalendarWidget, MessagesWidget, RecentClientsWidget } from "@/components/widgets";
 import { useMemo, useEffect } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -34,23 +38,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isEmployee, loading: permissionsLoading } = usePermissions();
+  const { firstName } = useCurrentUserDisplayName();
   
-  // Extraire le prénom de l'utilisateur depuis plusieurs sources possibles
-  const firstName = 
-    user?.user_metadata?.first_name || 
-    user?.user_metadata?.prenom || 
-    user?.user_metadata?.firstName ||
-    (user as any)?.raw_user_meta_data?.first_name ||
-    (user as any)?.raw_user_meta_data?.prenom ||
-    (user as any)?.raw_user_meta_data?.firstName ||
-    '';
-  
-  // Rediriger les employés vers leur dashboard dédié
-  useEffect(() => {
-    if (!permissionsLoading && isEmployee) {
-      navigate('/employee-dashboard', { replace: true });
-    }
-  }, [isEmployee, permissionsLoading, navigate]);
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const { data: clients, isLoading: clientsLoading } = useClients();
@@ -203,17 +192,116 @@ const Dashboard = () => {
 
   const isLoading = statsLoading || projectsLoading || clientsLoading || quotesLoading;
 
+  // Vue employé : pas de stats (CA, nb chantiers), uniquement accès rapide
+  if (isEmployee) {
+    const employeeCards = [
+      { to: "/projects", icon: FolderKanban, title: "Mes chantiers", desc: "Voir mes affectations", iconClass: "bg-blue-500/20 text-blue-600 dark:text-blue-400", cardClass: "hover:border-blue-500/40" },
+      { to: "/calendar", icon: Calendar, title: "Calendrier", desc: "Agenda et événements", iconClass: "bg-purple-500/20 text-purple-600 dark:text-purple-400", cardClass: "hover:border-purple-500/40" },
+      { to: "/my-planning", icon: Calendar, title: "Mon planning", desc: "Affectations et saisie heures", iconClass: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400", cardClass: "hover:border-emerald-500/40" },
+      { to: "/messaging", icon: Mail, title: "Messagerie", desc: "Messages", iconClass: "bg-amber-500/20 text-amber-600 dark:text-amber-400", cardClass: "hover:border-amber-500/40" },
+      { to: "/facturation", icon: FileText, title: "Facturation", desc: "Devis et factures", iconClass: "bg-rose-500/20 text-rose-600 dark:text-rose-400", cardClass: "hover:border-rose-500/40" },
+      { to: "/clients", icon: Users, title: "Clients", desc: "Gérer les clients", iconClass: "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400", cardClass: "hover:border-cyan-500/40" },
+    ];
+    return (
+      <PageLayout>
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 sm:space-y-8">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-1"
+          >
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
+              Bonjour {firstName || "Employé"} !
+            </h1>
+            <p className="text-muted-foreground">
+              {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
+            </p>
+            <p className="text-sm text-muted-foreground/80">Voici un aperçu de votre journée</p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {employeeCards.map((card, i) => (
+              <motion.div
+                key={card.to}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.05 * i }}
+              >
+                <Link to={card.to}>
+                  <GlassCard
+                    className={`p-6 transition-all duration-300 cursor-pointer h-full hover:shadow-xl hover:scale-[1.02] ${card.cardClass}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl shrink-0 ${card.iconClass}`}>
+                        <card.icon className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-base">{card.title}</h3>
+                        <p className="text-sm text-muted-foreground truncate">{card.desc}</p>
+                      </div>
+                    </div>
+                  </GlassCard>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Widgets */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.35 }}
+            >
+              <RecentProjectsWidget />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.4 }}
+            >
+              <CalendarWidget />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.45 }}
+            >
+              <MessagesWidget />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
+            >
+              <RecentClientsWidget />
+            </motion.div>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout>
       <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col gap-4"
+        >
           <div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
-              {firstName ? `Bienvenue ${firstName} !` : 'Bienvenue !'}
+              {firstName ? `Bonjour ${firstName} !` : 'Bonjour !'}
             </h1>
-            <p className="text-muted-foreground text-base">
-              Tableau de bord - Voici un aperçu de votre activité
+            <p className="text-muted-foreground">
+              {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
+            </p>
+            <p className="text-sm text-muted-foreground/80 mt-1">
+              Voici un aperçu de votre activité
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
@@ -247,7 +335,7 @@ const Dashboard = () => {
               </Button>
             </Link>
           </div>
-        </div>
+        </motion.div>
 
         {/* KPI Blocks */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
@@ -377,6 +465,9 @@ const Dashboard = () => {
                 ))}
               </div>
             </GlassCard>
+
+            {/* Recent Clients Widget */}
+            <RecentClientsWidget />
 
             {/* Calendar Widget */}
             <CalendarWidget />

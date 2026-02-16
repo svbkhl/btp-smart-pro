@@ -168,7 +168,7 @@ export default function SignaturesTracking() {
               placeholder="Rechercher par client, numéro de devis, signataire..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-11 sm:pl-12"
             />
           </div>
         </CardContent>

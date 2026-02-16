@@ -297,7 +297,7 @@ export const ConnectWithEmail = () => {
       <div className="space-y-2">
         <Label>Type de compte email</Label>
         <Select value={emailType} onValueChange={handleEmailTypeChange}>
-          <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+          <SelectTrigger className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -309,7 +309,7 @@ export const ConnectWithEmail = () => {
       </div>
 
       {(emailType === "smtp" || emailType === "gmail" || emailType === "outlook") && !connected && (
-        <div className="space-y-4 p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+        <div className="space-y-4 p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
           <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-4">
             <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
             <div className="text-xs text-blue-900 dark:text-blue-100">
@@ -352,7 +352,7 @@ export const ConnectWithEmail = () => {
                 value={emailConfig.smtp_host}
                 onChange={(e) => setEmailConfig({ ...emailConfig, smtp_host: e.target.value })}
                 placeholder={emailType === "gmail" ? "smtp.gmail.com" : emailType === "outlook" ? "smtp-mail.outlook.com" : "smtp.example.com"}
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 disabled={emailType === "gmail" || emailType === "outlook"}
               />
             </div>
@@ -364,7 +364,7 @@ export const ConnectWithEmail = () => {
                 value={emailConfig.smtp_port}
                 onChange={(e) => setEmailConfig({ ...emailConfig, smtp_port: e.target.value })}
                 placeholder="587"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 disabled={emailType === "gmail" || emailType === "outlook"}
               />
             </div>
@@ -376,7 +376,7 @@ export const ConnectWithEmail = () => {
                 value={emailConfig.smtp_user}
                 onChange={(e) => setEmailConfig({ ...emailConfig, smtp_user: e.target.value })}
                 placeholder={emailType === "gmail" ? "votre-email@gmail.com" : emailType === "outlook" ? "votre-email@outlook.com" : "votre-email@example.com"}
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
             <div className="space-y-2">
@@ -389,7 +389,7 @@ export const ConnectWithEmail = () => {
                 value={emailConfig.smtp_password}
                 onChange={(e) => setEmailConfig({ ...emailConfig, smtp_password: e.target.value })}
                 placeholder={emailType === "gmail" ? "Mot de passe d'application (16 caractères)" : "••••••••••••••••"}
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
               {emailType === "gmail" && (
                 <p className="text-xs text-muted-foreground">

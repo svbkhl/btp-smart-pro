@@ -175,11 +175,11 @@ export const InvoicesTable = ({
                 placeholder="Rechercher une facture..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="pl-11 sm:pl-12 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50">
+              <SelectTrigger className="w-full sm:w-48 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                 <SelectValue placeholder="Tous les statuts" />
               </SelectTrigger>
               <SelectContent>

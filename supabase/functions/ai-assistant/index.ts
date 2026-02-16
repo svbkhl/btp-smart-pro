@@ -67,10 +67,11 @@ serve(async (req) => {
 
   try {
     console.log('📥 Requête reçue pour ai-assistant');
-    const { message, history = [], conversationId, currentPage, context } = await req.json();
+    const { message, history = [], conversationId, currentPage, context, images = [] } = await req.json();
     console.log('📥 Données reçues:', { 
       messageLength: message?.length || 0, 
       historyLength: history?.length || 0,
+      imagesCount: images?.length || 0,
       conversationId,
       currentPage 
     });
@@ -121,7 +122,7 @@ serve(async (req) => {
     }
 
     // Construire les messages pour OpenAI
-    const messages: Array<{ role: string; content: string }> = [
+    const messages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }> = [
       { role: 'system', content: SYSTEM_PROMPT + contextMessage }
     ];
 
@@ -131,11 +132,25 @@ serve(async (req) => {
       messages.push({ role: msg.role, content: msg.content });
     });
 
-    // Ajouter le message actuel
-    messages.push({ role: 'user', content: message });
+    // Ajouter le message actuel (avec images si fournies)
+    const hasImages = images && Array.isArray(images) && images.length > 0;
+    if (hasImages) {
+      const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+        { type: 'text', text: message || 'Analyse ces images.' }
+      ];
+      images.forEach((img: string) => {
+        if (img && (img.startsWith('data:') || img.startsWith('http'))) {
+          contentParts.push({ type: 'image_url', image_url: { url: img } });
+        }
+      });
+      messages.push({ role: 'user', content: contentParts });
+    } else {
+      messages.push({ role: 'user', content: message });
+    }
 
-    // Appel à OpenAI
-    console.log('🤖 Appel à OpenAI avec', messages.length, 'messages');
+    // Appel à OpenAI (max_tokens plus élevé si images pour analyses détaillées)
+    const maxTokens = hasImages ? 1200 : 800;
+    console.log('🤖 Appel à OpenAI avec', messages.length, 'messages, max_tokens:', maxTokens);
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -146,7 +161,7 @@ serve(async (req) => {
         model: 'gpt-4o-mini',
         messages: messages,
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: maxTokens,
       }),
     });
 

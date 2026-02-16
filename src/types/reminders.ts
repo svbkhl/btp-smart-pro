@@ -63,3 +63,39 @@ export interface ReminderStats {
   level_2_count: number; // J+15
   level_3_count: number; // J+30
 }
+
+// --- Relances DEVIS (pas factures) ---
+export interface PendingQuote {
+  id: string;
+  quote_number: string;
+  client_id?: string;
+  client_name?: string;
+  client_email?: string;
+  amount_ttc: number;
+  sent_at_quote: string;
+  days_since_sent: number;
+  status?: string;
+  last_reminder_sent_at?: string;
+  last_reminder_level?: number;
+  reminder_count: number;
+}
+
+export interface QuoteReminderTemplate {
+  id: string;
+  company_id: string;
+  reminder_level: 1 | 2 | 3;
+  subject: string;
+  body: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteReminderStats {
+  total_pending: number;
+  total_amount: number;
+  reminders_sent_today: number;
+  level_1_count: number;
+  level_2_count: number;
+  level_3_count: number;
+}

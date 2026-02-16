@@ -115,7 +115,7 @@ const ForgotPassword = () => {
           </motion.div>
 
           {/* Message de succès avec style glass transparent */}
-          <div className="bg-white/5 dark:bg-black/10 backdrop-blur-md border border-white/10 dark:border-white/5 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
+          <div className="bg-transparent backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -181,7 +181,7 @@ const ForgotPassword = () => {
         </motion.div>
 
         {/* Formulaire avec style glass transparent */}
-        <div className="bg-white/5 dark:bg-black/10 backdrop-blur-md border border-white/10 dark:border-white/5 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
+        <div className="bg-transparent backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow duration-200">
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             {/* Champ email */}
             <div className="space-y-2">
@@ -199,7 +199,7 @@ const ForgotPassword = () => {
                 placeholder="votre@email.com"
                 required
                 disabled={loading}
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 px-4 text-sm sm:text-base h-9 sm:h-10"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 px-4 text-sm sm:text-base h-9 sm:h-10"
                 autoFocus
               />
             </div>

@@ -15,7 +15,7 @@ export const GlassCard = ({ children, className, delay = 0, ...props }: GlassCar
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
       className={cn(
-        "bg-white/5 dark:bg-black/10 backdrop-blur-md border border-white/10 dark:border-white/5 rounded-xl p-4 sm:p-6 shadow-lg",
+        "bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-4 sm:p-6 shadow-lg",
         "hover:shadow-xl transition-shadow duration-200",
         className
       )}

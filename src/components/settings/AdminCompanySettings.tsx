@@ -246,7 +246,7 @@ export const AdminCompanySettings = () => {
               className="space-y-6 pt-4 border-t"
             >
               {/* Informations de l'entreprise */}
-              <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-border/50">
                 <div className="flex items-center gap-2 mb-2">
                   <Building2 className="w-4 h-4 text-primary" />
                   <h3 className="font-semibold">Informations</h3>
@@ -292,7 +292,7 @@ export const AdminCompanySettings = () => {
                   {AVAILABLE_FEATURES.map((feature) => (
                     <div
                       key={feature.key}
-                      className="flex items-center justify-between p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50"
+                      className="flex items-center justify-between p-3 rounded-lg bg-transparent backdrop-blur-xl border border-border/50"
                     >
                       <div className="flex-1">
                         <Label className="font-medium cursor-pointer">{feature.label}</Label>

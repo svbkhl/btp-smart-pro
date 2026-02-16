@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
+import { isEmployeeViewEmail } from '@/config/admin';
 import { supabase } from '@/integrations/supabase/client';
 
 export type Permission = string; // 'users.invite', 'invoices.send', etc.
@@ -44,6 +45,7 @@ export interface UsePermissionsReturn {
  */
 export function usePermissions(): UsePermissionsReturn {
   const { user, currentCompanyId } = useAuth();
+  const forceEmployeeView = isEmployeeViewEmail(user?.email ?? "");
 
   // Récupérer les permissions de l'utilisateur
   const { 
@@ -75,7 +77,7 @@ export function usePermissions(): UsePermissionsReturn {
     refetchOnReconnect: false, // Ne pas re-fetch lors de la reconnexion
   });
 
-  // Récupérer le rôle de l'utilisateur
+  // Récupérer le rôle de l'utilisateur (avec company_id OU sans si pas de company sélectionnée)
   const { 
     data: roleData,
     isLoading: roleLoading,
@@ -83,28 +85,41 @@ export function usePermissions(): UsePermissionsReturn {
   } = useQuery({
     queryKey: ['user-role', user?.id, currentCompanyId],
     queryFn: async () => {
-      if (!user || !currentCompanyId) return null;
+      if (!user) return null;
 
-      const { data, error } = await supabase
+      // Cas 1 : company sélectionnée → rôle dans cette company
+      if (currentCompanyId) {
+        const { data, error } = await supabase
+          .from('company_users')
+          .select('role_id, role, roles(id, slug, name, is_system, color, icon)')
+          .eq('user_id', user.id)
+          .eq('company_id', currentCompanyId)
+          .maybeSingle();
+
+        if (error) {
+          console.error('❌ [usePermissions] Error fetching role:', error.message);
+          return null;
+        }
+        return data;
+      }
+
+      // Cas 2 : pas de company → récupérer le rôle dans la première company de l'utilisateur
+      const { data: firstCompanyUser, error } = await supabase
         .from('company_users')
         .select('role_id, role, roles(id, slug, name, is_system, color, icon)')
         .eq('user_id', user.id)
-        .eq('company_id', currentCompanyId)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
-      if (error) {
-        console.error('❌ [usePermissions] Error fetching role:', error.message);
+      if (error || !firstCompanyUser) {
         return null;
       }
-
-      if (!data) {
-        console.warn('⚠️ [usePermissions] No role data found');
-      }
-      return data;
+      return firstCompanyUser;
     },
-    enabled: !!user && !!currentCompanyId,
-    staleTime: 30 * 60 * 1000, // 30 minutes - Cache très agressif
-    gcTime: 60 * 60 * 1000, // 60 minutes
+    enabled: !!user,
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -146,11 +161,11 @@ export function usePermissions(): UsePermissionsReturn {
     [permissions]
   );
 
-  // Vérifications de rôles
+  // Vérifications de rôles (forceEmployeeView = vue employé forcée pour certains emails)
   const isOwner = isOwnerRole;
   const isAdmin = roleSlug === 'admin';
   const isRH = roleSlug === 'rh';
-  const isEmployee = roleSlug === 'employee';
+  const isEmployee = forceEmployeeView || roleSlug === 'employee';
 
   const loading = permissionsLoading || roleLoading;
   const error = (permissionsError || roleError) as Error | null;

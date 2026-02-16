@@ -57,6 +57,8 @@ export interface AIAssistantRequest {
   conversationId?: string;
   currentPage?: string;
   context?: Record<string, any>;
+  /** Images en base64 (data URL) pour l'analyse visuelle */
+  images?: string[];
 }
 
 /**
@@ -153,6 +155,7 @@ export async function callAIAssistant(
       conversationId: request.conversationId,
       currentPage: request.currentPage,
       context: request.context,
+      images: request.images,
     };
 
     // Appeler l'Edge Function ai-assistant

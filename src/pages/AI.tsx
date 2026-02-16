@@ -8,7 +8,7 @@ import { TextLibraryManager } from "@/components/text-library/TextLibraryManager
 import { Button } from "@/components/ui/button";
 
 // Lazy loading des composants lourds (chargés seulement quand l'onglet est activé)
-const AIAssistant = lazy(() => import("@/components/ai/AIAssistant").then(m => ({ default: m.AIAssistant })));
+const AssistantTab = lazy(() => import("@/components/ai/AssistantTab"));
 const AIQuotesTab = lazy(() => import("@/components/ai/AIQuotesTab"));
 const AIInvoicesTab = lazy(() => import("@/components/ai/AIInvoicesTab"));
 
@@ -88,7 +88,7 @@ const AI = () => {
 
             <TabsContent value="assistant" className="mt-0">
               <Suspense fallback={<TabLoader />}>
-                <AIAssistant />
+                <AssistantTab />
               </Suspense>
             </TabsContent>
 

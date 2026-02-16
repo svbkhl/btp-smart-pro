@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useProjects, useDeleteProject } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ProjectForm } from "@/components/ProjectForm";
 import { Pagination } from "@/components/Pagination";
 import { AdvancedFilters, AdvancedFiltersProps } from "@/components/AdvancedFilters";
@@ -62,6 +63,7 @@ const Projects = () => {
   
   const { data: projects, isLoading } = useProjects();
   const { data: clients } = useClients();
+  const { isEmployee } = usePermissions();
   const deleteProject = useDeleteProject();
   
   const displayProjects = projects || [];
@@ -79,9 +81,10 @@ const Projects = () => {
       
       const matchesClient = !advancedFilters.clientId || project.client_id === advancedFilters.clientId;
       
-      const matchesBudget = 
-        (!advancedFilters.minBudget || (project.budget && project.budget >= advancedFilters.minBudget)) &&
-        (!advancedFilters.maxBudget || (project.budget && project.budget <= advancedFilters.maxBudget));
+      const matchesBudget = isEmployee
+        ? true
+        : ((!advancedFilters.minBudget || (project.budget && project.budget >= advancedFilters.minBudget)) &&
+           (!advancedFilters.maxBudget || (project.budget && project.budget <= advancedFilters.maxBudget)));
       
       const matchesStartDate = !advancedFilters.startDate || 
         (project.start_date && project.start_date >= advancedFilters.startDate);
@@ -91,7 +94,7 @@ const Projects = () => {
       
       return matchesSearch && matchesStatus && matchesClient && matchesBudget && matchesStartDate && matchesEndDate;
     });
-  }, [displayProjects, debouncedSearchQuery, statusFilter, advancedFilters]); // Utilise debouncedSearchQuery
+  }, [displayProjects, debouncedSearchQuery, statusFilter, advancedFilters, isEmployee]);
 
   const paginationData = useMemo(() => {
     const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE);
@@ -189,12 +192,13 @@ const Projects = () => {
         >
           <div className="flex-1">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
-              Chantiers
+              {isEmployee ? "Mes chantiers" : "Chantiers"}
             </h1>
             <p className="text-muted-foreground text-base">
-              Gérez tous vos chantiers en un seul endroit
+              {isEmployee ? "Vos affectations de chantiers" : "Gérez tous vos chantiers en un seul endroit"}
             </p>
           </div>
+          {!isEmployee && (
           <Button
             onClick={handleCreateNew}
             className="gap-2 rounded-xl bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/30 hover:border-white/30 dark:hover:border-white/20 hover:shadow-lg"
@@ -203,9 +207,11 @@ const Projects = () => {
             <span className="hidden sm:inline">Nouveau chantier</span>
             <span className="sm:hidden">Nouveau</span>
           </Button>
+          )}
         </motion.div>
 
-        {/* KPI Stats */}
+        {/* KPI Stats — masqués pour les employés (pas de CA, nb chantiers, etc.) */}
+        {!isEmployee && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -282,6 +288,7 @@ const Projects = () => {
             </div>
           </motion.div>
         </div>
+        )}
 
         {/* Search and Filters */}
         <GlassCard delay={0.5} className="p-6">
@@ -290,7 +297,7 @@ const Projects = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 placeholder="Rechercher un chantier..." 
-                className="pl-10 rounded-xl border-white/20 dark:border-gray-700/30"
+                className="pl-11 sm:pl-12 rounded-xl border-white/20 dark:border-gray-700/30"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -324,6 +331,7 @@ const Projects = () => {
                 onFiltersChange={setAdvancedFilters}
                 clients={clients?.map(c => ({ id: c.id, name: c.name })) || []}
                 showClientFilter={true}
+                showBudgetFilter={!isEmployee}
               />
             </div>
           </div>
@@ -361,28 +369,32 @@ const Projects = () => {
                           style={{ willChange: 'transform' }}
                         />
                         <div className="absolute top-4 right-4 flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleEdit(project);
-                            }}
-                            className="h-8 w-8"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setDeletingProjectId(project.id);
-                            }}
-                            className="h-8 w-8"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!isEmployee && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleEdit(project);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setDeletingProjectId(project.id);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                           <Badge variant={getStatusColor(project.status)} className="backdrop-blur-sm rounded-lg">
                             {getStatusLabel(project.status)}
                           </Badge>
@@ -408,7 +420,7 @@ const Projects = () => {
                                 {project.location}
                               </div>
                             )}
-                            {project.budget && (
+                            {!isEmployee && project.budget && (
                               <div className="flex items-center gap-2">
                                 <Euro className="w-4 h-4" />
                                 {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(project.budget)}

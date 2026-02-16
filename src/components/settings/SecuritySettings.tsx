@@ -180,7 +180,7 @@ export const SecuritySettings = () => {
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, currentPassword: e.target.value })
                   }
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pr-10"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 pr-10"
                 />
                 <Button
                   type="button"
@@ -208,7 +208,7 @@ export const SecuritySettings = () => {
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, newPassword: e.target.value })
                   }
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pr-10"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 pr-10"
                   minLength={6}
                 />
                 <Button
@@ -240,7 +240,7 @@ export const SecuritySettings = () => {
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, confirmPassword: e.target.value })
                   }
-                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 pr-10"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 pr-10"
                   minLength={6}
                 />
                 <Button
@@ -282,7 +282,7 @@ export const SecuritySettings = () => {
         {/* Informations de session */}
         <div className="mt-8 pt-6 border-t border-border/50">
           <h3 className="font-semibold mb-4">Sessions actives</h3>
-          <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+          <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
             <p className="text-sm text-muted-foreground">
               Session actuelle : {user?.email}
             </p>

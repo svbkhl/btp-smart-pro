@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { usePermissions } from "./usePermissions";
 import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_INVOICES } from "@/fakeData/invoices";
@@ -99,14 +100,16 @@ export interface UpdateInvoiceData extends Partial<CreateInvoiceData> {
 }
 
 // Hook pour récupérer toutes les factures
+// Employé : uniquement ses propres factures | Owner/Admin : toutes les factures de l'entreprise
 export const useInvoices = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
   const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
+  const { isEmployee } = usePermissions();
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: ["invoices", companyId],
+    queryKey: ["invoices", companyId, isEmployee],
     queryFn: async () => {
       // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
@@ -124,7 +127,8 @@ export const useInvoices = () => {
           }
 
           // ✅ CORRECTION P0: Sélectionner uniquement les colonnes qui existent réellement
-          const { data, error } = await supabase
+          // Employé : uniquement ses factures | Owner/Admin : toutes
+          let query = supabase
             .from("invoices")
             .select(`
               id, user_id, company_id, client_id, quote_id, invoice_number, status, 
@@ -132,8 +136,11 @@ export const useInvoices = () => {
               client_name, client_email,
               total_ht, total_ttc, tva
             `)
-            .eq("company_id", companyId)
-            .order("created_at", { ascending: false });
+            .eq("company_id", companyId);
+          if (isEmployee && user) {
+            query = query.eq("user_id", user.id);
+          }
+          const { data, error } = await query.order("created_at", { ascending: false });
 
           if (error) {
             // ✅ LOG COMPLET SI ERREUR (P0)

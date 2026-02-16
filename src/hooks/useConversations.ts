@@ -118,12 +118,6 @@ export const useConversations = (archived = false, conversationType: Conversatio
               prefetchQuery = prefetchQuery.eq("metadata->>type", "chatbot");
             }
             
-            // Si on cherche les conversations actives (archived = false),
-            // ne montrer QUE celles qui ont au moins un message (last_message_at IS NOT NULL)
-            // Les conversations sans messages ne doivent pas apparaître dans "actives"
-            if (!archived) {
-              prefetchQuery = prefetchQuery.not("last_message_at", "is", null);
-            }
             // Si archived = true, montrer TOUTES les conversations archivées (même sans messages)
             // car l'utilisateur les a explicitement archivées
             
@@ -160,23 +154,7 @@ export const useConversations = (archived = false, conversationType: Conversatio
               data = simpleResult.data;
               error = simpleResult.error;
               
-              // Filtrer côté client si nécessaire (pour les actives sans messages)
-              if (!archived && data && Array.isArray(data)) {
-                // Vérifier quelles conversations ont des messages
-                const conversationsWithMessages = await Promise.all(
-                  data.map(async (conv) => {
-                    const { count } = await supabase
-                      .from("ai_messages")
-                      .select("*", { count: "exact", head: true })
-                      .eq("conversation_id", conv.id);
-                    return { conv, hasMessages: (count || 0) > 0 };
-                  })
-                );
-                
-                data = conversationsWithMessages
-                  .filter(({ hasMessages }) => hasMessages)
-                  .map(({ conv }) => conv) as AIConversation[];
-              }
+              // Ne plus filtrer par présence de messages - afficher toutes les conversations
             }
 
             if (error) throw error;
@@ -203,15 +181,11 @@ export const useConversations = (archived = false, conversationType: Conversatio
         query = query.eq("metadata->>type", "chatbot");
       }
       
-      // IMPORTANT : Les conversations ne sont archivées QUE manuellement par l'utilisateur
-      // Si on cherche les conversations actives (archived = false), 
-      // ne montrer que celles qui ont au moins un message (last_message_at IS NOT NULL)
-      // Mais d'abord, vérifier si les colonnes existent
+      // IMPORTANT : Afficher toutes les conversations non-archivées (y compris nouvelles sans message)
+      // pour qu'elles persistent dans la sidebar et ne disparaissent pas
       try {
         if (!archived) {
-          // Filtrer : is_archived = false ET last_message_at IS NOT NULL
           query = query.eq("is_archived", false);
-          query = query.not("last_message_at", "is", null);
         } else {
           // Pour les archives : seulement celles explicitement archivées par l'utilisateur
           query = query.eq("is_archived", true);
@@ -278,24 +252,8 @@ export const useConversations = (archived = false, conversationType: Conversatio
           error = minimalResult.error;
         }
         
-        // Filtrer côté client pour les conversations actives (celles qui ont des messages)
-        if (!archived && data && Array.isArray(data) && data.length > 0) {
-          // Vérifier quelles conversations ont des messages
-          const conversationsWithMessages = await Promise.all(
-            data.map(async (conv) => {
-              const { count } = await supabase
-                .from("ai_messages")
-                .select("*", { count: "exact", head: true })
-                .eq("conversation_id", conv.id);
-              return { conv, hasMessages: (count || 0) > 0 };
-            })
-          );
-          
-          // Filtrer : seulement les conversations qui ont des messages ET qui ne sont pas archivées
-          data = conversationsWithMessages
-            .filter(({ hasMessages, conv }) => hasMessages && !conv.is_archived)
-            .map(({ conv }) => conv) as AIConversation[];
-        } else if (archived && data && Array.isArray(data)) {
+        // Pour les archives : s'assurer qu'elles sont bien archivées
+        if (archived && data && Array.isArray(data)) {
           // Pour les archives : s'assurer qu'elles sont bien archivées
           data = data.filter((conv: any) => conv.is_archived === true);
         }
@@ -335,10 +293,12 @@ export const useCreateConversation = () => {
       if (!user) throw new Error("User not authenticated");
 
       // Essayer d'abord avec le nouveau schéma (title, metadata)
+      const now = new Date().toISOString();
       let insertData: any = {
         user_id: user.id,
         title: data.title || "Nouvelle conversation",
         metadata: data.metadata || {},
+        last_message_at: now, // Pour que la conversation apparaisse immédiatement dans la sidebar
       };
 
       let { data: conversation, error } = await supabase

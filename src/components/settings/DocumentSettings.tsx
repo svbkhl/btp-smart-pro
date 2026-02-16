@@ -93,7 +93,7 @@ export const DocumentSettings = () => {
               onChange={(e) => setFormData({ ...formData, terms_and_conditions: e.target.value })}
               placeholder="Conditions générales de vente, mentions légales, modalités de paiement..."
               rows={8}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             <p className="text-xs text-muted-foreground">
               Ces mentions apparaîtront automatiquement sur tous vos devis et factures
@@ -102,7 +102,7 @@ export const DocumentSettings = () => {
 
           {/* Options */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="space-y-0.5">
                 <Label htmlFor="auto_signature">Signature automatique</Label>
                 <p className="text-sm text-muted-foreground">

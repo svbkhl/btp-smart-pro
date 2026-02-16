@@ -278,7 +278,7 @@ const MessagingNew = () => {
                 placeholder="Rechercher par client, objet, numéro..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-11 sm:pl-12"
               />
             </div>
 

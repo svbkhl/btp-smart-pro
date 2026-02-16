@@ -199,7 +199,7 @@ export const ConnectWithStripe = () => {
           </div>
         </div>
       ) : (
-        <div className="p-6 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50 text-center">
+        <div className="p-6 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10 text-center">
           <CreditCard className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="font-semibold mb-2">Connecter votre compte Stripe</h3>
           <p className="text-sm text-muted-foreground mb-4">

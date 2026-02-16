@@ -235,7 +235,25 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+          <TabsList className={`grid w-full gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto ${isEmployee ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8"}`}>
+            {/* Employés : Intégrations, Notifications, Sécurité (en dernier à droite) */}
+            {isEmployee ? (
+              <>
+                <TabsTrigger value="integrations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Intégrations</span>
+                </TabsTrigger>
+                <TabsTrigger value="notifications" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Bell className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Notifications</span>
+                </TabsTrigger>
+                <TabsTrigger value="security" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Sécurité</span>
+                </TabsTrigger>
+              </>
+            ) : (
+            <>
             {!isEmployee && (
               <>
                 <TabsTrigger value="company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
@@ -306,6 +324,8 @@ const Settings = () => {
               <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Sécurité</span>
             </TabsTrigger>
+            </>
+            )}
           </TabsList>
 
           {!isEmployee && (
@@ -371,8 +391,8 @@ const Settings = () => {
 
           <TabsContent value="notifications" className="mt-0">
             <div className="space-y-8">
-              <NotificationSettings />
-              <RelanceTemplatesSettings />
+              <NotificationSettings isEmployee={isEmployee} />
+              {!isEmployee && <RelanceTemplatesSettings />}
             </div>
           </TabsContent>
 

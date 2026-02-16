@@ -68,7 +68,7 @@ const CompanyEmployeesList = ({ companyId, companyName }: { companyId: string; c
         {members.map((member) => (
           <div
             key={member.user_id}
-            className="flex items-center justify-between p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-white/10"
+            className="flex items-center justify-between p-3 rounded-lg bg-transparent backdrop-blur-xl border border-white/10"
           >
             <div className="flex-1">
               <div className="font-medium">
@@ -351,7 +351,7 @@ const AdminCompanies = () => {
                 </div>
                 <div className="space-y-2">
                   {/* Chantiers */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
                     <Switch
                       checked={newCompanyData.features.projets === true}
                       onCheckedChange={(checked) => {
@@ -368,7 +368,7 @@ const AdminCompanies = () => {
                   </div>
 
                   {/* Calendrier */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
                     <Switch
                       checked={newCompanyData.features.planning === true}
                       onCheckedChange={(checked) => {
@@ -385,7 +385,7 @@ const AdminCompanies = () => {
                   </div>
 
                   {/* Employés */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
                     <Switch
                       checked={newCompanyData.features.employes === true}
                       onCheckedChange={(checked) => {
@@ -402,7 +402,7 @@ const AdminCompanies = () => {
                   </div>
 
                   {/* IA */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
                     <Switch
                       checked={newCompanyData.features.ia_assistant === true}
                       onCheckedChange={(checked) => {
@@ -419,7 +419,7 @@ const AdminCompanies = () => {
                   </div>
 
                   {/* Facturation */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
                     <Switch
                       checked={newCompanyData.features.facturation === true}
                       onCheckedChange={(checked) => {
@@ -436,7 +436,7 @@ const AdminCompanies = () => {
                   </div>
 
                   {/* Messagerie */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
                     <Switch
                       checked={newCompanyData.features.messagerie === true}
                       onCheckedChange={(checked) => {
@@ -620,7 +620,7 @@ const AdminCompanies = () => {
                         {ALL_FEATURES.map((feature) => (
                           <div
                             key={feature.key}
-                            className="flex items-center space-x-2 p-2 rounded-lg bg-white/50 dark:bg-gray-800/50"
+                            className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl"
                           >
                             <Switch
                               checked={company.features?.[feature.key] === true}

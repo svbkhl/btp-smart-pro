@@ -29,6 +29,7 @@ export interface AdvancedFiltersProps {
   onFiltersChange: (filters: AdvancedFiltersProps["filters"]) => void;
   clients?: Array<{ id: string; name: string }>;
   showClientFilter?: boolean;
+  showBudgetFilter?: boolean;
 }
 
 export const AdvancedFilters = ({
@@ -36,6 +37,7 @@ export const AdvancedFilters = ({
   onFiltersChange,
   clients = [],
   showClientFilter = false,
+  showBudgetFilter = true,
 }: AdvancedFiltersProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -111,35 +113,39 @@ export const AdvancedFilters = ({
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>Budget minimum (€)</Label>
-            <Input
-              type="number"
-              placeholder="0"
-              value={filters.minBudget || ""}
-              onChange={(e) =>
-                handleFilterChange(
-                  "minBudget",
-                  e.target.value ? parseFloat(e.target.value) : undefined
-                )
-              }
-            />
-          </div>
+          {showBudgetFilter && (
+            <>
+              <div className="space-y-2">
+                <Label>Budget minimum (€)</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={filters.minBudget || ""}
+                  onChange={(e) =>
+                    handleFilterChange(
+                      "minBudget",
+                      e.target.value ? parseFloat(e.target.value) : undefined
+                    )
+                  }
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Budget maximum (€)</Label>
-            <Input
-              type="number"
-              placeholder="100000"
-              value={filters.maxBudget || ""}
-              onChange={(e) =>
-                handleFilterChange(
-                  "maxBudget",
-                  e.target.value ? parseFloat(e.target.value) : undefined
-                )
-              }
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Budget maximum (€)</Label>
+                <Input
+                  type="number"
+                  placeholder="100000"
+                  value={filters.maxBudget || ""}
+                  onChange={(e) =>
+                    handleFilterChange(
+                      "maxBudget",
+                      e.target.value ? parseFloat(e.target.value) : undefined
+                    )
+                  }
+                />
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label>Date de début</Label>

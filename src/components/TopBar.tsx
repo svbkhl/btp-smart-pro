@@ -3,6 +3,7 @@ import { Menu, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserDisplayName } from "@/hooks/useCurrentUserDisplayName";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Notifications } from "@/components/Notifications";
@@ -47,9 +48,7 @@ export const TopBar = () => {
     }
   };
 
-  // Utiliser first_name/last_name (format standard) avec fallback sur prenom/nom (ancien format)
-  const firstName = user?.user_metadata?.first_name || user?.user_metadata?.prenom;
-  const lastName = user?.user_metadata?.last_name || user?.user_metadata?.nom;
+  const { firstName, lastName } = useCurrentUserDisplayName();
   
   const userInitials = firstName?.[0] && lastName?.[0]
     ? `${firstName[0]}${lastName[0]}`

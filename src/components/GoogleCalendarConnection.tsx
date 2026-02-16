@@ -2,7 +2,7 @@
 // 🔗 COMPOSANT CONNEXION GOOGLE CALENDAR
 // ============================================================================
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +16,129 @@ import {
   useCanConnectGoogleCalendar,
   useCanManageGoogleCalendarSettings 
 } from "@/hooks/useGoogleCalendarRoles";
-import { Calendar, CheckCircle2, XCircle, Loader2, ExternalLink, Crown } from "lucide-react";
+import { useCalendarFeedUrl } from "@/hooks/useCalendarFeedUrl";
+import { Calendar, CheckCircle2, XCircle, Loader2, ExternalLink, Crown, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
+
+function GoogleCalendarConnectionEmployee({
+  hasConnection,
+  navigate,
+}: {
+  hasConnection: boolean;
+  navigate: (path: string) => void;
+}) {
+  const { feedUrl, isLoading, error } = useCalendarFeedUrl();
+  const { toast } = useToast();
+
+  const handleCopyUrl = () => {
+    if (!feedUrl) return;
+    navigator.clipboard.writeText(feedUrl);
+    toast({
+      title: "Lien copié",
+      description: "Collez ce lien dans Google Calendar (Autres calendriers → Par URL)",
+    });
+  };
+
+  const handleAddToGoogleCalendar = () => {
+    if (!feedUrl) return;
+    navigator.clipboard.writeText(feedUrl);
+    window.open("https://calendar.google.com/calendar/u/0/r/settings/addbyurl", "_blank");
+    toast({
+      title: "Prêt pour Google Calendar",
+      description: "Le lien a été copié. Collez-le (Ctrl+V) dans la page Google Calendar qui vient de s'ouvrir pour synchroniser votre planning.",
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            <CardTitle>Google Calendar</CardTitle>
+          </div>
+          {hasConnection && (
+            <Badge
+              variant="outline"
+              className="bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
+            >
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Synchronisé
+            </Badge>
+          )}
+        </div>
+        <CardDescription>
+          {hasConnection
+            ? "Le dirigeant a connecté Google Calendar. Ajoutez votre planning à votre Google Calendar personnel ci-dessous."
+            : "Le dirigeant n'a pas encore connecté Google Calendar. Vous pouvez quand même ajouter votre planning à votre Google Calendar personnel."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="p-4 rounded-lg bg-muted/50 dark:bg-muted/20 border border-border space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Votre planning est défini par le dirigeant. Consultez l'onglet <strong>Planning</strong> pour voir vos affectations, ou ajoutez-le directement dans Google Calendar :
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {feedUrl && (
+              <Button
+                variant="default"
+                onClick={handleAddToGoogleCalendar}
+                className="w-full sm:w-auto"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Ajouter mon planning à Google Calendar
+              </Button>
+            )}
+            <Button
+              variant={feedUrl ? "outline" : "default"}
+              onClick={() => navigate("/my-planning")}
+              className="w-full sm:w-auto"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Voir mon planning
+            </Button>
+          </div>
+
+          {error ? (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              Impossible de générer le lien de synchronisation. Assurez-vous d&apos;être enregistré comme employé de l&apos;entreprise.
+            </p>
+          ) : isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Chargement du lien...
+            </div>
+          ) : feedUrl ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Lien de synchronisation (à ajouter dans Google Calendar → Autres calendriers → Par URL) :
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={feedUrl}
+                  className="font-mono text-xs"
+                />
+                <Button variant="outline" size="icon" onClick={handleCopyUrl} title="Copier le lien">
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export const GoogleCalendarConnection = () => {
   const { currentCompanyId } = useAuth();
-  const { isOwner } = usePermissions();
+  const { isOwner, isEmployee } = usePermissions();
+  const navigate = useNavigate();
   const canConnect = useCanConnectGoogleCalendar();
   const canManage = useCanManageGoogleCalendarSettings();
   const { data: connection, isLoading } = useGoogleCalendarConnection();
@@ -70,6 +186,17 @@ export const GoogleCalendarConnection = () => {
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  // Vue simplifiée pour les employés : statut de la sync et accès au planning
+  if (isEmployee) {
+    const hasConnection = connection && connection.enabled;
+    return (
+      <GoogleCalendarConnectionEmployee
+        hasConnection={hasConnection}
+        navigate={navigate}
+      />
     );
   }
 

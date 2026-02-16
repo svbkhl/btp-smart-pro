@@ -7,6 +7,7 @@ import { FAKE_PROJECTS } from "@/fakeData/projects";
 import type { Project } from "@/fakeData/projects";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useCompanyId } from "./useCompanyId";
+import { usePermissions } from "./usePermissions";
 import { logger } from "@/utils/logger";
 import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
 
@@ -28,13 +29,15 @@ export interface UpdateProjectData extends Partial<CreateProjectData> {
 }
 
 // Hook pour récupérer tous les projets
+// Pour les employés : uniquement les chantiers où ils sont affectés
 export const useProjects = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
   const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
+  const { isEmployee } = usePermissions();
 
   return useQuery({
-    queryKey: ["projects", companyId],
+    queryKey: ["projects", companyId, isEmployee],
     queryFn: async () => {
       if (fakeDataEnabled) {
         return FAKE_PROJECTS;
@@ -46,6 +49,32 @@ export const useProjects = () => {
           if (!companyId) {
             logger.warn("User is not a member of any company", { userId: user.id });
             return [];
+          }
+
+          // Employé : filtrer aux chantiers où il est affecté (sans budget/prix)
+          if (isEmployee) {
+            const { data: emp } = await supabase
+              .from("employees")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("company_id", companyId)
+              .maybeSingle();
+            if (!emp?.id) return [];
+
+            const { data: assignmentProjectIds } = await supabase
+              .from("employee_assignments")
+              .select("project_id")
+              .eq("employee_id", emp.id);
+            const projectIds = [...new Set((assignmentProjectIds || []).map((a: any) => a.project_id).filter(Boolean))];
+            if (projectIds.length === 0) return [];
+
+            const { data, error } = await supabase
+              .from("projects")
+              .select("id, user_id, company_id, client_id, name, status, start_date, end_date, description, created_at, updated_at, client:clients(id, name, email)")
+              .in("id", projectIds)
+              .order("created_at", { ascending: false });
+            if (error) throw error;
+            return ((data || []).map((p: any) => ({ ...p, budget: undefined, costs: undefined, actual_revenue: undefined }))) as Project[];
           }
 
           const { data, error } = await supabase
@@ -67,12 +96,14 @@ export const useProjects = () => {
 };
 
 // Hook pour récupérer un projet par ID
+// Pour les employés : vérifier qu'ils sont affectés au chantier
 export const useProject = (id: string | undefined) => {
   const { user } = useAuth();
   const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
+  const { isEmployee } = usePermissions();
 
   return useQuery({
-    queryKey: ["project", id, companyId],
+    queryKey: ["project", id, companyId, isEmployee],
     queryFn: async () => {
       return queryWithTimeout(
         async () => {
@@ -94,6 +125,28 @@ export const useProject = (id: string | undefined) => {
           }
 
           if (error) throw error;
+
+          // Employé : vérifier qu'il est affecté à ce chantier et retirer les données financières
+          if (isEmployee) {
+            const { data: emp } = await supabase
+              .from("employees")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("company_id", companyId)
+              .maybeSingle();
+            if (!emp?.id) throw new Error("Accès non autorisé");
+
+            const { data: assignment } = await supabase
+              .from("employee_assignments")
+              .select("id")
+              .eq("employee_id", emp.id)
+              .eq("project_id", id)
+              .maybeSingle();
+            if (!assignment) throw new Error("Vous n'êtes pas affecté à ce chantier");
+            const { budget, costs, actual_revenue, ...rest } = data as any;
+            return { ...rest } as Project;
+          }
+
           return data as Project;
         },
         FAKE_PROJECTS[0] || null,

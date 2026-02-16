@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
+import { usePermissions } from "@/hooks/usePermissions";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -71,6 +72,7 @@ const EVENT_TYPES = {
 };
 
 const Calendar = () => {
+  const { isEmployee } = usePermissions();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -159,7 +161,7 @@ const Calendar = () => {
               transition={{ duration: 0.2 }}
               className={`min-h-24 rounded-xl border p-2 transition-all ${
                 isCurrentMonth 
-                  ? "bg-white/50 dark:bg-gray-800/50 border-white/20 dark:border-gray-700/30" 
+                  ? "bg-transparent backdrop-blur-xl border-white/20 dark:border-gray-700/30" 
                   : "bg-muted/30 border-muted"
               } ${isDayToday ? "ring-2 ring-primary shadow-lg" : ""}`}
             >
@@ -218,7 +220,7 @@ const Calendar = () => {
               className={`text-center p-3 rounded-xl ${
                 isToday(day) 
                   ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/20 text-primary" 
-                  : "bg-white/50 dark:bg-gray-800/50 border border-white/20 dark:border-gray-700/30"
+                  : "bg-transparent backdrop-blur-xl border border-white/20 dark:border-gray-700/30"
               }`}
             >
               <div className="font-semibold text-sm">{format(day, "EEE", { locale: fr })}</div>
@@ -347,24 +349,43 @@ const Calendar = () => {
           </div>
         </motion.div>
 
-        {/* Tabs - Événements / Mon planning / Agenda */}
-        <Tabs defaultValue="events" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
-            <TabsTrigger value="events" className="gap-2">
-              <CalendarIcon className="w-4 h-4" />
-              Événements
-            </TabsTrigger>
-            <TabsTrigger value="planning" className="gap-2">
-              <User className="w-4 h-4" />
-              Mon planning
-            </TabsTrigger>
-            <TabsTrigger value="agenda" className="gap-2">
-              <Clock className="w-4 h-4" />
-              Agenda
-            </TabsTrigger>
+        {/* Tabs - Ordre différent pour employés : Mon planning, Agenda, Événements (en dernier) */}
+        <Tabs defaultValue={isEmployee ? "planning" : "events"} className="w-full space-y-0">
+          <TabsList className="grid w-full grid-cols-3 rounded-xl shrink-0 mb-0">
+            {isEmployee ? (
+              <>
+                <TabsTrigger value="planning" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Mon planning
+                </TabsTrigger>
+                <TabsTrigger value="agenda" className="gap-2">
+                  <Clock className="w-4 h-4" />
+                  Agenda
+                </TabsTrigger>
+                <TabsTrigger value="events" className="gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  Événements
+                </TabsTrigger>
+              </>
+            ) : (
+              <>
+                <TabsTrigger value="events" className="gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  Événements
+                </TabsTrigger>
+                <TabsTrigger value="planning" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Mon planning
+                </TabsTrigger>
+                <TabsTrigger value="agenda" className="gap-2">
+                  <Clock className="w-4 h-4" />
+                  Agenda
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
-          <TabsContent value="events" className="space-y-4 mt-6">
+          <TabsContent value="events" className="space-y-4 mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none">
             {/* Bouton Nouvel événement */}
             <div className="flex justify-end">
               <Button 
@@ -520,11 +541,11 @@ const Calendar = () => {
         )}
           </TabsContent>
 
-          <TabsContent value="planning" className="mt-6">
+          <TabsContent value="planning" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none">
             <MyPlanning embedded />
           </TabsContent>
 
-          <TabsContent value="agenda" className="mt-6">
+          <TabsContent value="agenda" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none">
             {/* Section Agenda du jour */}
             <GlassCard className="p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">

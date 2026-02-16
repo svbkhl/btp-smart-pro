@@ -2,27 +2,38 @@ import { motion } from "framer-motion";
 import { memo } from "react";
 
 /**
- * Composant AnimatedBackground - Arrière-plan animé avec formes flottantes
- * Style similaire à la homepage avec blobs animés et gradients
+ * Composant AnimatedBackground - Arrière-plan animé pleine page
+ * Dégradé du bas vers le haut + blobs animés
  * Optimisé pour la performance GPU avec will-change et transform
- * 
- * REMARQUE: Le grid pattern a été supprimé pour un look plus moderne et fluide
  */
 export const AnimatedBackground = memo(() => {
   return (
     <div 
-      className="fixed inset-0 overflow-hidden pointer-events-none z-0"
+      className="fixed inset-0 overflow-hidden pointer-events-none z-0 min-h-screen min-w-full"
       style={{ 
         contain: 'layout style paint',
         willChange: 'transform',
         transform: 'translateZ(0)'
       }}
     >
-      {/* Gradient blobs animés - Style homepage avec mouvements fluides */}
+      {/* Dégradé : du bas vers le milieu seulement - léger */}
+      <motion.div 
+        className="absolute bottom-0 left-0 right-0 h-1/2 min-w-full bg-gradient-to-t from-primary/20 via-purple-600/12 via-accent/10 to-transparent"
+        animate={{
+          opacity: [0.9, 1, 0.9],
+        }}
+        transition={{
+          duration: 6,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        aria-hidden
+      />
       
-      {/* Blob 1 - Bleu/Cyan (haut gauche) */}
+      {/* Blobs animés superposés */}
+      {/* Blob 1 - Bleu/Cyan (milieu gauche) */}
       <motion.div
-        className="absolute top-1/4 left-1/4 w-72 h-72 md:w-96 md:h-96 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl"
+        className="absolute bottom-1/3 left-1/4 w-64 h-64 md:w-80 md:h-80 bg-gradient-to-br from-blue-500/12 to-cyan-500/12 rounded-full blur-3xl"
         style={{
           willChange: 'transform',
           transform: 'translateZ(0)',
@@ -39,9 +50,9 @@ export const AnimatedBackground = memo(() => {
         }}
       />
       
-      {/* Blob 2 - Violet/Rose (milieu droite) */}
+      {/* Blob 2 - Violet/Rose (bas droite) */}
       <motion.div
-        className="absolute top-1/2 right-1/4 w-80 h-80 md:w-96 md:h-96 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl"
+        className="absolute bottom-1/4 right-1/4 w-64 h-64 md:w-80 md:h-80 bg-gradient-to-br from-purple-500/12 to-pink-500/12 rounded-full blur-3xl"
         style={{
           willChange: 'transform',
           transform: 'translateZ(0)',
@@ -61,7 +72,7 @@ export const AnimatedBackground = memo(() => {
       
       {/* Blob 3 - Primary/Accent (bas centre) */}
       <motion.div
-        className="absolute bottom-1/4 left-1/2 w-72 h-72 md:w-80 md:h-80 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full blur-3xl"
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-72 h-72 md:w-96 md:h-96 bg-gradient-to-br from-primary/15 to-accent/15 rounded-full blur-3xl"
         style={{
           willChange: 'transform',
           transform: 'translateZ(0)',
@@ -79,9 +90,9 @@ export const AnimatedBackground = memo(() => {
         }}
       />
       
-      {/* Blob 4 - AI Color (haut droite) - Plus petit pour plus de profondeur */}
+      {/* Blob 4 - AI Color (bas droite) */}
       <motion.div
-        className="absolute top-1/3 right-1/3 w-56 h-56 md:w-72 md:h-72 bg-gradient-to-br from-[hsl(320_80%_60%)]/15 to-[hsl(320_80%_50%)]/15 rounded-full blur-3xl"
+        className="absolute bottom-1/3 right-1/3 w-48 h-48 md:w-60 md:h-60 bg-gradient-to-br from-[hsl(320_80%_60%)]/10 to-[hsl(320_80%_50%)]/10 rounded-full blur-3xl"
         style={{
           willChange: 'transform',
           transform: 'translateZ(0)',
@@ -99,9 +110,9 @@ export const AnimatedBackground = memo(() => {
         }}
       />
       
-      {/* Blob 5 - Accent/Cyan (bas gauche) - Pour plus de profondeur */}
+      {/* Blob 5 - Accent/Cyan (bas gauche) */}
       <motion.div
-        className="absolute bottom-1/3 left-1/3 w-64 h-64 md:w-80 md:h-80 bg-gradient-to-br from-accent/15 to-cyan-500/15 rounded-full blur-3xl"
+        className="absolute bottom-1/4 left-1/4 w-56 h-56 md:w-72 md:h-72 bg-gradient-to-br from-accent/12 to-cyan-500/12 rounded-full blur-3xl"
         style={{
           willChange: 'transform',
           transform: 'translateZ(0)',
@@ -119,7 +130,25 @@ export const AnimatedBackground = memo(() => {
         }}
       />
       
-      {/* NOTE: Grid pattern supprimé pour un look plus moderne et fluide */}
+      {/* Blob 6 - Violet (bas droite) */}
+      <motion.div
+        className="absolute bottom-1/3 right-0 w-56 h-56 md:w-72 md:h-72 bg-gradient-to-br from-purple-600/12 to-primary/10 rounded-full blur-3xl"
+        style={{
+          willChange: 'transform',
+          transform: 'translateZ(0)',
+        }}
+        animate={{
+          x: [0, -40, 25, 0],
+          y: [0, -35, 45, 0],
+          scale: [1, 1.15, 0.9, 1],
+        }}
+        transition={{
+          duration: 21,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 3,
+        }}
+      />
       {/* L'ancien grid pattern a été retiré pour correspondre au style de la homepage */}
     </div>
   );

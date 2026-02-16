@@ -44,7 +44,7 @@ export const UserManagementSettings = () => {
         </p>
 
         <div className="space-y-4">
-          <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+          <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
             <h3 className="font-semibold mb-2">Gestion des employés</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Créez et gérez les comptes employés, assignez les rôles et permissions
@@ -57,7 +57,7 @@ export const UserManagementSettings = () => {
             </Link>
           </div>
 
-          <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+          <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
             <h3 className="font-semibold mb-2">Rôles et permissions</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Configurez les rôles (admin, member) et leurs permissions

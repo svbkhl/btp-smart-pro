@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Send, Bot, User, ImagePlus, X, Trash2 } from "lucide-react";
+import { Loader2, Send, Bot, User, ImagePlus, X, Trash2, Mic, MicOff } from "lucide-react";
 import { callAIAssistant } from "@/services/aiService";
 import { useBTPConversations, useCreateConversation, useDeleteConversation } from "@/hooks/useConversations";
 import { useMessages, useCreateMessage } from "@/hooks/useMessages";
@@ -25,6 +25,8 @@ export const AIAssistant = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   // Utiliser le hook spécialisé pour les conversations BTP uniquement
   const { data: conversations = [] } = useBTPConversations(false);
@@ -85,6 +87,55 @@ export const AIAssistant = () => {
 
   const removeImage = (index: number) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const startVoiceInput = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({
+        title: "Saisie vocale non supportée",
+        description: "Votre navigateur ne supporte pas la reconnaissance vocale. Utilisez Chrome ou Edge.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setMessage((prev) => (prev.endsWith(" ") || prev === "" ? prev : prev + " ") + transcript);
+    };
+    recognition.onerror = (event: any) => {
+      if (event.error !== "aborted") {
+        toast({
+          title: "Erreur reconnaissance vocale",
+          description: event.error === "no-speech" ? "Aucune parole détectée" : event.error,
+          variant: "destructive",
+        });
+      }
+      setIsRecording(false);
+    };
+    recognition.onend = () => setIsRecording(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    toast({ title: "Écoute en cours...", description: "Parlez. Cliquez sur le micro pour arrêter." });
+  };
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current && isRecording) recognitionRef.current.stop();
+    setIsRecording(false);
+  };
+
+  const toggleVoice = () => {
+    if (isRecording) stopVoiceInput();
+    else startVoiceInput();
   };
 
   const handleSend = async () => {
@@ -433,14 +484,25 @@ export const AIAssistant = () => {
             >
               <ImagePlus className="h-4 w-4" />
             </Button>
+            <Button
+              type="button"
+              variant={isRecording ? "destructive" : "outline"}
+              size="icon"
+              onClick={toggleVoice}
+              disabled={loading}
+              className="shrink-0"
+              title={isRecording ? "Arrêter l'enregistrement" : "Parler au micro"}
+            >
+              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
             <Input
               ref={inputRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Tapez votre message ou ajoutez des images..."
+              placeholder="Tapez ou parlez (micro) - ajoutez des images..."
               disabled={loading}
-              className="flex-1 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="flex-1 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             <Button 
               onClick={handleSend} 

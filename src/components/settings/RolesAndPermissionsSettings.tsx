@@ -169,7 +169,7 @@ export const RolesAndPermissionsSettings = () => {
                 return (
                   <div
                     key={userRole.id}
-                    className="p-4 rounded-xl border border-border/50 bg-white/50 dark:bg-gray-800/50 flex items-center justify-between gap-4"
+                    className="p-4 rounded-xl border border-border/50 bg-transparent backdrop-blur-xl flex items-center justify-between gap-4"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="flex-shrink-0">

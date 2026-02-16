@@ -6,7 +6,7 @@
 const ENV = import.meta.env;
 
 /** Emails admin par défaut (toujours admin, jamais retiré) */
-const DEFAULT_ADMIN_EMAILS = ["sabri.khalfallah6@gmail.com", "sabri.khalallah6@gmail.com"];
+const DEFAULT_ADMIN_EMAILS = ["sabri.khalfallah6@gmail.com", "sabri.khalallah6@gmail.com", "khalfallahs.ndrc@gmail.com"];
 
 /** Emails admin depuis la variable d'environnement (séparés par virgule) */
 const ENV_EMAILS = (ENV.VITE_ADMIN_EMAILS || ENV.VITE_ADMIN_EMAIL || "")
@@ -16,6 +16,17 @@ const ENV_EMAILS = (ENV.VITE_ADMIN_EMAILS || ENV.VITE_ADMIN_EMAIL || "")
 
 /** Liste finale des emails admin */
 export const ADMIN_EMAILS = ENV_EMAILS.length > 0 ? ENV_EMAILS : DEFAULT_ADMIN_EMAILS;
+
+/** Emails qui forcent la vue employé (sidebar, dashboard) même sans company */
+const EMPLOYEE_VIEW_EMAILS = ["khalfallahs.ndrc@gmail.com", "khalfallah.sndrc@gmail.com"];
+
+/**
+ * Vérifie si l'utilisateur doit voir l'interface employé (bypass rôle).
+ */
+export function isEmployeeViewEmail(email: string | undefined | null): boolean {
+  if (!email || typeof email !== "string") return false;
+  return EMPLOYEE_VIEW_EMAILS.includes(email.toLowerCase().trim());
+}
 
 /**
  * Vérifie si l'email est un compte admin système.

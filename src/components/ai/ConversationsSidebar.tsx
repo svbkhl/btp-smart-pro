@@ -140,12 +140,12 @@ export const ConversationsSidebar = ({
 
       <div className="p-4 border-b border-border/50">
         <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
           <Input
             placeholder="Rechercher..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+            className="pl-9 sm:pl-10 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
           />
         </div>
       </div>

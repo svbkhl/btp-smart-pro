@@ -7,83 +7,57 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, Mail } from "lucide-react";
-import { useReminderTemplates, useUpsertReminderTemplate } from "@/hooks/usePaymentReminders";
+import { useQuoteReminderTemplates, useUpsertQuoteReminderTemplate } from "@/hooks/useQuoteReminders";
 import { motion } from "framer-motion";
-import type { ReminderTemplate } from "@/types/reminders";
+import type { QuoteReminderTemplate } from "@/types/reminders";
 
 const LEVEL_LABELS: Record<1 | 2 | 3, string> = {
   1: "Relance 1 — Premier rappel",
-  2: "Relance 2 — Rappel renforcé",
-  3: "Relance 3 — Mise en demeure",
+  2: "Relance 2 — Rappel de suivi",
+  3: "Relance 3 — Dernier rappel",
 };
 
 const DEFAULT_TEMPLATES: Record<1 | 2 | 3, { subject: string; body: string }> = {
   1: {
-    subject: "Rappel – Facture {{invoice_number}} – {{amount}}€",
+    subject: "Rappel : Devis {{quote_number}} en attente",
     body: `Bonjour {{client_name}},
 
-Nous vous remercions pour votre confiance.
+Nous vous avons transmis notre devis {{quote_number}} d'un montant de {{amount}}€, envoyé il y a {{days_since_sent}} jours.
 
-Rappel de paiement
-
-• Facture : {{invoice_number}}
-• Montant : {{amount}}€
-• Échéance : {{due_date}}
-• Retard : {{days_overdue}} jour(s)
-
-Nous n'avons pas encore reçu le règlement de cette facture. S'il s'agit d'un oubli, merci de régulariser votre situation au plus tôt.
-
-Si le paiement a déjà été effectué, veuillez ignorer ce message.
+Nous restons à votre disposition pour toute question ou pour convenir d'un rendez-vous afin de finaliser ce projet.
 
 Cordialement,`,
   },
   2: {
-    subject: "URGENT – Facture {{invoice_number}} impayée – {{amount}}€",
+    subject: "Rappel : Devis {{quote_number}} — Suite à notre envoi",
     body: `Bonjour {{client_name}},
 
-Nous vous avons adressé un premier rappel concernant la facture {{invoice_number}}.
+Nous revenons vers vous concernant notre devis {{quote_number}} ({{amount}}€), transmis il y a {{days_since_sent}} jours.
 
-État du dossier
-
-• Montant dû : {{amount}}€
-• Échéance : {{due_date}}
-• Retard actuel : {{days_overdue}} jour(s)
-
-Malgré ce rappel, cette facture demeure impayée. Nous vous demandons de régulariser votre situation sous 7 jours.
-
-En cas de difficulté, contactez-nous sans délai afin de trouver une solution amiable.
+Avez-vous pu prendre connaissance de notre proposition ? Nous restons disponibles pour en discuter et répondre à vos questions.
 
 Cordialement,`,
   },
   3: {
-    subject: "Mise en demeure – Facture {{invoice_number}} – {{amount}}€",
+    subject: "Dernier rappel : Devis {{quote_number}}",
     body: `Bonjour {{client_name}},
 
-Malgré nos relances successives, la facture {{invoice_number}} demeure impayée.
+Malgré nos précédents rappels, nous n'avons pas reçu de retour concernant notre devis {{quote_number}} ({{amount}}€), envoyé il y a {{days_since_sent}} jours.
 
-Récapitulatif
+Souhaitez-vous que nous maintenions cette proposition à disposition ou préférez-vous la laisser expirer ?
 
-• Montant : {{amount}}€
-• Échéance : {{due_date}}
-• Retard : {{days_overdue}} jour(s)
-
-Nous vous adressons une mise en demeure formelle de régler ce montant sous 8 jours à compter de la réception de ce courrier.
-
-Passé ce délai, nous serons contraints d'entamer une procédure de recouvrement contentieux.
-
-Nous restons à votre disposition pour toute régularisation avant cette échéance.
+Nous restons à votre écoute.
 
 Cordialement,`,
   },
 };
 
-// En base et à l'envoi on utilise {{...}} ; dans l'interface on affiche [Libellé] pour ne pas montrer les parenthèses techniques
+// Variables pour relances DEVIS (pas factures)
 const STORAGE_TO_DISPLAY: [string, string][] = [
   ["{{client_name}}", "[Nom du client]"],
-  ["{{invoice_number}}", "[Numéro de facture]"],
+  ["{{quote_number}}", "[Numéro de devis]"],
   ["{{amount}}", "[Montant]"],
-  ["{{due_date}}", "[Date d'échéance]"],
-  ["{{days_overdue}}", "[Jours de retard]"],
+  ["{{days_since_sent}}", "[Jours depuis envoi]"],
 ];
 const DISPLAY_TO_STORAGE: [string, string][] = STORAGE_TO_DISPLAY.map(([a, b]) => [b, a]);
 
@@ -100,16 +74,15 @@ function displayToStorage(text: string): string {
 
 const VARIABLE_BUTTONS: { label: string; displayValue: string }[] = [
   { label: "Nom du client", displayValue: "[Nom du client]" },
-  { label: "Numéro de facture", displayValue: "[Numéro de facture]" },
+  { label: "Numéro de devis", displayValue: "[Numéro de devis]" },
   { label: "Montant", displayValue: "[Montant]" },
-  { label: "Date d'échéance", displayValue: "[Date d'échéance]" },
-  { label: "Jours de retard", displayValue: "[Jours de retard]" },
+  { label: "Jours depuis envoi", displayValue: "[Jours depuis envoi]" },
 ];
 
 export const RelanceTemplatesSettings = () => {
   const { toast } = useToast();
-  const { data: templates = [], isLoading } = useReminderTemplates();
-  const upsert = useUpsertReminderTemplate();
+  const { data: templates = [], isLoading } = useQuoteReminderTemplates();
+  const upsert = useUpsertQuoteReminderTemplate();
 
   const subjectRefs = useRef<Record<1 | 2 | 3, HTMLInputElement | null>>({ 1: null, 2: null, 3: null });
   const bodyRefs = useRef<Record<1 | 2 | 3, HTMLTextAreaElement | null>>({ 1: null, 2: null, 3: null });
@@ -148,7 +121,7 @@ export const RelanceTemplatesSettings = () => {
   useEffect(() => {
     const next = { ...edits };
     ([1, 2, 3] as const).forEach((level) => {
-      const t = templates.find((x: ReminderTemplate) => x.reminder_level === level);
+      const t = templates.find((x: QuoteReminderTemplate) => x.reminder_level === level);
       const rawSubject = t ? t.subject : DEFAULT_TEMPLATES[level].subject;
       const rawBody = t ? t.body : DEFAULT_TEMPLATES[level].body;
       next[level] = {
@@ -162,7 +135,7 @@ export const RelanceTemplatesSettings = () => {
 
   const handleSave = async (level: 1 | 2 | 3) => {
     try {
-      const t = templates.find((x: ReminderTemplate) => x.reminder_level === level);
+      const t = templates.find((x: QuoteReminderTemplate) => x.reminder_level === level);
       const payload = {
         id: t?.id,
         reminder_level: level,
@@ -241,7 +214,7 @@ export const RelanceTemplatesSettings = () => {
                   onChange={(e) =>
                     setEdits((e) => ({ ...e, [level]: { ...e[level], subject: e.target.value } }))
                   }
-                  placeholder="Ex : Rappel de paiement - Facture impayée"
+                  placeholder="Ex : Rappel - Devis en attente de signature"
                   className="rounded-lg"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">

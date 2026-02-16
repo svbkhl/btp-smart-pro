@@ -321,7 +321,7 @@ export const SendToClientModal = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="client@example.com"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
           </div>
 
@@ -334,7 +334,7 @@ export const SendToClientModal = ({
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
               placeholder={defaultMessage}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             <p className="text-xs text-muted-foreground">
               Le message par défaut sera utilisé si laissé vide
@@ -345,7 +345,7 @@ export const SendToClientModal = ({
           <div className="space-y-4">
             <Label>Options d'envoi</Label>
             
-            <div className="flex items-center space-x-2 p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="flex items-center space-x-2 p-3 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <Checkbox
                 id="includePDF"
                 checked={includePDF}
@@ -364,7 +364,7 @@ export const SendToClientModal = ({
 
             {/* Option de signature électronique - Seulement pour les devis */}
             {documentType === "quote" && (
-              <div className="flex items-center space-x-2 p-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+              <div className="flex items-center space-x-2 p-3 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
                 <Checkbox
                   id="includeSignatureLink"
                   checked={includeSignatureLink}

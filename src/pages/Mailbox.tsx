@@ -291,15 +291,15 @@ const Mailbox = () => {
                 💡 <strong>Astuce :</strong> Vous pouvez connecter :
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
                   <p className="font-semibold mb-1">📧 Gmail</p>
                   <p className="text-xs text-muted-foreground">Connexion OAuth sécurisée</p>
                 </div>
-                <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
                   <p className="font-semibold mb-1">📧 Outlook</p>
                   <p className="text-xs text-muted-foreground">Connexion OAuth Microsoft</p>
                 </div>
-                <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+                <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
                   <p className="font-semibold mb-1">⚙️ SMTP</p>
                   <p className="text-xs text-muted-foreground">Email professionnel</p>
                 </div>
@@ -414,7 +414,7 @@ const Mailbox = () => {
                   placeholder="Rechercher..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-11 sm:pl-12"
                 />
               </div>
             </GlassCard>

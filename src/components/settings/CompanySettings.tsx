@@ -314,7 +314,7 @@ export const CompanySettings = () => {
                 }}
                 placeholder="Ex: BTP Smart Pro"
                 required
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
             <div className="space-y-2">
@@ -324,7 +324,7 @@ export const CompanySettings = () => {
                 value={formData.legal_form}
                 onChange={(e) => setFormData((prev) => ({ ...prev, legal_form: e.target.value }))}
                 placeholder="Ex: SAS au capital social de 10 000 €, Auto-entrepreneur, SARL..."
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
               <p className="text-xs text-muted-foreground">
                 Texte libre : forme juridique, capital social, etc. S’affiche en bas au centre des devis et factures.
@@ -340,7 +340,7 @@ export const CompanySettings = () => {
               value={formData.address}
               onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
               placeholder="Ex: 123 Rue de la Construction"
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
           </div>
 
@@ -353,7 +353,7 @@ export const CompanySettings = () => {
                 value={formData.city}
                 onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
                 placeholder="Ex: Paris"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
             <div className="space-y-2">
@@ -363,7 +363,7 @@ export const CompanySettings = () => {
                 value={formData.postal_code}
                 onChange={(e) => setFormData((prev) => ({ ...prev, postal_code: e.target.value }))}
                 placeholder="Ex: 75001"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
             <div className="space-y-2">
@@ -373,7 +373,7 @@ export const CompanySettings = () => {
                 value={formData.country}
                 onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
                 placeholder="Ex: France"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
           </div>
@@ -388,7 +388,7 @@ export const CompanySettings = () => {
                 onChange={(e) => setFormData((prev) => ({ ...prev, siret: e.target.value.replace(/\D/g, "") }))}
                 placeholder="14 chiffres"
                 maxLength={14}
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
               <p className="text-xs text-muted-foreground">
                 Format: 14 chiffres (ex: 12345678901234)
@@ -401,7 +401,7 @@ export const CompanySettings = () => {
                 value={formData.vat_number}
                 onChange={(e) => setFormData((prev) => ({ ...prev, vat_number: e.target.value.toUpperCase() }))}
                 placeholder="Ex: FR12345678901"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
               <p className="text-xs text-muted-foreground">
                 Format: 2 lettres + 2-12 caractères (ex: FR12345678901)
@@ -419,7 +419,7 @@ export const CompanySettings = () => {
                 value={formData.email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 placeholder="contact@entreprise.fr"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
             <div className="space-y-2">
@@ -430,7 +430,7 @@ export const CompanySettings = () => {
                 value={formData.phone}
                 onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                 placeholder="+33 1 23 45 67 89"
-                className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               />
             </div>
           </div>
@@ -444,7 +444,7 @@ export const CompanySettings = () => {
               onChange={(e) => setFormData((prev) => ({ ...prev, terms_and_conditions: e.target.value }))}
               placeholder="Conditions générales de vente, mentions légales..."
               rows={6}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
             />
             <p className="text-xs text-muted-foreground">
               Ces mentions apparaîtront sur vos devis et factures
@@ -550,7 +550,7 @@ export const CompanySettings = () => {
           <h3 className="font-semibold text-lg mb-4">Fonctionnalités automatiques</h3>
           
           <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Signature automatique</h4>
@@ -561,7 +561,7 @@ export const CompanySettings = () => {
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-border/50">
+            <div className="p-4 rounded-lg bg-transparent backdrop-blur-xl border border-white/20 dark:border-white/10">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Envoi automatique par email</h4>

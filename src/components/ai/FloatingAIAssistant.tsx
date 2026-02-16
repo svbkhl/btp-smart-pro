@@ -408,7 +408,7 @@ export const FloatingAIAssistant = () => {
                         onKeyPress={handleKeyPress}
                         placeholder="Tapez votre message..."
                         disabled={loading}
-                        className="flex-1 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50"
+                        className="flex-1 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                       />
                       <Button
                         onClick={handleSend}

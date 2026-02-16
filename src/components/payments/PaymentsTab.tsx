@@ -285,7 +285,7 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
             {signedQuotesNeedingPayment.slice(0, 5).map((quote) => (
               <div
                 key={quote.id}
-                className="flex items-center justify-between p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border hover:border-primary/50 transition-colors"
+                className="flex items-center justify-between p-4 bg-transparent backdrop-blur-xl rounded-lg border hover:border-primary/50 transition-colors"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
@@ -347,7 +347,7 @@ export default function PaymentsTab({ payments, quotes, loading }: PaymentsTabPr
                 placeholder="Rechercher un paiement (référence, méthode, ID Stripe)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-11 sm:pl-12"
               />
             </div>
             

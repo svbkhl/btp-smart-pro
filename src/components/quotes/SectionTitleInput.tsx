@@ -67,7 +67,7 @@ export const SectionTitleInput = ({
           setTimeout(() => setPopoverOpen(false), 200);
         }}
         placeholder={placeholder}
-        className={`bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-border/50 ${className || ""}`}
+        className={`bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 ${className || ""}`}
       />
       {popoverOpen && libraryResults.length > 0 && (
         <div className="absolute z-50 w-full mt-1 border rounded-md bg-popover shadow-md">

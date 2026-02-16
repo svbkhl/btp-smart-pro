@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { usePermissions } from "./usePermissions";
 import { useToast } from "@/components/ui/use-toast";
 import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_QUOTES } from "@/fakeData/quotes";
@@ -83,13 +84,15 @@ export interface UpdateQuoteData extends Partial<CreateQuoteData> {
 }
 
 // Hook pour récupérer tous les devis
+// Employé : uniquement ses propres devis | Owner/Admin : tous les devis de l'entreprise
 export const useQuotes = () => {
   const { user } = useAuth();
   const { fakeDataEnabled } = useFakeDataStore();
   const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
+  const { isEmployee } = usePermissions();
 
   return useQuery({
-    queryKey: ["quotes", companyId],
+    queryKey: ["quotes", companyId, isEmployee],
     queryFn: async () => {
       // Si fake data est activé, retourner directement les fake data
       if (fakeDataEnabled) {
@@ -107,11 +110,15 @@ export const useQuotes = () => {
           }
 
           // Filtrer par company_id pour isolation multi-tenant
-          const { data, error } = await supabase
+          // Employé : uniquement ses devis | Owner/Admin : tous
+          let query = supabase
             .from("ai_quotes")
             .select("*")
-            .eq("company_id", companyId)
-            .order("created_at", { ascending: false });
+            .eq("company_id", companyId);
+          if (isEmployee && user) {
+            query = query.eq("user_id", user.id);
+          }
+          const { data, error } = await query.order("created_at", { ascending: false });
 
           if (error) throw error;
           
