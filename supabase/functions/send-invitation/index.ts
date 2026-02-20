@@ -117,7 +117,7 @@ serve(async (req) => {
 
     const emailToInvite = validateAndNormalizeEmail((validation.data as { email: string }).email);
     // Support à la fois l'ancien format (role) et le nouveau (role_id)
-    const requestedRole = (validation.data as { role?: 'owner' | 'admin' | 'member' }).role;
+    let requestedRole = (validation.data as { role?: 'owner' | 'admin' | 'member' }).role;
     const roleId = (validation.data as { role_id?: string }).role_id;
     // Support à la fois l'ancien format (companyId) et le nouveau (company_id)
     const companyId = (validation.data as { companyId?: string; company_id?: string }).companyId ||
@@ -194,6 +194,26 @@ serve(async (req) => {
 
     // Create Supabase admin client
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Si role_id fourni mais pas role : récupérer le slug du rôle pour définir requestedRole (owner/admin/member)
+    if (roleId && !requestedRole) {
+      const { data: roleRow } = await supabase
+        .from('roles')
+        .select('slug')
+        .eq('id', roleId)
+        .single();
+      if (roleRow?.slug) {
+        // Map slug -> role. invitations.role: owner|member (admin -> member car contrainte)
+        const slugToRole: Record<string, 'owner' | 'admin' | 'member'> = {
+          owner: 'owner',
+          dirigeant: 'owner',
+          admin: 'member',
+          employee: 'member',
+        };
+        requestedRole = slugToRole[roleRow.slug] || 'member';
+        logger.info("Derived role from role_id", { requestId, role_id: roleId, slug: roleRow.slug, requestedRole });
+      }
+    }
 
     // Récupérer l'utilisateur qui envoie l'invitation depuis le JWT
     const authHeader = req.headers.get("Authorization");

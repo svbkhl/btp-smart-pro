@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TextLibraryButton } from "@/components/facturation/TextLibraryButton";
+import { PaymentRemindersManager } from "@/components/reminders/PaymentRemindersManager";
 import { QuoteRemindersManager } from "@/components/reminders/QuoteRemindersManager";
 import { 
   Search, 
@@ -922,8 +923,15 @@ const Facturation = () => {
                 loading={paymentsLoading}
               />
             </TabsContent>
-            <TabsContent value="reminders" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none">
-              <QuoteRemindersManager />
+            <TabsContent value="reminders" className="mt-6 pt-6 border-t border-white/10 dark:border-white/5 focus-visible:outline-none space-y-10">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Relances factures impayées</h3>
+                <PaymentRemindersManager />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Relances devis en attente</h3>
+                <QuoteRemindersManager />
+              </div>
             </TabsContent>
           </>
           )}

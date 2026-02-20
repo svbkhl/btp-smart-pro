@@ -127,20 +127,25 @@ export const useAllCompanies = () => {
       }
 
       try {
-        const { data, error } = await supabase
-          .from("companies")
-          .select("*")
-          .order("created_at", { ascending: false });
+        // Utiliser l'RPC admin qui contourne RLS (les admins ne voient pas les entreprises via SELECT direct)
+        const { data, error } = await supabase.rpc("admin_get_all_companies");
 
         if (error) {
-          // Si la table n'existe pas (code 42P01 ou message contenant "does not exist")
+          // Si la fonction n'existe pas, fallback sur select direct (peut retourner [] à cause du RLS)
+          if (
+            error.code === "42883" ||
+            error.message?.includes("function") ||
+            error.message?.includes("does not exist")
+          ) {
+            console.warn("⚠️ RPC admin_get_all_companies inexistante. Exécutez la migration 20260220000001_admin_get_all_companies.sql");
+            const { data: fallback } = await supabase.from("companies").select("*").order("created_at", { ascending: false });
+            return (fallback || []) as Company[];
+          }
           if (
             error.code === "42P01" ||
             error.message?.includes("does not exist") ||
-            error.message?.includes("relation") ||
-            error.code === "PGRST116"
+            error.message?.includes("relation")
           ) {
-            console.warn("⚠️ Table companies n'existe pas encore. Exécutez le script CREATE-COMPANIES-SYSTEM.sql");
             return [];
           }
           console.error("❌ Error fetching companies:", error);
@@ -149,21 +154,19 @@ export const useAllCompanies = () => {
 
         return (data || []) as Company[];
       } catch (err: any) {
-        // Gérer les erreurs de manière gracieuse
         if (
           err?.code === "42P01" ||
           err?.message?.includes("does not exist") ||
           err?.message?.includes("relation")
         ) {
-          console.warn("⚠️ Table companies n'existe pas encore");
           return [];
         }
         throw err;
       }
     },
     enabled: !!user && !!isAdmin,
-    retry: false, // Ne pas réessayer si la table n'existe pas
-    throwOnError: false, // Ne pas bloquer l'UI
+    retry: false,
+    throwOnError: false,
   });
 };
 
