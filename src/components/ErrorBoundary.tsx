@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -26,6 +27,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
       return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
           <div className="max-w-md w-full space-y-4 text-center">

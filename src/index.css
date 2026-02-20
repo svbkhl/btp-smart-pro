@@ -401,6 +401,23 @@ button,
   user-select: none;
 }
 
+/* Garantir que les champs de saisie restent interactifs et recevables aux clics */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto !important;
+}
+
+/* Correctif PC/desktop : backdrop-filter peut causer des clics qui ne parviennent pas aux inputs */
+@media (hover: hover) and (pointer: fine) {
+  input, textarea {
+    position: relative !important;
+    z-index: 10 !important;
+  }
+}
+
 /* Styles de boutons restaurés - utilisation des variantes standard de Shadcn UI */
 
 /* ============================================

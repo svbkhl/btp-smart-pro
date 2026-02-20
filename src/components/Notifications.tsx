@@ -15,6 +15,16 @@ import { useNotifications, Notification } from "@/hooks/useNotifications";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+
+const formatDateSafe = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "—";
+    return formatDistanceToNow(d, { addSuffix: true, locale: fr });
+  } catch {
+    return "—";
+  }
+};
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
@@ -180,10 +190,7 @@ export const Notifications = () => {
                             {getTypeLabel(notification.type)}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(notification.created_at), {
-                              addSuffix: true,
-                              locale: fr,
-                            })}
+                            {formatDateSafe(notification.created_at)}
                           </span>
                         </div>
                       </div>
@@ -210,10 +217,7 @@ export const Notifications = () => {
                           {notification.message}
                         </p>
                         <span className="text-xs text-muted-foreground mt-1 block">
-                          {formatDistanceToNow(new Date(notification.created_at), {
-                            addSuffix: true,
-                            locale: fr,
-                          })}
+                          {formatDateSafe(notification.created_at)}
                         </span>
                       </div>
                     </DropdownMenuItem>

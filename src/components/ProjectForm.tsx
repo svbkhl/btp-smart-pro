@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useRef } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate } from "react-router-dom";
@@ -57,6 +57,7 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
     reset,
@@ -77,7 +78,12 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
     },
   });
 
+  const prevOpenRef = useRef(false);
   useEffect(() => {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
     if (project) {
       reset({
         name: project.name,
@@ -103,7 +109,7 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
         description: "",
       });
     }
-  }, [project, open, reset]);
+  }, [open, project, reset]);
 
   const onSubmit = async (data: ProjectFormData) => {
     console.log("Project form submitted:", data);
@@ -145,7 +151,14 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+          className="max-w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl max-h-[90vh] overflow-y-auto z-[60]"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById("project-form-name");
+            if (nameInput instanceof HTMLInputElement) nameInput.focus();
+          }}
+        >
         <DialogHeader>
           <DialogTitle>
             {project ? "Modifier le chantier" : "Nouveau chantier"}
@@ -159,10 +172,17 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nom du chantier *</Label>
-            <Input
-              id="name"
-              {...register("name")}
-              placeholder="Ex: Rénovation Maison Martin"
+            <Controller
+              name="name"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  id="project-form-name"
+                  placeholder="Ex: Rénovation Maison Martin"
+                />
+              )}
             />
             {errors.name && (
               <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -288,11 +308,18 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
 
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Description du chantier..."
-              rows={4}
+            <Controller
+              name="description"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  id="description"
+                  placeholder="Description du chantier..."
+                  rows={4}
+                />
+              )}
             />
           </div>
 

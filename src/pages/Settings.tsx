@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt } from "lucide-react";
+import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt, Send } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
@@ -37,6 +37,7 @@ import UsersManagementRBAC from "@/pages/UsersManagementRBAC";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { isSystemAdmin, isAdminEmail } from "@/config/admin";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const Settings = () => {
   const { user, isAdmin, userRole, currentCompanyId } = useAuth();
@@ -52,8 +53,8 @@ const Settings = () => {
   const hasProcessedOAuth = useRef(false);
   const oauthCodeRef = useRef<string | null>(null);
   
-  // Sections autorisées pour les OWNERS (7 sections : company, employees, billing, stripe, integrations, notifications, security)
-  const ownerAllowedSections = ['company', 'employees', 'billing', 'stripe', 'integrations', 'notifications', 'security'];
+  // Sections autorisées pour les OWNERS (8 sections : company, employees, billing, stripe, integrations, notifications, relances, security)
+  const ownerAllowedSections = ['company', 'employees', 'billing', 'stripe', 'integrations', 'notifications', 'relances', 'security'];
   
   // Sections autorisées pour les EMPLOYÉS (3 sections uniquement : sécurité, intégrations pour plannings, notifications)
   const employeeAllowedSections = ['security', 'integrations', 'notifications'];
@@ -191,14 +192,14 @@ const Settings = () => {
   
   // Ajuster le nombre de colonnes selon les onglets
   // EMPLOYÉS (3 onglets) : security, integrations, notifications
-  // OWNERS (7 onglets) : company, employees, billing, stripe, integrations, notifications, security
+  // OWNERS (8 onglets) : company, employees, billing, stripe, integrations, notifications, relances, security
   // ADMINS (12-13 onglets) : 7 de base + companies, contact-requests, users, roles, delegations (optionnel), admin-company, demo
   // Note: "legal" a été déplacé en haut à droite comme bouton
   const tabCount = isEmployee
     ? 3 // Employés: 3 onglets uniquement (security, integrations, notifications)
     : isReallyAdmin 
     ? (canManageDelegations ? 13 : 12) // Admins: 12 ou 13 onglets
-    : 7; // Owners: 7 onglets (company, employees, billing, stripe, integrations, notifications, security)
+    : 8; // Owners: 8 onglets (company, employees, billing, stripe, integrations, notifications, relances, security)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -320,6 +321,10 @@ const Settings = () => {
               <Bell className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Notifications</span>
             </TabsTrigger>
+            <TabsTrigger value="relances" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+              <Send className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">Relances</span>
+            </TabsTrigger>
             <TabsTrigger value="security" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
               <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Sécurité</span>
@@ -390,11 +395,24 @@ const Settings = () => {
           </TabsContent>
 
           <TabsContent value="notifications" className="mt-0">
-            <div className="space-y-8">
+            <ErrorBoundary
+              fallback={
+                <div className="p-6 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    Impossible de charger les paramètres de notifications. Réessayez ou utilisez un autre appareil.
+                  </p>
+                </div>
+              }
+            >
               <NotificationSettings isEmployee={isEmployee} />
-              {!isEmployee && <RelanceTemplatesSettings />}
-            </div>
+            </ErrorBoundary>
           </TabsContent>
+
+          {!isEmployee && (
+            <TabsContent value="relances" className="mt-0">
+              <RelanceTemplatesSettings />
+            </TabsContent>
+          )}
 
           <TabsContent value="security" className="mt-0">
             <SecuritySettings />

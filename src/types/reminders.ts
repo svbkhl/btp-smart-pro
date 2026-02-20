@@ -27,6 +27,7 @@ export interface ReminderTemplate {
   subject: string;
   body: string; // Peut contenir des variables : {{client_name}}, {{invoice_number}}, {{amount}}, {{due_date}}, {{days_overdue}}
   is_active: boolean;
+  send_after_days?: number; // Jours de retard avant d'envoyer cette relance (factures)
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +37,7 @@ export interface CreateReminderTemplateData {
   subject: string;
   body: string;
   is_active?: boolean;
+  send_after_days?: number;
 }
 
 export interface OverdueInvoice {
@@ -87,6 +89,7 @@ export interface QuoteReminderTemplate {
   subject: string;
   body: string;
   is_active: boolean;
+  send_after_days?: number; // Jours après envoi du devis avant d'envoyer cette relance
   created_at: string;
   updated_at: string;
 }

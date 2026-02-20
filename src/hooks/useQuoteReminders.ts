@@ -15,18 +15,26 @@ import type {
 /** Nombre de jours après envoi avant de proposer une relance (par défaut) */
 const DEFAULT_QUOTE_REMINDER_DAYS = 3;
 
-export const usePendingQuotesForReminder = (days = DEFAULT_QUOTE_REMINDER_DAYS) => {
+export const usePendingQuotesForReminder = (days?: number) => {
+  const { data: templates = [] } = useQuoteReminderTemplates();
+  const effectiveDays =
+    days ??
+    Math.min(
+      templates.find((t) => t.reminder_level === 1)?.send_after_days ?? DEFAULT_QUOTE_REMINDER_DAYS,
+      templates.find((t) => t.reminder_level === 2)?.send_after_days ?? 7,
+      templates.find((t) => t.reminder_level === 3)?.send_after_days ?? 14
+    );
   const { user } = useAuth();
   const { companyId, isLoading: isLoadingCompanyId } = useCompanyId();
 
   return useQuery({
-    queryKey: ["pending-quotes-reminder", companyId, days],
+    queryKey: ["pending-quotes-reminder", companyId, effectiveDays],
     queryFn: async () => {
       if (!user || !companyId) return [];
 
       const { data, error } = await supabase.rpc("get_pending_quotes_for_reminder", {
         p_company_id: companyId,
-        p_days: days,
+        p_days: effectiveDays,
       });
 
       if (error) throw error;
@@ -252,9 +260,16 @@ export const useSendQuoteReminder = () => {
   });
 };
 
-export const useQuoteReminderStats = (days = DEFAULT_QUOTE_REMINDER_DAYS) => {
+export const useQuoteReminderStats = (days?: number) => {
   const { data: pendingQuotes = [] } = usePendingQuotesForReminder(days);
   const { data: reminders = [] } = useQuoteRemindersHistory();
+  const { data: templates = [] } = useQuoteReminderTemplates();
+
+  const d = {
+    1: templates.find((t) => t.reminder_level === 1)?.send_after_days ?? 3,
+    2: templates.find((t) => t.reminder_level === 2)?.send_after_days ?? 7,
+    3: templates.find((t) => t.reminder_level === 3)?.send_after_days ?? 14,
+  };
 
   const stats: QuoteReminderStats = {
     total_pending: pendingQuotes.length,
@@ -263,30 +278,39 @@ export const useQuoteReminderStats = (days = DEFAULT_QUOTE_REMINDER_DAYS) => {
       if (!r.sent_at) return false;
       return new Date(r.sent_at).toDateString() === new Date().toDateString();
     }).length,
-    level_1_count: pendingQuotes.filter((q) => q.days_since_sent >= 3 && q.days_since_sent < 7).length,
-    level_2_count: pendingQuotes.filter((q) => q.days_since_sent >= 7 && q.days_since_sent < 14).length,
-    level_3_count: pendingQuotes.filter((q) => q.days_since_sent >= 14).length,
+    level_1_count: pendingQuotes.filter((q) => q.days_since_sent >= d[1] && q.days_since_sent < d[2]).length,
+    level_2_count: pendingQuotes.filter((q) => q.days_since_sent >= d[2] && q.days_since_sent < d[3]).length,
+    level_3_count: pendingQuotes.filter((q) => q.days_since_sent >= d[3]).length,
   };
 
   return stats;
 };
 
+const DEFAULT_DAYS_DEVIS = { 1: 3, 2: 7, 3: 14 } as const;
+
 export const useRecommendedQuoteReminderLevel = (quote: PendingQuote) => {
+  const { data: templates = [] } = useQuoteReminderTemplates();
   const daysSinceSent = quote.days_since_sent;
   const lastLevel = quote.last_reminder_level ?? 0;
+
+  const days = {
+    1: templates.find((t) => t.reminder_level === 1)?.send_after_days ?? DEFAULT_DAYS_DEVIS[1],
+    2: templates.find((t) => t.reminder_level === 2)?.send_after_days ?? DEFAULT_DAYS_DEVIS[2],
+    3: templates.find((t) => t.reminder_level === 3)?.send_after_days ?? DEFAULT_DAYS_DEVIS[3],
+  };
 
   let recommendedLevel: 1 | 2 | 3;
   let reason: string;
 
-  if (daysSinceSent >= 14 && lastLevel < 3) {
+  if (daysSinceSent >= days[3] && lastLevel < 3) {
     recommendedLevel = 3;
-    reason = "En attente depuis plus de 14 jours - Dernier rappel";
-  } else if (daysSinceSent >= 7 && lastLevel < 2) {
+    reason = `En attente depuis plus de ${days[3]} jours - Dernier rappel`;
+  } else if (daysSinceSent >= days[2] && lastLevel < 2) {
     recommendedLevel = 2;
-    reason = "En attente depuis plus de 7 jours - Rappel de suivi";
-  } else if (daysSinceSent >= 3 && lastLevel < 1) {
+    reason = `En attente depuis plus de ${days[2]} jours - Rappel de suivi`;
+  } else if (daysSinceSent >= days[1] && lastLevel < 1) {
     recommendedLevel = 1;
-    reason = "En attente depuis plus de 3 jours - Premier rappel";
+    reason = `En attente depuis plus de ${days[1]} jours - Premier rappel`;
   } else {
     recommendedLevel = Math.min(lastLevel + 1, 3) as 1 | 2 | 3;
     reason = `Dernière relance niveau ${lastLevel} envoyée - Niveau suivant possible`;

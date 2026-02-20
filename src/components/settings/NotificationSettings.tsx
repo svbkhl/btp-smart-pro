@@ -26,12 +26,26 @@ interface NotificationSettingsProps {
   isEmployee?: boolean;
 }
 
+// API Notifications navigateur (absente sur certains mobiles / WebView)
+const getNotificationPermission = (): "granted" | "denied" | "default" | "unsupported" => {
+  if (typeof window === "undefined") return "unsupported";
+  try {
+    if (!("Notification" in window)) return "unsupported";
+    const NotificationAPI = (window as Window & { Notification?: { permission: string } }).Notification;
+    if (!NotificationAPI || typeof NotificationAPI.permission !== "string") return "unsupported";
+    return NotificationAPI.permission as "granted" | "denied" | "default";
+  } catch {
+    return "unsupported";
+  }
+};
+
 export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pushRequesting, setPushRequesting] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<"granted" | "denied" | "default" | "unsupported">(() => getNotificationPermission());
   const [tableError, setTableError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     push_notifications: true,
@@ -89,18 +103,24 @@ export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) 
     loadPreferences();
   }, [user]);
 
+  // Mettre à jour la permission après action
+  useEffect(() => {
+    setNotificationPermission(getNotificationPermission());
+  }, [pushRequesting]);
+
   // Demander la permission pour les notifications push (doit être appelé au clic utilisateur)
   const requestPushPermission = async () => {
-    if (!("Notification" in window)) {
+    const perm = getNotificationPermission();
+    if (perm === "unsupported") {
       toast({
         title: "Non supporté",
-        description: "Votre navigateur ne supporte pas les notifications push",
+        description: "Les notifications push ne sont pas disponibles sur cet appareil.",
         variant: "destructive",
       });
       return;
     }
 
-    if (Notification.permission === "granted") {
+    if (perm === "granted") {
       setPreferences((p) => ({ ...p, push_notifications: true }));
       toast({
         title: "Déjà autorisé",
@@ -109,7 +129,7 @@ export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) 
       return;
     }
 
-    if (Notification.permission === "denied") {
+    if (perm === "denied") {
       toast({
         title: "Notifications bloquées",
         description: "Autorisez les notifications dans les paramètres du navigateur pour ce site.",
@@ -120,7 +140,17 @@ export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) 
 
     setPushRequesting(true);
     try {
-      const permission = await Notification.requestPermission();
+      const api = (window as Window & { Notification?: { requestPermission: () => Promise<string> } }).Notification;
+      if (!api?.requestPermission) {
+        toast({
+          title: "Non supporté",
+          description: "Les notifications push ne sont pas disponibles sur cet appareil.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const permission = await api.requestPermission();
+      setNotificationPermission(permission as "granted" | "denied" | "default");
       if (permission === "granted") {
         const next = { ...preferences, push_notifications: true };
         setPreferences(next);
@@ -247,20 +277,24 @@ export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) 
                   </p>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-2">
-                  {Notification.permission === "denied" && (
+                  {notificationPermission === "denied" && (
                     <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" aria-hidden />
                   )}
-                  {Notification.permission === "granted" ? (
+                  {notificationPermission === "granted" ? (
                     <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                       <CheckCircle2 className="h-5 w-5" />
                       <span>Activées</span>
                     </div>
+                  ) : notificationPermission === "unsupported" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Non disponible sur cet appareil.
+                    </p>
                   ) : (
                     <Button
                       variant="default"
                       size="sm"
                       onClick={requestPushPermission}
-                      disabled={pushRequesting || Notification.permission === "denied"}
+                      disabled={pushRequesting || notificationPermission === "denied"}
                       className="gap-2 rounded-xl shrink-0"
                     >
                       {pushRequesting ? (
@@ -278,12 +312,12 @@ export const NotificationSettings = ({ isEmployee }: NotificationSettingsProps) 
                   )}
                 </div>
               </div>
-              {Notification.permission !== "granted" && Notification.permission !== "denied" && (
+              {notificationPermission !== "granted" && notificationPermission !== "denied" && notificationPermission !== "unsupported" && (
                 <p className="text-xs text-muted-foreground">
                   Cliquez sur le bouton pour demander l&apos;autorisation au navigateur (requis pour activer).
                 </p>
               )}
-              {Notification.permission === "denied" && (
+              {notificationPermission === "denied" && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   Les notifications sont bloquées. Autorisez-les dans les paramètres du site (icône cadenas dans la barre d&apos;adresse).
                 </p>

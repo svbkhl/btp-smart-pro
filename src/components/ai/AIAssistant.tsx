@@ -292,12 +292,6 @@ export const AIAssistant = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 h-[calc(100vh-300px)] sm:h-[600px] min-h-[500px]">
@@ -499,10 +493,15 @@ export const AIAssistant = () => {
               ref={inputRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
               placeholder="Tapez ou parlez (micro) - ajoutez des images..."
               disabled={loading}
-              className="flex-1 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+              className="flex-1"
             />
             <Button 
               onClick={handleSend} 

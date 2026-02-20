@@ -281,6 +281,13 @@ export const useSendReminder = () => {
 export const useReminderStats = () => {
   const { data: overdueInvoices = [] } = useOverdueInvoices();
   const { data: reminders = [] } = usePaymentReminders();
+  const { data: templates = [] } = useReminderTemplates();
+
+  const days = {
+    1: templates.find((t) => t.reminder_level === 1)?.send_after_days ?? 7,
+    2: templates.find((t) => t.reminder_level === 2)?.send_after_days ?? 15,
+    3: templates.find((t) => t.reminder_level === 3)?.send_after_days ?? 30,
+  };
 
   const stats: ReminderStats = {
     total_overdue: overdueInvoices.length,
@@ -291,33 +298,41 @@ export const useReminderStats = () => {
       return new Date(r.sent_at).toDateString() === today;
     }).length,
     reminders_pending: reminders.filter(r => r.status === 'pending').length,
-    level_1_count: overdueInvoices.filter(inv => inv.days_overdue >= 7 && inv.days_overdue < 15).length,
-    level_2_count: overdueInvoices.filter(inv => inv.days_overdue >= 15 && inv.days_overdue < 30).length,
-    level_3_count: overdueInvoices.filter(inv => inv.days_overdue >= 30).length,
+    level_1_count: overdueInvoices.filter(inv => inv.days_overdue >= days[1] && inv.days_overdue < days[2]).length,
+    level_2_count: overdueInvoices.filter(inv => inv.days_overdue >= days[2] && inv.days_overdue < days[3]).length,
+    level_3_count: overdueInvoices.filter(inv => inv.days_overdue >= days[3]).length,
   };
 
   return stats;
 };
 
+const DEFAULT_DAYS_FACTURE = { 1: 7, 2: 15, 3: 30 } as const;
+
 // Hook pour déterminer le niveau de relance à envoyer
 export const useRecommendedReminderLevel = (invoice: OverdueInvoice) => {
+  const { data: templates = [] } = useReminderTemplates();
   const daysOverdue = invoice.days_overdue;
   const lastLevel = invoice.last_reminder_level || 0;
+
+  const days = {
+    1: templates.find((t) => t.reminder_level === 1)?.send_after_days ?? DEFAULT_DAYS_FACTURE[1],
+    2: templates.find((t) => t.reminder_level === 2)?.send_after_days ?? DEFAULT_DAYS_FACTURE[2],
+    3: templates.find((t) => t.reminder_level === 3)?.send_after_days ?? DEFAULT_DAYS_FACTURE[3],
+  };
 
   let recommendedLevel: 1 | 2 | 3;
   let reason: string;
 
-  if (daysOverdue >= 30 && lastLevel < 3) {
+  if (daysOverdue >= days[3] && lastLevel < 3) {
     recommendedLevel = 3;
-    reason = "Impayé depuis plus de 30 jours - Mise en demeure";
-  } else if (daysOverdue >= 15 && lastLevel < 2) {
+    reason = `Impayé depuis plus de ${days[3]} jours - Mise en demeure`;
+  } else if (daysOverdue >= days[2] && lastLevel < 2) {
     recommendedLevel = 2;
-    reason = "Impayé depuis plus de 15 jours - Rappel urgent";
-  } else if (daysOverdue >= 7 && lastLevel < 1) {
+    reason = `Impayé depuis plus de ${days[2]} jours - Rappel urgent`;
+  } else if (daysOverdue >= days[1] && lastLevel < 1) {
     recommendedLevel = 1;
-    reason = "Impayé depuis plus de 7 jours - Premier rappel";
+    reason = `Impayé depuis plus de ${days[1]} jours - Premier rappel`;
   } else {
-    // Déjà relancé au bon niveau, proposer le niveau suivant si possible
     recommendedLevel = Math.min(lastLevel + 1, 3) as 1 | 2 | 3;
     reason = `Dernière relance niveau ${lastLevel} envoyée`;
   }

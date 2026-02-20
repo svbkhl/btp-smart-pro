@@ -111,10 +111,7 @@ export const useNotifications = () => {
   // Marquer comme lu
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {
-      if (!user) throw new Error("User not authenticated");
-      if (!companyId) {
-        throw new Error("User must be a member of a company");
-      }
+      if (!user || !companyId) return;
 
       const { error } = await supabase
         .from("notifications")
@@ -132,10 +129,7 @@ export const useNotifications = () => {
   // Marquer toutes comme lues
   const markAllAsRead = useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("User not authenticated");
-      if (!companyId) {
-        throw new Error("User must be a member of a company");
-      }
+      if (!user || !companyId) return;
 
       const unreadIds = notifications
         ?.filter((n) => !n.is_read)

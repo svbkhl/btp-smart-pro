@@ -36,7 +36,13 @@ export const useCompanyId = (): UseCompanyIdReturn => {
 
       try {
         // 1. Vérifier si un company_id a été sélectionné manuellement (localStorage)
-        const selectedCompanyId = localStorage.getItem(`selectedCompanyId_${user.id}`);
+        let selectedCompanyId: string | null = null;
+        try {
+          selectedCompanyId = localStorage.getItem(`selectedCompanyId_${user.id}`);
+        } catch {
+          // localStorage peut être indisponible (mode privé mobile, etc.)
+          logger.warn("localStorage unavailable (e.g. private mode)");
+        }
         
         if (selectedCompanyId) {
           // Vérifier que ce company_id existe bien pour cet utilisateur
@@ -59,7 +65,11 @@ export const useCompanyId = (): UseCompanyIdReturn => {
               userId: user.id,
               invalidCompanyId: selectedCompanyId
             });
-            localStorage.removeItem(`selectedCompanyId_${user.id}`);
+            try {
+              localStorage.removeItem(`selectedCompanyId_${user.id}`);
+            } catch {
+              /* ignore */
+            }
           }
         }
         

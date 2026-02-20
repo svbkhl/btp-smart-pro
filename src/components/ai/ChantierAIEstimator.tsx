@@ -257,7 +257,7 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
               placeholder="Ex: Rénovation complète d'une salle de bain 8m², carrelage sol et murs..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[100px] pr-12 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+              className="min-h-[100px] pr-12"
               disabled={loading}
             />
             <Button

@@ -199,12 +199,6 @@ export const FloatingAIAssistant = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
 
   return (
     <>
@@ -405,10 +399,15 @@ export const FloatingAIAssistant = () => {
                         ref={inputRef}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
+                        onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
                         placeholder="Tapez votre message..."
                         disabled={loading}
-                        className="flex-1 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                        className="flex-1"
                       />
                       <Button
                         onClick={handleSend}
