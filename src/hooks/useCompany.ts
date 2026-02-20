@@ -350,15 +350,12 @@ export const useDeleteCompany = () => {
         throw new Error("Unauthorized");
       }
 
-      const { error } = await supabase
-        .from("companies")
-        .delete()
-        .eq("id", companyId);
+      const { data, error } = await supabase.functions.invoke("delete-company-admin", {
+        body: { company_id: companyId },
+      });
 
       if (error) {
-        // Vérifier si la table n'existe pas
         if (
-          error.code === "42P01" ||
           error.message?.includes("does not exist") ||
           error.message?.includes("relation")
         ) {
@@ -367,6 +364,7 @@ export const useDeleteCompany = () => {
         console.error("❌ Error deleting company:", error);
         throw error;
       }
+      if (data?.error) throw new Error(data.error);
 
       return companyId;
     },

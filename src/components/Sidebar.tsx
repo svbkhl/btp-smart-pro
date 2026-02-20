@@ -496,7 +496,9 @@ export default function Sidebar() {
         }}
         className={cn(
           "flex flex-col z-40",
-          "bg-transparent backdrop-blur-xl",
+          isMobile
+            ? "bg-background"
+            : "bg-transparent backdrop-blur-xl",
           "border border-white/20 dark:border-white/10",
           "shadow-2xl shadow-black/10 dark:shadow-black/30",
           "transition-shadow duration-300 ease-out",

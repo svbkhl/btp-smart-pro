@@ -204,16 +204,14 @@ export default function UsersManagementRBAC({ embedded = false }: UsersManagemen
     },
   });
 
-  // Supprimer un utilisateur
+  // Supprimer un utilisateur (appelle l'Edge Function pour nettoyer le compte Auth si orphelin)
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase
-        .from('company_users')
-        .update({ status: 'inactive' })
-        .eq('user_id', userId)
-        .eq('company_id', currentCompanyId);
-
+      const { data, error } = await supabase.functions.invoke('remove-user-from-company', {
+        body: { user_id: userId, company_id: currentCompanyId },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: async (_, userId) => {
       queryClient.invalidateQueries({ queryKey: ['company-users'] });
