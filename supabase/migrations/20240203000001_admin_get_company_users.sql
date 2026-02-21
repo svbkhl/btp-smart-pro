@@ -2,8 +2,11 @@
 -- FONCTION RPC : Récupérer les utilisateurs d'une entreprise (admin)
 -- ============================================================================
 
+-- Supprimer d'abord si elle existe (CREATE OR REPLACE ne permet pas de changer le type de retour)
+DROP FUNCTION IF EXISTS public.admin_get_company_users(UUID);
+
 -- Fonction pour récupérer les utilisateurs d'une entreprise depuis company_users
-CREATE OR REPLACE FUNCTION public.admin_get_company_users(target_company_id UUID)
+CREATE FUNCTION public.admin_get_company_users(target_company_id UUID)
 RETURNS TABLE (
   user_id UUID,
   company_id UUID,

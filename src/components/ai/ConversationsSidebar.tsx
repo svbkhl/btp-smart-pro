@@ -114,15 +114,15 @@ export const ConversationsSidebar = ({
   };
 
   return (
-    <GlassCard className="flex flex-col h-full min-h-[500px] sm:min-h-0">
-      <div className="p-4 border-b border-border/50 space-y-2">
+    <GlassCard className="flex flex-col h-full min-h-[140px] sm:min-h-0 max-h-[35vh] sm:max-h-none">
+      <div className="p-3 sm:p-4 border-b border-border/50 space-y-2">
         <Button
           onClick={handleNewConversation}
-          className="w-full"
+          className="w-full text-xs sm:text-sm"
           size="sm"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvelle conversation
+          <Plus className="h-4 w-4 mr-2 shrink-0" />
+          <span className="truncate">Nouvelle conversation</span>
         </Button>
         {filteredConversations.length > 0 && (
           <Button
@@ -138,14 +138,14 @@ export const ConversationsSidebar = ({
         )}
       </div>
 
-      <div className="p-4 border-b border-border/50">
+      <div className="p-3 sm:p-4 border-b border-border/50">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+          <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground z-10 pointer-events-none" />
           <Input
             placeholder="Rechercher..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 sm:pl-10 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+            className="pl-8 sm:pl-10 py-2 sm:py-2.5 text-sm bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
           />
         </div>
       </div>

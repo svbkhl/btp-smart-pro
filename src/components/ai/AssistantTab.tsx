@@ -18,23 +18,23 @@ export default function AssistantTab() {
   // Écran de choix (comme pour Devis simple / détaillé)
   if (!mode) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div>
-          <h3 className="text-xl font-semibold flex items-center gap-2 mb-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
+          <h3 className="text-lg sm:text-xl font-semibold flex items-center gap-2 mb-1 sm:mb-2">
+            <MessageSquare className="h-5 w-5 text-primary shrink-0" />
             Assistant IA
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Choisissez le type d&apos;assistance dont vous avez besoin
           </p>
         </div>
 
         {/* Choix : Assistant ou Estimateur */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Carte Assistant - Chat général */}
           <GlassCard
-            className="p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+            className="p-4 sm:p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group"
             onClick={() => setMode("assistant")}
           >
             <div className="flex flex-col items-center text-center space-y-4">
@@ -63,7 +63,7 @@ export default function AssistantTab() {
 
           {/* Carte Estimateur - Estimation chantiers */}
           <GlassCard
-            className="p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+            className="p-4 sm:p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group"
             onClick={() => setMode("estimator")}
           >
             <div className="flex flex-col items-center text-center space-y-4">

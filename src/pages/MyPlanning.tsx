@@ -159,8 +159,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
           *,
           projects:project_id (
             id,
-            name,
-            location
+            name
           )
         `)
         .eq("employee_id", employeeId)
@@ -209,6 +208,38 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
   useEffect(() => {
     fetchEmployeeData();
   }, [fetchEmployeeData]);
+
+  // Rafraîchir au focus (si l'employé revient sur l'onglet après une modif par l'owner)
+  useEffect(() => {
+    const onFocus = () => fetchEmployeeData();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchEmployeeData]);
+
+  // Écouter les modifications du planning par l'owner (synchro temps réel Supabase)
+  useEffect(() => {
+    if (!employee?.id || fakeDataEnabled) return;
+
+    const channel = supabase
+      .channel(`employee_assignments_${employee.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "employee_assignments",
+          filter: `employee_id=eq.${employee.id}`,
+        },
+        () => {
+          fetchEmployeeData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [employee?.id, fetchEmployeeData, fakeDataEnabled]);
 
   const getAssignmentsForDay = (day: string, date: Date) => {
     const dateStr = date.toISOString().split("T")[0];

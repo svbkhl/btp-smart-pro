@@ -161,8 +161,17 @@ SELECT public.add_company_id_column_if_not_exists('email_queue');
 -- Messages
 SELECT public.add_company_id_column_if_not_exists('messages');
 
--- Emails envoyés
-SELECT public.add_company_id_column_if_not_exists('email_messages');
+-- Emails envoyés (si table existe)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'email_messages'
+  ) THEN
+    PERFORM public.add_company_id_column_if_not_exists('email_messages');
+  END IF;
+END $$;
 
 -- Lignes de devis détaillés (si table existe)
 DO $$
@@ -250,6 +259,7 @@ DECLARE
   v_user_ids UUID[];
   v_sql_select TEXT;
   v_table_exists BOOLEAN;
+  v_user_id_column_exists BOOLEAN;
 BEGIN
   -- Vérifier si la table existe
   SELECT EXISTS (
@@ -263,6 +273,14 @@ BEGIN
     RETURN;
   END IF;
   
+  -- Vérifier si la colonne user_id (ou équivalent) existe dans la table
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = p_table_name
+    AND column_name = p_user_id_column
+  ) INTO v_user_id_column_exists;
+  
   -- Vérifier si status existe dans company_users
   SELECT EXISTS (
     SELECT 1 FROM information_schema.columns 
@@ -271,105 +289,109 @@ BEGIN
     AND column_name = 'status'
   ) INTO v_has_status;
   
-  -- 1. Migrer via company_users
-  IF v_has_status THEN
-    v_sql := format('
-      UPDATE public.%I t
-      SET company_id = (
-        SELECT cu.company_id 
-        FROM public.company_users cu 
-        WHERE cu.user_id = t.%I 
-        AND cu.status = ''active''
-        LIMIT 1
-      )
+  -- 1. Migrer via company_users (uniquement si la table a user_id ou la colonne ciblée)
+  IF v_user_id_column_exists THEN
+    IF v_has_status THEN
+      v_sql := format('
+        UPDATE public.%I t
+        SET company_id = (
+          SELECT cu.company_id 
+          FROM public.company_users cu 
+          WHERE cu.user_id = t.%I 
+          AND cu.status = ''active''
+          LIMIT 1
+        )
+        WHERE t.company_id IS NULL
+        AND EXISTS (
+          SELECT 1 FROM public.company_users cu 
+          WHERE cu.user_id = t.%I 
+          AND cu.status = ''active''
+        );
+      ', p_table_name, p_user_id_column, p_user_id_column, p_user_id_column);
+    ELSE
+      v_sql := format('
+        UPDATE public.%I t
+        SET company_id = (
+          SELECT cu.company_id 
+          FROM public.company_users cu 
+          WHERE cu.user_id = t.%I 
+          LIMIT 1
+        )
+        WHERE t.company_id IS NULL
+        AND EXISTS (
+          SELECT 1 FROM public.company_users cu 
+          WHERE cu.user_id = t.%I
+        );
+      ', p_table_name, p_user_id_column, p_user_id_column, p_user_id_column);
+    END IF;
+    
+    EXECUTE v_sql;
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RAISE NOTICE '✅ % : % lignes migrées via company_users', p_table_name, v_count;
+    
+    -- 2. Créer des companies par défaut pour les users sans company
+    -- Récupérer tous les user_ids sans company
+    v_sql_select := format('
+      SELECT ARRAY_AGG(DISTINCT t.%I)
+      FROM public.%I t
       WHERE t.company_id IS NULL
-      AND EXISTS (
-        SELECT 1 FROM public.company_users cu 
-        WHERE cu.user_id = t.%I 
-        AND cu.status = ''active''
-      );
-    ', p_table_name, p_user_id_column, p_user_id_column, p_user_id_column);
-  ELSE
-    v_sql := format('
-      UPDATE public.%I t
-      SET company_id = (
-        SELECT cu.company_id 
-        FROM public.company_users cu 
-        WHERE cu.user_id = t.%I 
-        LIMIT 1
-      )
-      WHERE t.company_id IS NULL
-      AND EXISTS (
+      AND NOT EXISTS (
         SELECT 1 FROM public.company_users cu 
         WHERE cu.user_id = t.%I
-      );
-    ', p_table_name, p_user_id_column, p_user_id_column, p_user_id_column);
-  END IF;
-  
-  EXECUTE v_sql;
-  GET DIAGNOSTICS v_count = ROW_COUNT;
-  RAISE NOTICE '✅ % : % lignes migrées via company_users', p_table_name, v_count;
-  
-  -- 2. Créer des companies par défaut pour les users sans company
-  -- Récupérer tous les user_ids sans company
-  v_sql_select := format('
-    SELECT ARRAY_AGG(DISTINCT t.%I)
-    FROM public.%I t
-    WHERE t.company_id IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM public.company_users cu 
-      WHERE cu.user_id = t.%I
-    )
-  ', p_user_id_column, p_table_name, p_user_id_column);
-  
-  EXECUTE v_sql_select INTO v_user_ids;
-  
-  -- Si des users sans company existent
-  IF v_user_ids IS NOT NULL AND array_length(v_user_ids, 1) > 0 THEN
-    FOREACH v_user_id IN ARRAY v_user_ids
-    LOOP
-      -- Récupérer l'email de l'utilisateur
-      SELECT email INTO v_user_email
-      FROM auth.users
-      WHERE id = v_user_id;
-      
-      -- Créer une company par défaut
-      INSERT INTO public.companies (name, owner_id)
-      VALUES (
-        COALESCE(v_user_email || '''s Company', 'Entreprise par défaut'),
-        v_user_id
       )
-      RETURNING id INTO v_company_id;
-      
-      -- Ajouter user comme owner
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_schema = 'public' 
-        AND table_name = 'company_users'
-        AND column_name = 'status'
-      ) THEN
-        INSERT INTO public.company_users (company_id, user_id, role, status)
-        VALUES (v_company_id, v_user_id, 'owner', 'active')
-        ON CONFLICT (company_id, user_id) DO UPDATE
-        SET status = 'active', role = 'owner';
-      ELSE
-        INSERT INTO public.company_users (company_id, user_id, role)
-        VALUES (v_company_id, v_user_id, 'owner')
-        ON CONFLICT (company_id, user_id) DO UPDATE
-        SET role = 'owner';
-      END IF;
-      
-      -- Mettre à jour les données de la table
-      EXECUTE format('
-        UPDATE public.%I
-        SET company_id = $1
-        WHERE %I = $2 
-        AND company_id IS NULL
-      ', p_table_name, p_user_id_column)
-      USING v_company_id, v_user_id;
-      
-      RAISE NOTICE '✅ Company créée pour user % : %', v_user_id, v_company_id;
-    END LOOP;
+    ', p_user_id_column, p_table_name, p_user_id_column);
+    
+    EXECUTE v_sql_select INTO v_user_ids;
+    
+    -- Si des users sans company existent
+    IF v_user_ids IS NOT NULL AND array_length(v_user_ids, 1) > 0 THEN
+      FOREACH v_user_id IN ARRAY v_user_ids
+      LOOP
+        -- Récupérer l'email de l'utilisateur
+        SELECT email INTO v_user_email
+        FROM auth.users
+        WHERE id = v_user_id;
+        
+        -- Créer une company par défaut
+        INSERT INTO public.companies (name, owner_id)
+        VALUES (
+          COALESCE(v_user_email || '''s Company', 'Entreprise par défaut'),
+          v_user_id
+        )
+        RETURNING id INTO v_company_id;
+        
+        -- Ajouter user comme owner
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = 'public' 
+          AND table_name = 'company_users'
+          AND column_name = 'status'
+        ) THEN
+          INSERT INTO public.company_users (company_id, user_id, role, status)
+          VALUES (v_company_id, v_user_id, 'owner', 'active')
+          ON CONFLICT (company_id, user_id) DO UPDATE
+          SET status = 'active', role = 'owner';
+        ELSE
+          INSERT INTO public.company_users (company_id, user_id, role)
+          VALUES (v_company_id, v_user_id, 'owner')
+          ON CONFLICT (company_id, user_id) DO UPDATE
+          SET role = 'owner';
+        END IF;
+        
+        -- Mettre à jour les données de la table
+        EXECUTE format('
+          UPDATE public.%I
+          SET company_id = $1
+          WHERE %I = $2 
+          AND company_id IS NULL
+        ', p_table_name, p_user_id_column)
+        USING v_company_id, v_user_id;
+        
+        RAISE NOTICE '✅ Company créée pour user % : %', v_user_id, v_company_id;
+      END LOOP;
+    END IF;
+  ELSE
+    RAISE NOTICE '⚠️ Table % : pas de colonne %, migration via company_users ignorée', p_table_name, p_user_id_column;
   END IF;
   
   -- 3. Pour les tables avec relations (projects via client, etc.)
@@ -472,7 +494,14 @@ SELECT public.backfill_company_id_for_table('image_analysis');
 SELECT public.backfill_company_id_for_table('ai_conversations');
 SELECT public.backfill_company_id_for_table('email_queue');
 SELECT public.backfill_company_id_for_table('messages');
-SELECT public.backfill_company_id_for_table('email_messages');
+
+-- email_messages (si table existe)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'email_messages') THEN
+    PERFORM public.backfill_company_id_for_table('email_messages');
+  END IF;
+END $$;
 
 -- Tables conditionnelles
 DO $$
@@ -626,7 +655,14 @@ SELECT public.make_company_id_not_null_if_safe('image_analysis');
 SELECT public.make_company_id_not_null_if_safe('ai_conversations');
 SELECT public.make_company_id_not_null_if_safe('email_queue');
 SELECT public.make_company_id_not_null_if_safe('messages');
-SELECT public.make_company_id_not_null_if_safe('email_messages');
+
+-- email_messages (si table existe)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'email_messages') THEN
+    PERFORM public.make_company_id_not_null_if_safe('email_messages');
+  END IF;
+END $$;
 
 -- Tables conditionnelles
 DO $$
@@ -841,7 +877,14 @@ SELECT public.create_multi_tenant_rls_policies('image_analysis');
 SELECT public.create_multi_tenant_rls_policies('ai_conversations');
 SELECT public.create_multi_tenant_rls_policies('email_queue');
 SELECT public.create_multi_tenant_rls_policies('messages');
-SELECT public.create_multi_tenant_rls_policies('email_messages');
+
+-- email_messages (si table existe)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'email_messages') THEN
+    PERFORM public.create_multi_tenant_rls_policies('email_messages');
+  END IF;
+END $$;
 
 -- Tables conditionnelles
 DO $$
@@ -890,7 +933,14 @@ COMMENT ON COLUMN public.notifications.company_id IS 'Company à laquelle appart
 COMMENT ON COLUMN public.candidatures.company_id IS 'Company à laquelle appartient cette candidature (multi-tenant SaaS)';
 COMMENT ON COLUMN public.taches_rh.company_id IS 'Company à laquelle appartient cette tâche RH (multi-tenant SaaS)';
 COMMENT ON COLUMN public.messages.company_id IS 'Company à laquelle appartient ce message (multi-tenant SaaS)';
-COMMENT ON COLUMN public.email_messages.company_id IS 'Company à laquelle appartient cet email (multi-tenant SaaS)';
+
+-- email_messages (si table existe)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'email_messages') THEN
+    EXECUTE 'COMMENT ON COLUMN public.email_messages.company_id IS ''Company à laquelle appartient cet email (multi-tenant SaaS)''';
+  END IF;
+END $$;
 
 -- =====================================================
 -- FIN DE LA MIGRATION

@@ -66,11 +66,19 @@ export const AIInsightsDashboard = () => {
 
       {/* Tabs pour les différentes analyses */}
       <Tabs defaultValue="predictions" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="predictions">Prédictions CA</TabsTrigger>
-          <TabsTrigger value="pricing">Suggestions Prix</TabsTrigger>
-          <TabsTrigger value="profitability">Rentabilité</TabsTrigger>
-          <TabsTrigger value="recommendations">Toutes les Recommandations</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 p-1.5 sm:p-1">
+          <TabsTrigger value="predictions" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
+            Prédictions CA
+          </TabsTrigger>
+          <TabsTrigger value="pricing" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
+            Suggestions Prix
+          </TabsTrigger>
+          <TabsTrigger value="profitability" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
+            Rentabilité
+          </TabsTrigger>
+          <TabsTrigger value="recommendations" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
+            <span className="hidden sm:inline">Toutes les </span>Recommandations
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab Prédictions CA */}

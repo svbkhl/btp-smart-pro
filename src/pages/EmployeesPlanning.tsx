@@ -225,23 +225,21 @@ const EmployeesPlanning = () => {
       console.log("🔵 [EmployeesPlanning] Nombre d'employés:", mappedEmployees.length);
       setEmployees(mappedEmployees);
 
-      // Récupérer les projets
+      // Récupérer les projets (sans location, colonne optionnelle selon le schéma)
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("id, name, location")
+        .select("id, name")
         .eq("company_id", currentCompanyId)
         .order("name");
 
       if (projectsError) {
         console.error("Error fetching projects:", projectsError);
-        // Continuer même si erreur, juste avec une liste vide
         setProjects([]);
       } else {
-        // Mapper les projets
         const mappedProjects = (projectsData || []).map((proj: any) => ({
           id: proj.id,
           name: proj.name,
-          location: proj.location || ''
+          location: proj.location || "",
         }));
         setProjects(mappedProjects);
       }
@@ -1095,7 +1093,7 @@ const EmployeesPlanning = () => {
 
         {/* Dialog d'édition d'affectation */}
         <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open })}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] z-[60]">
             <DialogHeader>
               <DialogTitle>
                 {editDialog.assignment ? "Modifier" : "Ajouter"} une affectation

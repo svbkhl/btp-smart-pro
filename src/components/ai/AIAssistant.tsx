@@ -294,22 +294,21 @@ export const AIAssistant = () => {
 
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4 h-[calc(100vh-300px)] sm:h-[600px] min-h-[500px]">
-      {/* Sidebar des conversations */}
+    <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 h-[calc(100dvh-220px)] min-h-[400px] sm:h-[550px] sm:min-h-[500px]">
+      {/* Sidebar - en bas sur mobile (flex-col-reverse), à gauche sur desktop */}
       <div className="w-full sm:w-64 flex-shrink-0">
         <ConversationsSidebar
           selectedConversationId={selectedConversationId}
           onSelectConversation={setSelectedConversationId}
         />
       </div>
-
-      {/* Zone de chat principale */}
-      <GlassCard className="flex-1 flex flex-col min-h-0">
-        <div className="p-4 sm:p-6 border-b border-border/50">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">Assistant IA</h3>
-              <p className="text-sm text-muted-foreground">
+      {/* Zone de chat - en haut sur mobile pour priorité à l'input visible */}
+      <GlassCard className="flex-1 flex flex-col min-h-0 min-w-0 flex-[1_1_0]">
+        <div className="p-3 sm:p-6 border-b border-border/50">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-base sm:text-lg">Assistant IA</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Posez vos questions sur le BTP
               </p>
             </div>
@@ -356,7 +355,7 @@ export const AIAssistant = () => {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4 sm:p-6">
+        <ScrollArea className="flex-1 p-3 sm:p-6 min-h-0">
           <div className="space-y-4">
             {messages.length === 0 && !loading && (
               <div className="text-center text-muted-foreground py-8 sm:py-12">
@@ -434,8 +433,8 @@ export const AIAssistant = () => {
           </div>
         </ScrollArea>
 
-        {/* Input */}
-        <div className="p-4 sm:p-6 border-t border-border/50 space-y-3">
+        {/* Input - padding bottom avec safe-area pour mobile */}
+        <div className="p-3 sm:p-6 border-t border-border/50 space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
           {/* Images uploadées */}
           {uploadedImages.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -458,7 +457,7 @@ export const AIAssistant = () => {
           )}
 
           {/* Barre d'input */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 sm:gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -499,9 +498,9 @@ export const AIAssistant = () => {
                 handleSend();
               }
             }}
-              placeholder="Tapez ou parlez (micro) - ajoutez des images..."
+              placeholder="Tapez votre message..."
               disabled={loading}
-              className="flex-1"
+              className="flex-1 min-w-0 text-sm sm:text-base"
             />
             <Button 
               onClick={handleSend} 
