@@ -29,6 +29,7 @@ import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
 import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
+import { PlanningEmailSettings } from "@/components/settings/PlanningEmailSettings";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 import DelegationsManagement from "@/pages/DelegationsManagement";
@@ -391,6 +392,7 @@ const Settings = () => {
           <TabsContent value="integrations" className="mt-0">
             <div className="space-y-6">
               <GoogleCalendarConnection />
+              {!isEmployee && <PlanningEmailSettings />}
             </div>
           </TabsContent>
 

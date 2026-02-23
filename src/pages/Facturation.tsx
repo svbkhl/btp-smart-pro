@@ -316,16 +316,16 @@ const Facturation = () => {
         </div>
 
         <Tabs defaultValue="quotes" className="space-y-0">
-          <TabsList className={`grid w-full gap-2 bg-transparent p-1 shrink-0 mb-0 ${isEmployee ? "grid-cols-2" : "grid-cols-4"}`}>
+          <TabsList className={`grid w-full gap-1 sm:gap-2 bg-transparent p-1 shrink-0 mb-0 min-w-0 [&>*]:min-w-0 ${isEmployee ? "grid-cols-2" : "grid-cols-4"}`}>
             <TabsTrigger 
               value="quotes" 
-              className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+              className="rounded-xl text-xs sm:text-base px-2 sm:px-4 py-2 sm:py-3 min-w-0 truncate data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
               Devis
             </TabsTrigger>
             <TabsTrigger 
               value="invoices" 
-              className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+              className="rounded-xl text-xs sm:text-base px-2 sm:px-4 py-2 sm:py-3 min-w-0 truncate data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
               Factures
             </TabsTrigger>
@@ -333,13 +333,13 @@ const Facturation = () => {
             <>
             <TabsTrigger 
               value="payments" 
-              className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+              className="rounded-xl text-xs sm:text-base px-2 sm:px-4 py-2 sm:py-3 min-w-0 truncate data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
               Paiements
             </TabsTrigger>
             <TabsTrigger 
               value="reminders" 
-              className="rounded-xl text-sm sm:text-base px-4 py-3 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+              className="rounded-xl text-xs sm:text-base px-2 sm:px-4 py-2 sm:py-3 min-w-0 truncate data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
               Relances
             </TabsTrigger>

@@ -81,6 +81,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     heures: 8,
     heure_debut: "08:00",
     heure_fin: "17:00",
+    temps_pause: 60,
   });
 
   // Calculer les dates de la semaine avec useMemo pour éviter les recalculs
@@ -121,39 +122,41 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     try {
       setLoading(true);
 
-      // Récupérer l'employé UNIQUEMENT pour la company courante (isolation stricte)
-      if (!effectiveCompanyId) {
-        setEmployee(null);
-        setAssignments([]);
-        setLoading(false);
-        return;
+      // 1. Récupérer l'employé (company_id prioritaire si dispo, sinon fallback par user_id)
+      let employeeResult: { data: any; error: any } = { data: null, error: null };
+      if (effectiveCompanyId) {
+        employeeResult = await supabase
+          .from("employees" as any)
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("company_id", effectiveCompanyId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
       }
-
-      const employeePromise = supabase
-        .from("employees" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("company_id", effectiveCompanyId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const employeeResult = await Promise.race([
-        employeePromise,
-        new Promise<{ data: null; error: { message: string } }>((resolve) =>
-          setTimeout(() => resolve({ data: null, error: { message: "TIMEOUT" } }), 3000)
-        ),
-      ]);
-
-      clearTimeout(timeoutId);
+      if (employeeResult.error || !employeeResult.data) {
+        // Fallback : fiche employé par user_id (company_id NULL, autre entreprise, ou effectiveCompanyId manquant)
+        const fallback = await supabase
+          .from("employees" as any)
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!fallback.error && fallback.data) {
+          employeeResult = fallback;
+        }
+      }
 
       if (employeeResult.error || !employeeResult.data) {
         setEmployee(null);
         setAssignments([]);
         setLoading(false);
+        clearTimeout(timeoutId);
         return;
       }
 
+      clearTimeout(timeoutId);
       setEmployee(employeeResult.data);
 
       const employeeId = (employeeResult.data as any).id;
@@ -165,13 +168,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
       // (ex: company_id NULL sur d'anciennes données, ou décalage effectiveCompanyId)
       const assignmentsPromise = supabase
         .from("employee_assignments" as any)
-        .select(`
-          *,
-          projects:project_id (
-            id,
-            name
-          )
-        `)
+        .select("*")
         .eq("employee_id", employeeId)
         .gte("date", weekStartStr)
         .lte("date", weekEndStr)
@@ -185,11 +182,22 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
       ]);
 
       if (assignmentsResult.error) {
-        // Ne pas bloquer si les affectations ne peuvent pas être chargées
         setAssignments([]);
       } else {
-        // Mapper les données pour correspondre à l'interface Assignment
-        const mappedAssignments: Assignment[] = ((assignmentsResult.data as any[]) || []).map((item: any) => ({
+        const rawAssignments = (assignmentsResult.data as any[]) || [];
+        const projectIds = [...new Set(rawAssignments.map((a: any) => a.project_id).filter(Boolean))];
+        let projectsMap: Record<string, { name: string; location?: string }> = {};
+        if (projectIds.length > 0) {
+          const { data: projectsData } = await supabase
+            .from("projects" as any)
+            .select("id, name, location")
+            .in("id", projectIds);
+          projectsMap = (projectsData || []).reduce((acc: any, p: any) => {
+            acc[p.id] = { name: p.name, location: p.location };
+            return acc;
+          }, {});
+        }
+        const mappedAssignments: Assignment[] = rawAssignments.map((item: any) => ({
           id: item.id,
           project_id: item.project_id || undefined,
           title: item.title || undefined,
@@ -198,10 +206,9 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
           date: item.date,
           heure_debut: item.heure_debut,
           heure_fin: item.heure_fin,
-          project: item.projects ? {
-            name: item.projects.name,
-            location: item.projects.location
-          } : undefined
+          project: item.project_id && projectsMap[item.project_id]
+            ? { name: projectsMap[item.project_id].name, location: projectsMap[item.project_id].location }
+            : undefined
         }));
         setAssignments(mappedAssignments);
       }
@@ -273,8 +280,8 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
   };
 
-  // Fonction pour calculer les heures à partir des horaires
-  const calculateHoursFromTime = (heure_debut?: string, heure_fin?: string): number => {
+  // Fonction pour calculer les heures à partir des horaires (avec pause optionnelle)
+  const calculateHoursFromTime = (heure_debut?: string, heure_fin?: string, temps_pause: number = 0): number => {
     if (!heure_debut || !heure_fin) return 0;
     
     const [startHour, startMin] = heure_debut.split(':').map(Number);
@@ -283,10 +290,10 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
     
-    if (endMinutes <= startMinutes) return 0; // Pas de calcul si fin <= début
+    if (endMinutes <= startMinutes) return 0;
     
-    const diffMinutes = endMinutes - startMinutes;
-    return Math.round((diffMinutes / 60) * 10) / 10; // Arrondir à 0.1h près
+    const diffMinutes = endMinutes - startMinutes - temps_pause;
+    return Math.max(0, Math.round((diffMinutes / 60) * 10) / 10);
   };
 
   const handleEditHours = (assignment: Assignment) => {
@@ -321,12 +328,14 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     }
     
     if (assignment) {
+      const pause = (assignment as any).temps_pause ?? 60;
       setAssignmentForm({
         project_id: assignment.project_id || "",
         title: assignment.title || "",
         heures: assignment.heures || 8,
         heure_debut: assignment.heure_debut || "08:00",
         heure_fin: assignment.heure_fin || "17:00",
+        temps_pause: pause,
       });
     } else {
       setAssignmentForm({
@@ -335,6 +344,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
         heures: 8,
         heure_debut: "08:00",
         heure_fin: "17:00",
+        temps_pause: 60,
       });
     }
 
@@ -539,7 +549,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
 
     let heures = assignmentForm.heures;
     if (assignmentForm.heure_debut && assignmentForm.heure_fin) {
-      heures = calculateHoursFromTime(assignmentForm.heure_debut, assignmentForm.heure_fin);
+      heures = calculateHoursFromTime(assignmentForm.heure_debut, assignmentForm.heure_fin, assignmentForm.temps_pause ?? 60);
     }
     
     console.log("🔵 [saveAssignment] Heures calculées:", heures);
@@ -565,6 +575,8 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
         } else {
           updateData.heure_fin = null;
         }
+        
+        updateData.temps_pause = assignmentForm.temps_pause ?? 60;
         
         // Ajouter project_id seulement s'il est fourni
         if (assignmentForm.project_id) {
@@ -607,6 +619,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
         if (assignmentForm.heure_fin) {
           insertData.heure_fin = assignmentForm.heure_fin;
         }
+        insertData.temps_pause = assignmentForm.temps_pause ?? 60;
         
         // Ajouter project_id seulement s'il est fourni (la colonne peut être nullable)
         // Note: La contrainte UNIQUE(employee_id, project_id, jour, date) nécessite un project_id pour fonctionner correctement
@@ -1179,7 +1192,14 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                     id="heure_debut_assignment"
                     type="time"
                     value={assignmentForm.heure_debut}
-                    onChange={(e) => setAssignmentForm({ ...assignmentForm, heure_debut: e.target.value })}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAssignmentForm((prev) => ({
+                        ...prev,
+                        heure_debut: v,
+                        heures: calculateHoursFromTime(v, prev.heure_fin, prev.temps_pause ?? 60) || prev.heures,
+                      }));
+                    }}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1188,9 +1208,43 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                     id="heure_fin_assignment"
                     type="time"
                     value={assignmentForm.heure_fin}
-                    onChange={(e) => setAssignmentForm({ ...assignmentForm, heure_fin: e.target.value })}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAssignmentForm((prev) => ({
+                        ...prev,
+                        heure_fin: v,
+                        heures: calculateHoursFromTime(prev.heure_debut, v, prev.temps_pause ?? 60) || prev.heures,
+                      }));
+                    }}
                   />
                 </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Temps de pause</Label>
+                <Select
+                  value={String(assignmentForm.temps_pause ?? 60)}
+                  onValueChange={(value) => {
+                    const p = parseInt(value, 10);
+                    setAssignmentForm((prev) => ({
+                      ...prev,
+                      temps_pause: p,
+                      heures: calculateHoursFromTime(prev.heure_debut, prev.heure_fin, p) || prev.heures,
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 min</SelectItem>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">1 h</SelectItem>
+                    <SelectItem value="90">1 h 30</SelectItem>
+                    <SelectItem value="120">2 h</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -1217,7 +1271,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                 />
                 {assignmentForm.heure_debut && assignmentForm.heure_fin && (
                   <p className="text-xs text-muted-foreground">
-                    Calcul automatique: {calculateHoursFromTime(assignmentForm.heure_debut, assignmentForm.heure_fin)}h
+                    Calcul automatique: {calculateHoursFromTime(assignmentForm.heure_debut, assignmentForm.heure_fin, assignmentForm.temps_pause ?? 60)}h
                   </p>
                 )}
               </div>

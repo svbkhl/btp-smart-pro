@@ -74,6 +74,7 @@ interface Assignment {
   date: string;
   heure_debut?: string;
   heure_fin?: string;
+  temps_pause?: number;
 }
 
 const JOURS_SEMAINE = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
@@ -103,6 +104,7 @@ const EmployeesPlanning = () => {
     heures: 8,
     heure_debut: "08:00",
     heure_fin: "17:00",
+    temps_pause: 60,
   });
   const [addEmployeeDialog, setAddEmployeeDialog] = useState(false);
   const [employeeForm, setEmployeeForm] = useState({
@@ -281,6 +283,17 @@ const EmployeesPlanning = () => {
     return projects.find((p) => p.id === projectId);
   };
 
+  // Calculer les heures travaillées (durée - pause)
+  const calculateHeuresWithPause = (heure_debut: string, heure_fin: string, temps_pause: number): number => {
+    const [startHour, startMin] = heure_debut.split(":").map(Number);
+    const [endHour, endMin] = heure_fin.split(":").map(Number);
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    if (endMinutes <= startMinutes) return 0;
+    const diffMinutes = endMinutes - startMinutes - temps_pause;
+    return Math.max(0, Math.round((diffMinutes / 60) * 10) / 10);
+  };
+
   // Ouvrir le dialog d'édition
   const openEditDialog = (
     employeeId: string,
@@ -294,6 +307,7 @@ const EmployeesPlanning = () => {
         heures: assignment.heures,
         heure_debut: assignment.heure_debut || "08:00",
         heure_fin: assignment.heure_fin || "17:00",
+        temps_pause: (assignment as any).temps_pause ?? 60,
       });
     } else {
       setEditForm({
@@ -301,6 +315,7 @@ const EmployeesPlanning = () => {
         heures: 8,
         heure_debut: "08:00",
         heure_fin: "17:00",
+        temps_pause: 60,
       });
     }
 
@@ -336,6 +351,7 @@ const EmployeesPlanning = () => {
             heures: editForm.heures,
             heure_debut: editForm.heure_debut,
             heure_fin: editForm.heure_fin,
+            temps_pause: editForm.temps_pause ?? 60,
           })
           .eq("id", editDialog.assignment.id);
 
@@ -351,7 +367,8 @@ const EmployeesPlanning = () => {
           heures: editForm.heures,
           heure_debut: editForm.heure_debut,
           heure_fin: editForm.heure_fin,
-          company_id: currentCompanyId, // Ajouter company_id
+          temps_pause: editForm.temps_pause ?? 60,
+          company_id: currentCompanyId,
         }).select("id").single();
 
         if (error) throw error;
@@ -1131,9 +1148,14 @@ const EmployeesPlanning = () => {
                   <Input
                     type="time"
                     value={editForm.heure_debut}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, heure_debut: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditForm((prev) => ({
+                        ...prev,
+                        heure_debut: v,
+                        heures: calculateHeuresWithPause(v, prev.heure_fin, prev.temps_pause) || prev.heures,
+                      }));
+                    }}
                     className="rounded-xl"
                   />
                 </div>
@@ -1142,23 +1164,57 @@ const EmployeesPlanning = () => {
                   <Input
                     type="time"
                     value={editForm.heure_fin}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, heure_fin: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditForm((prev) => ({
+                        ...prev,
+                        heure_fin: v,
+                        heures: calculateHeuresWithPause(prev.heure_debut, v, prev.temps_pause) || prev.heures,
+                      }));
+                    }}
                     className="rounded-xl"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
+                <Label>Temps de pause</Label>
+                <Select
+                  value={String(editForm.temps_pause)}
+                  onValueChange={(value) => {
+                    const p = parseInt(value, 10);
+                    setEditForm((prev) => ({
+                      ...prev,
+                      temps_pause: p,
+                      heures: calculateHeuresWithPause(prev.heure_debut, prev.heure_fin, p) || prev.heures,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 min</SelectItem>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">1 h</SelectItem>
+                    <SelectItem value="90">1 h 30</SelectItem>
+                    <SelectItem value="120">2 h</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Nombre d'heures</Label>
                 <Input
                   type="number"
-                  min="1"
+                  min="0"
                   max="24"
+                  step="0.5"
                   value={editForm.heures}
                   onChange={(e) =>
-                    setEditForm({ ...editForm, heures: parseInt(e.target.value) || 0 })
+                    setEditForm({ ...editForm, heures: parseFloat(e.target.value) || 0 })
                   }
                   className="rounded-xl"
                 />

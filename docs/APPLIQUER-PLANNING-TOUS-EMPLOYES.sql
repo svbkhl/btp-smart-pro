@@ -65,6 +65,10 @@ EXCEPTION
     RAISE NOTICE '⚠️ Étape 0: %', SQLERRM;
 END $$;
 
+-- 0b2. Ajouter temps de pause (en minutes) aux affectations si absent
+ALTER TABLE public.employee_assignments
+ADD COLUMN IF NOT EXISTS temps_pause INTEGER DEFAULT 60 CHECK (temps_pause >= 0 AND temps_pause <= 480);
+
 -- 0c. Remplir company_id manquant sur employee_assignments (depuis employees)
 UPDATE public.employee_assignments ea
 SET company_id = e.company_id, updated_at = now()

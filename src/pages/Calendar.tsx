@@ -351,35 +351,35 @@ const Calendar = () => {
 
         {/* Tabs - Ordre différent pour employés : Mon planning, Agenda, Événements (en dernier) */}
         <Tabs defaultValue={isEmployee ? "planning" : "events"} className="w-full space-y-0">
-          <TabsList className="grid w-full grid-cols-3 rounded-xl shrink-0 mb-0">
+          <TabsList className="grid w-full grid-cols-3 rounded-xl shrink-0 mb-0 min-w-0 [&>*]:min-w-0">
             {isEmployee ? (
               <>
-                <TabsTrigger value="planning" className="gap-2">
-                  <User className="w-4 h-4" />
-                  Mon planning
+                <TabsTrigger value="planning" className="gap-1 sm:gap-2 px-2 sm:px-6 min-w-0 text-xs sm:text-base truncate">
+                  <User className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Mon planning</span>
                 </TabsTrigger>
-                <TabsTrigger value="agenda" className="gap-2">
-                  <Clock className="w-4 h-4" />
-                  Agenda
+                <TabsTrigger value="agenda" className="gap-1 sm:gap-2 px-2 sm:px-6 min-w-0 text-xs sm:text-base truncate">
+                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Agenda</span>
                 </TabsTrigger>
-                <TabsTrigger value="events" className="gap-2">
-                  <CalendarIcon className="w-4 h-4" />
-                  Événements
+                <TabsTrigger value="events" className="gap-1 sm:gap-2 px-2 sm:px-6 min-w-0 text-xs sm:text-base truncate">
+                  <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Événements</span>
                 </TabsTrigger>
               </>
             ) : (
               <>
-                <TabsTrigger value="events" className="gap-2">
-                  <CalendarIcon className="w-4 h-4" />
-                  Événements
+                <TabsTrigger value="events" className="gap-1 sm:gap-2 px-2 sm:px-6 min-w-0 text-xs sm:text-base truncate">
+                  <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Événements</span>
                 </TabsTrigger>
-                <TabsTrigger value="planning" className="gap-2">
-                  <User className="w-4 h-4" />
-                  Mon planning
+                <TabsTrigger value="planning" className="gap-1 sm:gap-2 px-2 sm:px-6 min-w-0 text-xs sm:text-base truncate">
+                  <User className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Mon planning</span>
                 </TabsTrigger>
-                <TabsTrigger value="agenda" className="gap-2">
-                  <Clock className="w-4 h-4" />
-                  Agenda
+                <TabsTrigger value="agenda" className="gap-1 sm:gap-2 px-2 sm:px-6 min-w-0 text-xs sm:text-base truncate">
+                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="truncate">Agenda</span>
                 </TabsTrigger>
               </>
             )}
@@ -421,12 +421,12 @@ const Calendar = () => {
                 {viewMode === "day" && format(currentDate, "EEEE d MMMM yyyy", { locale: fr })}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 min-w-0">
               <Button
                 variant={viewMode === "day" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setViewMode("day")}
-                className="rounded-xl"
+                className="rounded-xl text-xs sm:text-sm px-2 sm:px-3"
               >
                 Jour
               </Button>
@@ -434,7 +434,7 @@ const Calendar = () => {
                 variant={viewMode === "week" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setViewMode("week")}
-                className="rounded-xl"
+                className="rounded-xl text-xs sm:text-sm px-2 sm:px-3"
               >
                 Semaine
               </Button>
@@ -442,7 +442,7 @@ const Calendar = () => {
                 variant={viewMode === "month" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setViewMode("month")}
-                className="rounded-xl"
+                className="rounded-xl text-xs sm:text-sm px-2 sm:px-3"
               >
                 Mois
               </Button>

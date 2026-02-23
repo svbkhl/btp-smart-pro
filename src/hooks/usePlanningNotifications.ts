@@ -53,17 +53,10 @@ export const useTomorrowAssignments = () => {
       // Récupérer les affectations de demain
       const { data: assignments, error } = await supabase
         .from("employee_assignments")
-        .select(`
-          *,
-          projects:project_id (
-            id,
-            name,
-            location
-          )
-        `)
+        .select("*")
         .eq("employee_id", employee.id)
         .eq("date", tomorrowStr)
-        .order("heure_debut", { ascending: true });
+        .order("created_at", { ascending: true });
 
       if (error) {
         console.error("❌ [useTomorrowAssignments] Erreur récupération:", error);
@@ -111,19 +104,12 @@ export const useUpcomingAssignments = () => {
 
       const { data: assignments, error } = await supabase
         .from("employee_assignments")
-        .select(`
-          *,
-          projects:project_id (
-            id,
-            name,
-            location
-          )
-        `)
+        .select("*")
         .eq("employee_id", employee.id)
         .gte("date", todayStr)
         .lte("date", weekFromNowStr)
         .order("date", { ascending: true })
-        .order("heure_debut", { ascending: true });
+        .order("created_at", { ascending: true });
 
       if (error) {
         console.error("❌ [useUpcomingAssignments] Erreur récupération:", error);
