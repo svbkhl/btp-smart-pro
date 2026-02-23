@@ -65,6 +65,14 @@ EXCEPTION
     RAISE NOTICE '⚠️ Étape 0: %', SQLERRM;
 END $$;
 
+-- 0c. Remplir company_id manquant sur employee_assignments (depuis employees)
+UPDATE public.employee_assignments ea
+SET company_id = e.company_id, updated_at = now()
+FROM public.employees e
+WHERE ea.employee_id = e.id
+  AND ea.company_id IS NULL
+  AND e.company_id IS NOT NULL;
+
 -- 1. RLS : les employés voient toujours leurs affectations
 DO $$
 BEGIN

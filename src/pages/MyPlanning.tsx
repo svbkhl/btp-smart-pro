@@ -157,12 +157,12 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
       setEmployee(employeeResult.data);
 
       const employeeId = (employeeResult.data as any).id;
-      const weekStart = new Date(weekDates[0]);
-      weekStart.setHours(0, 0, 0, 0);
-      const weekEnd = new Date(weekDates[4]);
-      weekEnd.setHours(23, 59, 59, 999);
+      const weekStartStr = format(weekDates[0], "yyyy-MM-dd");
+      const weekEndStr = format(weekDates[4], "yyyy-MM-dd");
 
-      // Affectations : même company_id que l'employé (pas de mélange entre entreprises)
+      // Affectations : filtrer par employee_id uniquement (RLS garantit l'isolation)
+      // Ne pas filtrer par company_id pour éviter d'exclure des affectations valides
+      // (ex: company_id NULL sur d'anciennes données, ou décalage effectiveCompanyId)
       const assignmentsPromise = supabase
         .from("employee_assignments" as any)
         .select(`
@@ -173,9 +173,8 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
           )
         `)
         .eq("employee_id", employeeId)
-        .eq("company_id", effectiveCompanyId)
-        .gte("date", weekStart.toISOString().split("T")[0])
-        .lte("date", weekEnd.toISOString().split("T")[0])
+        .gte("date", weekStartStr)
+        .lte("date", weekEndStr)
         .order("date", { ascending: true });
 
       const assignmentsResult = await Promise.race([
