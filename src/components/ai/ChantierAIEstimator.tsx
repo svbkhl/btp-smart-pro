@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Ruler, Wand2, ChevronDown, ChevronUp, Mic, MicOff, Loader2, ImagePlus, X } from "lucide-react";
 import { callAIAssistant } from "@/services/aiService";
 import { useToast } from "@/components/ui/use-toast";
-import { useEstimations, useCreateEstimation } from "@/hooks/useEstimations";
+import { useEstimations, useCreateEstimation, useUpdateEstimation } from "@/hooks/useEstimations";
 import { EstimationsSidebar } from "./EstimationsSidebar";
 
 const ESTIMATION_PROMPT = `Je souhaite obtenir une estimation indicative (pas un devis formel) pour le chantier suivant. 
@@ -43,6 +43,8 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
   const [description, setDescription] = useState("");
   const [estimation, setEstimation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [followUpLoading, setFollowUpLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [selectedEstimationId, setSelectedEstimationId] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
 
   const { data: estimations = [] } = useEstimations();
   const createEstimation = useCreateEstimation();
+  const updateEstimation = useUpdateEstimation();
 
   const selectedEstimation = estimations.find((e) => e.id === selectedEstimationId);
 
@@ -173,12 +176,21 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
       if (response?.response) {
         setEstimation(response.response);
         const title = generateTitle(trimmed, uploadedImages.length);
-        createEstimation.mutate({
-          title,
-          description: trimmed || null,
-          estimation_result: response.response,
-          images_count: uploadedImages.length,
-        });
+        try {
+          const saved = await createEstimation.mutateAsync({
+            title,
+            description: trimmed || null,
+            estimation_result: response.response,
+            images_count: uploadedImages.length,
+          });
+          setSelectedEstimationId(saved.id);
+        } catch (err) {
+          toast({
+            title: "Erreur",
+            description: "L'estimation n'a pas pu être enregistrée dans l'historique",
+            variant: "destructive",
+          });
+        }
       } else {
         throw new Error("Réponse invalide");
       }
@@ -198,6 +210,52 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
     setEstimation(null);
     setUploadedImages([]);
     setSelectedEstimationId(null);
+    setFollowUpQuestion("");
+  };
+
+  const handleFollowUp = async () => {
+    const q = followUpQuestion.trim();
+    if (!q || !estimation || !selectedEstimationId) return;
+
+    setFollowUpLoading(true);
+    setFollowUpQuestion("");
+
+    try {
+      const trimmed = description.trim();
+      const originalPrompt = trimmed
+        ? `${ESTIMATION_PROMPT}\n\n${trimmed}`
+        : `${ESTIMATION_PROMPT}\n\n[Photos du chantier jointes]`;
+
+      const response = await callAIAssistant({
+        message: q,
+        history: [
+          { role: "user", content: originalPrompt },
+          { role: "assistant", content: estimation },
+        ],
+        currentPage: "/ai",
+        context: { type: "estimation_chantier_followup" },
+      });
+
+      if (response?.response) {
+        const appended = `${estimation}\n\n--- Suite de la conversation ---\n\n**Votre question :** ${q}\n\n**Réponse :**\n${response.response}`;
+        setEstimation(appended);
+        await updateEstimation.mutateAsync({
+          id: selectedEstimationId,
+          estimation_result: appended,
+        });
+      } else {
+        throw new Error("Réponse invalide");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'obtenir la réponse",
+        variant: "destructive",
+      });
+      setFollowUpQuestion(q);
+    } finally {
+      setFollowUpLoading(false);
+    }
   };
 
   const renderFormAndResult = () => (
@@ -252,13 +310,16 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
             </Button>
           </div>
 
-          <div className="relative">
+          <div className="relative [touch-action:manipulation]">
             <Textarea
               placeholder="Ex: Rénovation complète d'une salle de bain 8m², carrelage sol et murs..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[100px] pr-12"
+              onFocus={(e) => e.target.scrollIntoView({ block: "nearest", behavior: "smooth" })}
+              className="min-h-[100px] pr-12 [touch-action:manipulation]"
               disabled={loading}
+              inputMode="text"
+              autoComplete="off"
             />
             <Button
               type="button"
@@ -296,11 +357,42 @@ export const ChantierAIEstimator = ({ defaultExpanded = false }: ChantierAIEstim
       )}
 
       {estimation && (
-        <div className="p-4 rounded-lg bg-white/10 dark:bg-white/5 border border-border/50">
-          <h5 className="font-medium mb-2 text-sm">Estimation indicative :</h5>
-          <div className="text-sm whitespace-pre-wrap break-words text-foreground/90">
-            {estimation}
+        <div className="space-y-4">
+          <div className="p-4 rounded-lg bg-white/10 dark:bg-white/5 border border-border/50">
+            <h5 className="font-medium mb-2 text-sm">Estimation indicative :</h5>
+            <div className="text-sm whitespace-pre-wrap break-words text-foreground/90">
+              {estimation}
+            </div>
           </div>
+          <div className="flex gap-2 items-end">
+            <Textarea
+              placeholder="Poser une question de suivi à l'IA (ex: Peux-tu détailler le poste carrelage ?)"
+              value={followUpQuestion}
+              onChange={(e) => setFollowUpQuestion(e.target.value)}
+              disabled={followUpLoading}
+              className="min-h-[60px] flex-1 resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleFollowUp();
+                }
+              }}
+            />
+            <Button
+              onClick={handleFollowUp}
+              disabled={followUpLoading || !followUpQuestion.trim()}
+              className="shrink-0"
+            >
+              {followUpLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Envoyer"
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Vous pouvez continuer la conversation avec l&apos;IA pour obtenir des précisions.
+          </p>
         </div>
       )}
     </div>

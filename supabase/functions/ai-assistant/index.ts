@@ -58,6 +58,9 @@ Si l'utilisateur te demande comment faire quelque chose dans l'application, guid
 Si l'utilisateur a un problème ou une erreur, aide-le à le résoudre.
 Si l'utilisateur veut créer quelque chose (devis, facture, projet, etc.), explique-lui comment procéder.
 
+ANALYSE D'IMAGES :
+Quand l'utilisateur joint des photos ou images à son message, tu PEUX et DOIS les analyser. Décris ce que tu vois, réponds aux questions sur le contenu des images, et fournis des conseils BTP quand c'est pertinent (matériaux, défauts, éléments de construction, chantier, etc.). Ne dis jamais que tu ne peux pas voir les images si des images t'ont été fournies.
+
 Réponds toujours en français, de manière claire et structurée.`;
 
 serve(async (req) => {
@@ -178,34 +181,8 @@ serve(async (req) => {
     const aiResponse = data.choices[0]?.message?.content || 'Désolé, je n\'ai pas pu générer de réponse.';
     console.log('✅ Réponse IA générée, longueur:', aiResponse.length);
 
-    // Sauvegarder la conversation si conversationId est fourni (non-bloquant)
-    if (conversationId) {
-      // Sauvegarder le message de l'assistant
-      supabase
-        .from('ai_messages')
-        .insert({
-          conversation_id: conversationId,
-          content: aiResponse,
-          role: 'assistant',
-        })
-        .then(() => {
-          // Mettre à jour la date de dernière activité de la conversation
-          supabase
-            .from('ai_conversations')
-            .update({ 
-              updated_at: new Date().toISOString(),
-              last_message_at: new Date().toISOString()
-            })
-            .eq('id', conversationId)
-            .catch((err) => {
-              console.error('Error updating conversation:', err);
-            });
-        })
-        .catch((err) => {
-          console.error('Error saving message:', err);
-          // Ne pas bloquer la réponse en cas d'erreur de sauvegarde
-        });
-    }
+    // Ne PAS sauvegarder ici : le client sauvegarde via createMessage.
+    // Sinon on aurait une double sauvegarde = 2 réponses identiques affichées.
 
     const responseData = {
       success: true,

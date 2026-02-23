@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Calendar, Building2, User, ChevronLeft, ChevronRight, Edit2, Plus, Trash2 } from "lucide-react";
+import { Clock, Calendar, Building2, User, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -209,11 +209,18 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     fetchEmployeeData();
   }, [fetchEmployeeData]);
 
-  // Rafraîchir au focus (si l'employé revient sur l'onglet après une modif par l'owner)
+  // Rafraîchir quand l'utilisateur revient sur la page (focus + visibility pour mobile)
   useEffect(() => {
     const onFocus = () => fetchEmployeeData();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") fetchEmployeeData();
+    };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [fetchEmployeeData]);
 
   // Écouter les modifications du planning par l'owner (synchro temps réel Supabase)
@@ -829,7 +836,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
             Mon Planning
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Consultez vos affectations et heures travaillées
+            {isAdmin ? "Consultez et gérez vos affectations" : "Consultez vos affectations définies par votre responsable"}
           </p>
         </div>
 
@@ -915,6 +922,16 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => fetchEmployeeData()}
+                className="gap-2 rounded-xl sm:hidden"
+                title="Rafraîchir le planning"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Rafraîchir
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   const prevWeek = new Date(currentWeek);
                   prevWeek.setDate(prevWeek.getDate() - 7);
@@ -981,9 +998,9 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                         return (
                           <td
                             key={jour}
-                            className="border border-border p-2 text-center align-top cursor-pointer hover:bg-muted/50 transition-colors min-h-[100px]"
-                            onClick={() => openAssignmentDialog(jour, weekDates[idx])}
-                            title="Cliquer pour ajouter une affectation"
+                            className={`border border-border p-2 text-center align-top min-h-[100px] ${isAdmin ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
+                            onClick={isAdmin ? () => openAssignmentDialog(jour, weekDates[idx]) : undefined}
+                            title={isAdmin ? "Cliquer pour ajouter une affectation" : undefined}
                           >
                             {dayAssignments.length > 0 ? (
                               <div className="space-y-2">
@@ -1006,25 +1023,27 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                                             </div>
                                           )}
                                         </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-5 w-5 opacity-0 group-hover/assignment:opacity-100 transition-opacity text-destructive"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteAssignment(assignment.id);
-                                          }}
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
+                                        {isAdmin && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-5 w-5 opacity-0 group-hover/assignment:opacity-100 transition-opacity text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              deleteAssignment(assignment.id);
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        )}
                                       </div>
                                       <div 
-                                        className="flex items-center justify-center gap-1 mt-1 cursor-pointer hover:bg-primary/30 rounded px-1 py-0.5 transition-colors"
-                                        onClick={(e) => {
+                                        className={`flex items-center justify-center gap-1 mt-1 rounded px-1 py-0.5 ${isAdmin ? "cursor-pointer hover:bg-primary/30 transition-colors" : ""}`}
+                                        onClick={isAdmin ? (e) => {
                                           e.stopPropagation();
                                           handleEditHours(assignment);
-                                        }}
-                                        title="Cliquer pour modifier les horaires"
+                                        } : undefined}
+                                        title={isAdmin ? "Cliquer pour modifier les horaires" : undefined}
                                       >
                                         <Clock className="h-3 w-3 text-muted-foreground" />
                                         <span className="font-semibold">
@@ -1032,7 +1051,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                                             ? `${assignment.heure_debut} - ${assignment.heure_fin} (${assignment.heures || 0}h)`
                                             : `${assignment.heures || 0}h`}
                                         </span>
-                                        <Edit2 className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover/assignment:opacity-100 transition-opacity ml-1" />
+                                        {isAdmin && <Edit2 className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover/assignment:opacity-100 transition-opacity ml-1" />}
                                       </div>
                                     </div>
                                   );
@@ -1040,7 +1059,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                               </div>
                             ) : (
                               <div className="text-muted-foreground text-xs py-2 opacity-50">
-                                Cliquer pour ajouter
+                                {isAdmin ? "Cliquer pour ajouter" : "—"}
                               </div>
                             )}
                           </td>
@@ -1053,14 +1072,16 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
           </div>
         </GlassCard>
 
-        {/* Bouton flottant pour créer une affectation */}
-        <Button
-          size="lg"
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
-          onClick={() => openAssignmentDialog()}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
+        {/* Bouton flottant pour créer une affectation (patron uniquement) */}
+        {isAdmin && (
+          <Button
+            size="lg"
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
+            onClick={() => openAssignmentDialog()}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        )}
 
         {/* Dialog pour créer/éditer une affectation */}
         <Dialog open={editAssignmentDialog.open} onOpenChange={(open) => setEditAssignmentDialog({ ...editAssignmentDialog, open })}>

@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Search, Trash2, Ruler } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Search, Trash2, Ruler, CheckSquare, X } from "lucide-react";
 import { useEstimations, useDeleteEstimation } from "@/hooks/useEstimations";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useToast } from "@/components/ui/use-toast";
@@ -23,6 +34,10 @@ export const EstimationsSidebar = ({
   onNewEstimation,
 }: EstimationsSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteSelectionDialog, setShowDeleteSelectionDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const { data: estimations = [] } = useEstimations();
   const deleteEstimation = useDeleteEstimation();
@@ -47,6 +62,47 @@ export const EstimationsSidebar = ({
     }
   };
 
+  const toggleSelectMode = () => {
+    setIsSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelection = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsDeleting(true);
+    try {
+      await Promise.all(ids.map((id) => deleteEstimation.mutateAsync(id)));
+      toast({
+        title: "Estimations supprimées",
+        description: `${ids.length} estimation(s) supprimée(s) avec succès`,
+      });
+      if (selectedEstimationId && ids.includes(selectedEstimationId)) {
+        onSelectEstimation(null);
+      }
+      setSelectedIds(new Set());
+      setIsSelectMode(false);
+      setShowDeleteSelectionDialog(false);
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer les estimations",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <GlassCard className="flex flex-col h-full min-h-[400px] sm:min-h-0">
       <div className="p-4 border-b border-border/50 space-y-2">
@@ -54,6 +110,29 @@ export const EstimationsSidebar = ({
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle estimation
         </Button>
+        {filteredEstimations.length > 0 && !isSelectMode && (
+          <Button onClick={toggleSelectMode} variant="outline" className="w-full" size="sm">
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Sélectionner
+          </Button>
+        )}
+        {filteredEstimations.length > 0 && isSelectMode && (
+          <div className="flex gap-2">
+            <Button
+              onClick={() => selectedIds.size > 0 && setShowDeleteSelectionDialog(true)}
+              variant="destructive"
+              className="flex-1"
+              size="sm"
+              disabled={isDeleting || selectedIds.size === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer ({selectedIds.size})
+            </Button>
+            <Button onClick={toggleSelectMode} variant="outline" size="sm" disabled={isDeleting}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="p-4 border-b border-border/50">
@@ -81,13 +160,39 @@ export const EstimationsSidebar = ({
                 key={est.id}
                 estimation={est}
                 isSelected={selectedEstimationId === est.id}
-                onSelect={() => onSelectEstimation(est.id)}
+                onSelect={() => !isSelectMode && onSelectEstimation(est.id)}
                 onDelete={(e) => handleDelete(est.id, e)}
+                isSelectMode={isSelectMode}
+                isChecked={selectedIds.has(est.id)}
+                onToggleSelect={() => toggleSelect(est.id)}
               />
             ))
           )}
         </div>
       </ScrollArea>
+
+      <AlertDialog open={showDeleteSelectionDialog} onOpenChange={setShowDeleteSelectionDialog}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer les estimations sélectionnées</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer {selectedIds.size} estimation(s) ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={isDeleting}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelection}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+            >
+              {isDeleting ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </GlassCard>
   );
 };
@@ -97,6 +202,9 @@ interface EstimationItemProps {
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
+  isSelectMode?: boolean;
+  isChecked?: boolean;
+  onToggleSelect?: () => void;
 }
 
 const EstimationItem = ({
@@ -104,9 +212,12 @@ const EstimationItem = ({
   isSelected,
   onSelect,
   onDelete,
+  isSelectMode = false,
+  isChecked = false,
+  onToggleSelect,
 }: EstimationItemProps) => (
   <div
-    onClick={onSelect}
+    onClick={isSelectMode ? (e) => { e.stopPropagation(); onToggleSelect?.(); } : onSelect}
     className={cn(
       "group relative p-3 rounded-lg cursor-pointer transition-colors",
       isSelected
@@ -115,6 +226,14 @@ const EstimationItem = ({
     )}
   >
     <div className="flex items-start justify-between gap-2">
+      {isSelectMode && (
+        <Checkbox
+          checked={isChecked}
+          onCheckedChange={() => onToggleSelect?.()}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-0.5 shrink-0"
+        />
+      )}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate">{estimation.title || "Sans titre"}</p>
         <p
@@ -138,14 +257,16 @@ const EstimationItem = ({
           })}
         </p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 opacity-0 group-hover:opacity-100"
-        onClick={onDelete}
-      >
-        <Trash2 className="h-3 w-3" />
-      </Button>
+      {!isSelectMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      )}
     </div>
   </div>
 );

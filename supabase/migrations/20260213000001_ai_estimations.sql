@@ -29,6 +29,12 @@ CREATE POLICY "Users can create own estimations"
   ON public.ai_estimations FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own estimations" ON public.ai_estimations;
+CREATE POLICY "Users can update own estimations"
+  ON public.ai_estimations FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Users can delete own estimations" ON public.ai_estimations;
 CREATE POLICY "Users can delete own estimations"
   ON public.ai_estimations FOR DELETE

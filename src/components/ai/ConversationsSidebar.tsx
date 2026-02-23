@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useBTPConversations, useCreateConversation, useDeleteConversation } from "@/hooks/useConversations";
 import { useLastMessage } from "@/hooks/useLastMessage";
-import { Plus, Search, Trash2, MessageSquare } from "lucide-react";
+import { Plus, Search, Trash2, MessageSquare, CheckSquare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -33,6 +34,9 @@ export const ConversationsSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteSelectionDialog, setShowDeleteSelectionDialog] = useState(false);
   const { toast } = useToast();
   // Utiliser le hook spécialisé pour les conversations BTP uniquement
   const { data: conversations = [] } = useBTPConversations(false);
@@ -87,7 +91,6 @@ export const ConversationsSidebar = ({
   const handleDeleteAll = async () => {
     setIsDeletingAll(true);
     try {
-      // Supprimer toutes les conversations une par une
       const deletePromises = filteredConversations.map(conv => 
         deleteConversation.mutateAsync(conv.id)
       );
@@ -98,7 +101,6 @@ export const ConversationsSidebar = ({
         description: `${filteredConversations.length} conversation(s) supprimée(s) avec succès`,
       });
       
-      // Désélectionner la conversation actuelle
       onSelectConversation("");
       setShowDeleteAllDialog(false);
     } catch (error: any) {
@@ -106,6 +108,48 @@ export const ConversationsSidebar = ({
       toast({
         title: "Erreur",
         description: error.message || "Impossible de supprimer toutes les conversations",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelection = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsDeletingAll(true);
+    try {
+      await Promise.all(ids.map((id) => deleteConversation.mutateAsync(id)));
+      toast({
+        title: "✅ Conversations supprimées",
+        description: `${ids.length} conversation(s) supprimée(s) avec succès`,
+      });
+      if (selectedConversationId && ids.includes(selectedConversationId)) {
+        const remaining = filteredConversations.filter((c) => !ids.includes(c.id));
+        onSelectConversation(remaining[0]?.id ?? "");
+      }
+      setSelectedIds(new Set());
+      setIsSelectMode(false);
+      setShowDeleteSelectionDialog(false);
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer les conversations",
         variant: "destructive",
       });
     } finally {
@@ -124,17 +168,38 @@ export const ConversationsSidebar = ({
           <Plus className="h-4 w-4 mr-2 shrink-0" />
           <span className="truncate">Nouvelle conversation</span>
         </Button>
-        {filteredConversations.length > 0 && (
+        {filteredConversations.length > 0 && !isSelectMode && (
           <Button
-            onClick={() => setShowDeleteAllDialog(true)}
+            onClick={toggleSelectMode}
             variant="outline"
             className="w-full"
             size="sm"
-            disabled={isDeletingAll}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Supprimer toutes
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Sélectionner
           </Button>
+        )}
+        {filteredConversations.length > 0 && isSelectMode && (
+          <div className="flex gap-2">
+            <Button
+              onClick={() => selectedIds.size > 0 && setShowDeleteSelectionDialog(true)}
+              variant="destructive"
+              className="flex-1"
+              size="sm"
+              disabled={isDeletingAll || selectedIds.size === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer ({selectedIds.size})
+            </Button>
+            <Button
+              onClick={toggleSelectMode}
+              variant="outline"
+              size="sm"
+              disabled={isDeletingAll}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
 
@@ -163,13 +228,40 @@ export const ConversationsSidebar = ({
                 key={conv.id}
                 conversation={conv}
                 isSelected={selectedConversationId === conv.id}
-                onSelect={() => onSelectConversation(conv.id)}
+                onSelect={() => !isSelectMode && onSelectConversation(conv.id)}
                 onDelete={(e) => handleDelete(conv.id, e)}
+                isSelectMode={isSelectMode}
+                isChecked={selectedIds.has(conv.id)}
+                onToggleSelect={() => toggleSelect(conv.id)}
               />
             ))
           )}
         </div>
       </ScrollArea>
+
+      {/* Dialog de confirmation pour supprimer la sélection */}
+      <AlertDialog open={showDeleteSelectionDialog} onOpenChange={setShowDeleteSelectionDialog}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer les conversations sélectionnées</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer {selectedIds.size} conversation(s) ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={isDeletingAll}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelection}
+              disabled={isDeletingAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+            >
+              {isDeletingAll ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog de confirmation pour supprimer toutes les conversations */}
       <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
@@ -204,6 +296,9 @@ interface ConversationItemProps {
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
+  isSelectMode?: boolean;
+  isChecked?: boolean;
+  onToggleSelect?: () => void;
 }
 
 const ConversationItem = ({
@@ -211,12 +306,15 @@ const ConversationItem = ({
   isSelected,
   onSelect,
   onDelete,
+  isSelectMode = false,
+  isChecked = false,
+  onToggleSelect,
 }: ConversationItemProps) => {
   const { data: lastMessage } = useLastMessage(conversation.id);
 
   return (
     <div
-      onClick={onSelect}
+      onClick={isSelectMode ? (e) => { e.stopPropagation(); onToggleSelect?.(); } : onSelect}
       className={cn(
         "group relative p-3 rounded-lg cursor-pointer transition-colors",
         isSelected
@@ -225,6 +323,14 @@ const ConversationItem = ({
       )}
     >
       <div className="flex items-start justify-between gap-2">
+        {isSelectMode && (
+          <Checkbox
+            checked={isChecked}
+            onCheckedChange={() => onToggleSelect?.()}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-0.5 shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">
             {conversation.title || "Sans titre"}
@@ -256,14 +362,16 @@ const ConversationItem = ({
             })}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 opacity-0 group-hover:opacity-100"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        {!isSelectMode && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
+            onClick={onDelete}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
     </div>
   );

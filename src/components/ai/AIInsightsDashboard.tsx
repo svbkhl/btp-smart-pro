@@ -66,20 +66,33 @@ export const AIInsightsDashboard = () => {
 
       {/* Tabs pour les différentes analyses */}
       <Tabs defaultValue="predictions" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 p-1.5 sm:p-1">
-          <TabsTrigger value="predictions" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
-            Prédictions CA
-          </TabsTrigger>
-          <TabsTrigger value="pricing" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
-            Suggestions Prix
-          </TabsTrigger>
-          <TabsTrigger value="profitability" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
-            Rentabilité
-          </TabsTrigger>
-          <TabsTrigger value="recommendations" className="text-xs sm:text-base px-3 py-2 sm:px-6 sm:py-3">
-            <span className="hidden sm:inline">Toutes les </span>Recommandations
-          </TabsTrigger>
-        </TabsList>
+        <TabsList className="!flex flex-wrap w-full gap-2 p-2 h-auto sm:!grid sm:grid-cols-4 sm:h-10 sm:gap-1 sm:p-1 sm:justify-items-stretch [&>button]:min-w-0">
+            <TabsTrigger
+              value="predictions"
+              className="flex-1 min-w-0 basis-[calc(50%-4px)] sm:basis-auto sm:flex-none text-xs sm:text-base px-2 py-2.5 sm:px-6 sm:py-3 truncate rounded-lg"
+            >
+              Prédictions CA
+            </TabsTrigger>
+            <TabsTrigger
+              value="pricing"
+              className="flex-1 min-w-0 basis-[calc(50%-4px)] sm:basis-auto sm:flex-none text-xs sm:text-base px-2 py-2.5 sm:px-6 sm:py-3 truncate rounded-lg"
+            >
+              Suggestions Prix
+            </TabsTrigger>
+            <TabsTrigger
+              value="profitability"
+              className="flex-1 min-w-0 basis-[calc(50%-4px)] sm:basis-auto sm:flex-none text-xs sm:text-base px-2 py-2.5 sm:px-6 sm:py-3 truncate rounded-lg"
+            >
+              Rentabilité
+            </TabsTrigger>
+            <TabsTrigger
+              value="recommendations"
+              className="flex-1 min-w-0 basis-[calc(50%-4px)] sm:basis-auto sm:flex-none text-xs sm:text-base px-2 py-2.5 sm:px-6 sm:py-3 rounded-lg"
+            >
+              <span className="hidden sm:inline">Toutes les </span>
+              <span className="truncate block max-w-full">Recommandations</span>
+            </TabsTrigger>
+          </TabsList>
 
         {/* Tab Prédictions CA */}
         <TabsContent value="predictions" className="space-y-4">

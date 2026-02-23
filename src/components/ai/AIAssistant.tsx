@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Send, Bot, User, ImagePlus, X, Trash2, Mic, MicOff } from "lucide-react";
 import { callAIAssistant } from "@/services/aiService";
+import { compressImagesForAI } from "@/utils/imageCompression";
 import { useBTPConversations, useCreateConversation, useDeleteConversation } from "@/hooks/useConversations";
 import { useMessages, useCreateMessage } from "@/hooks/useMessages";
 import { ConversationsSidebar } from "./ConversationsSidebar";
@@ -169,6 +170,9 @@ export const AIAssistant = () => {
         console.log("✅ Nouvelle conversation créée:", conversationId, "Titre:", conversationTitle);
       }
 
+      // Compresser les images une seule fois (évite limites de taille Supabase + stockage)
+      const imagesToUse = images.length > 0 ? await compressImagesForAI(images) : undefined;
+
       // Préparer le contenu du message avec les images
       const messageContent = userMessage + (images.length > 0 ? `\n[${images.length} image(s) attachée(s)]` : "");
       
@@ -177,7 +181,7 @@ export const AIAssistant = () => {
         conversation_id: conversationId,
         content: messageContent,
         role: "user",
-        images: images.length > 0 ? images : undefined,
+        images: imagesToUse,
       });
       
       console.log("✅ Message utilisateur sauvegardé dans conversation:", conversationId);
@@ -188,18 +192,19 @@ export const AIAssistant = () => {
         content: msg.content,
       }));
 
-      // Appeler l'IA avec le contexte de la page actuelle et les images
+      // Appeler l'IA avec le contexte de la page actuelle et les images (déjà compressées)
       console.log("🚀 Appel de l'IA avec:", {
         message: userMessage,
         conversationId,
         historyLength: history.length,
+        imagesCount: imagesToUse?.length || 0,
       });
 
       let response;
       try {
         response = await callAIAssistant({
           message: userMessage,
-          images: images,
+          images: imagesToUse,
           history: history,
           conversationId: conversationId,
           currentPage: location.pathname,
@@ -272,12 +277,9 @@ export const AIAssistant = () => {
         // Elle restera visible dans l'interface
       }
       
-      // Forcer le rafraîchissement de la liste des conversations si c'était une nouvelle
-      if (isNewConversation) {
-        console.log("🔄 Rafraîchissement de la liste des conversations");
-        // Invalider les queries pour forcer le rafraîchissement
-        queryClient.invalidateQueries({ queryKey: ["ai_conversations"] });
-      }
+      // Pas d'invalidateQueries : la mise à jour optimiste dans useCreateConversation
+      // suffit. Un refetch écraserait la nouvelle conversation avec des données serveur
+      // potentiellement incomplètes (propagation) et la ferait disparaître.
     } catch (error: any) {
       console.error("❌ Erreur lors de l'envoi du message:", error);
       setPendingResponse(null); // Effacer la réponse en attente en cas d'erreur
@@ -498,9 +500,15 @@ export const AIAssistant = () => {
                 handleSend();
               }
             }}
+              onFocus={() => {
+                inputRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              }}
               placeholder="Tapez votre message..."
               disabled={loading}
-              className="flex-1 min-w-0 text-sm sm:text-base"
+              className="flex-1 min-w-0 text-sm sm:text-base [touch-action:manipulation]"
+              inputMode="text"
+              autoComplete="off"
+              enterKeyHint="send"
             />
             <Button 
               onClick={handleSend} 

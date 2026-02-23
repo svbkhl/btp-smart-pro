@@ -48,24 +48,28 @@ const Dashboard = () => {
 
 
   const calculatedStats = useMemo(() => {
+    const projectsList = projects || [];
     // Calculer le CA réel depuis les projets (actual_revenue si disponible, sinon budget)
-    const totalRevenue = (projects || []).reduce((sum, project) => {
+    const totalRevenue = projectsList.reduce((sum, project) => {
       const revenue = project.actual_revenue || project.budget || 0;
       return sum + Number(revenue);
     }, 0);
 
     // Calculer les coûts totaux
-    const totalCosts = (projects || []).reduce((sum, project) => {
+    const totalCosts = projectsList.reduce((sum, project) => {
       return sum + Number(project.costs || 0);
     }, 0);
 
     // Calculer le bénéfice réel
     const totalProfit = totalRevenue - totalCosts;
 
-    const activeProjects = stats?.active_projects || 0;
+    // Compter directement depuis projects (source de vérité) au lieu de user_stats
+    const totalProjects = projectsList.length;
+    const activeProjects = projectsList.filter(p =>
+      ["planifié", "en_attente", "en_cours"].includes(p.status || "")
+    ).length;
+    const completedProjects = projectsList.filter(p => p.status === "terminé").length;
     const totalClients = clients?.length || 0;
-    const completedProjects = stats?.completed_projects || 0;
-    const totalProjects = stats?.total_projects || 0;
 
     return {
       totalRevenue,
@@ -189,6 +193,71 @@ const Dashboard = () => {
     { name: "En cours", value: stats?.active_projects || 0, fill: "#3b82f6" },
     { name: "Planifiés", value: (stats?.total_projects || 0) - (stats?.active_projects || 0) - (stats?.completed_projects || 0), fill: "#8b5cf6" },
   ];
+
+  // Tendances réalistes : mois actuel vs mois précédent
+  const trends = useMemo(() => {
+    const now = new Date();
+    const currentMonthStart = startOfMonth(now);
+    const currentMonthEnd = endOfMonth(now);
+    const prevMonthStart = startOfMonth(subMonths(now, 1));
+    const prevMonthEnd = endOfMonth(subMonths(now, 1));
+
+    const calcPct = (current: number, previous: number): { value: number; isPositive: boolean } | undefined => {
+      if (current === 0 && previous === 0) return undefined;
+      if (previous === 0 && current > 0) return { value: 100, isPositive: true };
+      if (previous === 0) return undefined;
+      const pct = Math.round(((current - previous) / previous) * 100);
+      if (pct === 0) return undefined;
+      return { value: Math.abs(pct), isPositive: pct > 0 };
+    };
+
+    // CA : revenus du mois actuel vs mois précédent (depuis revenueData du graphique)
+    const currentRevenue = revenueData[5]?.revenue ?? 0;
+    const prevRevenue = revenueData[4]?.revenue ?? 0;
+    const revenueTrend = (currentRevenue > 0 || prevRevenue > 0 || calculatedStats.totalRevenue > 0)
+      ? (currentRevenue > 0 || prevRevenue > 0
+          ? calcPct(currentRevenue || calculatedStats.totalRevenue, prevRevenue)
+          : calculatedStats.totalRevenue > 0
+            ? { value: 100, isPositive: true }
+            : undefined)
+      : undefined;
+
+    // Bénéfice : total actuel vs profit du mois précédent (depuis projets)
+    const prevMonthProfit = (projects || [])
+      .filter(p => {
+        const d = new Date(p.updated_at || p.created_at || 0);
+        return d >= prevMonthStart && d <= prevMonthEnd;
+      })
+      .reduce((sum, p) => sum + ((p.actual_revenue || p.budget || 0) - (p.costs || 0)), 0);
+    const profitTrend = calculatedStats.totalProfit !== 0 || prevMonthProfit !== 0
+      ? calcPct(calculatedStats.totalProfit, prevMonthProfit)
+      : undefined;
+
+    // Chantiers : total maintenant vs total début du mois dernier (0 → N = +100%)
+    const prevTotalProjects = (projects || []).filter(p => {
+      const d = new Date(p.created_at || 0);
+      return d < prevMonthStart;
+    }).length;
+    const projectsTrend = calculatedStats.totalProjects > 0
+      ? calcPct(calculatedStats.totalProjects, prevTotalProjects)
+      : undefined;
+
+    // Clients : total maintenant vs total début du mois dernier
+    const prevTotalClients = (clients || []).filter((c: any) => {
+      const d = new Date(c.created_at || 0);
+      return d < prevMonthStart;
+    }).length;
+    const clientsTrend = calculatedStats.totalClients > 0
+      ? calcPct(calculatedStats.totalClients, prevTotalClients)
+      : undefined;
+
+    return {
+      revenue: revenueTrend,
+      profit: profitTrend,
+      projects: projectsTrend,
+      clients: clientsTrend,
+    };
+  }, [revenueData, calculatedStats, projects, clients]);
 
   const isLoading = statsLoading || projectsLoading || clientsLoading || quotesLoading;
 
@@ -347,7 +416,7 @@ const Dashboard = () => {
               maximumFractionDigits: 0 
             }).format(calculatedStats.totalRevenue)}
             icon={Euro}
-            trend={calculatedStats.totalRevenue > 0 ? { value: 12, isPositive: true } : undefined}
+            trend={trends.revenue}
             description={`${calculatedStats.totalProjects} chantiers`}
             delay={0.1}
             gradient="blue"
@@ -360,7 +429,7 @@ const Dashboard = () => {
               maximumFractionDigits: 0 
             }).format(calculatedStats.totalProfit)}
             icon={TrendingUp}
-            trend={calculatedStats.totalProfit > 0 ? { value: 8, isPositive: true } : calculatedStats.totalProfit < 0 ? { value: 5, isPositive: false } : undefined}
+            trend={trends.profit}
             description={`Coûts: ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(calculatedStats.totalCosts)}`}
             delay={0.2}
             gradient={calculatedStats.totalProfit >= 0 ? "green" : "orange"}
@@ -369,8 +438,8 @@ const Dashboard = () => {
             title="Chantiers actifs"
             value={calculatedStats.activeProjects.toString()}
             icon={FolderKanban}
-            trend={calculatedStats.activeProjects > 0 ? { value: 8, isPositive: true } : undefined}
-            description={`${stats?.total_projects || 0} projets au total`}
+            trend={trends.projects}
+            description={`${calculatedStats.totalProjects} projets au total`}
             delay={0.3}
             gradient="blue"
           />
@@ -378,7 +447,7 @@ const Dashboard = () => {
             title="Clients"
             value={calculatedStats.totalClients.toString()}
             icon={Users}
-            trend={calculatedStats.totalClients > 0 ? { value: 15, isPositive: true } : undefined}
+            trend={trends.clients}
             description={`${projects?.filter(p => p.status === "en_cours").length || 0} projets en cours`}
             delay={0.4}
             gradient="purple"
