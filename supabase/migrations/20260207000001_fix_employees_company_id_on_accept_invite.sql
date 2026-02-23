@@ -69,13 +69,13 @@ BEGIN
   LIMIT 1;
 
   v_email := COALESCE(NULLIF(TRIM(v_email), ''), 'membre@company.local');
-  v_nom   := COALESCE(NULLIF(TRIM(v_nom), ''), 'Membre');
+  v_nom   := COALESCE(NULLIF(TRIM(v_nom), ''), 'Employé');
   v_prenom := COALESCE(NULLIF(TRIM(v_prenom), ''), ' ');
 
   -- Insert ou update employees (company_id obligatoire pour éviter NOT NULL violation)
   BEGIN
     INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste)
-    VALUES (NEW.company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Membre')
+    VALUES (NEW.company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Employé')
     ON CONFLICT (user_id) DO UPDATE SET
       company_id = EXCLUDED.company_id,
       nom = COALESCE(NULLIF(TRIM(nom), ''), EXCLUDED.nom),
@@ -86,7 +86,7 @@ BEGIN
     WHEN OTHERS THEN
       -- Table sans unique(user_id) ou autre schéma : insert si pas de ligne pour (user_id, company_id)
       INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste)
-      SELECT NEW.company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Membre'
+      SELECT NEW.company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Employé'
       WHERE NOT EXISTS (
         SELECT 1 FROM public.employees e
         WHERE e.user_id = NEW.user_id AND e.company_id = NEW.company_id

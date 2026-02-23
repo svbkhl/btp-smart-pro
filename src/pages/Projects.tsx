@@ -27,7 +27,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { ProjectForm } from "@/components/ProjectForm";
 import { Pagination } from "@/components/Pagination";
 import { AdvancedFilters, AdvancedFiltersProps } from "@/components/AdvancedFilters";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { exportProjectsToCSV } from "@/services/exportService";
 import { safeAction } from "@/utils/safeAction";
 import {
@@ -329,7 +329,7 @@ const Projects = () => {
               <AdvancedFilters
                 filters={advancedFilters}
                 onFiltersChange={setAdvancedFilters}
-                clients={clients?.map(c => ({ id: c.id, name: c.name })) || []}
+                clients={clients?.map(c => ({ id: c.id, name: getClientFullName(c) })) || []}
                 showClientFilter={true}
                 showBudgetFilter={!isEmployee}
               />
@@ -411,7 +411,7 @@ const Projects = () => {
                             {project.client && (
                               <div className="flex items-center gap-2">
                                 <Users className="w-4 h-4" />
-                                {project.client.name}
+                                {getClientFullName(project.client)}
                               </div>
                             )}
                             {project.location && (

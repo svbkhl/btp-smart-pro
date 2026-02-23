@@ -617,7 +617,7 @@ const EmployeesPlanning = () => {
                             {employee.prenom} {employee.nom}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {employee.poste}
+                            {employee.poste === 'Membre' ? 'Employé' : employee.poste}
                           </p>
                         </div>
                       </div>
@@ -760,7 +760,7 @@ const EmployeesPlanning = () => {
                             </div>
                             {employee.poste && (
                               <div className="text-xs text-muted-foreground">
-                                {employee.poste}
+                                {employee.poste === 'Membre' ? 'Employé' : employee.poste}
                               </div>
                             )}
                           </div>
@@ -860,7 +860,7 @@ const EmployeesPlanning = () => {
                           {employee.prenom} {employee.nom}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {employee.poste}
+                          {employee.poste === 'Membre' ? 'Employé' : employee.poste}
                         </p>
                       </div>
                     </div>

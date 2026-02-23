@@ -69,8 +69,8 @@ const AI = () => {
             <TextLibraryManager />
           </GlassCard>
         ) : (
-          <GlassCard className="p-3 sm:p-6 min-h-0">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <GlassCard className="p-3 sm:p-6 min-h-[70vh] sm:min-h-0 flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 min-h-0">
               <TabsList className="grid w-full grid-cols-3 gap-1 sm:gap-2 mb-3 sm:mb-6 h-auto">
                 <TabsTrigger value="assistant" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -86,7 +86,7 @@ const AI = () => {
                 </TabsTrigger>
               </TabsList>
 
-            <TabsContent value="assistant" className="mt-0">
+            <TabsContent value="assistant" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
               <Suspense fallback={<TabLoader />}>
                 <AssistantTab />
               </Suspense>

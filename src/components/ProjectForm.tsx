@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateProject, useUpdateProject, CreateProjectData } from "@/hooks/useProjects";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { Loader2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/fakeData/projects";
@@ -209,7 +209,7 @@ export const ProjectForm = ({ open, onOpenChange, project }: ProjectFormProps) =
                 <SelectItem value="none">Aucun client</SelectItem>
                 {clients?.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.name}
+                    {getClientFullName(client)}
                   </SelectItem>
                 ))}
                 <div className="border-t border-border mt-1 pt-1">

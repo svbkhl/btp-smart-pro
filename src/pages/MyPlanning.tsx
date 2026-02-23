@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanyId } from "@/hooks/useCompanyId";
 import { useToast } from "@/components/ui/use-toast";
 import { useProjects } from "@/hooks/useProjects";
 import { useSyncPlanningWithGoogle } from "@/hooks/usePlanningSync";
@@ -50,6 +51,8 @@ interface MyPlanningProps {
 
 const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
   const { user, currentCompanyId, isAdmin } = useAuth();
+  const { companyId } = useCompanyId();
+  const effectiveCompanyId = currentCompanyId || companyId;
   const { toast } = useToast();
   const { fakeDataEnabled } = useFakeDataStore();
   const { data: projects = [] } = useProjects();
@@ -118,12 +121,21 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     try {
       setLoading(true);
 
-      // Récupérer les informations de l'employé avec timeout
-      // Utiliser maybeSingle() au lieu de single() pour éviter les erreurs si l'employee n'existe pas
+      // Récupérer l'employé UNIQUEMENT pour la company courante (isolation stricte)
+      if (!effectiveCompanyId) {
+        setEmployee(null);
+        setAssignments([]);
+        setLoading(false);
+        return;
+      }
+
       const employeePromise = supabase
         .from("employees" as any)
         .select("*")
         .eq("user_id", user.id)
+        .eq("company_id", effectiveCompanyId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       const employeeResult = await Promise.race([
@@ -136,7 +148,6 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
       clearTimeout(timeoutId);
 
       if (employeeResult.error || !employeeResult.data) {
-        // Ne pas bloquer, afficher une page vide avec message
         setEmployee(null);
         setAssignments([]);
         setLoading(false);
@@ -145,14 +156,13 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
 
       setEmployee(employeeResult.data);
 
-      // Récupérer les affectations de la semaine avec timeout
+      const employeeId = (employeeResult.data as any).id;
       const weekStart = new Date(weekDates[0]);
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = new Date(weekDates[4]);
       weekEnd.setHours(23, 59, 59, 999);
 
-      const employeeId = (employeeResult.data as any).id;
-
+      // Affectations : même company_id que l'employé (pas de mélange entre entreprises)
       const assignmentsPromise = supabase
         .from("employee_assignments" as any)
         .select(`
@@ -163,6 +173,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
           )
         `)
         .eq("employee_id", employeeId)
+        .eq("company_id", effectiveCompanyId)
         .gte("date", weekStart.toISOString().split("T")[0])
         .lte("date", weekEnd.toISOString().split("T")[0])
         .order("date", { ascending: true });
@@ -203,7 +214,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [user, weekDates, toast, fakeDataEnabled]);
+  }, [user, weekDates, toast, fakeDataEnabled, effectiveCompanyId]);
 
   useEffect(() => {
     fetchEmployeeData();
@@ -857,7 +868,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Poste</p>
-                  <p className="font-semibold text-lg">{employee.poste}</p>
+                  <p className="font-semibold text-lg">{employee.poste === 'Membre' ? 'Employé' : employee.poste}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Email</p>

@@ -104,7 +104,7 @@ export const EmployeesWidget = () => {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">
-                        {employee.poste}
+                        {employee.poste === 'Membre' ? 'Employé' : employee.poste}
                       </p>
                       {employee.specialites && employee.specialites.length > 0 && (
                         <div className="flex items-center gap-1 mt-1 flex-wrap">

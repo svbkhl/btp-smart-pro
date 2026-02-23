@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, FolderKanban, Calendar, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useProjectsData } from "@/lib/data/orchestrator";
+import { getClientFullName } from "@/hooks/useClients";
 import { WidgetSkeleton } from "./WidgetSkeleton";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -100,7 +101,7 @@ export const RecentProjectsWidget = () => {
                             <Users className="w-3 h-3" />
                             {typeof project.client === "string"
                               ? project.client
-                              : project.client.name}
+                              : getClientFullName(project.client)}
                           </span>
                         )}
                         {project.end_date && (

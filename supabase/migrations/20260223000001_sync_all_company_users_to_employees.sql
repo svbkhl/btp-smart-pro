@@ -19,7 +19,7 @@ BEGIN
       cu.user_id,
       cu.company_id,
       COALESCE(u.email, 'membre@company.local') AS email,
-      COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'nom'), ''), u.raw_user_meta_data->>'last_name', 'Membre') AS nom,
+      COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'nom'), ''), u.raw_user_meta_data->>'last_name', 'Employé') AS nom,
       COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'prenom'), ''), u.raw_user_meta_data->>'first_name', ' ') AS prenom
     FROM company_users cu
     JOIN auth.users u ON u.id = cu.user_id
@@ -42,7 +42,7 @@ BEGIN
     END IF;
     BEGIN
       INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste)
-      VALUES (v_company_id, r.user_id, r.nom, r.prenom, r.email, 'Membre');
+      VALUES (v_company_id, r.user_id, r.nom, r.prenom, r.email, 'Employé');
       v_count := v_count + 1;
     EXCEPTION 
       WHEN unique_violation THEN

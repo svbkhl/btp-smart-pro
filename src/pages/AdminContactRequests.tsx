@@ -212,10 +212,12 @@ const AdminContactRequests = () => {
         throw new Error('Vous devez être connecté pour envoyer une invitation');
       }
 
-      // Envoyer l'invitation (uniquement avec l'email)
+      // Envoyer l'invitation avec company_id pour associer l'invité à l'entreprise créée
       const { data, error: inviteError } = await supabase.functions.invoke('send-invitation', {
         body: {
           email: request.email,
+          company_id: company.id,
+          role: 'owner',
         },
       });
 

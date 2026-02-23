@@ -1,6 +1,6 @@
 export interface Project {
   id: string;
-  user_id: string;
+  user_id?: string | null;  // Créateur (null si compte supprimé, le chantier reste)
   client_id?: string;
   name: string;
   status: "planifié" | "en_attente" | "en_cours" | "terminé" | "annulé";
@@ -18,6 +18,8 @@ export interface Project {
   client?: {
     id: string;
     name: string;
+    prenom?: string;
+    titre?: "M." | "Mme";
     email?: string;
   };
 }

@@ -75,7 +75,7 @@ const CompanyEmployeesList = ({ companyId, companyName }: { companyId: string; c
                 {[member.prenom, member.nom].filter(Boolean).join(" ") || "—"}
               </div>
               <div className="text-sm text-muted-foreground">
-                {member.poste || "—"}
+                {member.poste === 'Membre' ? 'Employé' : (member.poste || "—")}
                 {member.email && (
                   <span className="ml-2">• {member.email}</span>
                 )}

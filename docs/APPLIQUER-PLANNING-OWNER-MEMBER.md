@@ -26,6 +26,8 @@ Exécuter `supabase/migrations/20260222000001_employee_assignments_fallback_for_
 Exécuter `supabase/migrations/20260223000001_sync_all_company_users_to_employees.sql` dans le SQL Editor.  
 Cela crée une fiche employé pour chaque membre qui n'en a pas encore.
 
+**Ou exécuter tout en une fois :** `docs/APPLIQUER-PLANNING-TOUS-EMPLOYES.sql` (RLS lecture seule + sync + fix company_users).
+
 ### Vérification
 Après application :
 1. L'owner crée une affectation pour un employé (Planning > Planning employés)

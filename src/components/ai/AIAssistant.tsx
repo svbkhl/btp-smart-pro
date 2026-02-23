@@ -296,9 +296,9 @@ export const AIAssistant = () => {
 
 
   return (
-    <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 h-[calc(100dvh-220px)] min-h-[400px] sm:h-[550px] sm:min-h-[500px]">
+    <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 min-h-[60vh] sm:min-h-[500px] h-[calc(100dvh-200px)] sm:h-[550px]">
       {/* Sidebar - en bas sur mobile (flex-col-reverse), à gauche sur desktop */}
-      <div className="w-full sm:w-64 flex-shrink-0">
+      <div className="w-full sm:w-64 flex-shrink-0 max-h-[40vh] sm:max-h-none">
         <ConversationsSidebar
           selectedConversationId={selectedConversationId}
           onSelectConversation={setSelectedConversationId}

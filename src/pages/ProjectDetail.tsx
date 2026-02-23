@@ -19,6 +19,7 @@ import {
   Clock
 } from "lucide-react";
 import { useProject, useDeleteProject } from "@/hooks/useProjects";
+import { getClientFullName } from "@/hooks/useClients";
 import { usePermissions } from "@/hooks/usePermissions";
 import { safeAction } from "@/utils/safeAction";
 import { ProjectForm } from "@/components/ProjectForm";
@@ -229,7 +230,7 @@ const ProjectDetail = () => {
           />
           <KPIBlock
             title="Client"
-            value={typeof project.client === "string" ? project.client : project.client?.name || "Non assigné"}
+            value={typeof project.client === "string" ? project.client : (project.client ? getClientFullName(project.client) : "Non assigné")}
             icon={Users}
             description="Client assigné"
             delay={isEmployee ? 0.2 : 0.4}
@@ -321,7 +322,7 @@ const ProjectDetail = () => {
                 </h3>
                 <div className="space-y-2">
                   <p className="font-medium">
-                    {typeof project.client === "string" ? project.client : project.client.name}
+                    {typeof project.client === "string" ? project.client : getClientFullName(project.client)}
                   </p>
                   {typeof project.client !== "string" && project.client.email && (
                     <p className="text-sm text-muted-foreground">{project.client.email}</p>

@@ -17,18 +17,21 @@ BEGIN
   END IF;
   IF v_company_id IS NULL THEN RETURN NEW; END IF;
   SELECT COALESCE(u.email,''), COALESCE(u.raw_user_meta_data->>'nom',u.raw_user_meta_data->>'last_name',''), COALESCE(u.raw_user_meta_data->>'prenom',u.raw_user_meta_data->>'first_name','') INTO v_email, v_nom, v_prenom FROM auth.users u WHERE u.id=NEW.user_id LIMIT 1;
-  v_email := COALESCE(NULLIF(TRIM(v_email),''),'membre@company.local'); v_nom := COALESCE(NULLIF(TRIM(v_nom),''),'Membre'); v_prenom := COALESCE(NULLIF(TRIM(v_prenom),''),' ');
+  v_email := COALESCE(NULLIF(TRIM(v_email),''),'membre@company.local'); v_nom := COALESCE(NULLIF(TRIM(v_nom),''),'Employé'); v_prenom := COALESCE(NULLIF(TRIM(v_prenom),''),' ');
   BEGIN
-    INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste) VALUES (v_company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Membre')
+    INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste) VALUES (v_company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Employé')
     ON CONFLICT (user_id) DO UPDATE SET company_id=EXCLUDED.company_id, nom=COALESCE(NULLIF(TRIM(nom),''),EXCLUDED.nom), prenom=COALESCE(NULLIF(TRIM(prenom),''),EXCLUDED.prenom), email=EXCLUDED.email, updated_at=now();
   EXCEPTION WHEN OTHERS THEN
-    INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste) SELECT v_company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Membre'
+    INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste) SELECT v_company_id, NEW.user_id, v_nom, v_prenom, v_email, 'Employé'
     WHERE NOT EXISTS (SELECT 1 FROM public.employees e WHERE e.user_id=NEW.user_id AND e.company_id=v_company_id);
   END;
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN RAISE WARNING 'sync_employee: %', SQLERRM; RETURN NEW;
 END;
 $$;
+
+-- 0a2. Migrer poste 'Membre' → 'Employé' dans employees
+UPDATE public.employees SET poste = 'Employé', updated_at = now() WHERE poste = 'Membre';
 
 -- 0b. Corriger company_users : propriétaires sans company_id (Henry et futurs)
 --    Utilise companies.owner_id pour remplir company_id manquant
@@ -81,48 +84,45 @@ BEGIN
 END $$;
 
 -- 2. Sync : créer une fiche employees pour chaque membre qui n'en a pas
---    Inclut les propriétaires (companies.owner_id) même si company_users était incomplet
 DO $$
 DECLARE
   v_count INTEGER := 0;
   r RECORD;
   v_company_id UUID;
 BEGIN
-  -- Depuis company_users (tous les membres, company_id NULL ou non)
   FOR r IN
-    SELECT DISTINCT ON (cu.user_id)
-      cu.user_id,
-      cu.company_id,
-      COALESCE(u.email, 'membre@company.local') AS email,
-      COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'nom'), ''), u.raw_user_meta_data->>'last_name', 'Membre') AS nom,
-      COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'prenom'), ''), u.raw_user_meta_data->>'first_name', ' ') AS prenom
-    FROM company_users cu
-    JOIN auth.users u ON u.id = cu.user_id
-    WHERE NOT EXISTS (
-      SELECT 1 FROM employees e 
-      WHERE e.user_id = cu.user_id AND (e.company_id = cu.company_id OR (e.company_id IS NOT NULL AND cu.company_id IS NULL))
+    WITH membres AS (
+      SELECT DISTINCT ON (cu.user_id)
+        cu.user_id,
+        COALESCE(
+          cu.company_id,
+          (SELECT c2.company_id FROM company_users c2 WHERE c2.user_id = cu.user_id AND c2.company_id IS NOT NULL LIMIT 1),
+          (SELECT id FROM companies WHERE owner_id = cu.user_id LIMIT 1),
+          (SELECT id FROM companies LIMIT 1)
+        ) AS company_id,
+        COALESCE(u.email, 'membre@company.local') AS email,
+        COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'nom'), ''), u.raw_user_meta_data->>'last_name', 'Employé') AS nom,
+        COALESCE(NULLIF(TRIM(u.raw_user_meta_data->>'prenom'), ''), u.raw_user_meta_data->>'first_name', ' ') AS prenom
+      FROM company_users cu
+      JOIN auth.users u ON u.id = cu.user_id
+      ORDER BY cu.user_id, (CASE WHEN cu.company_id IS NOT NULL THEN 0 ELSE 1 END), cu.company_id
     )
-    ORDER BY cu.user_id, (CASE WHEN cu.company_id IS NOT NULL THEN 0 ELSE 1 END), cu.company_id
+    SELECT m.* FROM membres m
+    WHERE m.company_id IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM employees e WHERE e.user_id = m.user_id AND e.company_id = m.company_id)
   LOOP
     v_company_id := r.company_id;
-    IF v_company_id IS NULL THEN
-      SELECT c2.company_id INTO v_company_id FROM company_users c2 WHERE c2.user_id = r.user_id AND c2.company_id IS NOT NULL LIMIT 1;
-    END IF;
-    IF v_company_id IS NULL AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'owner_id') THEN
-      SELECT id INTO v_company_id FROM companies WHERE owner_id = r.user_id LIMIT 1;
-    END IF;
-    IF v_company_id IS NULL THEN
-      SELECT id INTO v_company_id FROM companies LIMIT 1;
-    END IF;
     IF v_company_id IS NULL THEN CONTINUE; END IF;
     BEGIN
       INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste)
-      VALUES (v_company_id, r.user_id, r.nom, r.prenom, r.email, 'Membre');
+      VALUES (v_company_id, r.user_id, r.nom, r.prenom, r.email, 'Employé');
       v_count := v_count + 1;
     EXCEPTION 
       WHEN unique_violation THEN
-        UPDATE public.employees SET company_id = COALESCE(company_id, v_company_id), nom = CASE WHEN nom IS NULL OR nom = '' THEN r.nom ELSE nom END, prenom = CASE WHEN prenom IS NULL OR prenom = '' THEN r.prenom ELSE prenom END, email = COALESCE(NULLIF(TRIM(email), ''), r.email) WHERE user_id = r.user_id;
+        UPDATE public.employees SET company_id = COALESCE(company_id, v_company_id), nom = COALESCE(NULLIF(TRIM(nom), ''), r.nom), prenom = COALESCE(NULLIF(TRIM(prenom), ''), r.prenom), email = COALESCE(NULLIF(TRIM(email), ''), r.email) WHERE user_id = r.user_id;
         v_count := v_count + 1;
+      WHEN OTHERS THEN
+        RAISE NOTICE 'Skip user % : %', r.user_id, SQLERRM;
     END;
   END LOOP;
 
@@ -140,6 +140,10 @@ BEGIN
       WHERE c.owner_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM employees e WHERE e.user_id = c.owner_id AND e.company_id = c.id)
     LOOP
+      IF r.company_id IS NULL THEN
+        RAISE NOTICE 'Skip propriétaire user % : company_id null', r.user_id;
+        CONTINUE;
+      END IF;
       BEGIN
         INSERT INTO public.employees (company_id, user_id, nom, prenom, email, poste)
         VALUES (r.company_id, r.user_id, r.nom, r.prenom, r.email, 'Propriétaire');
@@ -148,6 +152,8 @@ BEGIN
         WHEN unique_violation THEN
           UPDATE public.employees SET company_id = COALESCE(company_id, r.company_id), nom = CASE WHEN nom IS NULL OR nom = '' THEN r.nom ELSE nom END, prenom = CASE WHEN prenom IS NULL OR prenom = '' THEN r.prenom ELSE prenom END, email = COALESCE(NULLIF(TRIM(email), ''), r.email) WHERE user_id = r.user_id;
           v_count := v_count + 1;
+        WHEN OTHERS THEN
+          RAISE NOTICE 'Skip propriétaire user % : %', r.user_id, SQLERRM;
       END;
     END LOOP;
   END IF;

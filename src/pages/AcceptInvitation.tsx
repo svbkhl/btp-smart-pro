@@ -157,15 +157,18 @@ const AcceptInvitation = () => {
         throw acceptError;
       }
 
-      // Créer le profil dans employees si nécessaire
-      if (invitation.role !== 'owner') {
-        await supabase.from('employees').insert({
+      // Créer le profil dans employees si nécessaire (avec company_id pour respecter la contrainte NOT NULL)
+      // L'invitation doit toujours avoir company_id quand un owner invite un employé
+      const companyId = invitation.company_id ?? invitation.companies?.id;
+      if (invitation.role !== 'owner' && companyId) {
+        await supabase.from('employees').upsert({
+          company_id: companyId,
           user_id: authData.user.id,
           nom,
           prenom,
           email: invitation.email,
           poste: invitation.role === 'admin' ? 'Administrateur' : 'Salarié',
-        });
+        }, { onConflict: 'user_id', ignoreDuplicates: false });
       }
 
       toast({

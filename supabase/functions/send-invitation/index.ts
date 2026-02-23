@@ -122,6 +122,18 @@ serve(async (req) => {
     // Support à la fois l'ancien format (companyId) et le nouveau (company_id)
     const companyId = (validation.data as { companyId?: string; company_id?: string }).companyId ||
                       (validation.data as { company_id?: string }).company_id;
+    
+    // Quand un owner/admin invite un employé, company_id est obligatoire pour associer l'invité à la même entreprise
+    if (!companyId || companyId.trim() === '') {
+      logger.warn("Missing company_id for invitation", { requestId, email: (validation.data as { email: string }).email });
+      const errorResponse = createErrorResponse(
+        "company_id est obligatoire lors de l'invitation d'un employé à rejoindre l'entreprise",
+        ErrorCode.VALIDATION_ERROR,
+        { field: "company_id" }
+      );
+      return createCorsResponse(errorResponse, 400);
+    }
+    
     // Offre / prix / période d'essai (choisis avant envoi)
     const stripePriceId = (validation.data as { stripe_price_id?: string }).stripe_price_id;
     const trialDays = (validation.data as { trial_days?: number }).trial_days;

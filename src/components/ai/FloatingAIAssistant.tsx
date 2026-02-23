@@ -223,17 +223,17 @@ export const FloatingAIAssistant = () => {
         )}
       </AnimatePresence>
 
-      {/* Fenêtre de chat flottante */}
+      {/* Fenêtre de chat flottante - plein écran sur mobile */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            className="fixed bottom-6 right-6 z-50 w-[90vw] sm:w-[380px] md:w-[400px] max-w-[400px]"
+            className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-50 w-full h-full sm:w-[380px] sm:h-auto sm:max-h-[85vh] md:w-[400px] sm:max-w-[400px]"
           >
-            <GlassCard className="flex flex-col shadow-2xl border-2">
+            <GlassCard className="flex flex-col shadow-2xl border-2 h-full sm:h-auto rounded-none sm:rounded-xl">
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-border/50">
                 <div className="flex items-center gap-3">
@@ -318,8 +318,7 @@ export const FloatingAIAssistant = () => {
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="flex flex-col"
-                  style={{ maxHeight: "400px", height: "400px" }}
+                  className="flex flex-col flex-1 min-h-0 min-h-[280px] sm:min-h-0 sm:h-[400px] sm:max-h-[400px] sm:flex-initial"
                 >
                   {/* Messages */}
                   <ScrollArea className="flex-1 p-4 min-h-0">

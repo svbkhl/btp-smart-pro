@@ -70,7 +70,7 @@ export const useProjects = () => {
 
             const { data, error } = await supabase
               .from("projects")
-              .select("id, user_id, company_id, client_id, name, status, start_date, end_date, description, created_at, updated_at, client:clients(id, name, email)")
+              .select("id, user_id, company_id, client_id, name, status, start_date, end_date, description, created_at, updated_at, client:clients(id, name, prenom, titre, email)")
               .in("id", projectIds)
               .order("created_at", { ascending: false });
             if (error) throw error;
@@ -79,7 +79,7 @@ export const useProjects = () => {
 
           const { data, error } = await supabase
             .from("projects")
-            .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at, client:clients(id, name, email)")
+            .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at, client:clients(id, name, prenom, titre, email)")
             .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 
@@ -115,7 +115,7 @@ export const useProject = (id: string | undefined) => {
 
           const { data, error } = await supabase
             .from("projects")
-            .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at, client:clients(id, name, email)")
+            .select("id, user_id, company_id, client_id, name, status, budget, costs, actual_revenue, start_date, end_date, description, created_at, updated_at, client:clients(id, name, prenom, titre, email)")
             .eq("id", id)
             .eq("company_id", companyId)
             .maybeSingle();

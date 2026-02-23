@@ -221,7 +221,7 @@ const EmployeesAndRH = () => {
                           {emp.prenom || ""} {emp.nom || "N/A"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {emp.poste || "-"}
+                          {emp.poste === 'Membre' ? 'Employé' : (emp.poste || "-")}
                         </p>
                       </div>
                     </div>
