@@ -442,10 +442,10 @@ export default function Start() {
     <div className="min-h-screen bg-background">
 
       {/* ── Bannière engagement 12 mois ── */}
-      <div className="bg-orange-500/10 border-b border-orange-500/20 px-4 py-3">
+      <div className="bg-muted border-b border-border px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-orange-800 dark:text-orange-300 font-medium leading-snug">
+          <AlertTriangle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+          <p className="text-sm text-muted-foreground leading-snug">
             À l'issue de la période d'essai de 14 jours, votre abonnement est engagé pour 12 mois non
             résiliable avant échéance — quel que soit le mode de paiement choisi.
           </p>
@@ -511,7 +511,7 @@ export default function Start() {
 
         {/* ── Footer légal ── */}
         <p className="text-center text-xs text-muted-foreground pt-2">
-          Tous les tarifs sont HT · Engagement 12 mois · Résiliation possible pendant les 14 jours d'essai uniquement
+          Engagement 12 mois · Résiliation possible pendant les 14 jours d'essai
         </p>
 
       </div>
