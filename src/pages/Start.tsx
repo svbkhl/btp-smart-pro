@@ -205,7 +205,7 @@ function PlanCard({
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Engagement 12 mois · Résiliation pendant l'essai uniquement
+            Résiliation possible pendant les 14 jours d'essai.
           </p>
         )}
       </div>
@@ -282,7 +282,7 @@ function PlanCard({
             )}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Aucun paiement aujourd'hui · Résiliation pendant les 14j d'essai
+            Aucun paiement aujourd'hui · Résiliation possible pendant les 14 jours d'essai.
           </p>
         </div>
       </CardContent>
@@ -509,10 +509,6 @@ export default function Start() {
           ))}
         </div>
 
-        {/* ── Footer légal ── */}
-        <p className="text-center text-xs text-muted-foreground pt-2">
-          Engagement 12 mois · Résiliation possible pendant les 14 jours d'essai
-        </p>
 
       </div>
     </div>
