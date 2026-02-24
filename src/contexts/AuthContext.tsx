@@ -5,6 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  /** True tant que le fetch initial de currentCompanyId n'est pas terminé */
+  isCompanyLoading: boolean;
   isAdmin: boolean;
   isEmployee: boolean;
   userRole: 'admin' | 'member' | null;
@@ -18,6 +20,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCompanyLoading, setIsCompanyLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
@@ -57,7 +60,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         fetchCurrentCompanyId(session.user.id);
       } else if (!session?.user) {
         setCurrentCompanyId(null);
+        setIsCompanyLoading(false);
         localStorage.removeItem('currentCompanyId');
+      } else {
+        // Déjà initialisé — company déjà disponible
+        setIsCompanyLoading(false);
       }
     }).catch((error) => {
       console.error('❌ [Auth] Erreur inattendue:', error);
@@ -77,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastFetchedCompanyIdRef.current = null;
         setIsAdmin(false);
         setCurrentCompanyId(null);
+        setIsCompanyLoading(false);
         localStorage.removeItem('currentCompanyId');
         handleSignOut();
         return;
@@ -88,6 +96,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         hasInitializedRef.current = true;
         checkAdminStatus(session.user);
         fetchCurrentCompanyId(session.user.id);
+      } else if (!session?.user) {
+        setIsCompanyLoading(false);
       }
     });
 
@@ -277,6 +287,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } finally {
       isFetchingCompanyIdRef.current = false;
+      setIsCompanyLoading(false);
     }
   };
 
@@ -287,6 +298,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value: AuthContextValue = {
     user,
     loading,
+    isCompanyLoading,
     isAdmin,
     isEmployee,
     userRole,

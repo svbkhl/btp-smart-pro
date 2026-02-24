@@ -296,7 +296,7 @@ export default function Start() {
   const [searchParams] = useSearchParams();
   const invitationId = searchParams.get("invitation_id");
   const { toast } = useToast();
-  const { user, loading: authLoading, currentCompanyId } = useAuth();
+  const { user, loading: authLoading, isCompanyLoading, currentCompanyId } = useAuth();
   const { isOwner } = usePermissions();
   const { isActive, isLoading: subLoading, subscription } = useSubscription();
 
@@ -369,7 +369,10 @@ export default function Start() {
   };
 
   // ─── Chargement ───────────────────────────────────────────────────────────
-  if (authLoading || (user && subLoading && !subscription)) {
+  // Attendre que l'auth ET le fetch de la company soient terminés
+  // Évite d'afficher "Rejoignez une entreprise" par erreur juste après la connexion
+  const waitingForCompany = user && isCompanyLoading && !currentCompanyId;
+  if (authLoading || waitingForCompany || (user && currentCompanyId && subLoading && !subscription)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -382,8 +385,8 @@ export default function Start() {
 
   if (!user) return null;
 
-  // ─── Pas d'entreprise ─────────────────────────────────────────────────────
-  if (!currentCompanyId) {
+  // ─── Pas d'entreprise (confirmé : fetch terminé et toujours null) ──────────
+  if (!currentCompanyId && !isCompanyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">

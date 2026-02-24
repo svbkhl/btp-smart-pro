@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,6 +29,40 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Navigation post-auth (définie ici pour être réutilisée) ─────────────
+  const handlePostAuthNavigation = useCallback(async (sessionUser: User) => {
+    const params = new URLSearchParams(window.location.search);
+    const invitationId = params.get("invitation_id");
+    if (invitationId) {
+      navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
+      return;
+    }
+    if (isSystemAdmin(sessionUser)) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+    const hasSub = await hasActiveSubscription(sessionUser.id, sessionUser.email);
+    if (!hasSub) {
+      navigate("/start", { replace: true });
+      return;
+    }
+    navigate("/dashboard", { replace: true });
+  }, [navigate]);
+
+  // ─── Auto-redirect si l'utilisateur a déjà une session valide ────────────
+  // Quand un invité revient plus tard, sa session peut encore être valide.
+  // On le redirige directement sans lui demander de re-saisir ses identifiants.
+  useEffect(() => {
+    const isResetPage = window.location.pathname.startsWith('/reset-password') ||
+                        window.__IS_PASSWORD_RESET_PAGE__ === true;
+    if (isResetPage) return;
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      await handlePostAuthNavigation(session.user);
+    }).catch(() => { /* session invalide → laisser le formulaire */ });
+  }, [handlePostAuthNavigation]);
 
   useEffect(() => {
     // Déclarer searchParams une seule fois pour tout le useEffect
@@ -96,26 +130,6 @@ const Auth = () => {
         }
       }
     }
-
-    const handlePostAuthNavigation = async (sessionUser: User) => {
-      const invitationId = searchParams.get("invitation_id");
-      if (invitationId) {
-        navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
-        return;
-      }
-      // Admin système : dashboard directement
-      if (isSystemAdmin(sessionUser)) {
-        navigate("/dashboard", { replace: true });
-        return;
-      }
-      // Pas de forfait actif → /start (choix forfait)
-      const hasSub = await hasActiveSubscription(sessionUser.id, sessionUser.email);
-      if (!hasSub) {
-        navigate("/start", { replace: true });
-        return;
-      }
-      navigate("/dashboard", { replace: true });
-    };
 
     // Gérer explicitement les callbacks Supabase Auth (invitation, magic link, etc.)
     const handleAuthCallback = async () => {
@@ -300,13 +314,16 @@ const Auth = () => {
       // Intercepter la requête pour logger les détails
       const startTime = Date.now();
       
-      // Faire la requête avec interception
+      // Faire la requête avec timeout de sécurité (20s max)
       const signInPromise = supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password: cleanPassword,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("La connexion a pris trop de temps. Vérifiez votre connexion internet et réessayez.")), 20000)
+      );
 
-      const result = await signInPromise;
+      const result = await Promise.race([signInPromise, timeoutPromise]);
       const duration = Date.now() - startTime;
 
       console.log('📥 [handleSignIn] Response received:', {
