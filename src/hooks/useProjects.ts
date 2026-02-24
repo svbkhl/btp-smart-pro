@@ -68,11 +68,13 @@ export const useProjects = () => {
             const projectIds = [...new Set((assignmentProjectIds || []).map((a: any) => a.project_id).filter(Boolean))];
             if (projectIds.length === 0) return [];
 
-            const { data, error } = await supabase
+            const query = supabase
               .from("projects")
               .select("id, user_id, company_id, client_id, name, status, start_date, end_date, description, created_at, updated_at, client:clients(id, name, prenom, titre, email)")
-              .in("id", projectIds)
               .order("created_at", { ascending: false });
+            const { data, error } = projectIds.length === 1
+              ? await query.eq("id", projectIds[0])
+              : await query.in("id", projectIds);
             if (error) throw error;
             return ((data || []).map((p: any) => ({ ...p, budget: undefined, costs: undefined, actual_revenue: undefined }))) as Project[];
           }

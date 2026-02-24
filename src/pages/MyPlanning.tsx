@@ -75,6 +75,11 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
     date?: string;
     assignment?: Assignment;
   }>({ open: false });
+  const [assignmentDetailDialog, setAssignmentDetailDialog] = useState<{
+    open: boolean;
+    assignment?: Assignment;
+    date?: Date;
+  }>({ open: false });
   const [assignmentForm, setAssignmentForm] = useState({
     project_id: "",
     title: "",
@@ -163,12 +168,17 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
       const weekStartStr = format(weekDates[0], "yyyy-MM-dd");
       const weekEndStr = format(weekDates[4], "yyyy-MM-dd");
 
-      // Affectations : filtrer par employee_id uniquement (RLS garantit l'isolation)
-      // Ne pas filtrer par company_id pour éviter d'exclure des affectations valides
-      // (ex: company_id NULL sur d'anciennes données, ou décalage effectiveCompanyId)
+      // Récupérer les affectations de la semaine avec les infos de chantier intégrées
       const assignmentsPromise = supabase
         .from("employee_assignments" as any)
-        .select("*")
+        .select(`
+          *,
+          project:projects (
+            id,
+            name,
+            location
+          )
+        `)
         .eq("employee_id", employeeId)
         .gte("date", weekStartStr)
         .lte("date", weekEndStr)
@@ -181,22 +191,45 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
         ),
       ]);
 
+      // Si la jointure échoue (ex: FK pas encore exposée), fallback sans jointure
+      let rawAssignments: any[] = [];
       if (assignmentsResult.error) {
-        setAssignments([]);
+        // Tentative sans jointure
+        const fallbackResult = await supabase
+          .from("employee_assignments" as any)
+          .select("*")
+          .eq("employee_id", employeeId)
+          .gte("date", weekStartStr)
+          .lte("date", weekEndStr)
+          .order("date", { ascending: true });
+        rawAssignments = (fallbackResult.data as any[]) || [];
       } else {
-        const rawAssignments = (assignmentsResult.data as any[]) || [];
+        rawAssignments = (assignmentsResult.data as any[]) || [];
+      }
+
+      if (true) {
         const projectIds = [...new Set(rawAssignments.map((a: any) => a.project_id).filter(Boolean))];
         let projectsMap: Record<string, { name: string; location?: string }> = {};
-        if (projectIds.length > 0) {
-          const { data: projectsData } = await supabase
-            .from("projects" as any)
-            .select("id, name, location")
-            .in("id", projectIds);
-          projectsMap = (projectsData || []).reduce((acc: any, p: any) => {
-            acc[p.id] = { name: p.name, location: p.location };
-            return acc;
-          }, {});
+
+        // Si les projets ne sont pas déjà intégrés via la jointure, les récupérer séparément
+        const hasEmbeddedProjects = rawAssignments.some((a: any) => a.project && a.project.name);
+        if (!hasEmbeddedProjects && projectIds.length > 0) {
+          try {
+            const query = supabase.from("projects").select("id, name, location");
+            const { data: projectsData, error: projectsErr } = projectIds.length === 1
+              ? await query.eq("id", projectIds[0])
+              : await query.in("id", projectIds);
+            if (!projectsErr && projectsData) {
+              projectsMap = projectsData.reduce((acc: any, p: any) => {
+                acc[p.id] = { name: p.name, location: p.location };
+                return acc;
+              }, {});
+            }
+          } catch {
+            // Continue sans nom de chantier
+          }
         }
+
         const mappedAssignments: Assignment[] = rawAssignments.map((item: any) => ({
           id: item.id,
           project_id: item.project_id || undefined,
@@ -206,13 +239,15 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
           date: item.date,
           heure_debut: item.heure_debut,
           heure_fin: item.heure_fin,
-          project: item.project_id && projectsMap[item.project_id]
+          project: item.project?.name
+            ? { name: item.project.name, location: item.project.location }
+            : item.project_id && projectsMap[item.project_id]
             ? { name: projectsMap[item.project_id].name, location: projectsMap[item.project_id].location }
             : undefined
         }));
         setAssignments(mappedAssignments);
       }
-    } catch (error) {
+    } catch (error) {  // eslint-disable-line
       clearTimeout(timeoutId);
       // Ne pas bloquer en cas d'erreur
       setEmployee(null);
@@ -279,6 +314,9 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
   };
+
+  // Formater les horaires HH:mm:ss -> HH:mm
+  const formatHeure = (h?: string) => (h ? h.slice(0, 5) : "—");
 
   // Fonction pour calculer les heures à partir des horaires (avec pause optionnelle)
   const calculateHoursFromTime = (heure_debut?: string, heure_fin?: string, temps_pause: number = 0): number => {
@@ -1032,16 +1070,35 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                                   return (
                                     <div
                                       key={assignment.id}
-                                      className="p-2 bg-primary/20 border border-primary/30 rounded text-xs relative group/assignment"
-                                      onClick={(e) => e.stopPropagation()}
+                                      className="p-2 bg-primary/20 border border-primary/30 rounded text-xs relative group/assignment cursor-pointer hover:bg-primary/30 hover:border-primary/50 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAssignmentDetailDialog({
+                                          open: true,
+                                          assignment,
+                                          date: weekDates[idx],
+                                        });
+                                      }}
+                                      title="Cliquer pour voir le détail"
                                     >
                                       <div className="flex items-start justify-between gap-2 mb-1">
-                                        <div className="flex-1">
-                                          <div className="font-medium">
-                                            {assignment.project?.name || assignment.title || "Affectation"}
+                                        <div className="flex-1 min-w-0">
+                                          {/* Nom du chantier – toujours visible en priorité */}
+                                          <div className="font-semibold text-foreground leading-tight truncate">
+                                            {assignment.project?.name
+                                              ? (
+                                                <span className="flex items-center gap-1">
+                                                  <Building2 className="h-3 w-3 shrink-0 text-primary" />
+                                                  {assignment.project.name}
+                                                </span>
+                                              )
+                                              : assignment.title
+                                              ? assignment.title
+                                              : <span className="text-muted-foreground italic">Chantier non renseigné</span>
+                                            }
                                           </div>
                                           {assignment.project?.location && (
-                                            <div className="text-muted-foreground text-xs mt-0.5">
+                                            <div className="text-muted-foreground text-xs mt-0.5 truncate">
                                               📍 {assignment.project.location}
                                             </div>
                                           )}
@@ -1050,7 +1107,7 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-5 w-5 opacity-0 group-hover/assignment:opacity-100 transition-opacity text-destructive"
+                                            className="h-5 w-5 opacity-0 group-hover/assignment:opacity-100 transition-opacity text-destructive shrink-0"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               deleteAssignment(assignment.id);
@@ -1061,17 +1118,17 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                                         )}
                                       </div>
                                       <div 
-                                        className={`flex items-center justify-center gap-1 mt-1 rounded px-1 py-0.5 ${isAdmin ? "cursor-pointer hover:bg-primary/30 transition-colors" : ""}`}
+                                        className={`flex items-center justify-center gap-1 mt-1 rounded px-1 py-0.5 bg-background/40 ${isAdmin ? "cursor-pointer hover:bg-primary/30 transition-colors" : ""}`}
                                         onClick={isAdmin ? (e) => {
                                           e.stopPropagation();
                                           handleEditHours(assignment);
                                         } : undefined}
                                         title={isAdmin ? "Cliquer pour modifier les horaires" : undefined}
                                       >
-                                        <Clock className="h-3 w-3 text-muted-foreground" />
+                                        <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
                                         <span className="font-semibold">
                                           {hasHoraires 
-                                            ? `${assignment.heure_debut} - ${assignment.heure_fin} (${assignment.heures || 0}h)`
+                                            ? `${formatHeure(assignment.heure_debut)} – ${formatHeure(assignment.heure_fin)} (${assignment.heures || 0}h)`
                                             : `${assignment.heures || 0}h`}
                                         </span>
                                         {isAdmin && <Edit2 className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover/assignment:opacity-100 transition-opacity ml-1" />}
@@ -1375,6 +1432,94 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
                 </Button>
               </DialogFooter>
             </DialogContent>
+        </Dialog>
+
+        {/* Dialog affichage détaillé de l'affectation (clic sur la carte) */}
+        <Dialog
+          open={assignmentDetailDialog.open}
+          onOpenChange={(open) => setAssignmentDetailDialog({ ...assignmentDetailDialog, open })}
+        >
+          <DialogContent className="max-w-md sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl">Détail de l'affectation</DialogTitle>
+              <DialogDescription>
+                {assignmentDetailDialog.date && (
+                  <span className="text-base font-medium text-foreground">
+                    {assignmentDetailDialog.date.toLocaleDateString("fr-FR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {assignmentDetailDialog.assignment && (
+              <div className="space-y-6 py-4">
+                <div className="rounded-xl bg-primary/10 border border-primary/20 p-6 space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Chantier</p>
+                    <p className="text-xl font-semibold">
+                      {assignmentDetailDialog.assignment.project?.name ||
+                        assignmentDetailDialog.assignment.title ||
+                        "Affectation"}
+                    </p>
+                  </div>
+                  {assignmentDetailDialog.assignment.project?.location && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Lieu</p>
+                      <p className="text-base flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        {assignmentDetailDialog.assignment.project.location}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Horaires</p>
+                    <p className="text-2xl font-bold flex items-center gap-2">
+                      <Clock className="h-6 w-6 text-primary" />
+                      {assignmentDetailDialog.assignment.heure_debut &&
+                      assignmentDetailDialog.assignment.heure_fin
+                        ? `${formatHeure(assignmentDetailDialog.assignment.heure_debut)} - ${formatHeure(assignmentDetailDialog.assignment.heure_fin)}`
+                        : "—"}
+                    </p>
+                    <p className="text-lg text-muted-foreground mt-1">
+                      Total : {assignmentDetailDialog.assignment.heures || 0} h
+                    </p>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        setAssignmentDetailDialog({ open: false });
+                        handleEditHours(assignmentDetailDialog.assignment!);
+                      }}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      Modifier les horaires
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setAssignmentDetailDialog({ open: false });
+                        if (assignmentDetailDialog.assignment) {
+                          deleteAssignment(assignmentDetailDialog.assignment.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Supprimer
+                    </Button>
+                  </DialogFooter>
+                )}
+              </div>
+            )}
+          </DialogContent>
         </Dialog>
       </div>
     );

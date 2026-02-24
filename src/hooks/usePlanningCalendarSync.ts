@@ -43,23 +43,31 @@ export const useSyncPlanningToCalendar = () => {
         throw new Error("Utilisateur non connecté ou pas de company_id");
       }
 
-      // Récupérer l'affectation complète avec les infos du projet
+      // Récupérer l'affectation complète (sans embedded join pour éviter un 400 si la FK n'est pas exposée)
       const { data: assignment, error: fetchError } = await supabase
         .from("employee_assignments")
-        .select(`
-          *,
-          projects:project_id (
-            id,
-            name,
-            location
-          )
-        `)
+        .select("*")
         .eq("id", assignmentId)
         .single();
 
       if (fetchError) {
         console.error("❌ [SyncPlanningToCalendar] Erreur récupération affectation:", fetchError);
         throw fetchError;
+      }
+
+      // Récupérer le projet séparément si project_id est renseigné
+      const projectId = (assignment as any)?.project_id;
+      let projectData: { id: string; name: string; location?: string } | null = null;
+      if (projectId) {
+        const { data: proj } = await supabase
+          .from("projects")
+          .select("id, name, location")
+          .eq("id", projectId)
+          .maybeSingle();
+        projectData = proj as any;
+      }
+      if (assignment && projectData) {
+        (assignment as any).projects = projectData;
       }
 
       const assignmentData = assignment as any;
