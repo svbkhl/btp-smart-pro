@@ -27,6 +27,7 @@ import { FAKE_QUOTES } from "@/fakeData/quotes";
 import { FAKE_USER_STATS } from "@/fakeData/stats";
 import { FAKE_INVOICES } from "@/fakeData/invoices";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { useLandingDemoStore } from "@/store/useLandingDemoStore";
 import { useAuth } from "@/hooks/useAuth";
 import { RecentProjectsWidget, CalendarWidget, MessagesWidget } from "@/components/widgets";
 
@@ -34,6 +35,7 @@ const Demo = () => {
   const navigate = useNavigate();
   const { user, userRole } = useAuth();
   const { setFakeDataEnabled } = useFakeDataStore();
+  const { activateDemo, deactivateDemo } = useLandingDemoStore();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Activer automatiquement les fake data quand on arrive sur la page Demo
@@ -44,6 +46,7 @@ const Demo = () => {
     if (user && userRole !== 'admin') {
       console.log("🔒 Utilisateur connecté (non-admin) détecté - Redirection vers dashboard réel");
       setFakeDataEnabled(false);
+      deactivateDemo();
       navigate("/dashboard", { replace: true });
       return;
     }
@@ -52,6 +55,7 @@ const Demo = () => {
     // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
     // 2. OU l'utilisateur est administrateur (démo dans l'app)
     if (!user || userRole === 'admin') {
+      activateDemo();
       setFakeDataEnabled(true);
     }
 
