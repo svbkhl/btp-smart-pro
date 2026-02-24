@@ -45,12 +45,20 @@ if ((!annuel || !mensuel) && def) {
 if (!annuel || !mensuel) {
   console.error("❌ Erreur: VITE_STRIPE_PRICE_ID_ANNUEL et VITE_STRIPE_PRICE_ID_MENSUEL (ou VITE_STRIPE_PRICE_ID) doivent être dans .env ou .env.local");
   console.error("");
-  console.error("Copie les valeurs depuis Supabase Dashboard → Edge Functions → Secrets,");
-  console.error("puis ajoute-les dans .env.local :");
-  console.error("  VITE_STRIPE_PRICE_ID_ANNUEL=price_xxx");
-  console.error("  VITE_STRIPE_PRICE_ID_MENSUEL=price_yyy");
+  console.error("Copie les valeurs depuis Stripe Dashboard puis ajoute-les dans .env.local :");
+  console.error("  VITE_STRIPE_PRICE_ID_ANNUEL=price_xxx          # Pro annuel");
+  console.error("  VITE_STRIPE_PRICE_ID_MENSUEL=price_xxx         # Pro mensuel");
+  console.error("  VITE_STRIPE_PRICE_ID_STARTER_ANNUEL=price_xxx  # Starter annuel");
+  console.error("  VITE_STRIPE_PRICE_ID_STARTER_MENSUEL=price_xxx # Starter mensuel");
+  console.error("  VITE_STRIPE_PRICE_ID_ELITE_ANNUEL=price_xxx    # Elite annuel");
+  console.error("  VITE_STRIPE_PRICE_ID_ELITE_MENSUEL=price_xxx   # Elite mensuel");
   process.exit(1);
 }
+
+const starterAnnuel  = vars.VITE_STRIPE_PRICE_ID_STARTER_ANNUEL?.trim();
+const starterMensuel = vars.VITE_STRIPE_PRICE_ID_STARTER_MENSUEL?.trim();
+const eliteAnnuel    = vars.VITE_STRIPE_PRICE_ID_ELITE_ANNUEL?.trim();
+const eliteMensuel   = vars.VITE_STRIPE_PRICE_ID_ELITE_MENSUEL?.trim();
 
 function run(name: string, value: string) {
   // Supprimer d'abord si elle existe (évite "already exists"), puis ajouter
@@ -99,12 +107,29 @@ if (!linked) {
 const publishable = vars.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
 
 console.log("📤 Ajout des variables Stripe vers Vercel (production)...\n");
+
+// Plan Pro (existant — ne pas modifier les valeurs si elles sont déjà bonnes)
 run("VITE_STRIPE_PRICE_ID_ANNUEL", annuel);
 run("VITE_STRIPE_PRICE_ID_MENSUEL", mensuel);
+
+// Plan Starter (nouveau)
+if (starterAnnuel)  run("VITE_STRIPE_PRICE_ID_STARTER_ANNUEL",  starterAnnuel);
+else console.log("⚠️  VITE_STRIPE_PRICE_ID_STARTER_ANNUEL non défini — le bouton Starter Annuel sera désactivé.");
+
+if (starterMensuel) run("VITE_STRIPE_PRICE_ID_STARTER_MENSUEL", starterMensuel);
+else console.log("⚠️  VITE_STRIPE_PRICE_ID_STARTER_MENSUEL non défini — le bouton Starter Mensuel sera désactivé.");
+
+// Plan Elite (nouveau)
+if (eliteAnnuel)    run("VITE_STRIPE_PRICE_ID_ELITE_ANNUEL",    eliteAnnuel);
+else console.log("⚠️  VITE_STRIPE_PRICE_ID_ELITE_ANNUEL non défini — le bouton Elite Annuel sera désactivé.");
+
+if (eliteMensuel)   run("VITE_STRIPE_PRICE_ID_ELITE_MENSUEL",   eliteMensuel);
+else console.log("⚠️  VITE_STRIPE_PRICE_ID_ELITE_MENSUEL non défini — le bouton Elite Mensuel sera désactivé.");
+
 if (publishable) {
   run("VITE_STRIPE_PUBLISHABLE_KEY", publishable);
 } else {
-  console.log("ℹ️ VITE_STRIPE_PUBLISHABLE_KEY non défini : ajoute-la dans .env.local pour activer le formulaire carte sur la page Abonnement.");
+  console.log("ℹ️  VITE_STRIPE_PUBLISHABLE_KEY non défini : ajoute-la dans .env.local pour activer le formulaire carte.");
 }
-console.log("\n✅ Terminé. Redéploie avec: npx vercel --prod");
-console.log("   Ou push sur main pour déclencher un déploiement automatique.");
+console.log("\n✅ Terminé. Redéploie avec: git push origin main");
+console.log("   ou: npx vercel --prod");
