@@ -33,12 +33,14 @@ import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell, BarChart, Bar, Legend, Label } from "recharts";
 import { BarChart3, Sparkles } from "lucide-react";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isEmployee, loading: permissionsLoading } = usePermissions();
   const { firstName } = useCurrentUserDisplayName();
+  const { fakeDataEnabled } = useFakeDataStore();
   
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: projects, isLoading: projectsLoading } = useProjects();
@@ -196,6 +198,17 @@ const Dashboard = () => {
 
   // Tendances réalistes : mois actuel vs mois précédent
   const trends = useMemo(() => {
+    // En mode démo les calculs dynamiques donnent des % aberrants (±1458%)
+    // On retourne des tendances réalistes hardcodées pour une démo crédible
+    if (fakeDataEnabled) {
+      return {
+        revenue:  { value: 12, isPositive: true  },  // CA  ↑12%
+        profit:   { value: 8,  isPositive: true  },  // Bénéfice ↑8%
+        projects: { value: 20, isPositive: true  },  // Chantiers ↑20%
+        clients:  { value: 50, isPositive: true  },  // Clients   ↑50%
+      };
+    }
+
     const now = new Date();
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
