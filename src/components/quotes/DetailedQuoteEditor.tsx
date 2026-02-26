@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { useCreateDetailedQuote, useUpdateDetailedQuote } from "@/hooks/useDetailedQuotes";
 import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
@@ -297,7 +297,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
       // 1. Créer le devis en DB
       const newQuote = await createDetailedQuote.mutateAsync({
         client_id: clientId,
-        client_name: selectedClient.name,
+        client_name: getClientFullName(selectedClient),
             tva_rate: tva293b ? 0 : tvaRate,
             tva_non_applicable_293b: tva293b,
       });
@@ -917,7 +917,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
               <SelectContent>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.name}
+                    {getClientFullName(client)}
                   </SelectItem>
                 ))}
               </SelectContent>

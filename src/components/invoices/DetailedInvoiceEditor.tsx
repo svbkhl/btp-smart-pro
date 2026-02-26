@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { useCreateInvoice, CreateInvoiceData } from "@/hooks/useInvoices";
 import { useToast } from "@/components/ui/use-toast";
@@ -236,7 +236,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
       // Créer la facture
       const invoiceData: CreateInvoiceData = {
         client_id: clientId,
-        client_name: selectedClient.name,
+        client_name: getClientFullName(selectedClient),
         client_email: selectedClient.email,
         client_address: selectedClient.location,
         description: descriptionParts.join('\n') || "Facture détaillée",
@@ -357,7 +357,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
               <SelectContent>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.name}
+                    {getClientFullName(client)}
                   </SelectItem>
                 ))}
               </SelectContent>

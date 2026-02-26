@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { generateSimpleQuote, STANDARD_PHRASE } from "@/services/simpleQuoteService";
 import { QuoteDisplay } from "./QuoteDisplay";
@@ -489,7 +489,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
                 ) : (
                   clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                      {getClientFullName(client)}
                     </SelectItem>
                   ))
                 )}

@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateInvoice, CreateInvoiceData } from "@/hooks/useInvoices";
-import { useClients, useCreateClient } from "@/hooks/useClients";
+import { useClients, useCreateClient, getClientFullName } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { Loader2, Plus } from "lucide-react";
 import { calculateFromTTC } from "@/utils/priceCalculations";
@@ -234,7 +234,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                       setValue("client_id", value);
                       const client = clients?.find((c) => c.id === value);
                       if (client) {
-                        setValue("client_name", client.name);
+                        setValue("client_name", getClientFullName(client));
                         setValue("client_email", client.email || "");
                         setValue("client_address", client.location || "");
                       }
@@ -247,7 +247,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
                   <SelectContent>
                     {clients?.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                        {getClientFullName(client)}
                       </SelectItem>
                     ))}
                     <div className="border-t border-border mt-1 pt-1">

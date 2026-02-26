@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateQuote, CreateQuoteData } from "@/hooks/useQuotes";
-import { useClients, useCreateClient } from "@/hooks/useClients";
+import { useClients, useCreateClient, getClientFullName } from "@/hooks/useClients";
 import { Loader2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -76,7 +76,7 @@ export const CreateQuoteDialog = ({ open, onOpenChange }: CreateQuoteDialogProps
     if (selectedClientId && clients) {
       const client = clients.find((c) => c.id === selectedClientId);
       if (client) {
-        setValue("client_name", client.name);
+        setValue("client_name", getClientFullName(client));
         setValue("client_email", client.email || "");
       }
     }
@@ -214,7 +214,7 @@ export const CreateQuoteDialog = ({ open, onOpenChange }: CreateQuoteDialogProps
                 <SelectContent>
                   {clients?.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                      {getClientFullName(client)}
                     </SelectItem>
                   ))}
                 </SelectContent>

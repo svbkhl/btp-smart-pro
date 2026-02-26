@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { useClients } from "@/hooks/useClients";
+import { useClients, getClientFullName } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
@@ -252,7 +252,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
       
       const invoiceData: CreateInvoiceData = {
         client_id: clientId,
-        client_name: selectedClient.name,
+        client_name: getClientFullName(selectedClient),
         client_email: selectedClient.email,
         client_address: selectedClient.location,
         quote_id: quoteId || undefined,
@@ -498,7 +498,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
                 ) : (
                   clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                      {getClientFullName(client)}
                     </SelectItem>
                   ))
                 )}
