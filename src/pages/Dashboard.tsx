@@ -40,7 +40,10 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { isEmployee, loading: permissionsLoading } = usePermissions();
   const { firstName } = useCurrentUserDisplayName();
-  const { fakeDataEnabled } = useFakeDataStore();
+  const { fakeDataEnabled, closerEmployeeMode } = useFakeDataStore();
+
+  // En mode "vue employé" (closer en démo), simuler le rôle employé
+  const effectiveIsEmployee = isEmployee || (closerEmployeeMode && fakeDataEnabled);
   
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: projects, isLoading: projectsLoading } = useProjects();
@@ -275,7 +278,7 @@ const Dashboard = () => {
   const isLoading = statsLoading || projectsLoading || clientsLoading || quotesLoading;
 
   // Vue employé : pas de stats (CA, nb chantiers), uniquement accès rapide
-  if (isEmployee) {
+  if (effectiveIsEmployee) {
     const employeeCards = [
       { to: "/projects", icon: FolderKanban, title: "Mes chantiers", desc: "Voir mes affectations", iconClass: "bg-blue-500/20 text-blue-600 dark:text-blue-400", cardClass: "hover:border-blue-500/40" },
       { to: "/calendar", icon: Calendar, title: "Calendrier", desc: "Agenda et événements", iconClass: "bg-purple-500/20 text-purple-600 dark:text-purple-400", cardClass: "hover:border-purple-500/40" },

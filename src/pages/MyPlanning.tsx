@@ -113,6 +113,28 @@ const MyPlanning = ({ embedded = false }: MyPlanningProps = {}) => {
       return;
     }
 
+    // Mode démo : charger les fausses données directement
+    if (fakeDataEnabled) {
+      const fakeEmp = FAKE_EMPLOYEES[0];
+      setEmployee(fakeEmp);
+      // Filtrer les affectations du faux employé (fake-emp-1) et adapter au format attendu
+      const mapped = FAKE_ASSIGNMENTS
+        .filter((a) => a.employee_id === fakeEmp.id)
+        .map((a) => ({
+          id: a.id,
+          project_id: a.project_id,
+          jour: a.jour,
+          heures: a.heures,
+          date: a.date,
+          heure_debut: a.heure_debut,
+          heure_fin: a.heure_fin,
+          project: a.projects ? { name: a.projects.name, location: a.projects.location } : undefined,
+        }));
+      setAssignments(mapped);
+      setLoading(false);
+      return;
+    }
+
     // Timeout de 3 secondes pour éviter les chargements infinis
     const timeoutId = setTimeout(() => {
       setLoading(false);
