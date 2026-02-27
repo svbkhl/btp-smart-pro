@@ -217,6 +217,8 @@ export default function Sidebar() {
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
+  const closerEmployeeMode = useFakeDataStore((state) => state.closerEmployeeMode);
+  const setCloserEmployeeMode = useFakeDataStore((state) => state.setCloserEmployeeMode);
   
   // Ref pour ignorer les hover events pendant la navigation
   const isNavigatingRef = useRef(false);
@@ -274,10 +276,12 @@ export default function Sidebar() {
     [can]
   );
   
-  // Calcul des menuGroups : employés = menu fixe (inclut forceEmployeeView via usePermissions)
+  // Calcul des menuGroups : vue employé si rôle employé OU si closer en mode vue employé
   const menuGroups = useMemo(
-    () => (isEmployee ? employeeMenuGroups : getMenuGroups(company, isEmployee, canFunc, isOwner)),
-    [company, isEmployee, canFunc, isOwner]
+    () => (isEmployee || (isCloser && closerEmployeeMode && fakeDataEnabled)
+      ? employeeMenuGroups
+      : getMenuGroups(company, isEmployee, canFunc, isOwner)),
+    [company, isEmployee, canFunc, isOwner, isCloser, closerEmployeeMode, fakeDataEnabled]
   );
   
   // Utiliser isVisible du contexte pour mobile aussi
@@ -937,26 +941,51 @@ export default function Sidebar() {
           <div className="pt-2 space-y-1">
             {user ? (
               <>
-                {/* Toggle Mode démo uniquement pour les admins (pas owner/employee) */}
-                {userRole === 'admin' && !isOwner && !isEmployee && (
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 mb-2">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-primary" />
-                      {isOpen && (
-                        <Label htmlFor="demo-mode-sidebar" className="text-xs font-medium cursor-pointer">
-                          Mode démo
-                        </Label>
-                      )}
+                {/* Toggle Mode démo pour les admins et les closers */}
+                {(userRole === 'admin' || isCloser) && !isOwner && !isEmployee && (
+                  <div className="space-y-1.5 mb-2">
+                    {/* Toggle démo */}
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        {isOpen && (
+                          <Label htmlFor="demo-mode-sidebar" className="text-xs font-medium cursor-pointer">
+                            Mode démo
+                          </Label>
+                        )}
+                      </div>
+                      <Switch
+                        id="demo-mode-sidebar"
+                        checked={fakeDataEnabled}
+                        onCheckedChange={(checked) => {
+                          setFakeDataEnabled(checked);
+                          if (!checked) setCloserEmployeeMode(false);
+                          queryClient.invalidateQueries();
+                          queryClient.refetchQueries();
+                        }}
+                      />
                     </div>
-                    <Switch
-                      id="demo-mode-sidebar"
-                      checked={fakeDataEnabled}
-                      onCheckedChange={(checked) => {
-                        setFakeDataEnabled(checked);
-                        queryClient.invalidateQueries();
-                        queryClient.refetchQueries();
-                      }}
-                    />
+
+                    {/* Toggle vue employé (visible uniquement si closer ET mode démo actif) */}
+                    {isCloser && fakeDataEnabled && (
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50">
+                        <div className="flex items-center gap-2">
+                          <UserCog className="w-4 h-4 text-orange-400" />
+                          {isOpen && (
+                            <Label htmlFor="employee-view-sidebar" className="text-xs font-medium cursor-pointer">
+                              Vue employé
+                            </Label>
+                          )}
+                        </div>
+                        <Switch
+                          id="employee-view-sidebar"
+                          checked={closerEmployeeMode}
+                          onCheckedChange={(checked) => {
+                            setCloserEmployeeMode(checked);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
                 <Button

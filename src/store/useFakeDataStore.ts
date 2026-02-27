@@ -5,6 +5,9 @@ interface FakeDataState {
   fakeDataEnabled: boolean;
   toggleFakeData: () => void;
   setFakeDataEnabled: (enabled: boolean) => void;
+  /** Mode vue employé pour les closers (démo visio) */
+  closerEmployeeMode: boolean;
+  setCloserEmployeeMode: (enabled: boolean) => void;
 }
 
 /**
@@ -19,9 +22,8 @@ interface FakeDataState {
 export const useFakeDataStore = create<FakeDataState>()(
   persist(
     (set, get) => ({
-      // Par défaut, le fake data est désactivé
-      // Il ne sera activé QUE par le mode démo de la landing page
       fakeDataEnabled: false,
+      closerEmployeeMode: false,
       
       toggleFakeData: () => {
         // Cette fonction n'est plus utilisée (toggle supprimé du Sidebar)
@@ -33,10 +35,13 @@ export const useFakeDataStore = create<FakeDataState>()(
       
       setFakeDataEnabled: (enabled: boolean) => {
         console.log("🔄 setFakeDataEnabled appelé avec:", enabled);
-        set({ fakeDataEnabled: enabled });
+        // Désactiver la vue employé quand on coupe le mode démo
+        set({ fakeDataEnabled: enabled, ...(enabled === false ? { closerEmployeeMode: false } : {}) });
         console.log("✅ État mis à jour, nouveau fakeDataEnabled:", get().fakeDataEnabled);
-        // Ne pas rafraîchir la page automatiquement
-        // Le rechargement sera géré par les composants qui utilisent ce store
+      },
+
+      setCloserEmployeeMode: (enabled: boolean) => {
+        set({ closerEmployeeMode: enabled });
       },
     }),
     {

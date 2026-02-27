@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useLandingDemoStore } from "@/store/useLandingDemoStore";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { isCloserEmail } from "@/config/admin";
 
 /**
  * Composant guard qui désactive automatiquement le mode démo
@@ -11,6 +12,7 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
  */
 export const DemoModeGuard = () => {
   const { user, loading, userRole } = useAuth();
+  const isCloser = isCloserEmail(user?.email);
   const location = useLocation();
   const { isDemoActive, deactivateDemo } = useLandingDemoStore();
   const { setFakeDataEnabled, fakeDataEnabled } = useFakeDataStore();
@@ -27,8 +29,8 @@ export const DemoModeGuard = () => {
         deactivateDemo();
       }
       
-      // Désactiver le fake data UNIQUEMENT si l'utilisateur n'est PAS administrateur
-      if (fakeDataEnabled && userRole !== 'admin') {
+      // Désactiver le fake data UNIQUEMENT si l'utilisateur n'est ni admin ni closer
+      if (fakeDataEnabled && userRole !== 'admin' && !isCloser) {
         console.log("🔒 Désactivation du mode fake data - Utilisateur non-admin connecté");
         setFakeDataEnabled(false);
       }

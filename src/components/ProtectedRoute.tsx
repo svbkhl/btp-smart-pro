@@ -27,11 +27,10 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   
   // Contrôler le mode démo selon le rôle de l'utilisateur
   useEffect(() => {
-    // Si l'utilisateur est connecté et le mode démo est activé
     if (user && fakeDataEnabled && !loading) {
-      // Si l'utilisateur n'est pas administrateur, désactiver le mode démo
-      if (userRole !== 'admin') {
-        console.log("🔒 Utilisateur non-admin détecté - Désactivation du mode démo");
+      const isCloser = isCloserEmail(user.email);
+      if (userRole !== 'admin' && !isCloser) {
+        console.log("🔒 Utilisateur non-admin/closer détecté - Désactivation du mode démo");
         setFakeDataEnabled(false);
       }
     }
@@ -117,7 +116,8 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
 
   // Redirection Settings en mode démo (dans un effet pour éviter setState pendant le render)
   useEffect(() => {
-    if (fakeDataEnabled && user && userRole !== 'admin') {
+    const isCloser = isCloserEmail(user?.email);
+    if (fakeDataEnabled && user && userRole !== 'admin' && !isCloser) {
       const isSettingsPage = location.pathname === '/settings' || location.pathname.startsWith('/settings');
       if (isSettingsPage) {
         navigate("/dashboard", { replace: true });
@@ -151,26 +151,22 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
     }
   }, [isPaywallPath, user, isAdmin, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
 
-  // En mode démo (fakeDataEnabled), permettre l'accès SEULEMENT si :
+  // En mode démo (fakeDataEnabled), permettre l'accès si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
-  // 2. OU l'utilisateur est administrateur (démo dans l'app)
-  // EXCEPTION : Bloquer l'accès à Settings en mode démo (redirection gérée dans l'effet ci-dessus)
+  // 2. OU l'utilisateur est admin ou closer
   if (fakeDataEnabled) {
+    const isCloser = isCloserEmail(user?.email);
     const isSettingsPage = location.pathname === '/settings' || location.pathname.startsWith('/settings');
-    if (isSettingsPage && user && userRole !== 'admin') {
+    if (isSettingsPage && user && userRole !== 'admin' && !isCloser) {
       return null; // l'effet redirige vers dashboard
     }
-    
-    // Si l'utilisateur n'est pas connecté, permettre l'accès (démo publique depuis landing page)
     if (!user) {
       return <>{children}</>;
     }
-    // Si l'utilisateur est connecté et est administrateur, permettre l'accès
-    if (user && userRole === 'admin') {
+    if (user && (userRole === 'admin' || isCloser)) {
       return <>{children}</>;
     }
-    // Si l'utilisateur est connecté mais n'est pas administrateur, continuer avec la vérification normale
-    // (le mode démo sera désactivé par le useEffect ci-dessus)
+    // Utilisateur connecté mais ni admin ni closer → continuer (mode démo sera désactivé par useEffect)
   }
 
   // Les closers ont accès à /closer sans abonnement ni company
