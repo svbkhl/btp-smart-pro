@@ -17,6 +17,22 @@ const ENV_EMAILS = (ENV.VITE_ADMIN_EMAILS || ENV.VITE_ADMIN_EMAIL || "")
 /** Liste finale des emails admin */
 export const ADMIN_EMAILS = ENV_EMAILS.length > 0 ? ENV_EMAILS : DEFAULT_ADMIN_EMAILS;
 
+/** Emails des closers (accès création entreprise + invitation dirigeant, sans suppression) */
+const DEFAULT_CLOSER_EMAILS: string[] = [];
+const CLOSER_ENV = (ENV.VITE_CLOSER_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+export const CLOSER_EMAILS = CLOSER_ENV.length > 0 ? CLOSER_ENV : DEFAULT_CLOSER_EMAILS;
+
+/**
+ * Vérifie si l'email est un compte closer (commercial).
+ */
+export function isCloserEmail(email: string | undefined | null): boolean {
+  if (!email || typeof email !== "string") return false;
+  return CLOSER_EMAILS.includes(email.toLowerCase().trim());
+}
+
 /** Emails qui forcent la vue employé (sidebar, dashboard) même sans company */
 const EMPLOYEE_VIEW_EMAILS = ["khalfallahs.ndrc@gmail.com", "khalfallah.sndrc@gmail.com"];
 

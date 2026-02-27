@@ -3,16 +3,17 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useSubscription } from "@/hooks/useSubscription";
-import { isSystemAdmin } from "@/config/admin";
+import { isSystemAdmin, isCloserEmail } from "@/config/admin";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  requireCloser?: boolean;
 }
 
 const PAYWALL_PATHS = ["/start", "/start/success", "/start/cancel"];
 
-export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, isAdmin, userRole, currentCompanyId } = useAuth();
@@ -172,11 +173,22 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     // (le mode démo sera désactivé par le useEffect ci-dessus)
   }
 
+  // Les closers ont accès à /closer sans abonnement ni company
+  const isCloser = isCloserEmail(user?.email);
+  if (requireCloser && !isCloser && !isSystemAdmin(user) && showContent) {
+    navigate("/dashboard", { replace: true });
+    return null;
+  }
+  if (requireCloser && !isCloser && !isSystemAdmin(user) && !showContent) {
+    return null;
+  }
+
   // Si on doit rediriger vers /start (gate abo), ne pas afficher les children pendant la redirection
   // Exclure aussi les admins système (ex. sabri.khalfallah6@gmail.com) qui n'ont pas de company
+  // Exclure les closers (ils n'ont pas de company non plus)
   const adminSystem = isSystemAdmin(user);
   const shouldRedirectToStart =
-    !isPaywallPath && user && !isAdmin && !adminSystem && !subscriptionLoading &&
+    !isPaywallPath && user && !isAdmin && !adminSystem && !isCloser && !subscriptionLoading &&
     ((currentCompanyId && !subscriptionActive) || !currentCompanyId);
   if (shouldRedirectToStart) {
     return null; // l'effet ci-dessus fait la redirection

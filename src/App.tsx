@@ -57,6 +57,7 @@ import RHCandidatures from './pages/RHCandidatures';
 import RHTaches from './pages/RHTaches';
 import AdminEmployees from './pages/AdminEmployees';
 import AdminCompanies from './pages/AdminCompanies';
+import CloserDashboard from './pages/CloserDashboard';
 import AcceptInvitation from './pages/AcceptInvitation';
 import InviteAccept from './pages/InviteAccept';
 import StripeCallback from './pages/StripeCallback';
@@ -405,6 +406,14 @@ function App() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminCompanies />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/closer"
+          element={
+            <ProtectedRoute requireCloser>
+              <CloserDashboard />
             </ProtectedRoute>
           }
         />
