@@ -2,8 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "@/components/ui/use-toast";
-import { safeLocalStorage } from "@/utils/isBrowser";
-import { updateConversationLastMessageInLocalStorage } from "./useConversations";
 
 export interface AIMessage {
   id: string;
@@ -54,26 +52,6 @@ const setCachedMessages = (conversationId: string, messages: AIMessage[]) => {
     // Ignore storage errors
   }
 };
-
-/** Mise à jour optimiste last_message_at sans invalider (évite refetch qui fait disparaître les convs) */
-function updateConversationLastMessageInCache(
-  queryClient: ReturnType<typeof import("@tanstack/react-query").useQueryClient>,
-  userId: string,
-  conversationId: string,
-  lastMessageAt: string,
-  conversationType: "btp" | "chatbot"
-) {
-  const key = ["ai_conversations", userId, false, conversationType] as const;
-  queryClient.setQueryData<Array<{ id: string; last_message_at: string | null; [k: string]: any }>>(
-    key,
-    (old) => {
-      if (!old) return old;
-      return old.map((c) =>
-        c.id === conversationId ? { ...c, last_message_at: lastMessageAt } : c
-      );
-    }
-  );
-}
 
 // Hook pour récupérer les messages d'une conversation
 export const useMessages = (conversationId: string | null) => {
@@ -193,26 +171,9 @@ export const useCreateMessage = () => {
     onSuccess: (message) => {
       // Invalider le cache des messages
       queryClient.invalidateQueries({ queryKey: ["ai_messages", message.conversation_id] });
-      // Mise à jour optimiste last_message_at (pas d'invalidate = pas de refetch qui fait disparaître les convs)
-      if (user) {
-        updateConversationLastMessageInCache(
-          queryClient,
-          user.id,
-          message.conversation_id,
-          message.created_at,
-          "btp"
-        );
-        updateConversationLastMessageInCache(
-          queryClient,
-          user.id,
-          message.conversation_id,
-          message.created_at,
-          "chatbot"
-        );
-        updateConversationLastMessageInLocalStorage(user.id, message.conversation_id, message.created_at, "btp");
-        updateConversationLastMessageInLocalStorage(user.id, message.conversation_id, message.created_at, "chatbot");
-      }
-
+      // Invalider le cache des conversations (pour mettre à jour last_message_at)
+      queryClient.invalidateQueries({ queryKey: ["ai_conversations"] });
+      
       // Mettre à jour le cache local
       const cached = getCachedMessages(message.conversation_id) || [];
       setCachedMessages(message.conversation_id, [...cached, message]);
@@ -304,28 +265,11 @@ export const useCreateMessagesBatch = () => {
       return (data || []) as AIMessage[];
     },
     onSuccess: (messages) => {
-      if (messages.length > 0 && user) {
+      if (messages.length > 0) {
         const conversationId = messages[0].conversation_id;
-        const lastMessage = messages[messages.length - 1];
         queryClient.invalidateQueries({ queryKey: ["ai_messages", conversationId] });
-        // Mise à jour optimiste (pas d'invalidate qui fait disparaître les convs)
-        updateConversationLastMessageInCache(
-          queryClient,
-          user.id,
-          conversationId,
-          lastMessage.created_at,
-          "btp"
-        );
-        updateConversationLastMessageInCache(
-          queryClient,
-          user.id,
-          conversationId,
-          lastMessage.created_at,
-          "chatbot"
-        );
-        updateConversationLastMessageInLocalStorage(user.id, conversationId, lastMessage.created_at, "btp");
-        updateConversationLastMessageInLocalStorage(user.id, conversationId, lastMessage.created_at, "chatbot");
-
+        queryClient.invalidateQueries({ queryKey: ["ai_conversations"] });
+        
         // Mettre à jour le cache local
         const cached = getCachedMessages(conversationId) || [];
         setCachedMessages(conversationId, [...cached, ...messages]);
