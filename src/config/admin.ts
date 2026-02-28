@@ -18,7 +18,7 @@ const ENV_EMAILS = (ENV.VITE_ADMIN_EMAILS || ENV.VITE_ADMIN_EMAIL || "")
 export const ADMIN_EMAILS = ENV_EMAILS.length > 0 ? ENV_EMAILS : DEFAULT_ADMIN_EMAILS;
 
 /** Emails des closers (accès création entreprise + invitation dirigeant, sans suppression) */
-const DEFAULT_CLOSER_EMAILS: string[] = [];
+const DEFAULT_CLOSER_EMAILS: string[] = ["sabbg.du73100@gmail.com"];
 const CLOSER_ENV = (ENV.VITE_CLOSER_EMAILS || "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
