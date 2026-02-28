@@ -4,7 +4,6 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -19,7 +18,6 @@ import {
   Company,
   useCompanyMembersForAdmin,
 } from "@/hooks/useCompany";
-import { ALL_FEATURES } from "@/utils/companyFeatures";
 import {
   Loader2,
   Building2,
@@ -301,18 +299,6 @@ const CloserDashboard = () => {
                   />
                 </div>
 
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">Modules activés</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ALL_FEATURES.filter((f) => company.features?.[f.key] === true).map((feature) => (
-                      <span key={feature.key} className="px-2 py-0.5 text-xs rounded-lg bg-primary/10 text-primary">{feature.label}</span>
-                    ))}
-                    {ALL_FEATURES.filter((f) => company.features?.[f.key] === true).length === 0 && (
-                      <span className="text-xs text-muted-foreground">Aucun module activé</span>
-                    )}
-                  </div>
-                </div>
-
                 <div className="pt-3 border-t">
                   <Button variant="ghost" size="sm" onClick={() => toggleExpansion(company.id)} className="w-full justify-between rounded-xl">
                     <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span>Voir les membres</span></div>
@@ -348,31 +334,6 @@ const CloserDashboard = () => {
                   <SelectItem value="elite">Elite</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Modules à activer</Label>
-                <Button type="button" variant="outline" size="sm" className="text-xs h-7 rounded-lg"
-                  onClick={() => {
-                    const allSelected = ALL_FEATURES.every((f) => newCompanyData.features[f.key as keyof typeof newCompanyData.features] === true);
-                    const newFeatures = ALL_FEATURES.reduce((acc, f) => ({ ...acc, [f.key]: !allSelected }), {});
-                    setNewCompanyData({ ...newCompanyData, features: newFeatures });
-                  }}
-                >
-                  {ALL_FEATURES.every((f) => newCompanyData.features[f.key as keyof typeof newCompanyData.features] === true) ? "Tout désélectionner" : "Tout sélectionner"}
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {ALL_FEATURES.map((feature) => (
-                  <div key={feature.key} className="flex items-center space-x-2 p-2 rounded-lg bg-transparent backdrop-blur-xl">
-                    <Switch
-                      checked={newCompanyData.features[feature.key as keyof typeof newCompanyData.features] === true}
-                      onCheckedChange={(checked) => setNewCompanyData({ ...newCompanyData, features: { ...newCompanyData.features, [feature.key]: checked } })}
-                    />
-                    <Label className="text-sm cursor-pointer">{feature.label}</Label>
-                  </div>
-                ))}
-              </div>
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="rounded-xl">Annuler</Button>
