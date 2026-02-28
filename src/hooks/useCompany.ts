@@ -117,12 +117,12 @@ export const useCompany = () => {
  * Récupère toutes les companies (admin seulement)
  */
 export const useAllCompanies = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isCloser } = useAuth();
 
   return useQuery<Company[], Error>({
     queryKey: ["all_companies"],
     queryFn: async () => {
-      if (!user || !isAdmin) {
+      if (!user || (!isAdmin && !isCloser)) {
         throw new Error("Unauthorized");
       }
 
@@ -164,7 +164,7 @@ export const useAllCompanies = () => {
         throw err;
       }
     },
-    enabled: !!user && !!isAdmin,
+    enabled: !!user && (!!isAdmin || !!isCloser),
     retry: false,
     throwOnError: false,
   });
@@ -189,7 +189,7 @@ export interface CompanyMemberForAdmin {
  * sans fiche employé. Utilise la RPC admin_get_company_users (SECURITY DEFINER).
  */
 export const useCompanyMembersForAdmin = (companyId: string | null) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isCloser } = useAuth();
 
   return useQuery<CompanyMemberForAdmin[], Error>({
     queryKey: ["company-members-admin", companyId],
@@ -201,7 +201,7 @@ export const useCompanyMembersForAdmin = (companyId: string | null) => {
       if (error) throw error;
       return (data ?? []) as CompanyMemberForAdmin[];
     },
-    enabled: !!user && !!isAdmin && !!companyId,
+    enabled: !!user && (!!isAdmin || !!isCloser) && !!companyId,
     staleTime: 2 * 60 * 1000,
     throwOnError: false,
   });
@@ -265,7 +265,7 @@ export const useUpdateCompany = () => {
  */
 export const useCreateCompany = () => {
   const queryClient = useQueryClient();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isCloser } = useAuth();
 
   return useMutation({
     mutationFn: async (companyData: {
@@ -275,7 +275,7 @@ export const useCreateCompany = () => {
       settings?: Company["settings"];
       support_level?: Company["support_level"];
     }) => {
-      if (!user || !isAdmin) {
+      if (!user || (!isAdmin && !isCloser)) {
         throw new Error("Unauthorized");
       }
 
