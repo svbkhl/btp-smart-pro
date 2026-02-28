@@ -153,14 +153,16 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   }, [isPaywallPath, user, isAdmin, isCloser, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
 
   // Rediriger les closers vers /closer s'ils atterrissent sur une page non appropriée
+  // En mode démo (fakeDataEnabled), les closers peuvent naviguer sur toutes les pages
   useEffect(() => {
     if (!isCloser || loading || !user) return;
+    if (fakeDataEnabled) return; // démo active → accès complet à toute l'app
     const closerAllowedPaths = ["/closer", "/demo", "/settings", "/dashboard"];
     const isAllowed = closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
     if (!isAllowed) {
       navigate("/closer", { replace: true });
     }
-  }, [isCloser, loading, user, location.pathname, navigate]);
+  }, [isCloser, loading, user, fakeDataEnabled, location.pathname, navigate]);
 
   // En mode démo (fakeDataEnabled), permettre l'accès si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)

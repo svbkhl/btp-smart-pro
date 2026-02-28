@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { FloatingAIAssistant } from './components/ai/FloatingAIAssistant';
 import { DemoModeGuard } from './components/DemoModeGuard';
 import { CompanySelector } from './components/CompanySelector';
+import { CloserProfileSetup } from './components/CloserProfileSetup';
 import { TomorrowAssignmentsNotification } from './components/TomorrowAssignmentsNotification';
 import { useAuth } from './contexts/AuthContext';
 
@@ -116,6 +117,8 @@ function App() {
     <ErrorBoundary>
       {/* Guard qui désactive automatiquement le mode démo si l'utilisateur se connecte */}
       <DemoModeGuard />
+      {/* Setup profil closer à la première connexion */}
+      <CloserProfileSetup />
       {/* Sélecteur d'entreprise - affiché uniquement si l'utilisateur appartient à plusieurs entreprises */}
       {user && !isPublicPage && <CompanySelector />}
       {/* Notification des affectations du lendemain - pour les employés */}

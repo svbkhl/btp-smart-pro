@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import {
   ChevronDown,
   ChevronUp,
   MonitorPlay,
+  Eye,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,7 +43,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Link } from "react-router-dom";
+import { useFakeDataStore } from "@/store/useFakeDataStore";
 
 const CompanyMembersList = ({
   companyId,
@@ -105,9 +107,11 @@ const CompanyMembersList = ({
 };
 
 const CloserDashboard = () => {
+  const navigate = useNavigate();
   const { data: companies = [], isLoading, error } = useAllCompanies();
   const createCompany = useCreateCompany();
   const { toast } = useToast();
+  const { setFakeDataEnabled, fakeDataEnabled, setCloserEmployeeMode } = useFakeDataStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [newCompanyData, setNewCompanyData] = useState({
@@ -118,6 +122,21 @@ const CloserDashboard = () => {
   });
 
   const companiesList = Array.isArray(companies) ? companies : [];
+
+  const handleLancerDemo = (employeeMode = false) => {
+    setFakeDataEnabled(true);
+    if (employeeMode) {
+      setCloserEmployeeMode(true);
+    } else {
+      setCloserEmployeeMode(false);
+    }
+    navigate("/dashboard");
+  };
+
+  const handleStopDemo = () => {
+    setFakeDataEnabled(false);
+    setCloserEmployeeMode(false);
+  };
 
   const handleCreateCompany = async () => {
     if (!newCompanyData.name.trim()) {
@@ -172,37 +191,52 @@ const CloserDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" />
             Espace Closer
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-0.5 text-sm">
             Créez des entreprises et invitez les dirigeants à rejoindre BTP Smart Pro
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Bouton Démo */}
-          <Button variant="outline" asChild className="gap-2 rounded-xl">
-            <Link to="/demo">
-              <MonitorPlay className="w-4 h-4" />
-              Lancer la démo
-            </Link>
+        {/* Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Démo patron */}
+          <Button
+            variant={fakeDataEnabled ? "default" : "outline"}
+            onClick={() => fakeDataEnabled ? handleStopDemo() : handleLancerDemo(false)}
+            className="gap-2 rounded-xl flex-1 sm:flex-none text-sm"
+          >
+            <MonitorPlay className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">
+              {fakeDataEnabled ? "Quitter la démo" : "Démo patron"}
+            </span>
           </Button>
 
-          {/* Bouton Créer entreprise */}
+          {/* Démo employé */}
+          <Button
+            variant="outline"
+            onClick={() => handleLancerDemo(true)}
+            className="gap-2 rounded-xl flex-1 sm:flex-none text-sm"
+          >
+            <Eye className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Démo employé</span>
+          </Button>
+
+          {/* Créer entreprise */}
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 rounded-xl">
-                <Plus className="w-4 h-4" />
-                Nouvelle entreprise
+              <Button className="gap-2 rounded-xl flex-1 sm:flex-none text-sm">
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">Nouvelle entreprise</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle entreprise</DialogTitle>
                 <DialogDescription>
@@ -301,7 +335,7 @@ const CloserDashboard = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
                   <Button
                     variant="outline"
                     onClick={() => setIsCreateDialogOpen(false)}
@@ -333,26 +367,42 @@ const CloserDashboard = () => {
         </div>
       </div>
 
+      {/* Bannière démo active */}
+      {fakeDataEnabled && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400 text-sm">
+          <MonitorPlay className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1 font-medium">Mode démo actif — vous naviguez avec de fausses données.</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleStopDemo}
+            className="text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 rounded-lg h-7 px-2 flex-shrink-0"
+          >
+            Quitter
+          </Button>
+        </div>
+      )}
+
       {/* Liste des entreprises */}
       <div className="grid grid-cols-1 gap-4">
         {companiesList.length > 0 ? (
           companiesList.map((company) => (
-            <GlassCard key={company.id} className="p-6">
+            <GlassCard key={company.id} className="p-4 sm:p-6">
               <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{company.name}</h3>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>Plan: {company.plan}</span>
-                      <span>Statut: {company.status}</span>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="text-lg sm:text-xl font-semibold truncate">{company.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
+                      <Badge variant="outline" className="text-xs">{company.plan}</Badge>
+                      <Badge variant="secondary" className="text-xs">{company.status}</Badge>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex-shrink-0">
                     <InviteUserDialog
                       companyId={company.id}
                       companyName={company.name}
                       trigger={
-                        <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                        <Button variant="outline" size="sm" className="gap-2 rounded-xl w-full sm:w-auto">
                           <Mail className="w-4 h-4" />
                           Inviter dirigeant
                         </Button>
@@ -364,13 +414,13 @@ const CloserDashboard = () => {
 
                 {/* Modules */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Modules activés</Label>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  <p className="text-xs text-muted-foreground mb-1.5">Modules activés</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {ALL_FEATURES.filter((f) => company.features?.[f.key] === true).map(
                       (feature) => (
                         <span
                           key={feature.key}
-                          className="px-2 py-1 text-xs rounded-lg bg-primary/10 text-primary"
+                          className="px-2 py-0.5 text-xs rounded-lg bg-primary/10 text-primary"
                         >
                           {feature.label}
                         </span>
@@ -408,9 +458,9 @@ const CloserDashboard = () => {
             </GlassCard>
           ))
         ) : (
-          <GlassCard className="p-12 text-center">
-            <Building2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground mb-4">Aucune entreprise créée pour l'instant</p>
+          <GlassCard className="p-8 sm:p-12 text-center">
+            <Building2 className="w-14 h-14 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground mb-4 text-sm">Aucune entreprise créée pour l'instant</p>
             <Button
               className="gap-2 rounded-xl"
               onClick={() => setIsCreateDialogOpen(true)}
