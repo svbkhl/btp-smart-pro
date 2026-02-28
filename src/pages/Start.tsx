@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Building2, Check, Gift, AlertTriangle } from "lucide-react";
+import { Loader2, Building2, Check, Gift, AlertTriangle, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -447,6 +447,21 @@ export default function Start() {
   // ─── Page de tarification principale ─────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
+
+      {/* ── Bouton retour pour les closers ── */}
+      {isCloser && (
+        <div className="max-w-6xl mx-auto px-4 pt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/closer")}
+            className="gap-2 rounded-xl text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Retour à l'espace closer
+          </Button>
+        </div>
+      )}
 
       {/* ── Bannière engagement 12 mois ── */}
       <div className="bg-muted border-b border-border px-4 py-3">
