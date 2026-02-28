@@ -67,7 +67,7 @@ const PLANS: PlanDef[] = [
     trialDays: 14,
     bonusItems: [
       { label: "Frais d'entrée",     value: "500 €"  },
-      { label: "Onboarding vidéos",  value: "197 €"  },
+      { label: "Démo visio",         value: "197 €"  },
       { label: "14j d'essai offert", value: "79 €"   },
     ],
     bonusTotal: 776,
