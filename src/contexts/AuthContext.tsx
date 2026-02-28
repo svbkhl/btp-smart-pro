@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isCloserEmail } from '@/config/admin';
 
 interface AuthContextValue {
   user: User | null;
@@ -9,6 +10,8 @@ interface AuthContextValue {
   isCompanyLoading: boolean;
   isAdmin: boolean;
   isEmployee: boolean;
+  /** True si l'utilisateur est un closer (hardcoded ou en base) */
+  isCloser: boolean;
   userRole: 'admin' | 'member' | null;
   currentCompanyId: string | null;
   /** Force refetch current company (e.g. after accepting an invitation). */
@@ -23,6 +26,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isCompanyLoading, setIsCompanyLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
+  const [isCloser, setIsCloser] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   
@@ -295,12 +299,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) await fetchCurrentCompanyId(user.id);
   };
 
+  // Vérifier si l'utilisateur est un closer (hardcoded OU en base)
+  useEffect(() => {
+    const email = user?.email;
+    if (!email) {
+      setIsCloser(false);
+      return;
+    }
+    // Vérification immédiate sur la liste hardcodée
+    if (isCloserEmail(email)) {
+      setIsCloser(true);
+      return;
+    }
+    // Vérification en base (asynchrone)
+    supabase
+      .from('closer_emails' as any)
+      .select('email')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle()
+      .then(({ data }) => setIsCloser(!!data));
+  }, [user?.email]);
+
   const value: AuthContextValue = {
     user,
     loading,
     isCompanyLoading,
     isAdmin,
     isEmployee,
+    isCloser,
     userRole,
     currentCompanyId,
     refetchCurrentCompanyId,

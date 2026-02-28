@@ -31,7 +31,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
-import { isCloserEmail } from "@/config/admin";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -211,8 +210,7 @@ const getMenuGroups = (
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, userRole, loading: authLoading } = useAuth();
-  const isCloser = isCloserEmail(user?.email);
+  const { user, isAdmin, isCloser, userRole, loading: authLoading } = useAuth();
   const { isOwner, can, isEmployee, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);

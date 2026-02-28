@@ -27,6 +27,7 @@ import { NotificationSettings } from "@/components/settings/NotificationSettings
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
 import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
+import { CloserSettings } from "@/components/settings/CloserSettings";
 import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import { PlanningEmailSettings } from "@/components/settings/PlanningEmailSettings";
@@ -300,6 +301,10 @@ const Settings = () => {
                   <SettingsIcon2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Config Entreprises</span>
                 </TabsTrigger>
+                <TabsTrigger value="closers" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Closers</span>
+                </TabsTrigger>
               </>
             )}
             {isReallyAdmin && (
@@ -376,6 +381,9 @@ const Settings = () => {
               )}
               <TabsContent value="admin-company" className="mt-0">
                 <AdminCompanySettings />
+              </TabsContent>
+              <TabsContent value="closers" className="mt-0">
+                <CloserSettings />
               </TabsContent>
               <TabsContent value="demo" className="mt-0">
                 <DemoModeSettings />

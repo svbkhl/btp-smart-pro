@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useSubscription } from "@/hooks/useSubscription";
-import { isSystemAdmin, isCloserEmail } from "@/config/admin";
+import { isSystemAdmin } from "@/config/admin";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ const PAYWALL_PATHS = ["/start", "/start/success", "/start/cancel"];
 export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, isAdmin, userRole, currentCompanyId } = useAuth();
+  const { user, loading, isAdmin, isCloser, userRole, currentCompanyId } = useAuth();
   const { fakeDataEnabled, setFakeDataEnabled } = useFakeDataStore();
   const { isActive: subscriptionActive, isLoading: subscriptionLoading } = useSubscription();
   const isPaywallPath = PAYWALL_PATHS.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
@@ -28,7 +28,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   // Contrôler le mode démo selon le rôle de l'utilisateur
   useEffect(() => {
     if (user && fakeDataEnabled && !loading) {
-      const isCloser = isCloserEmail(user.email);
+      
       if (userRole !== 'admin' && !isCloser) {
         console.log("🔒 Utilisateur non-admin/closer détecté - Désactivation du mode démo");
         setFakeDataEnabled(false);
@@ -116,7 +116,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
 
   // Redirection Settings en mode démo (dans un effet pour éviter setState pendant le render)
   useEffect(() => {
-    const isCloser = isCloserEmail(user?.email);
+    
     if (fakeDataEnabled && user && userRole !== 'admin' && !isCloser) {
       const isSettingsPage = location.pathname === '/settings' || location.pathname.startsWith('/settings');
       if (isSettingsPage) {
@@ -155,7 +155,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
   // 2. OU l'utilisateur est admin ou closer
   if (fakeDataEnabled) {
-    const isCloser = isCloserEmail(user?.email);
+    
     const isSettingsPage = location.pathname === '/settings' || location.pathname.startsWith('/settings');
     if (isSettingsPage && user && userRole !== 'admin' && !isCloser) {
       return null; // l'effet redirige vers dashboard
@@ -170,7 +170,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   }
 
   // Les closers ont accès à /closer sans abonnement ni company
-  const isCloser = isCloserEmail(user?.email);
+  
   if (requireCloser && !isCloser && !isSystemAdmin(user) && showContent) {
     navigate("/dashboard", { replace: true });
     return null;
