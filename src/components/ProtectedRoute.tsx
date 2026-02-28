@@ -157,7 +157,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   useEffect(() => {
     if (!isCloser || loading || !user) return;
     if (fakeDataEnabled) return; // démo active → accès complet à toute l'app
-    const closerAllowedPaths = ["/closer", "/demo", "/settings", "/dashboard"];
+    const closerAllowedPaths = ["/closer", "/demo", "/settings", "/dashboard", "/start"];
     const isAllowed = closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
     if (!isAllowed) {
       navigate("/closer", { replace: true });

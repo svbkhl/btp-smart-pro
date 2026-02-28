@@ -31,6 +31,7 @@ import {
   Eye,
   ArrowRight,
   LayoutDashboard,
+  Tag,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -228,7 +229,7 @@ const CloserDashboard = () => {
       )}
 
       {/* Tuiles principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ActionTile
           icon={MonitorPlay}
           title="Démo Patron"
@@ -245,11 +246,18 @@ const CloserDashboard = () => {
           color="green"
         />
         <ActionTile
+          icon={Tag}
+          title="Présenter les offres"
+          description="Affichez la page tarifaire Starter / Pro / Elite pour présenter les plans à votre client pendant la visio."
+          onClick={() => navigate("/start")}
+          color="orange"
+        />
+        <ActionTile
           icon={Plus}
           title="Nouvelle Entreprise"
-          description="Créez l'espace d'un nouveau client, choisissez son plan et activez ses modules."
+          description="Créez l'espace d'un nouveau client, choisissez son plan et inscrivez-le sur BTP Smart Pro."
           onClick={() => setIsCreateDialogOpen(true)}
-          color="orange"
+          color="primary"
         />
       </div>
 
