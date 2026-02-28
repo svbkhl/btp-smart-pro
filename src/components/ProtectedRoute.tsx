@@ -138,9 +138,10 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
 
   // Gate abonnement B2B : rediriger vers /start dans un effet (pas pendant le render)
   // Ne jamais rediriger les admins système (même sans company) pour éviter /start au refresh
+  // Ne jamais rediriger les closers (ils n'ont pas de company et n'ont pas besoin d'abonnement)
   useEffect(() => {
     const adminSystem = isSystemAdmin(user);
-    const skipGate = isPaywallPath || !user || isAdmin || adminSystem;
+    const skipGate = isPaywallPath || !user || isAdmin || adminSystem || isCloser;
     if (skipGate) return;
     if (currentCompanyId && !subscriptionLoading && !subscriptionActive) {
       navigate("/start", { replace: true });
@@ -149,7 +150,17 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
     if (!currentCompanyId && !subscriptionLoading) {
       navigate("/start", { replace: true });
     }
-  }, [isPaywallPath, user, isAdmin, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
+  }, [isPaywallPath, user, isAdmin, isCloser, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
+
+  // Rediriger les closers vers /closer s'ils atterrissent sur une page non appropriée
+  useEffect(() => {
+    if (!isCloser || loading || !user) return;
+    const closerAllowedPaths = ["/closer", "/demo", "/settings", "/dashboard"];
+    const isAllowed = closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
+    if (!isAllowed) {
+      navigate("/closer", { replace: true });
+    }
+  }, [isCloser, loading, user, location.pathname, navigate]);
 
   // En mode démo (fakeDataEnabled), permettre l'accès si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
