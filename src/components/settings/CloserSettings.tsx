@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useClosers, useAddCloser, useRemoveCloser } from "@/hooks/useClosers";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import {
   UserCog,
   Plus,
@@ -13,6 +15,7 @@ import {
   MonitorPlay,
   Building2,
   ShieldCheck,
+  Send,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -34,6 +37,7 @@ export const CloserSettings = () => {
   const addCloser = useAddCloser();
   const removeCloser = useRemoveCloser();
   const [newEmail, setNewEmail] = useState("");
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
 
   const handleAdd = () => {
     const trimmed = newEmail.trim().toLowerCase();
@@ -41,6 +45,39 @@ export const CloserSettings = () => {
     if (closers.some((c) => c.email === trimmed)) return;
     addCloser.mutate({ email: trimmed, addedBy: user?.email || "admin" });
     setNewEmail("");
+  };
+
+  const handleAddAndInvite = async () => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) return;
+    const alreadyExists = closers.some((c) => c.email === trimmed);
+    if (!alreadyExists) {
+      addCloser.mutate({ email: trimmed, addedBy: user?.email || "admin" });
+    }
+    setNewEmail("");
+    await sendInvitation(trimmed);
+  };
+
+  const sendInvitation = async (email: string) => {
+    setSendingInvite(email);
+    try {
+      const { data, error } = await supabase.functions.invoke("invite-closer", {
+        body: { email },
+      });
+      if (error) throw error;
+      toast({
+        title: "Invitation envoyée",
+        description: `Un email d'accès a été envoyé à ${email}.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erreur d'envoi",
+        description: err?.message || "Impossible d'envoyer l'invitation.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingInvite(null);
+    }
   };
 
   return (
@@ -86,10 +123,11 @@ export const CloserSettings = () => {
             placeholder="email@exemple.com"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            onKeyDown={(e) => e.key === "Enter" && handleAddAndInvite()}
             className="flex-1 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
           />
           <Button
+            variant="outline"
             onClick={handleAdd}
             disabled={addCloser.isPending || !newEmail.trim()}
             className="gap-2 rounded-xl"
@@ -101,9 +139,21 @@ export const CloserSettings = () => {
             )}
             Ajouter
           </Button>
+          <Button
+            onClick={handleAddAndInvite}
+            disabled={addCloser.isPending || sendingInvite !== null || !newEmail.trim()}
+            className="gap-2 rounded-xl"
+          >
+            {sendingInvite !== null ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            Ajouter + Inviter
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          La personne doit créer un compte avec cet email sur BTP Smart Pro pour accéder à l'espace closer.
+          Cliquez sur <strong>Ajouter + Inviter</strong> pour envoyer directement un email d'accès au closer.
         </p>
       </GlassCard>
 
@@ -154,12 +204,28 @@ export const CloserSettings = () => {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => sendInvitation(closer.email)}
+                    disabled={sendingInvite === closer.email}
+                    className="gap-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {sendingInvite === closer.email ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    Renvoyer
+                  </Button>
+
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0 ml-2"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -187,6 +253,7 @@ export const CloserSettings = () => {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                </div>
               </div>
             ))}
           </div>
