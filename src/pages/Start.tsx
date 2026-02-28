@@ -299,7 +299,7 @@ export default function Start() {
   const [searchParams] = useSearchParams();
   const invitationId = searchParams.get("invitation_id");
   const { toast } = useToast();
-  const { user, loading: authLoading, isCompanyLoading, currentCompanyId } = useAuth();
+  const { user, loading: authLoading, isCompanyLoading, currentCompanyId, isCloser } = useAuth();
   const { isOwner } = usePermissions();
   const { isActive, isLoading: subLoading, subscription } = useSubscription();
 
@@ -311,11 +311,11 @@ export default function Start() {
     if (!authLoading && !user) navigate("/auth", { replace: true });
   }, [user, authLoading, navigate]);
 
-  // Déjà abonné → dashboard
+  // Déjà abonné → dashboard (sauf les closers qui peuvent voir la page tarifaire)
   useEffect(() => {
-    if (authLoading || subLoading || !user) return;
+    if (authLoading || subLoading || !user || isCloser) return;
     if (isActive) navigate("/dashboard", { replace: true });
-  }, [user, isActive, subLoading, authLoading, navigate]);
+  }, [user, isActive, subLoading, authLoading, isCloser, navigate]);
 
   // ─── Checkout — même logique que l'existant, étendue aux 3 plans ─────────
   const handleSubscribe = async (planId: PlanId) => {
@@ -389,7 +389,8 @@ export default function Start() {
   if (!user) return null;
 
   // ─── Pas d'entreprise (confirmé : fetch terminé et toujours null) ──────────
-  if (!currentCompanyId && !isCompanyLoading) {
+  // Les closers n'ont pas de company mais doivent voir la page tarifaire
+  if (!currentCompanyId && !isCompanyLoading && !isCloser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
