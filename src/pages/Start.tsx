@@ -151,13 +151,11 @@ function PlanCard({
   interval,
   onSubscribe,
   loading,
-  closerMode = false,
 }: {
   plan: PlanDef;
   interval: BillingInterval;
   onSubscribe: (planId: PlanId) => void;
   loading: boolean;
-  closerMode?: boolean;
 }) {
   const currentPrice = interval === "annuel" ? plan.priceAnnuel : plan.priceMensuel;
   const priceId = PRICE_IDS[plan.id][interval];
@@ -271,37 +269,24 @@ function PlanCard({
 
         {/* CTA */}
         <div className="space-y-2 pt-2">
-          {closerMode ? (
-            <>
-              <div className="w-full h-11 flex items-center justify-center rounded-md border border-dashed border-muted-foreground/40 text-sm text-muted-foreground font-medium gap-2">
-                🎯 Plan à présenter au client
-              </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Le client souscrira via son espace après la visio.
-              </p>
-            </>
-          ) : (
-            <>
-              <Button
-                className="w-full h-11 text-sm font-semibold"
-                variant={plan.recommended ? "default" : "outline"}
-                disabled={loading || !priceId}
-                onClick={() => onSubscribe(plan.id)}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirection…
-                  </>
-                ) : (
-                  "Démarrer mon essai 14j gratuit"
-                )}
-              </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Aucun paiement aujourd'hui · Résiliation possible pendant les 14 jours d'essai.
-              </p>
-            </>
-          )}
+          <Button
+            className="w-full h-11 text-sm font-semibold"
+            variant={plan.recommended ? "default" : "outline"}
+            disabled={loading || !priceId}
+            onClick={() => onSubscribe(plan.id)}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirection…
+              </>
+            ) : (
+              "Démarrer mon essai 14j gratuit"
+            )}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Aucun paiement aujourd'hui · Résiliation possible pendant les 14 jours d'essai.
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -542,7 +527,6 @@ export default function Start() {
               interval={interval}
               onSubscribe={handleSubscribe}
               loading={creatingCheckout}
-              closerMode={isCloser}
             />
           ))}
         </div>
