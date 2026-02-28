@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
-import { isSystemAdmin } from "@/config/admin";
+import { isSystemAdmin, isCloserEmail } from "@/config/admin";
 import { hasActiveSubscription } from "@/lib/checkSubscription";
 
 // Déclaration de type pour la propriété globale window
@@ -42,6 +42,23 @@ const Auth = () => {
       navigate("/dashboard", { replace: true });
       return;
     }
+
+    // Vérifier closer (config statique + base de données)
+    const emailLower = sessionUser.email?.toLowerCase() || "";
+    let userIsCloser = isCloserEmail(emailLower);
+    if (!userIsCloser && emailLower) {
+      const { data } = await supabase
+        .from("closer_emails")
+        .select("email")
+        .eq("email", emailLower)
+        .maybeSingle();
+      userIsCloser = !!data;
+    }
+    if (userIsCloser) {
+      navigate("/closer", { replace: true });
+      return;
+    }
+
     const hasSub = await hasActiveSubscription(sessionUser.id, sessionUser.email);
     if (!hasSub) {
       navigate("/start", { replace: true });

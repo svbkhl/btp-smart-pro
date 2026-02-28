@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { User } from "@supabase/supabase-js";
-import { isSystemAdmin } from "@/config/admin";
+import { isSystemAdmin, isCloserEmail } from "@/config/admin";
 import { hasActiveSubscription } from "@/lib/checkSubscription";
 
 // Déclaration de type pour la propriété globale window
@@ -45,6 +45,23 @@ const AuthCallback = () => {
       navigate("/dashboard", { replace: true });
       return;
     }
+
+    // Vérifier si l'utilisateur est un closer (config statique ou base de données)
+    const emailLower = user.email?.toLowerCase() || "";
+    let userIsCloser = isCloserEmail(emailLower);
+    if (!userIsCloser && emailLower) {
+      const { data } = await supabase
+        .from("closer_emails")
+        .select("email")
+        .eq("email", emailLower)
+        .maybeSingle();
+      userIsCloser = !!data;
+    }
+    if (userIsCloser) {
+      navigate("/closer", { replace: true });
+      return;
+    }
+
     const hasSub = await hasActiveSubscription(user.id, user.email);
     if (!hasSub) {
       navigate("/start", { replace: true });
