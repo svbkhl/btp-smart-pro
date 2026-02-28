@@ -416,8 +416,8 @@ export default function Start() {
     );
   }
 
-  // ─── Pas owner ────────────────────────────────────────────────────────────
-  if (!isOwner) {
+  // ─── Pas owner (les closers peuvent voir la page tarifaire sans être owner) ──
+  if (!isOwner && !isCloser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
