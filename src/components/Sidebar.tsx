@@ -906,10 +906,9 @@ export default function Sidebar() {
           <div className="pt-2 space-y-1">
             {user ? (
               <>
-                {/* Toggle Mode démo pour les admins et les closers */}
-                {(userRole === 'admin' || isCloser) && !isOwner && !isEmployee && (
+                {/* Toggle Mode démo uniquement pour les admins (pas pour les closers) */}
+                {userRole === 'admin' && !isCloser && !isOwner && !isEmployee && (
                   <div className="space-y-1.5 mb-2">
-                    {/* Toggle démo */}
                     <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50">
                       <div className="flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4 text-primary" />
@@ -930,27 +929,6 @@ export default function Sidebar() {
                         }}
                       />
                     </div>
-
-                    {/* Toggle vue employé (visible uniquement si closer ET mode démo actif) */}
-                    {isCloser && fakeDataEnabled && (
-                      <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50">
-                        <div className="flex items-center gap-2">
-                          <UserCog className="w-4 h-4 text-orange-400" />
-                          {isOpen && (
-                            <Label htmlFor="employee-view-sidebar" className="text-xs font-medium cursor-pointer">
-                              Vue employé
-                            </Label>
-                          )}
-                        </div>
-                        <Switch
-                          id="employee-view-sidebar"
-                          checked={closerEmployeeMode}
-                          onCheckedChange={(checked) => {
-                            setCloserEmployeeMode(checked);
-                          }}
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
                 <Button

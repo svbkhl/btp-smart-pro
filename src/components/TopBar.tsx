@@ -56,9 +56,9 @@ export const TopBar = () => {
 
   return (
     <div className="sticky top-0 z-30 bg-transparent backdrop-blur-none">
-      {/* Badge Mode Démo */}
+      {/* Badge Mode Démo — masqué pour les closers (ils ont toujours les données fictives) */}
       <AnimatePresence>
-        {fakeDataEnabled && (
+        {fakeDataEnabled && !isCloser && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}

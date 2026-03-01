@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode } fro
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isCloserEmail } from '@/config/admin';
+import { useFakeDataStore } from '@/store/useFakeDataStore';
 
 interface AuthContextValue {
   user: User | null;
@@ -300,6 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Vérifier si l'utilisateur est un closer (hardcoded OU en base)
+  // et activer automatiquement les données fictives pour eux
   useEffect(() => {
     const email = user?.email;
     if (!email) {
@@ -309,6 +311,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Vérification immédiate sur la liste hardcodée
     if (isCloserEmail(email)) {
       setIsCloser(true);
+      useFakeDataStore.getState().setFakeDataEnabled(true);
       return;
     }
     // Vérification en base (asynchrone)
@@ -317,7 +320,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .select('email')
       .eq('email', email.toLowerCase().trim())
       .maybeSingle()
-      .then(({ data }) => setIsCloser(!!data));
+      .then(({ data }) => {
+        const closer = !!data;
+        setIsCloser(closer);
+        if (closer) {
+          useFakeDataStore.getState().setFakeDataEnabled(true);
+        }
+      });
   }, [user?.email]);
 
   const value: AuthContextValue = {

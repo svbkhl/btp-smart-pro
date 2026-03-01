@@ -171,9 +171,11 @@ const CloserDashboard = () => {
     navigate("/dashboard");
   };
 
+  // "Quitter" la démo = revenir à l'espace closer et sortir du mode employé
+  // fakeDataEnabled reste true car les closers ont toujours les données fictives
   const handleStopDemo = () => {
-    setFakeDataEnabled(false);
     setCloserEmployeeMode(false);
+    navigate("/closer");
   };
 
   const handleCreateCompany = async () => {
