@@ -262,6 +262,7 @@ const ProspectsTab = ({ userKey }: { userKey: string }) => {
     return saved ? extractSheetsEmbedUrl(saved) : null;
   });
   const [error, setError] = useState("");
+  const [showConfig, setShowConfig] = useState(!localStorage.getItem(storageKey));
 
   const handleSave = () => {
     setError("");
@@ -279,39 +280,57 @@ const ProspectsTab = ({ userKey }: { userKey: string }) => {
     localStorage.setItem(storageKey, inputUrl.trim());
     setSavedUrl(inputUrl.trim());
     setEmbedUrl(url);
+    setShowConfig(false);
   };
 
   return (
     <div className="space-y-4">
-      <GlassCard className="p-4 sm:p-5">
-        <div className="space-y-3">
-          <div>
-            <Label className="text-sm font-medium">URL Google Sheets</Label>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-              Copiez l'URL de votre Google Sheet (le sheet doit être partagé en lecture publique ou avec lien).
-            </p>
-            <div className="flex gap-2">
-              <Input
-                value={inputUrl}
-                onChange={(e) => { setInputUrl(e.target.value); setError(""); }}
-                placeholder="https://docs.google.com/spreadsheets/d/..."
-                className="text-sm"
-              />
-              <Button onClick={handleSave} className="gap-2 rounded-xl flex-shrink-0">
-                <Save className="w-4 h-4" />
-                <span className="hidden sm:inline">Enregistrer</span>
-              </Button>
+      {/* Bouton toggle config */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{savedUrl ? "Votre Google Sheet est configuré." : "Aucun Google Sheet configuré."}</p>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setShowConfig(!showConfig)}
+          className="gap-1.5 rounded-xl text-xs h-7"
+        >
+          <Pencil className="w-3 h-3" />
+          {showConfig ? "Masquer" : "Modifier l'URL"}
+        </Button>
+      </div>
+
+      {/* Bloc URL — masquable */}
+      {showConfig && (
+        <GlassCard className="p-4 sm:p-5">
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm font-medium">URL Google Sheets</Label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                Copiez l'URL de votre Google Sheet (le sheet doit être partagé en lecture publique ou avec lien).
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={inputUrl}
+                  onChange={(e) => { setInputUrl(e.target.value); setError(""); }}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  className="text-sm"
+                />
+                <Button onClick={handleSave} className="gap-2 rounded-xl flex-shrink-0">
+                  <Save className="w-4 h-4" />
+                  <span className="hidden sm:inline">Enregistrer</span>
+                </Button>
+              </div>
+              {error && <p className="text-destructive text-xs mt-1">{error}</p>}
             </div>
-            {error && <p className="text-destructive text-xs mt-1">{error}</p>}
+            {savedUrl && (
+              <a href={savedUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                <ExternalLink className="w-3 h-3" />
+                Ouvrir dans Google Sheets
+              </a>
+            )}
           </div>
-          {savedUrl && (
-            <a href={savedUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-              <ExternalLink className="w-3 h-3" />
-              Ouvrir dans Google Sheets
-            </a>
-          )}
-        </div>
-      </GlassCard>
+        </GlassCard>
+      )}
 
       {embedUrl ? (
         <GlassCard className="overflow-hidden p-0">
@@ -342,6 +361,7 @@ const CalendlyTab = ({ userKey }: { userKey: string }) => {
     return saved ? buildCalendlyEmbedUrl(saved) : null;
   });
   const [error, setError] = useState("");
+  const [showConfig, setShowConfig] = useState(!localStorage.getItem(storageKey));
 
   const handleSave = () => {
     setError("");
@@ -356,39 +376,57 @@ const CalendlyTab = ({ userKey }: { userKey: string }) => {
     }
     localStorage.setItem(storageKey, inputUrl.trim());
     setEmbedUrl(buildCalendlyEmbedUrl(inputUrl.trim()));
+    setShowConfig(false);
   };
 
   return (
     <div className="space-y-4">
-      <GlassCard className="p-4 sm:p-5">
-        <div className="space-y-3">
-          <div>
-            <Label className="text-sm font-medium">URL Calendly personnelle</Label>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-              Accédez à votre Calendly pour planifier vous-même les RDV après vos appels téléphoniques avec les prospects.
-            </p>
-            <div className="flex gap-2">
-              <Input
-                value={inputUrl}
-                onChange={(e) => { setInputUrl(e.target.value); setError(""); }}
-                placeholder="https://calendly.com/votre-nom/demo-btp"
-                className="text-sm"
-              />
-              <Button onClick={handleSave} className="gap-2 rounded-xl flex-shrink-0">
-                <Save className="w-4 h-4" />
-                <span className="hidden sm:inline">Enregistrer</span>
-              </Button>
+      {/* Bouton toggle config */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{inputUrl ? "Votre Calendly est configuré." : "Aucun Calendly configuré."}</p>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setShowConfig(!showConfig)}
+          className="gap-1.5 rounded-xl text-xs h-7"
+        >
+          <Pencil className="w-3 h-3" />
+          {showConfig ? "Masquer" : "Modifier l'URL"}
+        </Button>
+      </div>
+
+      {/* Bloc URL — masquable */}
+      {showConfig && (
+        <GlassCard className="p-4 sm:p-5">
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm font-medium">URL Calendly personnelle</Label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                Accédez à votre Calendly pour planifier vous-même les RDV après vos appels téléphoniques avec les prospects.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={inputUrl}
+                  onChange={(e) => { setInputUrl(e.target.value); setError(""); }}
+                  placeholder="https://calendly.com/votre-nom/demo-btp"
+                  className="text-sm"
+                />
+                <Button onClick={handleSave} className="gap-2 rounded-xl flex-shrink-0">
+                  <Save className="w-4 h-4" />
+                  <span className="hidden sm:inline">Enregistrer</span>
+                </Button>
+              </div>
+              {error && <p className="text-destructive text-xs mt-1">{error}</p>}
             </div>
-            {error && <p className="text-destructive text-xs mt-1">{error}</p>}
+            {embedUrl && (
+              <a href={inputUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                <ExternalLink className="w-3 h-3" />
+                Ouvrir Calendly en plein écran
+              </a>
+            )}
           </div>
-          {embedUrl && (
-            <a href={inputUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-              <ExternalLink className="w-3 h-3" />
-              Ouvrir Calendly en plein écran
-            </a>
-          )}
-        </div>
-      </GlassCard>
+        </GlassCard>
+      )}
 
       {embedUrl ? (
         <GlassCard className="overflow-hidden p-0">
