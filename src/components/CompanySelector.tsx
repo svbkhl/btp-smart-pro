@@ -12,8 +12,11 @@ import {
 } from "@/components/ui/select";
 
 export const CompanySelector = () => {
-  const { user } = useAuth();
+  const { user, isCloser } = useAuth();
   const { companyId: currentCompany } = useCompanyId();
+
+  // Les closers ne sont dans aucune entreprise — on masque le sélecteur
+  if (isCloser) return null;
   const queryClient = useQueryClient();
   const [companies, setCompanies] = useState<Array<{id: string, name: string}>>([]);
   const [loading, setLoading] = useState(true);
