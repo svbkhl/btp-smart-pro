@@ -805,39 +805,6 @@ export default function Sidebar() {
             );
           })}
           
-          {/* Espace Closer (visible uniquement pour les closers) */}
-          {isCloser && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25, duration: 0.15 }}
-              whileHover={{ scale: 1.02, x: 4, transition: { type: "spring", stiffness: 400, damping: 20 } }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Link
-                to="/closer"
-                className={cn(
-                  "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
-                  "hover:shadow-lg hover:shadow-primary/20",
-                  isActive("/closer")
-                    ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
-                )}
-              >
-                {isActive("/closer") && (
-                  <motion.div
-                    layoutId="activeTabCloser"
-                    className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
-                <motion.div whileHover={{ scale: 1.1 }} className="relative z-10">
-                  <UserCog className={cn("w-5 h-5 transition-colors", isActive("/closer") && "text-primary")} />
-                </motion.div>
-                <span className="relative z-10">Espace Closer</span>
-              </Link>
-            </motion.div>
-          )}
 
           {/* Paramètres (toujours visible) */}
           {settingsMenuGroup.items.map((item) => {

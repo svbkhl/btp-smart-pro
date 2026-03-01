@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X, Sparkles, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Notifications } from "@/components/Notifications";
 import { GlobalSearchWrapper } from "@/components/GlobalSearchWrapper";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/components/ui/use-toast";
 
 export const TopBar = () => {
-  const { user } = useAuth();
+  const { user, isCloser } = useAuth();
   const { isOwner } = usePermissions();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -93,6 +93,21 @@ export const TopBar = () => {
         )}
         {/* Right Actions - Serrés vers la droite avec recherche */}
         <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 ml-auto">
+          {/* Bouton Espace Closer (visible uniquement pour les closers) */}
+          {isCloser && (
+            <Link to="/closer">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-xl border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/50 text-xs sm:text-sm px-2.5 sm:px-3 flex-shrink-0"
+              >
+                <UserCog className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Espace Closer</span>
+                <span className="sm:hidden">Closer</span>
+              </Button>
+            </Link>
+          )}
+
           {/* Search Bar */}
           <div className="flex-initial sm:max-w-xs min-w-0">
             <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
