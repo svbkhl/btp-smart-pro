@@ -1,5 +1,5 @@
--- Étendre admin_get_all_companies pour inclure les closers
--- (pas seulement les admins hardcodés)
+-- Closers voient uniquement les entreprises qu'ils ont créées (owner_id = leur uid)
+-- Les admins voient toujours toutes les entreprises
 
 CREATE OR REPLACE FUNCTION public.admin_get_all_companies()
 RETURNS SETOF public.companies
@@ -16,7 +16,7 @@ AS $$
       'khalfallahs.ndrc@gmail.com'
     )
     OR
-    -- Closers : voient uniquement les entreprises qu'ils ont créées (owner_id = leur user_id)
+    -- Closers : uniquement leurs entreprises créées (owner_id = leur user_id)
     (
       EXISTS (
         SELECT 1 FROM public.closer_emails
