@@ -332,17 +332,6 @@ const CloserDashboard = () => {
               <Label htmlFor="name">Nom de l'entreprise *</Label>
               <Input id="name" value={newCompanyData.name} onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })} placeholder="Ex: Maçonnerie Dupont" />
             </div>
-            <div>
-              <Label htmlFor="plan">Plan souscrit</Label>
-              <Select value={newCompanyData.plan} onValueChange={(value: Company["plan"]) => setNewCompanyData({ ...newCompanyData, plan: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="basic">Starter</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="elite">Elite</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="rounded-xl">Annuler</Button>
               <Button onClick={handleCreateCompany} disabled={createCompany.isPending} className="gap-2 rounded-xl">
