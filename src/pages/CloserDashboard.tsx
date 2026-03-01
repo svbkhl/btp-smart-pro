@@ -47,6 +47,7 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CloserResources } from "@/components/closer/CloserResources";
+import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
 
 /* ─── Membres d'une entreprise ─── */
 const CompanyMembersList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
@@ -316,6 +317,9 @@ const CloserDashboard = () => {
           ))}
         </div>
       )}
+
+      {/* Classement des closers */}
+      <CloserLeaderboard />
 
       {/* Ressources Closer : Documentation, Prospects, Calendly */}
       <CloserResources />
