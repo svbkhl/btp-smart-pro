@@ -365,7 +365,7 @@ const CalendlyTab = ({ userKey }: { userKey: string }) => {
           <div>
             <Label className="text-sm font-medium">URL Calendly personnelle</Label>
             <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-              Collez votre lien Calendly de démo pour que vos prospects puissent réserver directement.
+              Accédez à votre Calendly pour planifier vous-même les RDV après vos appels téléphoniques avec les prospects.
             </p>
             <div className="flex gap-2">
               <Input
@@ -402,7 +402,7 @@ const CalendlyTab = ({ userKey }: { userKey: string }) => {
         <GlassCard className="p-12 text-center">
           <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
           <p className="text-muted-foreground text-sm">Renseignez votre URL Calendly ci-dessus</p>
-          <p className="text-muted-foreground/60 text-xs mt-1">Vos prospects pourront réserver une démo directement depuis cette page</p>
+          <p className="text-muted-foreground/60 text-xs mt-1">Votre agenda s'affichera ici pour poser les RDV après vos appels</p>
         </GlassCard>
       )}
     </div>
