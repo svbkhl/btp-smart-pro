@@ -46,6 +46,7 @@ import {
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CloserResources } from "@/components/closer/CloserResources";
 
 /* ─── Membres d'une entreprise ─── */
 const CompanyMembersList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
@@ -315,6 +316,9 @@ const CloserDashboard = () => {
           ))}
         </div>
       )}
+
+      {/* Ressources Closer : Documentation, Prospects, Calendly */}
+      <CloserResources />
 
       {/* Dialog créer entreprise */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
