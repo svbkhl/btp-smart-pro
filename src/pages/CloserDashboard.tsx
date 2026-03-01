@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /* ─── Membres d'une entreprise ─── */
 const CompanyMembersList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
@@ -151,7 +152,7 @@ const CloserDashboard = () => {
   const { data: companies = [], isLoading, error } = useAllCompanies();
   const createCompany = useCreateCompany();
   const { toast } = useToast();
-  const { setFakeDataEnabled, fakeDataEnabled, setCloserEmployeeMode } = useFakeDataStore();
+  const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showCompanies, setShowCompanies] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
@@ -206,7 +207,10 @@ const CloserDashboard = () => {
     <div className="space-y-8 max-w-4xl mx-auto">
 
       {/* Titre */}
-      <div className="text-center pt-4">
+      <div className="relative text-center pt-4">
+        <div className="absolute right-0 top-4">
+          <ThemeToggle />
+        </div>
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-sm font-medium mb-4">
           <Building2 className="w-4 h-4" />
           Espace Closer
@@ -217,33 +221,23 @@ const CloserDashboard = () => {
         </p>
       </div>
 
-      {/* Bannière démo active */}
-      {fakeDataEnabled && (
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400 text-sm">
-          <MonitorPlay className="w-4 h-4 flex-shrink-0" />
-          <span className="flex-1 font-medium">Mode démo actif — vous naviguez avec de fausses données.</span>
-          <Button size="sm" variant="ghost" onClick={handleStopDemo} className="text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 rounded-lg h-7 px-2 flex-shrink-0">
-            Quitter
-          </Button>
-        </div>
-      )}
-
       {/* Tuiles principales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ActionTile
           icon={MonitorPlay}
           title="Démo Patron"
           description="Lancez une démo complète en vue dirigeant avec toutes les fonctionnalités et données réalistes."
-          onClick={() => fakeDataEnabled ? handleStopDemo() : handleLancerDemo(false)}
+          onClick={() => (fakeDataEnabled && !closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(false)}
           color="blue"
-          active={fakeDataEnabled}
+          active={fakeDataEnabled && !closerEmployeeMode}
         />
         <ActionTile
           icon={Eye}
           title="Démo Employé"
           description="Montrez la vue employé avec le planning, les affectations chantiers et l'espace personnel."
-          onClick={() => handleLancerDemo(true)}
+          onClick={() => (fakeDataEnabled && closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(true)}
           color="green"
+          active={fakeDataEnabled && closerEmployeeMode}
         />
         <ActionTile
           icon={Tag}
