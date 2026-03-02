@@ -306,21 +306,29 @@ async function processPlace(place: any, deptCode: string, stats: { found: number
 
 // ─── Point d'entrée principal ─────────────────────────────────
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: { "Access-Control-Allow-Origin": "*" } });
+    return new Response(null, { headers: CORS });
   }
 
   const body = await req.json().catch(() => ({}));
   const jobId: string = body.job_id;
-  if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400 });
+  const jsonHeaders = { ...CORS, "Content-Type": "application/json" };
+
+  if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400, headers: jsonHeaders });
 
   // Charger le job
   const { data: job, error: jobErr } = await supabase
     .from("lead_jobs").select("*").eq("id", jobId).single();
-  if (jobErr || !job) return new Response(JSON.stringify({ error: "Job not found" }), { status: 404 });
+  if (jobErr || !job) return new Response(JSON.stringify({ error: "Job not found" }), { status: 404, headers: jsonHeaders });
   if (job.status === "DONE" || job.status === "FAILED") {
-    return new Response(JSON.stringify({ ok: true, status: job.status }));
+    return new Response(JSON.stringify({ ok: true, status: job.status }), { headers: jsonHeaders });
   }
 
   // Générer la grille si premier appel
@@ -330,7 +338,7 @@ serve(async (req) => {
     try { cells = generateGrid(job.dept_code); }
     catch (e: any) {
       await supabase.from("lead_jobs").update({ status: "FAILED", error_log: e.message, finished_at: new Date().toISOString() }).eq("id", jobId);
-      return new Response(JSON.stringify({ error: e.message }), { status: 400 });
+      return new Response(JSON.stringify({ error: e.message }), { status: 400, headers: jsonHeaders });
     }
   }
 
@@ -413,5 +421,5 @@ serve(async (req) => {
     cells_done: ci,
     total_cells: totalCells,
     inserted: stats.inserted,
-  }), { headers: { "Content-Type": "application/json" } });
+  }), { headers: jsonHeaders });
 });

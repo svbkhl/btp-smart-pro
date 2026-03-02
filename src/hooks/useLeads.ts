@@ -233,13 +233,56 @@ export function useGenerateLeads() {
       if (!jobId) throw new Error("Impossible de créer le job");
 
       // Lancer le worker Edge Function
-      await supabase.functions.invoke("lead-generator", {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("lead-generator", {
         body: { job_id: jobId },
       });
 
+      if (fnError) {
+        // Marquer le job FAILED si la fonction ne répond pas
+        await supabase.from("lead_jobs" as any).update({
+          status: "FAILED",
+          error_log: fnError.message || "Erreur lors du lancement de la fonction",
+          finished_at: new Date().toISOString(),
+        }).eq("id", jobId);
+        throw new Error(`Erreur Edge Function : ${fnError.message}`);
+      }
+
+      console.log("[lead-generator] Réponse fonction:", fnData);
       return { id: jobId, dept_code: deptCode, dept_name: deptName, status: "PENDING" };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
+  });
+}
+
+export function useRetryJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      // Remettre en PENDING avant relance
+      await supabase.from("lead_jobs" as any).update({
+        status: "PENDING",
+        error_log: null,
+        finished_at: null,
+      }).eq("id", jobId);
+
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("lead-generator", {
+        body: { job_id: jobId },
+      });
+
+      if (fnError) {
+        await supabase.from("lead_jobs" as any).update({
+          status: "FAILED",
+          error_log: fnError.message || "Erreur relance",
+          finished_at: new Date().toISOString(),
+        }).eq("id", jobId);
+        throw new Error(`Erreur Edge Function : ${fnError.message}`);
+      }
+
+      console.log("[lead-generator] Relance:", fnData);
+      return fnData;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
+    onError: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
   });
 }
 

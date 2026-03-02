@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
-  useAssignLeads, LeadJob, Lead, RETRY_NETWORK,
+  useAssignLeads, useRetryJob, LeadJob, Lead, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -86,7 +86,17 @@ function SectionGenerate() {
   const [dept, setDept] = useState("");
   const { toast } = useToast();
   const generate = useGenerateLeads();
+  const retry = useRetryJob();
   const { data: jobs = [], refetch, isRefetching } = useLeadJobs();
+
+  const handleRetry = async (job: LeadJob) => {
+    try {
+      await retry.mutateAsync(job.id);
+      toast({ title: "✅ Job relancé", description: `Génération ${job.dept_code} — ${job.dept_name} reprise…` });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
+  };
 
   const handleGenerate = async () => {
     if (!dept) return toast({ title: "Sélectionnez un département", variant: "destructive" });
@@ -152,44 +162,69 @@ function SectionGenerate() {
           <p className="text-sm text-muted-foreground">Aucun job pour l'instant.</p>
         ) : (
           <div className="space-y-3">
-            {jobs.map((job) => (
-              <div key={job.id} className="border border-border/50 rounded-xl p-4 bg-card/30">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Badge className={`gap-1 text-xs border ${JOB_COLORS[job.status]}`}>
-                      {JOB_ICONS[job.status]} {job.status}
-                    </Badge>
-                    <span className="font-medium text-sm">{job.dept_code} — {job.dept_name || "—"}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{durationStr(job)}</span>
-                </div>
-
-                {job.status === "RUNNING" && job.total_cells > 0 && (
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>{progressPct(job)}%</span>
-                      <span>{job.processed_cells} / {job.total_cells} cellules</span>
+            {jobs.map((job) => {
+              const isRetrying = retry.isPending && (retry.variables as string) === job.id;
+              const canRetry = job.status === "PENDING" || job.status === "FAILED";
+              return (
+                <div key={job.id} className="border border-border/50 rounded-xl p-4 bg-card/30">
+                  {/* En-tête : statut + département + durée + bouton */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className={`gap-1 text-xs border ${JOB_COLORS[job.status]}`}>
+                        {JOB_ICONS[job.status]} {job.status}
+                      </Badge>
+                      <span className="font-semibold text-sm">{job.dept_code} — {job.dept_name || "—"}</span>
+                      <span className="text-xs text-muted-foreground">{durationStr(job)}</span>
                     </div>
-                    <div className="h-1.5 bg-border rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full transition-all"
-                        style={{ width: `${progressPct(job)}%` }}
-                      />
-                    </div>
+
+                    {/* Bouton Lancer / Relancer */}
+                    {canRetry && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleRetry(job)}
+                        disabled={isRetrying || generate.isPending}
+                        className="h-7 px-3 text-xs bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold"
+                      >
+                        {isRetrying
+                          ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Lancement…</>
+                          : job.status === "FAILED"
+                            ? <><RefreshCw className="h-3 w-3 mr-1" /> Relancer</>
+                            : <><Zap className="h-3 w-3 mr-1" /> Lancer</>
+                        }
+                      </Button>
+                    )}
                   </div>
-                )}
 
-                <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                  <span>🔍 {job.total_found} trouvés</span>
-                  <span>✅ {job.total_inserted} insérés</span>
-                  <span>⏭ {job.total_skipped} ignorés</span>
+                  {/* Barre de progression (RUNNING) */}
+                  {job.status === "RUNNING" && job.total_cells > 0 && (
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>{progressPct(job)}%</span>
+                        <span>{job.processed_cells} / {job.total_cells} cellules</span>
+                      </div>
+                      <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full transition-all"
+                          style={{ width: `${progressPct(job)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stats */}
+                  <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                    <span>🔍 {job.total_found} trouvés</span>
+                    <span>✅ {job.total_inserted} insérés</span>
+                    <span>⏭ {job.total_skipped} ignorés</span>
+                  </div>
+
+                  {/* Erreur */}
+                  {job.error_log && (
+                    <p className="text-xs text-red-400 mt-2 truncate">{job.error_log}</p>
+                  )}
                 </div>
-
-                {job.error_log && (
-                  <p className="text-xs text-red-400 mt-2 truncate">{job.error_log}</p>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </GlassCard>

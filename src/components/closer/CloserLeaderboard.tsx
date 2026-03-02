@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Trophy, Crown, Flame, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnlineClosers } from "@/hooks/useCloserPresence";
 
 interface CloserRank {
   closer_email: string;
@@ -66,8 +67,15 @@ function useLeaderboard() {
 const initials = (name: string) =>
   name.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 
+const OnlineDot = () => (
+  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-1.5 py-0.5 leading-none">
+    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+    En ligne
+  </span>
+);
+
 /* ─── Podium top 3 ─────────────────────────────────────────────────────────── */
-const PodiumTop3 = ({ top3, userEmail }: { top3: CloserRank[]; userEmail?: string }) => {
+const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; userEmail?: string; onlineEmails: Set<string> }) => {
   if (top3.length < 3) return null;
 
   const [first, second, third] = [top3[0], top3[1], top3[2]];
@@ -102,6 +110,7 @@ const PodiumTop3 = ({ top3, userEmail }: { top3: CloserRank[]; userEmail?: strin
     rankIcon: React.ReactNode;
   }) => {
     const isSelf = entry.closer_email?.toLowerCase() === userEmail?.toLowerCase();
+    const isOnline = onlineEmails.has(entry.closer_email?.toLowerCase() ?? "");
     return (
       <div className="flex flex-col items-center gap-2 flex-1">
         {/* Info au-dessus du podium */}
@@ -109,10 +118,14 @@ const PodiumTop3 = ({ top3, userEmail }: { top3: CloserRank[]; userEmail?: strin
           <div className="relative">
             {avatar(entry, avatarSize, avatarColor)}
             <span className="absolute -top-2 -right-1">{rankIcon}</span>
+            {isOnline && (
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-background" />
+            )}
           </div>
           <p className="font-bold text-sm text-center leading-tight max-w-[90px] truncate">
             {entry.closer_name.split(" ")[0]}
           </p>
+          {isOnline && <OnlineDot />}
           {isSelf && <Badge variant="outline" className="text-xs py-0 px-1.5">Vous</Badge>}
           <div className="flex flex-col items-center">
             <span className={cn("text-2xl font-extrabold leading-none", scoreColor)}>{entry.monthly_closes}</span>
@@ -176,19 +189,28 @@ const PodiumTop3 = ({ top3, userEmail }: { top3: CloserRank[]; userEmail?: strin
 };
 
 /* ─── Ligne classement (rang 4+) ──────────────────────────────────────────── */
-const RankRow = ({ entry, userEmail, maxCloses }: { entry: CloserRank; userEmail?: string; maxCloses: number }) => {
+const RankRow = ({ entry, userEmail, maxCloses, onlineEmails }: { entry: CloserRank; userEmail?: string; maxCloses: number; onlineEmails: Set<string> }) => {
   const isSelf = entry.closer_email?.toLowerCase() === userEmail?.toLowerCase();
+  const isOnline = onlineEmails.has(entry.closer_email?.toLowerCase() ?? "");
   const pct = Math.round((entry.monthly_closes / maxCloses) * 100);
 
   return (
     <div className={cn("flex items-center gap-3 px-4 py-3 transition-colors", isSelf && "bg-primary/5")}>
       <span className="w-6 text-center text-xs font-bold text-muted-foreground">#{entry.rank}</span>
-      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-        {initials(entry.closer_name)}
+      <div className="relative w-9 h-9 flex-shrink-0">
+        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+          {initials(entry.closer_name)}
+        </div>
+        {isOnline && (
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-background" />
+        )}
       </div>
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-medium text-sm truncate">{entry.closer_name.split("@")[0]}</p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="font-medium text-sm truncate">{entry.closer_name.split("@")[0]}</p>
+            {isOnline && <OnlineDot />}
+          </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {entry.trials_active > 0 && (
               <span className="inline-flex items-center gap-1 text-xs text-orange-400 font-medium">
@@ -215,7 +237,7 @@ const RankRow = ({ entry, userEmail, maxCloses }: { entry: CloserRank; userEmail
 export const CloserLeaderboard = () => {
   const { user } = useAuth();
   const { data: realData = [], isLoading, error } = useLeaderboard();
-  // monthOffset : 0 = mois en cours, -1 = mois précédent, etc.
+  const onlineEmails = useOnlineClosers();
   const [monthOffset, setMonthOffset] = useState(0);
 
   const leaderboard = realData;
@@ -290,7 +312,7 @@ export const CloserLeaderboard = () => {
           {/* Podium */}
           {top3.length === 3 && (
             <div className="px-4 pt-6 pb-0 relative">
-              <PodiumTop3 top3={top3} userEmail={user?.email} />
+              <PodiumTop3 top3={top3} userEmail={user?.email} onlineEmails={onlineEmails} />
             </div>
           )}
 
@@ -303,15 +325,19 @@ export const CloserLeaderboard = () => {
                   entry={entry}
                   userEmail={user?.email}
                   maxCloses={maxCloses}
+                  onlineEmails={onlineEmails}
                 />
               ))}
             </div>
           )}
 
           {/* Légende */}
-          <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-border/40 mt-1">
+          <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-border/40 mt-1 flex-wrap">
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <Flame className="w-3 h-3 text-orange-400" /> Prospects chauds en essai
+              <span className="w-2 h-2 rounded-full bg-emerald-400" /> En ligne maintenant
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Flame className="w-3 h-3 text-orange-400" /> Prospects chauds
             </span>
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Trophy className="w-3 h-3 text-yellow-500" /> Close = abonnement signé

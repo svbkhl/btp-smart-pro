@@ -37,48 +37,31 @@ serve(async (req) => {
     const normalizedEmail = email.toLowerCase().trim();
     const redirectTo = `${APP_URL}/closer`;
 
-    // Vérifier si l'utilisateur existe déjà
-    const { data: usersData } = await supabase.auth.admin.listUsers();
-    const existing = usersData?.users?.find(
-      (u: any) => u.email?.toLowerCase() === normalizedEmail
-    );
-
     let actionLink: string;
+    let isExisting = false;
 
-    if (existing) {
-      // Utilisateur existant → magic link vers /closer
-      const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    // 1. Essayer d'abord "invite" (crée le compte si inexistant)
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.generateLink({
+      type: 'invite',
+      email: normalizedEmail,
+      options: { redirectTo },
+    });
+
+    if (!inviteError && inviteData?.properties?.action_link) {
+      actionLink = inviteData.properties.action_link;
+    } else {
+      // 2. L'utilisateur existe déjà → magic link
+      isExisting = true;
+      const { data: mlData, error: mlError } = await supabase.auth.admin.generateLink({
         type: 'magiclink',
         email: normalizedEmail,
         options: { redirectTo },
       });
 
-      if (linkError || !linkData?.properties?.action_link) {
-        throw new Error(linkError?.message || 'Impossible de générer le lien');
+      if (mlError || !mlData?.properties?.action_link) {
+        throw new Error(mlError?.message || inviteError?.message || 'Impossible de générer le lien');
       }
-      actionLink = linkData.properties.action_link;
-    } else {
-      // Nouvel utilisateur → invitation (crée le compte + envoie l'email)
-      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-        normalizedEmail,
-        { redirectTo }
-      );
-
-      if (inviteError || !inviteData?.user) {
-        throw new Error(inviteError?.message || 'Impossible de créer l\'invitation');
-      }
-
-      // Générer un lien d'invitation pour l'email custom
-      const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-        type: 'invite',
-        email: normalizedEmail,
-        options: { redirectTo },
-      });
-
-      if (linkError || !linkData?.properties?.action_link) {
-        throw new Error(linkError?.message || 'Impossible de générer le lien d\'invitation');
-      }
-      actionLink = linkData.properties.action_link;
+      actionLink = mlData.properties.action_link;
     }
 
     // Envoyer l'email via Resend avec un template closer personnalisé
@@ -117,7 +100,7 @@ serve(async (req) => {
           <tr>
             <td align="center">
               <a href="${actionLink}" style="display:inline-block; padding:16px 40px; background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; text-decoration:none; border-radius:8px; font-weight:700; font-size:16px; box-shadow:0 4px 12px rgba(249,115,22,0.4);">
-                ${existing ? 'Accéder à mon espace Closer' : 'Créer mon compte et accéder à mon espace'}
+                ${isExisting ? 'Accéder à mon espace Closer' : 'Créer mon compte et accéder à mon espace'}
               </a>
             </td>
           </tr>
@@ -148,7 +131,7 @@ serve(async (req) => {
       body: JSON.stringify({
         from: `BTP Smart Pro <${FROM_EMAIL}>`,
         to: [normalizedEmail],
-        subject: existing
+        subject: isExisting
           ? 'Votre accès Closer BTP Smart Pro'
           : 'Bienvenue — Votre accès Closer BTP Smart Pro',
         html: emailHtml,

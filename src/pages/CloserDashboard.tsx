@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useCloserPresence } from "@/hooks/useCloserPresence";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,6 +144,8 @@ const CloserDashboard = () => {
   const createCompany = useCreateCompany();
   const { toast } = useToast();
   const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
+  // Rejoindre le canal de présence dès que le closer est connecté
+  useCloserPresence(user?.email);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [newCompanyData, setNewCompanyData] = useState({
