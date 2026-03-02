@@ -180,23 +180,29 @@ export function useAdminLeads(filters: {
 export function useGeneratedDepts() {
   return useQuery<{ code: string; name: string; total: number; available: number }[]>({
     queryKey: ["generated_depts"],
-    refetchInterval: 5000, // se met à jour toutes les 5s pendant la génération
+    refetchInterval: 5000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leads" as any)
-        .select("dept_code, status, owner_id");
-      if (error) throw error;
-      const rows = (data as any[]) || [];
-
+      const PAGE = 1000;
       const map = new Map<string, { total: number; available: number }>();
-      rows.forEach((r) => {
-        const prev = map.get(r.dept_code) || { total: 0, available: 0 };
-        map.set(r.dept_code, {
-          total: prev.total + 1,
-          available: r.status === "NEW" && !r.owner_id ? prev.available + 1 : prev.available,
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("leads" as any)
+          .select("dept_code, status, owner_id")
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const rows = (data as any[]) || [];
+        rows.forEach((r) => {
+          const prev = map.get(r.dept_code) || { total: 0, available: 0 };
+          map.set(r.dept_code, {
+            total: prev.total + 1,
+            available: r.status === "NEW" && !r.owner_id ? prev.available + 1 : prev.available,
+          });
         });
-      });
-
+        hasMore = rows.length === PAGE;
+        from += PAGE;
+      }
       return Array.from(map.entries())
         .map(([code, stats]) => {
           const dept = DEPTS.find((d) => d.code === code);
@@ -212,16 +218,18 @@ export function useLeadStats(deptCode: string) {
   return useQuery({
     queryKey: ["lead_stats", deptCode],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leads" as any)
-        .select("status, owner_id", { count: "exact" })
-        .eq("dept_code", deptCode);
-      if (error) throw error;
-      const rows = (data as any[]) || [];
+      const [totalRes, availableRes, assignedRes] = await Promise.all([
+        supabase.from("leads" as any).select("*", { count: "exact", head: true }).eq("dept_code", deptCode),
+        supabase.from("leads" as any).select("*", { count: "exact", head: true }).eq("dept_code", deptCode).eq("status", "NEW").is("owner_id", null),
+        supabase.from("leads" as any).select("*", { count: "exact", head: true }).eq("dept_code", deptCode).not("owner_id", "is", null),
+      ]);
+      if (totalRes.error) throw totalRes.error;
+      if (availableRes.error) throw availableRes.error;
+      if (assignedRes.error) throw assignedRes.error;
       return {
-        total: rows.length,
-        available: rows.filter((r) => r.status === "NEW" && !r.owner_id).length,
-        assigned: rows.filter((r) => r.owner_id).length,
+        total: totalRes.count ?? 0,
+        available: availableRes.count ?? 0,
+        assigned: assignedRes.count ?? 0,
       };
     },
     enabled: !!deptCode,
