@@ -25,11 +25,13 @@ export interface Lead {
   size_bucket: SizeBucket | null;
   priority: LeadPriority | null;
   dept_code: string;
+  job_dept: string | null;
   status: LeadStatus;
   owner_id: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+  category: string | null;
   // joined
   owner_email?: string;
   owner_name?: string;
@@ -147,6 +149,7 @@ export function useAdminLeads(filters: {
   status?: string;
   owner_id?: string;
   priority?: string;
+  category?: string;
   page?: number;
 }) {
   const PAGE = 50;
@@ -155,8 +158,6 @@ export function useAdminLeads(filters: {
   return useQuery<{ leads: Lead[]; count: number }>({
     queryKey: ["admin_leads", filters],
     queryFn: async () => {
-      let q = (supabase.from("lead_jobs" as any) as any);
-      // On utilise supabase direct sur leads table
       let query = supabase
         .from("leads" as any)
         .select("*", { count: "exact" })
@@ -167,6 +168,7 @@ export function useAdminLeads(filters: {
       if (filters.status)   query = query.eq("status", filters.status);
       if (filters.owner_id) query = query.eq("owner_id", filters.owner_id);
       if (filters.priority) query = query.eq("priority", filters.priority);
+      if (filters.category) query = query.eq("category", filters.category);
 
       const { data, error, count } = await query;
       if (error) throw error;
@@ -189,13 +191,14 @@ export function useGeneratedDepts() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("leads" as any)
-          .select("dept_code, status, owner_id")
+          .select("job_dept, dept_code, status, owner_id")
           .range(from, from + PAGE - 1);
         if (error) throw error;
         const rows = (data as any[]) || [];
         rows.forEach((r) => {
-          const prev = map.get(r.dept_code) || { total: 0, available: 0 };
-          map.set(r.dept_code, {
+          const bucket = r.job_dept ?? r.dept_code;
+          const prev = map.get(bucket) || { total: 0, available: 0 };
+          map.set(bucket, {
             total: prev.total + 1,
             available: r.status === "NEW" && !r.owner_id ? prev.available + 1 : prev.available,
           });
@@ -218,10 +221,11 @@ export function useLeadStats(deptCode: string) {
   return useQuery({
     queryKey: ["lead_stats", deptCode],
     queryFn: async () => {
+      const orFilter = `job_dept.eq.${deptCode},and(dept_code.eq.${deptCode},job_dept.is.null)`;
       const [totalRes, availableRes, assignedRes] = await Promise.all([
-        supabase.from("leads" as any).select("*", { count: "exact", head: true }).eq("dept_code", deptCode),
-        supabase.from("leads" as any).select("*", { count: "exact", head: true }).eq("dept_code", deptCode).eq("status", "NEW").is("owner_id", null),
-        supabase.from("leads" as any).select("*", { count: "exact", head: true }).eq("dept_code", deptCode).not("owner_id", "is", null),
+        supabase.from("leads" as any).select("*", { count: "exact", head: true }).or(orFilter),
+        supabase.from("leads" as any).select("*", { count: "exact", head: true }).or(orFilter).eq("status", "NEW").is("owner_id", null),
+        supabase.from("leads" as any).select("*", { count: "exact", head: true }).or(orFilter).not("owner_id", "is", null),
       ]);
       if (totalRes.error) throw totalRes.error;
       if (availableRes.error) throw availableRes.error;

@@ -38,6 +38,21 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: stri
   C: { label: "Priorité C", color: "bg-red-500/10 text-red-400 border-red-500/20",             icon: "❄️" },
 };
 
+const CATEGORY_ICON: Record<string, string> = {
+  "Plomberie":       "🔧",
+  "Électricité":     "⚡",
+  "Chauffage":       "🔥",
+  "Artisan BTP":     "🏗️",
+  "Rénovation":      "🏠",
+  "Couverture":      "🏚️",
+  "Maçonnerie":      "🧱",
+  "Menuiserie":      "🪵",
+  "Peinture":        "🎨",
+  "Photovoltaïque":  "☀️",
+  "Terrassement":    "⛏️",
+  "Multi-services":  "🔨",
+};
+
 // ─── Counter card ─────────────────────────────────────────────
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
@@ -126,6 +141,11 @@ function LeadCard({ lead }: { lead: Lead }) {
                 <h3 className="font-semibold text-sm leading-tight truncate">{lead.name}</h3>
                 {prio && (
                   <span className="text-xs">{prio.icon}</span>
+                )}
+                {(lead as any).category && (
+                  <span className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5 font-medium">
+                    {CATEGORY_ICON[(lead as any).category] || "🏗️"} {(lead as any).category}
+                  </span>
                 )}
               </div>
               {lead.address && (
@@ -265,6 +285,7 @@ export default function CloserLeads() {
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(0);
 
   const { data: statsData } = useMyLeadStats();
@@ -272,6 +293,7 @@ export default function CloserLeads() {
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
     dept: deptFilter || undefined,
+    category: categoryFilter || undefined,
     page,
   });
 
@@ -327,6 +349,28 @@ export default function CloserLeads() {
               {DEPTS.map((d) => (
                 <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={categoryFilter || "_all"} onValueChange={(v) => { setCategoryFilter(v === "_all" ? "" : v); setPage(0); }}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Tous les métiers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Tous les métiers</SelectItem>
+              {/* Ordre : plus facile → moins facile à closer (plombiers en premier) */}
+              <SelectItem value="Plomberie">🔧 Plomberie</SelectItem>
+              <SelectItem value="Chauffage">🔥 Chauffage</SelectItem>
+              <SelectItem value="Électricité">⚡ Électricité</SelectItem>
+              <SelectItem value="Couverture">🏚️ Couverture</SelectItem>
+              <SelectItem value="Menuiserie">🪵 Menuiserie</SelectItem>
+              <SelectItem value="Peinture">🎨 Peinture</SelectItem>
+              <SelectItem value="Rénovation">🏠 Rénovation</SelectItem>
+              <SelectItem value="Maçonnerie">🧱 Maçonnerie</SelectItem>
+              <SelectItem value="Artisan BTP">🏗️ Artisan BTP</SelectItem>
+              <SelectItem value="Photovoltaïque">☀️ Photovoltaïque</SelectItem>
+              <SelectItem value="Terrassement">⛏️ Terrassement</SelectItem>
+              <SelectItem value="Multi-services">🔨 Multi-services</SelectItem>
             </SelectContent>
           </Select>
 

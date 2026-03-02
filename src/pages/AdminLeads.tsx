@@ -82,6 +82,22 @@ const KEYWORD_CATEGORY: Record<string, string> = {
   "terrassier": "Terrassement", "multi services bâtiment": "Multi-services",
 };
 
+// Ordre : du plus facile au moins facile à closer (plombiers en premier)
+const METIER_OPTIONS: { value: string; label: string }[] = [
+  { value: "Plomberie", label: "Plomberie" },
+  { value: "Chauffage", label: "Chauffage" },
+  { value: "Électricité", label: "Électricité" },
+  { value: "Couverture", label: "Couverture" },
+  { value: "Menuiserie", label: "Menuiserie" },
+  { value: "Peinture", label: "Peinture" },
+  { value: "Rénovation", label: "Rénovation" },
+  { value: "Maçonnerie", label: "Maçonnerie" },
+  { value: "Artisan BTP", label: "Artisan BTP" },
+  { value: "Photovoltaïque", label: "Photovoltaïque" },
+  { value: "Terrassement", label: "Terrassement" },
+  { value: "Multi-services", label: "Multi-services" },
+];
+
 const DEPT_BOUNDS: Record<string, [number, number, number, number]> = {
   // [minLat, maxLat, minLng, maxLng]
   "01":[45.75,46.52,4.73,5.78],"02":[49.09,50.07,3.02,4.24],"03":[45.98,46.80,2.12,3.81],
@@ -199,7 +215,7 @@ async function processPlaceBrowser(
       phone_mobile: phoneMobile, phone_fixed: phoneFixed,
       website: place.websiteUri || null, maps_url: place.googleMapsUri,
       rating: rating || null, reviews_count: count,
-      size_bucket: bucket, priority, dept_code: deptCode, category,
+      size_bucket: bucket, priority, dept_code: deptCode, job_dept: jobDept, category,
     } as any, { onConflict: "place_id", ignoreDuplicates: true } as any);
     if (!error) stats.inserted++; else stats.skipped++;
   } catch (_) {
@@ -628,8 +644,9 @@ function SectionLeads() {
   const [dept, setDept] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
+  const [category, setCategory] = useState("");
   const [page, setPage] = useState(0);
-  const { data, isLoading } = useAdminLeads({ dept, status, priority, page });
+  const { data, isLoading } = useAdminLeads({ dept, status, priority, category, page });
   const leads = data?.leads || [];
   const count = data?.count || 0;
   const PAGE = 50;
@@ -643,6 +660,15 @@ function SectionLeads() {
             <SelectContent>
               <SelectItem value="_all">Tous les départements</SelectItem>
               {DEPTS.map((d) => <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={category || "_all"} onValueChange={(v) => { setCategory(v === "_all" ? "" : v); setPage(0); }}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Tous les métiers" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Tous les métiers</SelectItem>
+              {METIER_OPTIONS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={status || "_all"} onValueChange={(v) => { setStatus(v === "_all" ? "" : v); setPage(0); }}>
@@ -677,7 +703,7 @@ function SectionLeads() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/50 bg-card/50">
-                  {["Entreprise", "Mobile", "Site web", "Taille", "Priorité", "Statut", "Dept"].map((h) => (
+                  {["Entreprise", "Mobile", "Site web", "Métier", "Taille", "Priorité", "Statut", "Dept"].map((h) => (
                     <th key={h} className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -703,6 +729,7 @@ function SectionLeads() {
                           </a>
                         : <span className="text-muted-foreground">—</span>}
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs text-muted-foreground">{lead.category || "—"}</span></td>
                     <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs text-muted-foreground">{lead.size_bucket || "—"}</span></td>
                     <td className="px-4 py-3">
                       {lead.priority ? <Badge className={`text-xs border ${PRIORITY_COLORS[lead.priority]}`}>{lead.priority}</Badge> : "—"}
