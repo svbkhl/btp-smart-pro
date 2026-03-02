@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
-  useAssignLeads, useRetryJob, LeadJob, Lead, RETRY_NETWORK,
+  useAssignLeads, useRetryJob, useGeneratedDepts, LeadJob, Lead, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -240,6 +240,7 @@ function SectionAssign() {
   const { toast } = useToast();
   const assign = useAssignLeads();
   const { data: closers = [] } = useClosersList();
+  const { data: generatedDepts = [], isLoading: deptsLoading } = useGeneratedDepts();
   const { data: stats } = useLeadStats(dept);
 
   const handleAssign = async () => {
@@ -261,17 +262,36 @@ function SectionAssign() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium mb-1.5 block">Département</label>
+          <label className="text-sm font-medium mb-1.5 block">
+            Département
+            {generatedDepts.length > 0 && (
+              <span className="ml-2 text-xs text-muted-foreground font-normal">({generatedDepts.length} générés)</span>
+            )}
+          </label>
           <Select value={dept} onValueChange={setDept}>
             <SelectTrigger>
-              <SelectValue placeholder="Sélectionner…" />
+              <SelectValue placeholder={deptsLoading ? "Chargement…" : generatedDepts.length === 0 ? "Aucun lead généré" : "Sélectionner…"} />
             </SelectTrigger>
             <SelectContent>
-              {DEPTS.map((d) => (
-                <SelectItem key={d.code} value={d.code}>
-                  {d.code} — {d.name}
-                </SelectItem>
-              ))}
+              {generatedDepts.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                  Aucun lead généré pour l'instant
+                </div>
+              ) : (
+                generatedDepts.map((d) => (
+                  <SelectItem key={d.code} value={d.code}>
+                    <span className="flex items-center gap-2">
+                      <span>{d.code} — {d.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {d.available > 0
+                          ? <span className="text-blue-400">{d.available} dispo</span>
+                          : <span className="text-muted-foreground/50">0 dispo</span>
+                        }
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>

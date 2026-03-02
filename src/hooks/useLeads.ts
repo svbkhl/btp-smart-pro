@@ -177,6 +177,36 @@ export function useAdminLeads(filters: {
   });
 }
 
+export function useGeneratedDepts() {
+  return useQuery<{ code: string; name: string; total: number; available: number }[]>({
+    queryKey: ["generated_depts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads" as any)
+        .select("dept_code, status, owner_id");
+      if (error) throw error;
+      const rows = (data as any[]) || [];
+
+      const map = new Map<string, { total: number; available: number }>();
+      rows.forEach((r) => {
+        const prev = map.get(r.dept_code) || { total: 0, available: 0 };
+        map.set(r.dept_code, {
+          total: prev.total + 1,
+          available: r.status === "NEW" && !r.owner_id ? prev.available + 1 : prev.available,
+        });
+      });
+
+      return Array.from(map.entries())
+        .map(([code, stats]) => {
+          const dept = DEPTS.find((d) => d.code === code);
+          return { code, name: dept?.name || code, ...stats };
+        })
+        .sort((a, b) => a.code.localeCompare(b.code));
+    },
+    ...RETRY_NETWORK,
+  });
+}
+
 export function useLeadStats(deptCode: string) {
   return useQuery({
     queryKey: ["lead_stats", deptCode],
