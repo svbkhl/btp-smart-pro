@@ -14,7 +14,7 @@ import {
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
   useAssignLeads, useRetryJob, useStopJob, useGeneratedDepts, useLeadsFixed,
-  LeadJob, Lead, LeadFixed, RETRY_NETWORK,
+  useLeadsFixedDepts, LeadJob, Lead, LeadFixed, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -525,11 +525,12 @@ function SectionLeads() {
 function SectionIgnored() {
   const [dept, setDept] = useState("");
   const [page, setPage] = useState(0);
-  const { data: generatedDepts = [] } = useGeneratedDepts();
+  const { data: fixedDepts = [] } = useLeadsFixedDepts();
   const { data: result, isLoading } = useLeadsFixed({ dept, page });
   const leads = result?.leads || [];
   const count = result?.count || 0;
   const totalPages = Math.ceil(count / 50);
+  const totalIgnored = fixedDepts.reduce((s, d) => s + d.count, 0);
 
   return (
     <div className="space-y-4">
@@ -543,19 +544,31 @@ function SectionIgnored() {
               Ces entreprises n'avaient qu'un numéro fixe. Vous pouvez les retravailler manuellement.
             </p>
           </div>
-          <span className="text-sm font-semibold text-orange-400">{count} entrées</span>
+          <span className="text-sm font-semibold text-orange-400">{totalIgnored} total</span>
         </div>
-        <Select value={dept || "_all"} onValueChange={(v) => { setDept(v === "_all" ? "" : v); setPage(0); }}>
-          <SelectTrigger className="w-56">
-            <SelectValue placeholder="Tous les départements" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Tous les départements</SelectItem>
-            {generatedDepts.map((d) => (
-              <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        {/* Filtres par département */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => { setDept(""); setPage(0); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              !dept ? "bg-primary text-primary-foreground border-primary" : "border-border/50 text-muted-foreground hover:border-primary/50"
+            }`}
+          >
+            Tous ({totalIgnored})
+          </button>
+          {fixedDepts.map((d) => (
+            <button
+              key={d.code}
+              onClick={() => { setDept(d.code); setPage(0); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                dept === d.code ? "bg-orange-500/20 text-orange-400 border-orange-500/40" : "border-border/50 text-muted-foreground hover:border-orange-500/30"
+              }`}
+            >
+              {d.code} — {d.name} ({d.count})
+            </button>
+          ))}
+        </div>
       </GlassCard>
 
       <GlassCard className="p-0 overflow-hidden">

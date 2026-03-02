@@ -465,6 +465,29 @@ export interface LeadFixed {
   created_at: string;
 }
 
+export function useLeadsFixedDepts() {
+  return useQuery<{ code: string; name: string; count: number }[]>({
+    queryKey: ["leads_fixed_depts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads_fixed" as any)
+        .select("dept_code");
+      if (error) throw error;
+      const rows = (data as any[]) || [];
+      const map = new Map<string, number>();
+      rows.forEach((r) => map.set(r.dept_code, (map.get(r.dept_code) || 0) + 1));
+      return Array.from(map.entries())
+        .map(([code, count]) => ({
+          code,
+          name: DEPTS.find((d) => d.code === code)?.name || code,
+          count,
+        }))
+        .sort((a, b) => a.code.localeCompare(b.code));
+    },
+    ...RETRY_NETWORK,
+  });
+}
+
 export function useLeadsFixed(filters: { dept?: string; page?: number }) {
   const PAGE = 50;
   const from = (filters.page || 0) * PAGE;
@@ -474,6 +497,7 @@ export function useLeadsFixed(filters: { dept?: string; page?: number }) {
       let query = supabase
         .from("leads_fixed" as any)
         .select("*", { count: "exact" })
+        .order("dept_code", { ascending: true })
         .order("created_at", { ascending: false })
         .range(from, from + PAGE - 1);
       if (filters.dept) query = query.eq("dept_code", filters.dept);
