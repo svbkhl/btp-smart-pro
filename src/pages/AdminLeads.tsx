@@ -269,10 +269,12 @@ function SectionAssign() {
   const { data: closers = [] } = useClosersList();
   const { data: generatedDepts = [], isLoading: deptsLoading } = useGeneratedDepts();
   const { data: stats } = useLeadStats(dept);
+  const { data: jobs = [] } = useLeadJobs();
+  const isGenerating = dept ? jobs.some((j) => j.dept_code === dept && j.status === "RUNNING") : false;
 
   const handleAssign = async () => {
     if (!dept || !closerId) return toast({ title: "Sélectionnez département et closer", variant: "destructive" });
-    if (!stats?.available) return toast({ title: "Aucun lead NEW disponible dans ce département", variant: "destructive" });
+    if (!stats?.available) return toast({ title: "Aucun lead disponible", description: isGenerating ? "La génération est encore en cours, réessaie dans quelques secondes." : "Tous les leads de ce département sont déjà assignés.", variant: "destructive" });
     try {
       const count = await assign.mutateAsync({ deptCode: dept, closerEmail: closerId });
       toast({ title: `✅ ${count} leads assignés au closer` });
@@ -283,9 +285,17 @@ function SectionAssign() {
 
   return (
     <GlassCard className="p-6 space-y-5">
-      <h3 className="text-lg font-semibold flex items-center gap-2">
-        <Users className="h-5 w-5 text-primary" /> Assigner les leads
-      </h3>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Users className="h-5 w-5 text-primary" /> Assigner les leads
+        </h3>
+        {isGenerating && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-full px-3 py-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Génération en cours — les leads s'ajoutent au fur et à mesure
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

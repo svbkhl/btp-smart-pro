@@ -180,6 +180,7 @@ export function useAdminLeads(filters: {
 export function useGeneratedDepts() {
   return useQuery<{ code: string; name: string; total: number; available: number }[]>({
     queryKey: ["generated_depts"],
+    refetchInterval: 5000, // se met à jour toutes les 5s pendant la génération
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leads" as any)
@@ -224,6 +225,8 @@ export function useLeadStats(deptCode: string) {
       };
     },
     enabled: !!deptCode,
+    refetchInterval: 5000,
+    ...RETRY_NETWORK,
   });
 }
 
