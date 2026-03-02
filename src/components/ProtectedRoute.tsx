@@ -26,15 +26,15 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   const [showContent, setShowContent] = useState(false);
   
   // Contrôler le mode démo selon le rôle de l'utilisateur
+  // Attendre isCloserLoading pour ne pas désactiver fakeData avant la vérification DB
   useEffect(() => {
-    if (user && fakeDataEnabled && !loading) {
-      
+    if (user && fakeDataEnabled && !loading && !isCloserLoading) {
       if (userRole !== 'admin' && !isCloser) {
         console.log("🔒 Utilisateur non-admin/closer détecté - Désactivation du mode démo");
         setFakeDataEnabled(false);
       }
     }
-  }, [user, userRole, fakeDataEnabled, loading, setFakeDataEnabled]);
+  }, [user, userRole, fakeDataEnabled, loading, isCloser, isCloserLoading, setFakeDataEnabled]);
   
   useEffect(() => {
     const timeoutId = setTimeout(() => {

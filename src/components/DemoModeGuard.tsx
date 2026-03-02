@@ -9,7 +9,7 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
  * dès qu'un utilisateur non-admin/closer se connecte
  */
 export const DemoModeGuard = () => {
-  const { user, loading, userRole, isCloser } = useAuth();
+  const { user, loading, userRole, isCloser, isCloserLoading } = useAuth();
   const location = useLocation();
   const { isDemoActive, deactivateDemo } = useLandingDemoStore();
   const { setFakeDataEnabled, fakeDataEnabled } = useFakeDataStore();
@@ -22,7 +22,8 @@ export const DemoModeGuard = () => {
         console.log("🔒 Utilisateur connecté détecté - Désactivation du mode démo landing");
         deactivateDemo();
       }
-      if (fakeDataEnabled && userRole !== 'admin' && !isCloser) {
+      // Attendre que le check closer soit terminé avant de désactiver fakeData
+      if (fakeDataEnabled && userRole !== 'admin' && !isCloser && !isCloserLoading) {
         console.log("🔒 Désactivation du mode fake data - Utilisateur non-admin/closer connecté");
         setFakeDataEnabled(false);
       }
@@ -32,7 +33,7 @@ export const DemoModeGuard = () => {
       console.log("🔒 Désactivation du mode fake data - Mode démo non actif");
       setFakeDataEnabled(false);
     }
-  }, [user, loading, userRole, isCloser, isDemoActive, fakeDataEnabled, deactivateDemo, setFakeDataEnabled, location.pathname]);
+  }, [user, loading, userRole, isCloser, isCloserLoading, isDemoActive, fakeDataEnabled, deactivateDemo, setFakeDataEnabled, location.pathname]);
 
   return null;
 };
