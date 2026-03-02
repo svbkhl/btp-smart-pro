@@ -345,12 +345,14 @@ serve(async (req) => {
   const cellIndex    = cursor.cell_index    ?? 0;
   const keywordIndex = cursor.keyword_index ?? 0;
   const totalCells   = cells.length;
+  // On track la progression en nb de requêtes (cellules × mots-clés)
+  const totalRequests = totalCells * KEYWORDS.length;
 
-  // Marquer RUNNING
+  // Marquer RUNNING — total_cells = nb de requêtes total pour une progression fluide
   await supabase.from("lead_jobs").update({
     status: "RUNNING",
     started_at: job.started_at ?? new Date().toISOString(),
-    total_cells: totalCells,
+    total_cells: totalRequests,
   }).eq("id", jobId);
 
   const stats = {
@@ -363,7 +365,6 @@ serve(async (req) => {
   let ci = cellIndex;
   let ki = keywordIndex;
 
-  // Traiter BATCH_CELLS cellules max ou jusqu'à timeout
   outer:
   while (ci < cells.length && (Date.now() - startTime) / 1000 < MAX_DURATION) {
     const cell = cells[ci];
@@ -371,20 +372,21 @@ serve(async (req) => {
       if ((Date.now() - startTime) / 1000 >= MAX_DURATION) break outer;
 
       const places = await searchPlaces(KEYWORDS[ki], cell.lat, cell.lng);
-      await sleep(200); // rate limit 5 req/s
+      await sleep(200);
 
       for (const place of places) {
         await processPlace(place, job.dept_code, stats);
       }
 
       ki++;
-      // Sauvegarde du curseur toutes les 5 keywords
-      if (ki % 5 === 0) {
+      // Sauvegarde toutes les 3 requêtes (progression visible dès le départ)
+      if (ki % 3 === 0) {
+        const processedRequests = ci * KEYWORDS.length + ki;
         await supabase.from("lead_jobs").update({
           total_found: stats.found,
           total_inserted: stats.inserted,
           total_skipped: stats.skipped,
-          processed_cells: ci,
+          processed_cells: processedRequests,
           progress_cursor: { cells, cell_index: ci, keyword_index: ki },
         }).eq("id", jobId);
       }
@@ -394,14 +396,15 @@ serve(async (req) => {
   }
 
   const isDone = ci >= cells.length;
+  const finalProcessed = ci * KEYWORDS.length + ki;
 
-  // Mise à jour finale du job
+  // Mise à jour finale
   await supabase.from("lead_jobs").update({
     status: isDone ? "DONE" : "RUNNING",
     total_found: stats.found,
     total_inserted: stats.inserted,
     total_skipped: stats.skipped,
-    processed_cells: ci,
+    processed_cells: isDone ? totalRequests : finalProcessed,
     finished_at: isDone ? new Date().toISOString() : null,
     progress_cursor: isDone ? {} : { cells, cell_index: ci, keyword_index: ki },
   }).eq("id", jobId);
