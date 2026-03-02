@@ -180,7 +180,8 @@ async function processPlaceBrowser(
   if (!phoneMobile) { stats.skipped++; return; }
 
   const address = place.formattedAddress || "";
-  const deptCode = deptFromAddress(address, jobDept);
+  // Tous les leads restent dans le département du job pour cohérence avec l'assignation
+  const deptCode = jobDept;
   const name = place.displayName?.text || "";
   const count = place.userRatingCount ?? 0;
   const rating = place.rating ?? 0;
