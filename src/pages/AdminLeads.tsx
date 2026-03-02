@@ -187,16 +187,19 @@ async function processPlaceBrowser(
   const bucket = sizeBucket(count, name);
   const priority = calcPriority(bucket, rating);
 
-  const { error } = await (supabase.from("leads" as any) as any).upsert({
-    place_id: place.id, name, address,
-    lat: place.location?.latitude, lng: place.location?.longitude,
-    phone_mobile: phoneMobile, phone_fixed: phoneFixed,
-    website: place.websiteUri || null, maps_url: place.googleMapsUri,
-    rating: rating || null, reviews_count: count,
-    size_bucket: bucket, priority, dept_code: deptCode, category,
-  }, { onConflict: "place_id", ignoreDuplicates: true });
-
-  if (!error) stats.inserted++; else stats.skipped++;
+  try {
+    const { error } = await supabase.from("leads" as any).upsert({
+      place_id: place.id, name, address,
+      lat: place.location?.latitude, lng: place.location?.longitude,
+      phone_mobile: phoneMobile, phone_fixed: phoneFixed,
+      website: place.websiteUri || null, maps_url: place.googleMapsUri,
+      rating: rating || null, reviews_count: count,
+      size_bucket: bucket, priority, dept_code: deptCode, category,
+    } as any, { onConflict: "place_id", ignoreDuplicates: true } as any);
+    if (!error) stats.inserted++; else stats.skipped++;
+  } catch (_) {
+    stats.skipped++;
+  }
 }
 
 // ─── Section 1 : Générer des leads ───────────────────────────
@@ -295,10 +298,12 @@ function SectionGenerate() {
         }
 
         // Sauvegarder la progression après chaque cellule
-        await supabase.from("lead_jobs" as any).update({
-          total_found: stats.found, total_inserted: stats.inserted, total_skipped: stats.skipped,
-          processed_cells: ci + 1, progress_cursor: { cell_index: ci + 1 },
-        }).eq("id", jobId).catch(() => {});
+        try {
+          await supabase.from("lead_jobs" as any).update({
+            total_found: stats.found, total_inserted: stats.inserted, total_skipped: stats.skipped,
+            processed_cells: ci + 1, progress_cursor: { cell_index: ci + 1 },
+          }).eq("id", jobId);
+        } catch (_) { /* ignore */ }
 
         qc.invalidateQueries({ queryKey: ["lead_jobs"] });
       }
@@ -315,10 +320,12 @@ function SectionGenerate() {
         toast({ title: "✅ Génération terminée !", description: `${deptCode} — ${stats.inserted} leads insérés.` });
       }
     } catch (err: any) {
-      await supabase.from("lead_jobs" as any).update({
-        status: "FAILED", error_log: err?.message || "Erreur inconnue",
-        finished_at: new Date().toISOString(),
-      }).eq("id", jobId).catch(() => {});
+      try {
+        await supabase.from("lead_jobs" as any).update({
+          status: "FAILED", error_log: err?.message || "Erreur inconnue",
+          finished_at: new Date().toISOString(),
+        }).eq("id", jobId);
+      } catch (_) { /* ignore */ }
       qc.invalidateQueries({ queryKey: ["lead_jobs"] });
     } finally {
       abortMap.current.delete(jobId);
