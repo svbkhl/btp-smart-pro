@@ -231,13 +231,8 @@ const CloserDashboard = () => {
       </div>
 
       {/* ── Section tabulée : Classement / Entreprises / Ressources ── */}
-      <Tabs defaultValue="classement" className="w-full">
+      <Tabs defaultValue="entreprises" className="w-full">
         <TabsList className="w-full grid grid-cols-3 rounded-xl h-11 border-0 bg-transparent p-0 gap-2">
-          <TabsTrigger value="classement" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <Trophy className="w-4 h-4" />
-            <span className="hidden sm:inline">Classement</span>
-            <span className="sm:hidden">Top</span>
-          </TabsTrigger>
           <TabsTrigger value="entreprises" className="gap-1.5 rounded-lg text-xs sm:text-sm">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Mes entreprises</span>
@@ -251,12 +246,12 @@ const CloserDashboard = () => {
             <span className="hidden sm:inline">Ressources</span>
             <span className="sm:hidden">Docs</span>
           </TabsTrigger>
+          <TabsTrigger value="classement" className="gap-1.5 rounded-lg text-xs sm:text-sm">
+            <Trophy className="w-4 h-4" />
+            <span className="hidden sm:inline">Classement</span>
+            <span className="sm:hidden">Top</span>
+          </TabsTrigger>
         </TabsList>
-
-        {/* Classement */}
-        <TabsContent value="classement" className="mt-4">
-          <CloserLeaderboard />
-        </TabsContent>
 
         {/* Mes entreprises */}
         <TabsContent value="entreprises" className="mt-4 space-y-4">
@@ -319,6 +314,11 @@ const CloserDashboard = () => {
         {/* Ressources */}
         <TabsContent value="ressources" className="mt-4">
           <CloserResources />
+        </TabsContent>
+
+        {/* Classement */}
+        <TabsContent value="classement" className="mt-4">
+          <CloserLeaderboard />
         </TabsContent>
       </Tabs>
 
