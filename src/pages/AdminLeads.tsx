@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
-  useAssignLeads, useRetryJob, useGeneratedDepts, LeadJob, Lead, RETRY_NETWORK,
+  useAssignLeads, useRetryJob, useStopJob, useGeneratedDepts, LeadJob, Lead, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -87,7 +87,17 @@ function SectionGenerate() {
   const { toast } = useToast();
   const generate = useGenerateLeads();
   const retry = useRetryJob();
+  const stop = useStopJob();
   const { data: jobs = [], refetch, isRefetching } = useLeadJobs();
+
+  const handleStop = async (job: LeadJob) => {
+    try {
+      await stop.mutateAsync(job.id);
+      toast({ title: "⏹ Job arrêté", description: `${job.dept_code} — ${job.dept_name} arrêté. Tu peux le relancer.` });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
+  };
 
   const handleRetry = async (job: LeadJob) => {
     try {
@@ -177,7 +187,23 @@ function SectionGenerate() {
                       <span className="text-xs text-muted-foreground">{durationStr(job)}</span>
                     </div>
 
-                    {/* Bouton Lancer / Relancer */}
+                    {/* Bouton Arrêter (RUNNING) */}
+                    {job.status === "RUNNING" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleStop(job)}
+                        disabled={stop.isPending && (stop.variables as string) === job.id}
+                        className="h-7 px-3 text-xs border-red-500/40 text-red-400 hover:bg-red-500/10"
+                      >
+                        {stop.isPending && (stop.variables as string) === job.id
+                          ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Arrêt…</>
+                          : <><XCircle className="h-3 w-3 mr-1" /> Arrêter</>
+                        }
+                      </Button>
+                    )}
+
+                    {/* Bouton Lancer / Relancer (PENDING ou FAILED) */}
                     {canRetry && (
                       <Button
                         size="sm"

@@ -284,6 +284,21 @@ export function useGenerateLeads() {
   });
 }
 
+export function useStopJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      const { error } = await supabase.from("lead_jobs" as any).update({
+        status: "FAILED",
+        error_log: "Arrêté manuellement",
+        finished_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
+  });
+}
+
 export function useRetryJob() {
   const qc = useQueryClient();
   return useMutation({
