@@ -180,8 +180,12 @@ async function processPlaceBrowser(
   if (!phoneMobile) { stats.skipped++; return; }
 
   const address = place.formattedAddress || "";
-  // Tous les leads restent dans le département du job pour cohérence avec l'assignation
-  const deptCode = jobDept;
+  const deptCode = deptFromAddress(address, jobDept);
+  // Ne garder que les entreprises dont l'adresse est vraiment dans le département du job
+  if (deptCode !== jobDept) {
+    stats.skipped++;
+    return;
+  }
   const name = place.displayName?.text || "";
   const count = place.userRatingCount ?? 0;
   const rating = place.rating ?? 0;
