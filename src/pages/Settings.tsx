@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt, Send } from "lucide-react";
+import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt, Send, Zap } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
@@ -32,6 +32,7 @@ import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import { PlanningEmailSettings } from "@/components/settings/PlanningEmailSettings";
 import AdminCompanies from "@/pages/AdminCompanies";
+import AdminLeads from "@/pages/AdminLeads";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 import DelegationsManagement from "@/pages/DelegationsManagement";
 import RolesManagement from "@/pages/RolesManagement";
@@ -305,6 +306,10 @@ const Settings = () => {
                   <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Closers</span>
                 </TabsTrigger>
+                <TabsTrigger value="leads" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                  <Zap className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">Leads BTP</span>
+                </TabsTrigger>
               </>
             )}
             {isReallyAdmin && (
@@ -384,6 +389,9 @@ const Settings = () => {
               </TabsContent>
               <TabsContent value="closers" className="mt-0">
                 <CloserSettings />
+              </TabsContent>
+              <TabsContent value="leads" className="mt-0">
+                <AdminLeads />
               </TabsContent>
               <TabsContent value="demo" className="mt-0">
                 <DemoModeSettings />

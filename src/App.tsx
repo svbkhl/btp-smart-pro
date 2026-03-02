@@ -58,6 +58,7 @@ import RHCandidatures from './pages/RHCandidatures';
 import RHTaches from './pages/RHTaches';
 import AdminEmployees from './pages/AdminEmployees';
 import AdminCompanies from './pages/AdminCompanies';
+import AdminLeads from './pages/AdminLeads';
 import CloserDashboard from './pages/CloserDashboard';
 import AcceptInvitation from './pages/AcceptInvitation';
 import InviteAccept from './pages/InviteAccept';
@@ -409,6 +410,14 @@ function App() {
           element={
             <ProtectedRoute requireAdmin>
               <AdminCompanies />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/leads"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminLeads />
             </ProtectedRoute>
           }
         />

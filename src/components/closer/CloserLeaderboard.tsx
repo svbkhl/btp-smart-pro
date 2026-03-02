@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trophy, Medal, Crown, TrendingUp, Clock, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Trophy, Crown, Flame, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -15,114 +17,251 @@ interface CloserRank {
   rank: number;
 }
 
+
 function useLeaderboard() {
   return useQuery<CloserRank[]>({
     queryKey: ["closer_leaderboard"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_closer_leaderboard" as any);
+      // 1. Données de closes (vrais scores)
+      const { data: scores, error } = await supabase.rpc("get_closer_leaderboard" as any);
       if (error) throw error;
-      return (data as unknown as CloserRank[]) || [];
+      const scoreList: CloserRank[] = (scores as unknown as CloserRank[]) || [];
+
+      // 2. Tous les closers inscrits
+      const { data: allClosers } = await supabase
+        .from("closer_emails" as any)
+        .select("email, name");
+      const closerList = (allClosers as { email: string; name?: string }[]) || [];
+
+      // 3. Fusionner : closers sans score → monthly_closes: 0
+      const merged: CloserRank[] = closerList.map((c) => {
+        const found = scoreList.find(
+          (s) => s.closer_email?.toLowerCase() === c.email?.toLowerCase()
+        );
+        return found ?? {
+          closer_email: c.email,
+          closer_name: c.name || c.email.split("@")[0],
+          total_closes: 0,
+          monthly_closes: 0,
+          trials_active: 0,
+          rank: 0,
+        };
+      });
+
+      // Ajouter les scores qui ne sont pas dans closer_emails (sécurité)
+      scoreList.forEach((s) => {
+        if (!merged.some((m) => m.closer_email?.toLowerCase() === s.closer_email?.toLowerCase())) {
+          merged.push(s);
+        }
+      });
+
+      return merged
+        .sort((a, b) => b.monthly_closes - a.monthly_closes)
+        .map((e, i) => ({ ...e, rank: i + 1 }));
     },
-    refetchInterval: 60_000, // actualise toutes les minutes
+    refetchInterval: 60_000,
   });
 }
 
-/* ─── Médaille selon le rang ─── */
-const RankBadge = ({ rank }: { rank: number }) => {
-  if (rank === 1) return <Crown className="w-6 h-6 text-yellow-400" />;
-  if (rank === 2) return <Medal className="w-6 h-6 text-slate-400" />;
-  if (rank === 3) return <Medal className="w-6 h-6 text-amber-600" />;
-  return <span className="text-sm font-bold text-muted-foreground w-6 text-center">#{rank}</span>;
-};
+const initials = (name: string) =>
+  name.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 
-/* ─── Carte podium (top 3) ─── */
-const PodiumCard = ({ entry, isSelf }: { entry: CloserRank; isSelf: boolean }) => {
-  const styles: Record<number, { border: string; bg: string; shadow: string; size: string }> = {
-    1: {
-      border: "border-yellow-400/40",
-      bg: "bg-yellow-500/10",
-      shadow: "shadow-yellow-500/20",
-      size: "scale-105",
-    },
-    2: {
-      border: "border-slate-400/30",
-      bg: "bg-slate-500/10",
-      shadow: "shadow-slate-500/10",
-      size: "",
-    },
-    3: {
-      border: "border-amber-600/30",
-      bg: "bg-amber-600/10",
-      shadow: "shadow-amber-600/10",
-      size: "",
-    },
+/* ─── Podium top 3 ─────────────────────────────────────────────────────────── */
+const PodiumTop3 = ({ top3, userEmail }: { top3: CloserRank[]; userEmail?: string }) => {
+  if (top3.length < 3) return null;
+
+  const [first, second, third] = [top3[0], top3[1], top3[2]];
+
+  const avatar = (entry: CloserRank, size: string, colorClass: string) => (
+    <div className={cn("rounded-full flex items-center justify-center font-bold flex-shrink-0", size, colorClass)}>
+      {initials(entry.closer_name)}
+    </div>
+  );
+
+  const maxCloses = first.monthly_closes || 1;
+
+  const PodiumSlot = ({
+    entry,
+    height,
+    label,
+    avatarSize,
+    scoreColor,
+    bgColor,
+    borderColor,
+    avatarColor,
+    rankIcon,
+  }: {
+    entry: CloserRank;
+    height: string;
+    label: string;
+    avatarSize: string;
+    scoreColor: string;
+    bgColor: string;
+    borderColor: string;
+    avatarColor: string;
+    rankIcon: React.ReactNode;
+  }) => {
+    const isSelf = entry.closer_email?.toLowerCase() === userEmail?.toLowerCase();
+    return (
+      <div className="flex flex-col items-center gap-2 flex-1">
+        {/* Info au-dessus du podium */}
+        <div className="flex flex-col items-center gap-1 mb-1">
+          <div className="relative">
+            {avatar(entry, avatarSize, avatarColor)}
+            <span className="absolute -top-2 -right-1">{rankIcon}</span>
+          </div>
+          <p className="font-bold text-sm text-center leading-tight max-w-[90px] truncate">
+            {entry.closer_name.split(" ")[0]}
+          </p>
+          {isSelf && <Badge variant="outline" className="text-xs py-0 px-1.5">Vous</Badge>}
+          <div className="flex flex-col items-center">
+            <span className={cn("text-2xl font-extrabold leading-none", scoreColor)}>{entry.monthly_closes}</span>
+            <span className="text-xs text-muted-foreground">closes</span>
+          </div>
+          {entry.trials_active > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-orange-400 font-medium">
+              <Flame className="w-3 h-3" />{entry.trials_active} chauds
+            </span>
+          )}
+        </div>
+        {/* Colonne podium */}
+        <div className={cn("w-full rounded-t-xl border-t border-x flex items-center justify-center text-lg font-black", height, bgColor, borderColor, label === "🥇" ? "text-yellow-400" : label === "🥈" ? "text-slate-400" : "text-amber-600")}>
+          {label}
+        </div>
+      </div>
+    );
   };
 
-  const s = styles[entry.rank] || styles[3];
-  const initials = entry.closer_name
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
   return (
-    <div className={cn("flex flex-col items-center gap-3 p-5 rounded-2xl border backdrop-blur-xl transition-transform", s.border, s.bg, s.size, isSelf && "ring-2 ring-primary/40")}>
-      {/* Avatar */}
-      <div className={cn(
-        "relative w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold",
-        entry.rank === 1 ? "bg-yellow-500/20 text-yellow-500" :
-        entry.rank === 2 ? "bg-slate-400/20 text-slate-400" :
-        "bg-amber-600/20 text-amber-600"
-      )}>
-        {initials || "?"}
-        <span className="absolute -top-2 -right-2">
-          <RankBadge rank={entry.rank} />
-        </span>
+    <div className="flex items-end gap-2 px-2 pb-0">
+      <PodiumSlot
+        entry={second}
+        height="h-20"
+        label="🥈"
+        avatarSize="w-12 h-12 text-base"
+        scoreColor="text-slate-400"
+        bgColor="bg-slate-500/10"
+        borderColor="border-slate-400/30"
+        avatarColor="bg-slate-400/20 text-slate-300"
+        rankIcon={<span className="text-lg">🥈</span>}
+      />
+      <div className="relative">
+        {/* Halo animé autour du 1er */}
+        <div className="absolute -inset-2 rounded-2xl bg-yellow-400/10 animate-pulse pointer-events-none" />
+        <PodiumSlot
+          entry={first}
+          height="h-32"
+          label="🥇"
+          avatarSize="w-16 h-16 text-xl"
+          scoreColor="text-yellow-400"
+          bgColor="bg-yellow-500/10"
+          borderColor="border-yellow-400/30"
+          avatarColor="bg-yellow-500/20 text-yellow-400"
+          rankIcon={<Crown className="w-5 h-5 text-yellow-400 animate-bounce" />}
+        />
       </div>
-
-      {/* Nom */}
-      <div className="text-center">
-        <p className="font-bold text-sm leading-tight">{entry.closer_name.split("@")[0]}</p>
-        {isSelf && <Badge variant="outline" className="text-xs mt-1">Vous</Badge>}
-      </div>
-
-      {/* Stats */}
-      <div className="text-center">
-        <p className={cn("text-3xl font-extrabold", entry.rank === 1 ? "text-yellow-400" : entry.rank === 2 ? "text-slate-400" : "text-amber-600")}>
-          {entry.monthly_closes}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">close{entry.monthly_closes > 1 ? "s" : ""} ce mois</p>
-      </div>
-
-      {entry.trials_active > 0 && (
-        <Badge variant="secondary" className="text-xs gap-1">
-          <Clock className="w-3 h-3" />
-          {entry.trials_active} en essai
-        </Badge>
-      )}
+      <PodiumSlot
+        entry={third}
+        height="h-14"
+        label="🥉"
+        avatarSize="w-10 h-10 text-sm"
+        scoreColor="text-amber-600"
+        bgColor="bg-amber-600/10"
+        borderColor="border-amber-600/30"
+        avatarColor="bg-amber-600/20 text-amber-600"
+        rankIcon={<span className="text-lg">🥉</span>}
+      />
     </div>
   );
 };
 
-/* ─── Composant principal ─── */
+/* ─── Ligne classement (rang 4+) ──────────────────────────────────────────── */
+const RankRow = ({ entry, userEmail, maxCloses }: { entry: CloserRank; userEmail?: string; maxCloses: number }) => {
+  const isSelf = entry.closer_email?.toLowerCase() === userEmail?.toLowerCase();
+  const pct = Math.round((entry.monthly_closes / maxCloses) * 100);
+
+  return (
+    <div className={cn("flex items-center gap-3 px-4 py-3 transition-colors", isSelf && "bg-primary/5")}>
+      <span className="w-6 text-center text-xs font-bold text-muted-foreground">#{entry.rank}</span>
+      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+        {initials(entry.closer_name)}
+      </div>
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium text-sm truncate">{entry.closer_name.split("@")[0]}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {entry.trials_active > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs text-orange-400 font-medium">
+                <Flame className="w-3 h-3" />{entry.trials_active}
+              </span>
+            )}
+            <span className="font-bold text-sm">{entry.monthly_closes} <span className="text-xs font-normal text-muted-foreground">closes</span></span>
+            {isSelf && <Badge variant="outline" className="text-xs py-0 px-1.5">Vous</Badge>}
+          </div>
+        </div>
+        {/* Barre de progression */}
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn("h-full rounded-full transition-all", isSelf ? "bg-primary" : "bg-muted-foreground/40")}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Composant principal ─────────────────────────────────────────────────── */
 export const CloserLeaderboard = () => {
   const { user } = useAuth();
-  const { data: leaderboard = [], isLoading, error } = useLeaderboard();
+  const { data: realData = [], isLoading, error } = useLeaderboard();
+  // monthOffset : 0 = mois en cours, -1 = mois précédent, etc.
+  const [monthOffset, setMonthOffset] = useState(0);
 
-  const currentMonth = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const leaderboard = realData;
+
+  const displayDate = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + monthOffset);
+    return d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  })();
+
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
-  const myEntry = leaderboard.find((e) => e.closer_email?.toLowerCase() === user?.email?.toLowerCase());
-  const myRank = myEntry?.rank;
+  const maxCloses = leaderboard[0]?.monthly_closes || 1;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Trophy className="w-4 h-4 text-yellow-500" />
-        <span className="text-sm font-semibold capitalize">{currentMonth}</span>
-        <span className="text-xs text-muted-foreground">— Primes Top 3 fin de mois</span>
+      {/* Header avec navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-lg"
+            onClick={() => setMonthOffset((v) => v - 1)}
+            disabled={monthOffset <= -2}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <div className="flex items-center gap-1.5 px-1">
+            <Trophy className="w-4 h-4 text-yellow-500" />
+            <span className="text-sm font-semibold capitalize min-w-[130px] text-center">{displayDate}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-lg"
+            onClick={() => setMonthOffset((v) => v + 1)}
+            disabled={monthOffset >= 0}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
+          <Star className="w-3 h-3 text-yellow-500" />
+          Primes Top 3
+        </span>
       </div>
 
       {isLoading ? (
@@ -133,110 +272,52 @@ export const CloserLeaderboard = () => {
         <GlassCard className="p-6 text-center text-sm text-muted-foreground">
           Impossible de charger le classement.
         </GlassCard>
-      ) : leaderboard.length === 0 ? (
-        <GlassCard className="p-10 text-center">
-          <Trophy className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-          <p className="font-medium">Aucun classement pour l'instant</p>
-          <p className="text-sm text-muted-foreground mt-1">Le classement se mettra à jour automatiquement après chaque conversion.</p>
-        </GlassCard>
       ) : (
-        <>
-          {/* Mon rang (si pas top 3) */}
-          {myEntry && myRank && myRank > 3 && (
-            <GlassCard className="p-4 flex items-center justify-between border-primary/20 bg-primary/5">
-              <div className="flex items-center gap-3">
-                <span className="text-xl font-extrabold text-primary">#{myRank}</span>
-                <div>
-                  <p className="font-semibold text-sm">Votre position</p>
-                  <p className="text-xs text-muted-foreground">{myEntry.monthly_closes} close{myEntry.monthly_closes > 1 ? "s" : ""} ce mois • {myEntry.trials_active} en essai</p>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-xs">Vous</Badge>
-            </GlassCard>
-          )}
+        <GlassCard className="overflow-hidden relative">
+          {/* Déco animée fond */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            {/* Orbes colorés */}
+            <div className="absolute top-4 left-8 w-24 h-24 rounded-full bg-yellow-400/10 blur-2xl animate-pulse" />
+            <div className="absolute top-12 right-12 w-16 h-16 rounded-full bg-slate-400/10 blur-xl animate-pulse [animation-delay:1s]" />
+            <div className="absolute bottom-8 left-1/2 w-20 h-20 rounded-full bg-amber-600/10 blur-2xl animate-pulse [animation-delay:2s]" />
+            {/* Étoiles scintillantes */}
+            <span className="absolute top-6 left-[42%] text-yellow-400/60 text-xs animate-bounce [animation-delay:0.3s]">★</span>
+            <span className="absolute top-3 left-[55%] text-yellow-300/40 text-[10px] animate-bounce [animation-delay:0.8s]">✦</span>
+            <span className="absolute top-8 left-[30%] text-yellow-500/30 text-[8px] animate-bounce [animation-delay:1.2s]">✦</span>
+            <span className="absolute top-2 right-24 text-yellow-400/40 text-xs animate-bounce [animation-delay:1.7s]">★</span>
+          </div>
 
-          {/* Podium top 3 */}
-          {top3.length > 0 && (
-            <div className={cn(
-              "grid gap-3",
-              top3.length === 1 ? "grid-cols-1 max-w-xs mx-auto" :
-              top3.length === 2 ? "grid-cols-2" :
-              "grid-cols-3"
-            )}>
-              {/* Réordonner pour le podium visuel : 2 - 1 - 3 */}
-              {top3.length === 3 ? (
-                [top3[1], top3[0], top3[2]].map((entry) => (
-                  <PodiumCard
-                    key={entry.closer_email}
-                    entry={entry}
-                    isSelf={entry.closer_email?.toLowerCase() === user?.email?.toLowerCase()}
-                  />
-                ))
-              ) : (
-                top3.map((entry) => (
-                  <PodiumCard
-                    key={entry.closer_email}
-                    entry={entry}
-                    isSelf={entry.closer_email?.toLowerCase() === user?.email?.toLowerCase()}
-                  />
-                ))
-              )}
+          {/* Podium */}
+          {top3.length === 3 && (
+            <div className="px-4 pt-6 pb-0 relative">
+              <PodiumTop3 top3={top3} userEmail={user?.email} />
             </div>
           )}
 
-          {/* Suite du classement (rang 4+) */}
+          {/* Liste rang 4+ */}
           {rest.length > 0 && (
-            <GlassCard className="overflow-hidden divide-y divide-border/50">
+            <div className="divide-y divide-border/40 mt-2">
               {rest.map((entry) => (
-                <div
+                <RankRow
                   key={entry.closer_email}
-                  className={cn(
-                    "flex items-center gap-4 px-4 py-3 transition-colors",
-                    entry.closer_email?.toLowerCase() === user?.email?.toLowerCase() && "bg-primary/5"
-                  )}
-                >
-                  <span className="text-sm font-bold text-muted-foreground w-7 text-center">#{entry.rank}</span>
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {entry.closer_name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{entry.closer_name.split("@")[0]}</p>
-                  </div>
-                  <div className="flex items-center gap-3 text-right">
-                    <div>
-                      <p className="font-bold text-sm">{entry.monthly_closes}</p>
-                      <p className="text-xs text-muted-foreground">ce mois</p>
-                    </div>
-                    {entry.trials_active > 0 && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Clock className="w-3 h-3" />{entry.trials_active}
-                      </Badge>
-                    )}
-                    {entry.closer_email?.toLowerCase() === user?.email?.toLowerCase() && (
-                      <Badge variant="outline" className="text-xs">Vous</Badge>
-                    )}
-                  </div>
-                </div>
+                  entry={entry}
+                  userEmail={user?.email}
+                  maxCloses={maxCloses}
+                />
               ))}
-            </GlassCard>
+            </div>
           )}
 
           {/* Légende */}
-          <div className="flex flex-wrap items-center gap-4 justify-center text-xs text-muted-foreground pt-1">
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-green-500" />
-              <span>Close = entreprise convertie en abonnement payant</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-orange-400" />
-              <span>En essai = prospect chaud (14j)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-primary" />
-              <span>Primes Top 3 fin de mois</span>
-            </div>
+          <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-border/40 mt-1">
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Flame className="w-3 h-3 text-orange-400" /> Prospects chauds en essai
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Trophy className="w-3 h-3 text-yellow-500" /> Close = abonnement signé
+            </span>
           </div>
-        </>
+        </GlassCard>
       )}
     </div>
   );

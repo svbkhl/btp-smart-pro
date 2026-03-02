@@ -1,5 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -38,7 +53,6 @@ import {
   Calendar,
   Pencil,
   Check,
-  X,
   Plus,
   Trash2,
   ChevronDown,
@@ -50,6 +64,7 @@ import {
   ExternalLink,
   Save,
   Loader2,
+  GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -131,10 +146,24 @@ function useDeleteResource() {
   });
 }
 
-/* ─── Carte d'une ressource ─── */
+function useUpdateSortOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: { id: string; sort_order: number }[]) => {
+      await Promise.all(
+        updates.map(({ id, sort_order }) =>
+          supabase.from("closer_resources" as any).update({ sort_order }).eq("id", id)
+        )
+      );
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["closer_resources"] }),
+  });
+}
+
+/* ─── Carte d'une ressource (sortable) ─── */
 const ResourceCard = ({ resource }: { resource: CloserResource }) => {
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(resource.title);
   const [editContent, setEditContent] = useState(resource.content);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -142,14 +171,23 @@ const ResourceCard = ({ resource }: { resource: CloserResource }) => {
   const del = useDeleteResource();
   const { toast } = useToast();
 
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: resource.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
   const cat = CATEGORIES[resource.category] || CATEGORIES.autre;
   const CatIcon = cat.icon;
+
+  const handleOpenEdit = () => {
+    setEditTitle(resource.title);
+    setEditContent(resource.content);
+    setEditOpen(true);
+  };
 
   const handleSave = async () => {
     try {
       await upsert.mutateAsync({ ...resource, title: editTitle, content: editContent });
-      setEditing(false);
       toast({ title: "Sauvegardé ✓" });
+      setEditOpen(false);
     } catch {
       toast({ title: "Erreur", description: "Impossible de sauvegarder", variant: "destructive" });
     }
@@ -166,73 +204,82 @@ const ResourceCard = ({ resource }: { resource: CloserResource }) => {
 
   return (
     <>
-      <GlassCard className="overflow-hidden">
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className={cn("p-2 rounded-lg border flex-shrink-0", cat.color)}>
-                <CatIcon className="w-4 h-4" />
-              </div>
-              {editing ? (
-                <Input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="font-semibold h-8 text-sm"
-                  autoFocus
-                />
-              ) : (
+      <div ref={setNodeRef} style={style} className={cn("touch-none", isDragging && "opacity-50 z-50")}>
+        <GlassCard className="overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              {/* Poignée drag */}
+              <button
+                {...attributes}
+                {...listeners}
+                className="flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none"
+                tabIndex={-1}
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className={cn("p-2 rounded-lg border flex-shrink-0", cat.color)}>
+                  <CatIcon className="w-4 h-4" />
+                </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-sm truncate">{resource.title}</p>
                   <Badge variant="outline" className={cn("text-xs mt-0.5", cat.color)}>{cat.label}</Badge>
                 </div>
-              )}
+              </div>
+
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleOpenEdit}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setExpanded(!expanded)}>
+                  {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {editing ? (
-                <>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={handleSave} disabled={upsert.isPending}>
-                    {upsert.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(false); setEditTitle(resource.title); setEditContent(resource.content); }}>
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(true); setExpanded(true); }}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={() => setConfirmDelete(true)}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setExpanded(!expanded)}>
-                    {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </Button>
-                </>
-              )}
+
+            {expanded && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed bg-transparent p-0 m-0">
+                  {resource.content}
+                </pre>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* ─── Modal édition ─── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
+          <DialogHeader>
+            <DialogTitle>Modifier la ressource</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Titre</Label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Titre de la ressource" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Contenu</Label>
+              <p className="text-xs text-muted-foreground">Supporte le Markdown : ## Titre, **gras**, - liste</p>
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-[360px] font-mono text-sm"
+                placeholder="Rédigez votre script, fiche ou process ici..."
+              />
             </div>
           </div>
-
-          {(expanded || editing) && (
-            <div className="mt-4 pt-4 border-t border-border/50">
-              {editing ? (
-                <Textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="min-h-[300px] font-mono text-sm"
-                  placeholder="Contenu en Markdown (## Titre, **gras**, - liste...)"
-                />
-              ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed bg-transparent p-0 m-0">
-                    {resource.content}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </GlassCard>
+          <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)} className="rounded-xl">Annuler</Button>
+            <Button onClick={handleSave} disabled={!editTitle.trim() || upsert.isPending} className="gap-2 rounded-xl">
+              {upsert.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              Sauvegarder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -352,6 +399,49 @@ const ProspectsTab = ({ userKey }: { userKey: string }) => {
   );
 };
 
+/* ─── Iframe Calendly avec loader ─── */
+const CalendlyFrame = ({ url, rawUrl }: { url: string; rawUrl: string }) => {
+  const [loaded, setLoaded] = useState(false);
+  // On mémorise l'URL précédente : le remontage n'a lieu que si l'URL change vraiment
+  const prevUrl = useRef<string>("");
+
+  useEffect(() => {
+    if (prevUrl.current !== url) {
+      prevUrl.current = url;
+      setLoaded(false);
+    }
+  }, [url]);
+
+  return (
+    <GlassCard className="overflow-hidden p-0 relative">
+      {!loaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 z-10">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Chargement de Calendly…</p>
+          <a
+            href={rawUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Ouvrir dans un nouvel onglet
+          </a>
+        </div>
+      )}
+      <iframe
+        src={url}
+        title="Calendly"
+        className="w-full border-0"
+        style={{ height: "650px", display: "block" }}
+        allow="camera; microphone; autoplay; encrypted-media; fullscreen"
+        referrerPolicy="no-referrer-when-downgrade"
+        onLoad={() => setLoaded(true)}
+      />
+    </GlassCard>
+  );
+};
+
 /* ─── Onglet Calendly ─── */
 const CalendlyTab = ({ userKey }: { userKey: string }) => {
   const storageKey = `closer_calendly_url_${userKey}`;
@@ -429,13 +519,7 @@ const CalendlyTab = ({ userKey }: { userKey: string }) => {
       )}
 
       {embedUrl ? (
-        <GlassCard className="overflow-hidden p-0">
-          <iframe
-            src={embedUrl}
-            title="Calendly — Réservation démo"
-            className="w-full min-h-[650px] border-0"
-          />
-        </GlassCard>
+        <CalendlyFrame url={embedUrl} rawUrl={inputUrl} />
       ) : (
         <GlassCard className="p-12 text-center">
           <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
@@ -514,62 +598,64 @@ const NewResourceDialog = ({ open, onClose }: { open: boolean; onClose: () => vo
   );
 };
 
-/* ─── Composant principal ─── */
+/* ─── Documentation (sans onglets internes) ─── */
 export const CloserResources = () => {
-  const { user } = useAuth();
   const { data: resources = [], isLoading } = useCloserResources();
+  const [localResources, setLocalResources] = useState<CloserResource[]>([]);
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const userKey = user?.email || "default";
+  const updateSortOrder = useUpdateSortOrder();
+
+  useEffect(() => {
+    if (resources.length > 0) setLocalResources(resources);
+  }, [resources]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setLocalResources((prev) => {
+      const oldIndex = prev.findIndex((r) => r.id === active.id);
+      const newIndex = prev.findIndex((r) => r.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+      updateSortOrder.mutate(reordered.map((r, i) => ({ id: r.id, sort_order: i })));
+      return reordered;
+    });
+  };
 
   const groupedResources = (Object.keys(CATEGORIES) as Category[]).reduce((acc, cat) => {
-    acc[cat] = resources.filter((r) => r.category === cat);
+    acc[cat] = localResources.filter((r) => r.category === cat);
     return acc;
   }, {} as Record<Category, CloserResource[]>);
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="documentation" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 rounded-xl h-11">
-          <TabsTrigger value="documentation" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">Documentation</span>
-            <span className="sm:hidden">Docs</span>
-          </TabsTrigger>
-          <TabsTrigger value="prospects" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <Sheet className="w-4 h-4" />
-            <span className="hidden sm:inline">Mes Prospects</span>
-            <span className="sm:hidden">Prospects</span>
-          </TabsTrigger>
-          <TabsTrigger value="calendly" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <Calendar className="w-4 h-4" />
-            <span className="hidden sm:inline">Mon Calendly</span>
-            <span className="sm:hidden">Calendly</span>
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Scripts d'appel, fiches produits, process R1/R2 — partagés avec tous les closers.
+        </p>
+        <Button size="sm" onClick={() => setShowNewDialog(true)} className="gap-2 rounded-xl flex-shrink-0">
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Ajouter</span>
+        </Button>
+      </div>
 
-        {/* ── Documentation ── */}
-        <TabsContent value="documentation" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Scripts d'appel, fiches produits, process R1/R2 — partagés avec tous les closers.
-            </p>
-            <Button size="sm" onClick={() => setShowNewDialog(true)} className="gap-2 rounded-xl flex-shrink-0">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Ajouter</span>
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
-          ) : resources.length === 0 ? (
-            <GlassCard className="p-12 text-center">
-              <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-              <p className="text-muted-foreground text-sm">Aucune ressource pour l'instant</p>
-              <Button size="sm" onClick={() => setShowNewDialog(true)} className="mt-4 gap-2 rounded-xl">
-                <Plus className="w-4 h-4" />Ajouter une ressource
-              </Button>
-            </GlassCard>
-          ) : (
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
+      ) : resources.length === 0 ? (
+        <GlassCard className="p-12 text-center">
+          <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
+          <p className="text-muted-foreground text-sm">Aucune ressource pour l'instant</p>
+          <Button size="sm" onClick={() => setShowNewDialog(true)} className="mt-4 gap-2 rounded-xl">
+            <Plus className="w-4 h-4" /> Ajouter une ressource
+          </Button>
+        </GlassCard>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={localResources.map((r) => r.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
               {(Object.entries(groupedResources) as [Category, CloserResource[]][])
                 .filter(([, items]) => items.length > 0)
@@ -584,21 +670,18 @@ export const CloserResources = () => {
                   </div>
                 ))}
             </div>
-          )}
-        </TabsContent>
-
-        {/* ── Prospects ── */}
-        <TabsContent value="prospects" className="mt-4">
-          <ProspectsTab userKey={userKey} />
-        </TabsContent>
-
-        {/* ── Calendly ── */}
-        <TabsContent value="calendly" className="mt-4">
-          <CalendlyTab userKey={userKey} />
-        </TabsContent>
-      </Tabs>
+          </SortableContext>
+        </DndContext>
+      )}
 
       <NewResourceDialog open={showNewDialog} onClose={() => setShowNewDialog(false)} />
     </div>
   );
+};
+
+/* ─── Calendly exporté pour le dashboard ─── */
+export const CloserCalendly = () => {
+  const { user } = useAuth();
+  const userKey = user?.email || "default";
+  return <CalendlyTab userKey={userKey} />;
 };

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,8 @@ import {
   Tag,
   Trophy,
   BookOpen,
+  Phone,
+  CalendarDays,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,8 +44,9 @@ import {
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { CloserResources } from "@/components/closer/CloserResources";
+import { CloserResources, CloserCalendly } from "@/components/closer/CloserResources";
 import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
+import CloserLeads from "@/components/closer/CloserLeads";
 
 /* ─── Membres d'une entreprise ─── */
 const CompanyMembersList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
@@ -69,7 +73,7 @@ const CompanyMembersList = ({ companyId, companyName }: { companyId: string; com
   );
 };
 
-/* ─── Tuile d'action compacte ─── */
+/* ─── Tuile d'action grande ─── */
 const ActionTile = ({
   icon: Icon,
   title,
@@ -77,6 +81,7 @@ const ActionTile = ({
   onClick,
   color = "primary",
   active = false,
+  gradient,
 }: {
   icon: React.ElementType;
   title: string;
@@ -84,12 +89,13 @@ const ActionTile = ({
   onClick: () => void;
   color?: "primary" | "orange" | "blue" | "green";
   active?: boolean;
+  gradient: string;
 }) => {
   const colorMap = {
-    primary: { bg: "bg-primary/10 hover:bg-primary/20", icon: "bg-primary/20 text-primary", border: "border-primary/20 hover:border-primary/40", active: "bg-primary/20 border-primary/50" },
-    orange:  { bg: "bg-orange-500/10 hover:bg-orange-500/20", icon: "bg-orange-500/20 text-orange-500", border: "border-orange-500/20 hover:border-orange-500/40", active: "bg-orange-500/20 border-orange-500/50" },
-    blue:    { bg: "bg-blue-500/10 hover:bg-blue-500/20", icon: "bg-blue-500/20 text-blue-500", border: "border-blue-500/20 hover:border-blue-500/40", active: "bg-blue-500/20 border-blue-500/50" },
-    green:   { bg: "bg-green-500/10 hover:bg-green-500/20", icon: "bg-green-500/20 text-green-500", border: "border-green-500/20 hover:border-green-500/40", active: "bg-green-500/20 border-green-500/50" },
+    primary: { icon: "text-violet-400", border: "border-violet-500/20 hover:border-violet-500/50", glow: "hover:shadow-violet-500/20" },
+    orange:  { icon: "text-orange-400", border: "border-orange-500/20 hover:border-orange-500/50", glow: "hover:shadow-orange-500/20" },
+    blue:    { icon: "text-blue-400",   border: "border-blue-500/20 hover:border-blue-500/50",   glow: "hover:shadow-blue-500/20" },
+    green:   { icon: "text-green-400",  border: "border-green-500/20 hover:border-green-500/50",  glow: "hover:shadow-green-500/20" },
   };
   const c = colorMap[color];
 
@@ -97,29 +103,30 @@ const ActionTile = ({
     <button
       onClick={onClick}
       className={cn(
-        "group relative w-full rounded-2xl border p-4 sm:p-5 text-left transition-all duration-200 cursor-pointer",
-        "backdrop-blur-xl shadow-sm hover:shadow-md",
-        active ? c.active : `${c.bg} ${c.border}`
+        "group relative w-full rounded-2xl border text-left transition-all duration-300 cursor-pointer overflow-hidden",
+        "backdrop-blur-xl shadow-lg hover:shadow-2xl hover:-translate-y-1",
+        c.border, c.glow,
+        active && "ring-2 ring-inset ring-white/20"
       )}
     >
-      <div className="flex items-center gap-4">
-        <div className={cn("p-3 rounded-xl flex-shrink-0 transition-transform group-hover:scale-110", c.icon)}>
+      {/* Fond dégradé */}
+      <div className={cn("absolute inset-0 opacity-80 dark:opacity-60", gradient)} />
+      {/* Cercle déco flou */}
+      <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-white/5 group-hover:scale-125 transition-transform duration-500" />
+      <div className="absolute -top-4 -left-4 w-20 h-20 rounded-full bg-white/5 group-hover:scale-110 transition-transform duration-700" />
+
+      <div className="relative p-5 sm:p-6 flex flex-col gap-4 min-h-[140px]">
+        {/* Icône */}
+        <div className={cn("w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3", c.icon)}>
           <Icon className="w-6 h-6" />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-sm sm:text-base leading-tight">{title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{description}</p>
+        {/* Texte */}
+        <div>
+          <p className="font-bold text-base sm:text-lg text-white leading-tight">{title}</p>
+          <p className="text-xs sm:text-sm text-white/70 mt-1 leading-relaxed">{description}</p>
         </div>
-        <div className="flex-shrink-0">
-          {active ? (
-            <span className="flex items-center gap-1 text-xs font-medium text-green-500">
-              <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse inline-block" />
-              Actif
-            </span>
-          ) : (
-            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-          )}
-        </div>
+        {/* Flèche */}
+        <ArrowRight className="absolute bottom-5 right-5 w-5 h-5 text-white/40 group-hover:text-white/80 group-hover:translate-x-1 transition-all duration-300" />
       </div>
     </button>
   );
@@ -128,6 +135,7 @@ const ActionTile = ({
 /* ─── Dashboard principal ─── */
 const CloserDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: companies = [], isLoading } = useAllCompanies();
   const createCompany = useCreateCompany();
   const { toast } = useToast();
@@ -181,23 +189,30 @@ const CloserDashboard = () => {
     return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
+  const firstName = user?.user_metadata?.prenom || user?.user_metadata?.first_name || user?.email?.split("@")[0] || "vous";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
 
       {/* ── Header ── */}
       <div className="relative flex items-center justify-between pt-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-medium mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-500 text-xs font-medium mb-2">
             <Building2 className="w-3.5 h-3.5" />
             Espace Closer
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Que voulez-vous faire ?</h1>
+          <p className="text-sm text-muted-foreground font-medium">
+            {greeting}, <span className="text-foreground font-semibold capitalize">{firstName}</span> 👋
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight mt-0.5">Que voulez-vous faire ?</h1>
         </div>
         <ThemeToggle />
       </div>
 
       {/* ── Tuiles d'action ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ActionTile
           icon={MonitorPlay}
           title="Démo Patron"
@@ -205,6 +220,7 @@ const CloserDashboard = () => {
           onClick={() => (fakeDataEnabled && !closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(false)}
           color="blue"
           active={fakeDataEnabled && !closerEmployeeMode}
+          gradient="bg-gradient-to-br from-blue-600 to-blue-800"
         />
         <ActionTile
           icon={Eye}
@@ -213,6 +229,7 @@ const CloserDashboard = () => {
           onClick={() => (fakeDataEnabled && closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(true)}
           color="green"
           active={fakeDataEnabled && closerEmployeeMode}
+          gradient="bg-gradient-to-br from-emerald-600 to-teal-800"
         />
         <ActionTile
           icon={Tag}
@@ -220,6 +237,7 @@ const CloserDashboard = () => {
           description="Page tarifaire Starter / Pro / Elite à montrer au client en visio."
           onClick={() => navigate("/start")}
           color="orange"
+          gradient="bg-gradient-to-br from-orange-500 to-rose-700"
         />
         <ActionTile
           icon={Plus}
@@ -227,28 +245,33 @@ const CloserDashboard = () => {
           description="Créer l'espace d'un nouveau client et l'inscrire sur BTP Smart Pro."
           onClick={() => setIsCreateDialogOpen(true)}
           color="primary"
+          gradient="bg-gradient-to-br from-violet-600 to-purple-900"
         />
       </div>
 
-      {/* ── Section tabulée : Classement / Entreprises / Ressources ── */}
+      {/* ── Section tabulée ── */}
       <Tabs defaultValue="entreprises" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 rounded-xl h-11 border-0 bg-transparent p-0 gap-2">
-          <TabsTrigger value="entreprises" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <Building2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Mes entreprises</span>
-            <span className="sm:hidden">Entreprises</span>
-            {companiesList.length > 0 && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0 ml-0.5">{companiesList.length}</Badge>
-            )}
+        <TabsList className="w-full grid grid-cols-5 rounded-xl h-11 border-0 bg-transparent p-0 gap-1.5">
+          <TabsTrigger value="entreprises" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <Building2 className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">Entreprises</span>
           </TabsTrigger>
-          <TabsTrigger value="ressources" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <BookOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">Ressources</span>
+          <TabsTrigger value="leads" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <Phone className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">Mes leads</span>
+          </TabsTrigger>
+          <TabsTrigger value="documentation" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <BookOpen className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">Documentation</span>
             <span className="sm:hidden">Docs</span>
           </TabsTrigger>
-          <TabsTrigger value="classement" className="gap-1.5 rounded-lg text-xs sm:text-sm">
-            <Trophy className="w-4 h-4" />
-            <span className="hidden sm:inline">Classement</span>
+          <TabsTrigger value="calendly" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <CalendarDays className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">Calendly</span>
+          </TabsTrigger>
+          <TabsTrigger value="classement" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <Trophy className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">Classement</span>
             <span className="sm:hidden">Top</span>
           </TabsTrigger>
         </TabsList>
@@ -311,9 +334,19 @@ const CloserDashboard = () => {
           )}
         </TabsContent>
 
-        {/* Ressources */}
-        <TabsContent value="ressources" className="mt-4">
+        {/* Mes Leads */}
+        <TabsContent value="leads" className="mt-4">
+          <CloserLeads />
+        </TabsContent>
+
+        {/* Documentation */}
+        <TabsContent value="documentation" className="mt-4">
           <CloserResources />
+        </TabsContent>
+
+        {/* Calendly — forceMount pour garder l'iframe en DOM et éviter le rechargement à chaque visite */}
+        <TabsContent value="calendly" className="mt-4 data-[state=inactive]:hidden" forceMount>
+          <CloserCalendly />
         </TabsContent>
 
         {/* Classement */}
