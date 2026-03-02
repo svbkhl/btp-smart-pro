@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
-  useAssignLeads, useRetryJob, useStopJob, useGeneratedDepts, LeadJob, Lead, RETRY_NETWORK,
+  useAssignLeads, useRetryJob, useStopJob, useGeneratedDepts, useLeadsFixed,
+  LeadJob, Lead, LeadFixed, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -509,6 +510,106 @@ function SectionLeads() {
   );
 }
 
+// ─── Section 4 : Leads ignorés (fixes) ───────────────────────
+
+function SectionIgnored() {
+  const [dept, setDept] = useState("");
+  const [page, setPage] = useState(0);
+  const { data: generatedDepts = [] } = useGeneratedDepts();
+  const { data: result, isLoading } = useLeadsFixed({ dept, page });
+  const leads = result?.leads || [];
+  const count = result?.count || 0;
+  const totalPages = Math.ceil(count / 50);
+
+  return (
+    <div className="space-y-4">
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-400" /> Leads ignorés — Fixes uniquement
+            </h3>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Ces entreprises n'avaient qu'un numéro fixe. Vous pouvez les retravailler manuellement.
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-orange-400">{count} entrées</span>
+        </div>
+        <Select value={dept || "_all"} onValueChange={(v) => { setDept(v === "_all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Tous les départements" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Tous les départements</SelectItem>
+            {generatedDepts.map((d) => (
+              <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </GlassCard>
+
+      <GlassCard className="p-0 overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+        ) : leads.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground text-sm">Aucun lead ignoré pour ces filtres.</div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30 border-b border-border/50">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Entreprise</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Téléphone fixe</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Site web</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dépt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {leads.map((lead: LeadFixed) => (
+                    <tr key={lead.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 font-medium max-w-[200px] truncate">{lead.name}</td>
+                      <td className="px-4 py-3">
+                        {lead.phone_fixed ? (
+                          <a href={`tel:${lead.phone_fixed}`} className="flex items-center gap-1 text-primary hover:underline">
+                            <Phone className="h-3.5 w-3.5" />{lead.phone_fixed}
+                          </a>
+                        ) : <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.website ? (
+                          <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-400 hover:underline">
+                            <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate max-w-[160px] inline-block">{lead.website.replace(/^https?:\/\//, "")}</span>
+                          </a>
+                        ) : <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className="text-xs">{lead.dept_code}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-border/50">
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">Page {page + 1} / {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </GlassCard>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────
 
 export default function AdminLeads() {
@@ -540,6 +641,9 @@ export default function AdminLeads() {
             <TabsTrigger value="leads" className="gap-2">
               <List className="h-4 w-4" /> Vue leads
             </TabsTrigger>
+            <TabsTrigger value="ignored" className="gap-2">
+              <AlertCircle className="h-4 w-4 text-orange-400" /> Ignorés
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="generate" className="mt-6">
@@ -550,6 +654,9 @@ export default function AdminLeads() {
           </TabsContent>
           <TabsContent value="leads" className="mt-6">
             <SectionLeads />
+          </TabsContent>
+          <TabsContent value="ignored" className="mt-6">
+            <SectionIgnored />
           </TabsContent>
         </Tabs>
       </div>

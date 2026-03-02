@@ -303,11 +303,18 @@ export function useRetryJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (jobId: string) => {
-      // Remettre en PENDING avant relance
+      // Reset complet : force recalcul total_cells/processed_cells avec le nouveau code
       await supabase.from("lead_jobs" as any).update({
         status: "PENDING",
         error_log: null,
         finished_at: null,
+        started_at: null,
+        total_cells: 0,
+        processed_cells: 0,
+        total_found: 0,
+        total_inserted: 0,
+        total_skipped: 0,
+        progress_cursor: {},
       }).eq("id", jobId);
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke("lead-generator", {
@@ -439,5 +446,39 @@ export function useUpdateLeadNotes() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["my_leads"] }),
+  });
+}
+
+// ─── Leads ignorés (fixes uniquement) ────────────────────────
+
+export interface LeadFixed {
+  id: string;
+  place_id: string;
+  name: string;
+  phone_fixed: string | null;
+  website: string | null;
+  dept_code: string;
+  enriched: boolean;
+  created_at: string;
+}
+
+export function useLeadsFixed(filters: { dept?: string; page?: number }) {
+  const PAGE = 50;
+  const from = (filters.page || 0) * PAGE;
+  return useQuery<{ leads: LeadFixed[]; count: number }>({
+    queryKey: ["leads_fixed", filters],
+    queryFn: async () => {
+      let query = supabase
+        .from("leads_fixed" as any)
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (filters.dept) query = query.eq("dept_code", filters.dept);
+      const { data, error, count } = await query;
+      if (error) throw error;
+      return { leads: (data as unknown as LeadFixed[]) || [], count: count || 0 };
+    },
+    placeholderData: (prev) => prev,
+    ...RETRY_NETWORK,
   });
 }
