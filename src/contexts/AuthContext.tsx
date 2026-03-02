@@ -13,6 +13,8 @@ interface AuthContextValue {
   isEmployee: boolean;
   /** True si l'utilisateur est un closer (hardcoded ou en base) */
   isCloser: boolean;
+  /** True pendant la vérification asynchrone du statut closer (évite les redirections prématurées) */
+  isCloserLoading: boolean;
   userRole: 'admin' | 'member' | null;
   currentCompanyId: string | null;
   /** Force refetch current company (e.g. after accepting an invitation). */
@@ -28,6 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
   const [isCloser, setIsCloser] = useState(false);
+  const [isCloserLoading, setIsCloserLoading] = useState(true);
   const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   
@@ -306,15 +309,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const email = user?.email;
     if (!email) {
       setIsCloser(false);
+      setIsCloserLoading(false);
       return;
     }
     // Vérification immédiate sur la liste hardcodée
     if (isCloserEmail(email)) {
       setIsCloser(true);
+      setIsCloserLoading(false);
       useFakeDataStore.getState().setFakeDataEnabled(true);
       return;
     }
-    // Vérification en base (asynchrone)
+    // Vérification en base (asynchrone) — isCloserLoading reste true pendant ce temps
+    setIsCloserLoading(true);
     supabase
       .from('closer_emails' as any)
       .select('email')
@@ -323,6 +329,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .then(({ data }) => {
         const closer = !!data;
         setIsCloser(closer);
+        setIsCloserLoading(false);
         if (closer) {
           useFakeDataStore.getState().setFakeDataEnabled(true);
         }
@@ -336,6 +343,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAdmin,
     isEmployee,
     isCloser,
+    isCloserLoading,
     userRole,
     currentCompanyId,
     refetchCurrentCompanyId,

@@ -16,7 +16,7 @@ const PAYWALL_PATHS = ["/start", "/start/success", "/start/cancel"];
 export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, isAdmin, isCloser, userRole, currentCompanyId } = useAuth();
+  const { user, loading, isAdmin, isCloser, isCloserLoading, userRole, currentCompanyId } = useAuth();
   const { fakeDataEnabled, setFakeDataEnabled } = useFakeDataStore();
   const { isActive: subscriptionActive, isLoading: subscriptionLoading } = useSubscription();
   const isPaywallPath = PAYWALL_PATHS.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
@@ -141,7 +141,8 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
   // Ne jamais rediriger les closers (ils n'ont pas de company et n'ont pas besoin d'abonnement)
   useEffect(() => {
     const adminSystem = isSystemAdmin(user);
-    const skipGate = isPaywallPath || !user || isAdmin || adminSystem || isCloser;
+    // isCloserLoading : en attente de la vérification DB → on bloque toute redirection
+    const skipGate = isPaywallPath || !user || isAdmin || adminSystem || isCloser || isCloserLoading;
     if (skipGate) return;
     if (currentCompanyId && !subscriptionLoading && !subscriptionActive) {
       navigate("/start", { replace: true });
@@ -150,7 +151,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
     if (!currentCompanyId && !subscriptionLoading) {
       navigate("/start", { replace: true });
     }
-  }, [isPaywallPath, user, isAdmin, isCloser, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
+  }, [isPaywallPath, user, isAdmin, isCloser, isCloserLoading, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
 
   // Rediriger les closers vers /closer s'ils atterrissent sur une page non appropriée
   // En mode démo (fakeDataEnabled), les closers peuvent naviguer sur toutes les pages
