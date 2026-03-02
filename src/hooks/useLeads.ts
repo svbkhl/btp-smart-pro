@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "LOST" | "SIGNED";
 export type LeadPriority = "A" | "B" | "C";
 export type SizeBucket = "0-3" | "4-10" | "10-50" | "50+";
-export type JobStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED";
+export type JobStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "STOPPED";
 
 export interface Lead {
   id: string;
@@ -256,32 +256,14 @@ export function useGenerateLeads() {
   return useMutation({
     mutationFn: async (deptCode: string) => {
       const deptName = DEPTS.find((d) => d.code === deptCode)?.name || deptCode;
-
-      // Créer le job via RPC (bypass RLS, autorise admin par email)
+      // Crée uniquement le job en DB — l'orchestration se fait côté browser dans AdminLeads
       const { data: jobId, error: rpcError } = await supabase.rpc("create_lead_job" as any, {
         p_dept_code: deptCode,
         p_dept_name: deptName,
       });
       if (rpcError) throw new Error(rpcError.message);
       if (!jobId) throw new Error("Impossible de créer le job");
-
-      // Lancer le worker Edge Function
-      const { data: fnData, error: fnError } = await supabase.functions.invoke("lead-generator", {
-        body: { job_id: jobId },
-      });
-
-      if (fnError) {
-        // Marquer le job FAILED si la fonction ne répond pas
-        await supabase.from("lead_jobs" as any).update({
-          status: "FAILED",
-          error_log: fnError.message || "Erreur lors du lancement de la fonction",
-          finished_at: new Date().toISOString(),
-        }).eq("id", jobId);
-        throw new Error(`Erreur Edge Function : ${fnError.message}`);
-      }
-
-      console.log("[lead-generator] Réponse fonction:", fnData);
-      return { id: jobId, dept_code: deptCode, dept_name: deptName, status: "PENDING" };
+      return { id: jobId as string, dept_code: deptCode, dept_name: deptName };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
   });
@@ -292,7 +274,7 @@ export function useStopJob() {
   return useMutation({
     mutationFn: async (jobId: string) => {
       const { error } = await supabase.from("lead_jobs" as any).update({
-        status: "FAILED",
+        status: "STOPPED",
         error_log: "Arrêté manuellement",
         finished_at: new Date().toISOString(),
       }).eq("id", jobId);
@@ -306,8 +288,8 @@ export function useRetryJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (jobId: string) => {
-      // Reset complet : force recalcul total_cells/processed_cells avec le nouveau code
-      await supabase.from("lead_jobs" as any).update({
+      // Reset complet — l'orchestration repart depuis la cellule 0 côté browser
+      const { error } = await supabase.from("lead_jobs" as any).update({
         status: "PENDING",
         error_log: null,
         finished_at: null,
@@ -319,22 +301,8 @@ export function useRetryJob() {
         total_skipped: 0,
         progress_cursor: {},
       }).eq("id", jobId);
-
-      const { data: fnData, error: fnError } = await supabase.functions.invoke("lead-generator", {
-        body: { job_id: jobId },
-      });
-
-      if (fnError) {
-        await supabase.from("lead_jobs" as any).update({
-          status: "FAILED",
-          error_log: fnError.message || "Erreur relance",
-          finished_at: new Date().toISOString(),
-        }).eq("id", jobId);
-        throw new Error(`Erreur Edge Function : ${fnError.message}`);
-      }
-
-      console.log("[lead-generator] Relance:", fnData);
-      return fnData;
+      if (error) throw new Error(error.message);
+      return jobId;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
     onError: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
@@ -365,6 +333,7 @@ export function useMyLeads(filters: {
   status?: string;
   priority?: string;
   dept?: string;
+  category?: string;
   page?: number;
 }) {
   const { user } = useAuth();
@@ -385,6 +354,7 @@ export function useMyLeads(filters: {
       if (filters.status)   query = query.eq("status", filters.status);
       if (filters.priority) query = query.eq("priority", filters.priority);
       if (filters.dept)     query = query.eq("dept_code", filters.dept);
+      if (filters.category) query = query.eq("category", filters.category);
 
       const { data, error, count } = await query;
       if (error) throw error;
