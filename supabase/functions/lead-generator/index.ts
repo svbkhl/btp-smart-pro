@@ -9,20 +9,24 @@ const SELF_URL     = `${SUPABASE_URL}/functions/v1/lead-generator`;
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 // ─── Constantes ──────────────────────────────────────────────
-const GRID_STEP_KM   = 7;
-const SEARCH_RADIUS  = 5500;
-const BATCH_CELLS    = 3;   // cellules par invocation
-const MAX_DURATION   = 45;  // secondes max par invocation
+const GRID_STEP_KM   = 12;   // agrandi : moins de cellules, couverture suffisante
+const SEARCH_RADIUS  = 9000; // rayon augmenté pour couvrir le pas de grille
+const MAX_DURATION   = 50;   // secondes max par invocation
+const PARALLEL_KW    = 4;    // mots-clés traités en parallèle par cellule
 
+// Mots-clés les plus efficaces (réduits à 12 pour la vitesse)
 const KEYWORDS = [
-  "plombier", "électricien", "chauffagiste", "climaticien",
-  "pompe à chaleur", "serrurier", "vitrier",
-  "entreprise de rénovation", "rénovation intérieure",
-  "artisan bâtiment", "entreprise bâtiment",
-  "peintre", "plaquiste", "carreleur", "menuisier",
-  "couvreur", "charpentier", "zingueur",
-  "maçon", "terrassier", "travaux publics",
-  "paysagiste", "photovoltaïque", "borne recharge", "domotique",
+  "plombier",
+  "électricien",
+  "chauffagiste",
+  "artisan bâtiment",
+  "entreprise rénovation",
+  "couvreur",
+  "maçon",
+  "menuisier",
+  "peintre bâtiment",
+  "photovoltaïque",
+  "terrassier",
   "multi services bâtiment",
 ];
 
@@ -342,17 +346,16 @@ serve(async (req) => {
     }
   }
 
-  const cellIndex    = cursor.cell_index    ?? 0;
-  const keywordIndex = cursor.keyword_index ?? 0;
-  const totalCells   = cells.length;
-  // On track la progression en nb de requêtes (cellules × mots-clés)
-  const totalRequests = totalCells * KEYWORDS.length;
+  const cellIndex  = cursor.cell_index ?? 0;
+  const totalCells = cells.length;
+  // Progression : 1 unité = 1 cellule (chaque cellule traite tous ses KW en parallèle)
+  const totalUnits = totalCells;
 
-  // Marquer RUNNING — total_cells = nb de requêtes total pour une progression fluide
+  // Marquer RUNNING
   await supabase.from("lead_jobs").update({
     status: "RUNNING",
     started_at: job.started_at ?? new Date().toISOString(),
-    total_cells: totalRequests,
+    total_cells: totalUnits,
   }).eq("id", jobId);
 
   const stats = {
@@ -363,40 +366,41 @@ serve(async (req) => {
 
   const startTime = Date.now();
   let ci = cellIndex;
-  let ki = keywordIndex;
 
-  outer:
   while (ci < cells.length && (Date.now() - startTime) / 1000 < MAX_DURATION) {
     const cell = cells[ci];
-    while (ki < KEYWORDS.length) {
-      if ((Date.now() - startTime) / 1000 >= MAX_DURATION) break outer;
 
-      const places = await searchPlaces(KEYWORDS[ki], cell.lat, cell.lng);
-      await sleep(200);
+    // Traiter tous les mots-clés de la cellule en lots parallèles
+    for (let batch = 0; batch < KEYWORDS.length; batch += PARALLEL_KW) {
+      if ((Date.now() - startTime) / 1000 >= MAX_DURATION) break;
 
-      for (const place of places) {
-        await processPlace(place, job.dept_code, stats);
-      }
+      const kwBatch = KEYWORDS.slice(batch, batch + PARALLEL_KW);
+      const results = await Promise.all(
+        kwBatch.map((kw) => searchPlaces(kw, cell.lat, cell.lng).catch(() => []))
+      );
+      await sleep(150); // petit délai après chaque lot
 
-      ki++;
-      // Sauvegarde toutes les 3 requêtes (progression visible dès le départ)
-      if (ki % 3 === 0) {
-        const processedRequests = ci * KEYWORDS.length + ki;
-        await supabase.from("lead_jobs").update({
-          total_found: stats.found,
-          total_inserted: stats.inserted,
-          total_skipped: stats.skipped,
-          processed_cells: processedRequests,
-          progress_cursor: { cells, cell_index: ci, keyword_index: ki },
-        }).eq("id", jobId);
+      for (const places of results) {
+        for (const place of places) {
+          await processPlace(place, job.dept_code, stats);
+        }
       }
     }
-    ki = 0;
+
     ci++;
+
+    // Sauvegarde après chaque cellule
+    await supabase.from("lead_jobs").update({
+      total_found: stats.found,
+      total_inserted: stats.inserted,
+      total_skipped: stats.skipped,
+      processed_cells: ci,
+      progress_cursor: { cells, cell_index: ci },
+    }).eq("id", jobId);
   }
 
   const isDone = ci >= cells.length;
-  const finalProcessed = ci * KEYWORDS.length + ki;
+  const finalProcessed = ci;
 
   // Mise à jour finale
   await supabase.from("lead_jobs").update({
@@ -404,9 +408,9 @@ serve(async (req) => {
     total_found: stats.found,
     total_inserted: stats.inserted,
     total_skipped: stats.skipped,
-    processed_cells: isDone ? totalRequests : finalProcessed,
+    processed_cells: isDone ? totalUnits : finalProcessed,
     finished_at: isDone ? new Date().toISOString() : null,
-    progress_cursor: isDone ? {} : { cells, cell_index: ci, keyword_index: ki },
+    progress_cursor: isDone ? {} : { cells, cell_index: ci },
   }).eq("id", jobId);
 
   // Si pas fini, s'auto-invoquer pour la suite (fire & forget)

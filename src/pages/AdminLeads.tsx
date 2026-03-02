@@ -227,7 +227,7 @@ function SectionGenerate() {
                     <div className="mt-3">
                       <div className="flex justify-between text-xs text-muted-foreground mb-1">
                         <span>{progressPct(job)}%</span>
-                        <span>{job.processed_cells} / {job.total_cells} requêtes</span>
+                        <span>{job.processed_cells} / {job.total_cells} zones</span>
                       </div>
                       <div className="h-1.5 bg-border rounded-full overflow-hidden">
                         <div
