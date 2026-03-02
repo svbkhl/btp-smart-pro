@@ -175,3 +175,6 @@ verify_jwt = false
 
 [functions.notify-contact-request]
 verify_jwt = false
+
+[functions.lead-generator]
+verify_jwt = false

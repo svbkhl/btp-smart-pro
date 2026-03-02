@@ -10,7 +10,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 // ─── Constantes ──────────────────────────────────────────────
 const GRID_STEP_KM   = 12;
 const SEARCH_RADIUS  = 9000;
-const MAX_DURATION   = 18; // secondes — le frontend relance automatiquement
+const MAX_DURATION   = 8; // secondes — le frontend relance automatiquement
 const PARALLEL_KW    = 4;
 const PARALLEL_PLACE = 8;
 
@@ -250,7 +250,7 @@ async function processPlace(
   }
 }
 
-async function runProcessing(job: any, cells: { lat: number; lng: number }[]): Promise<boolean> {
+async function runProcessing(job: any, cells: { lat: number; lng: number }[]): Promise<{ isDone: boolean; processedCells: number }> {
   const cursor = (job.progress_cursor as any) || {};
   const cellIndex = cursor.cell_index ?? 0;
   const stats = { found: job.total_found || 0, inserted: job.total_inserted || 0, skipped: job.total_skipped || 0 };
@@ -302,7 +302,7 @@ async function runProcessing(job: any, cells: { lat: number; lng: number }[]): P
     finished_at: isDone ? new Date().toISOString() : null,
     progress_cursor: isDone ? {} : { cell_index: ci },
   }).eq("id", job.id).catch(() => {});
-  return isDone;
+  return { isDone, processedCells: ci };
 }
 
 // ─── CORS ─────────────────────────────────────────────────────
@@ -354,14 +354,11 @@ serve(async (req) => {
       total_cells: cells.length,
     }).eq("id", jobId).then(() => {}).catch(() => {});
 
-    const isDone = await runProcessing(job, cells);
-
-    const { data: finalJob } = await supabase
-      .from("lead_jobs" as any).select("processed_cells").eq("id", jobId).single();
+    const { isDone, processedCells } = await runProcessing(job, cells);
 
     return new Response(JSON.stringify({
       ok: true, done: isDone,
-      cells_done: finalJob?.processed_cells ?? 0,
+      cells_done: processedCells,
       total_cells: cells.length,
     }), { headers: jsonHeaders });
 
