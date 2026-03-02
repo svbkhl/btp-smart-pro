@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,8 @@ import {
   useLeadsFixedDepts, LeadJob, Lead, LeadFixed, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useClosers } from "@/hooks/useClosers";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -62,24 +63,7 @@ function progressPct(job: LeadJob) {
   return Math.round((job.processed_cells / job.total_cells) * 100);
 }
 
-// ─── Closers list (for assign dropdown) ──────────────────────
-
-function useClosersList() {
-  return useQuery<{ id: string; email: string; name: string }[]>({
-    queryKey: ["closers_list_admin"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("closer_emails" as any).select("email");
-      if (error) throw error;
-      return ((data as any[]) || []).map((c: any) => ({
-        id: c.email,
-        email: c.email,
-        name: c.name || c.email.split("@")[0],
-      }));
-    },
-    ...RETRY_NETWORK,
-  });
-}
+// useClosersList → remplacé par useClosers() de useClosers.ts
 
 // ─── Section 1 : Générer des leads ───────────────────────────
 
@@ -90,6 +74,105 @@ function SectionGenerate() {
   const retry = useRetryJob();
   const stop = useStopJob();
   const { data: jobs = [], refetch, isRefetching } = useLeadJobs();
+  const qc = useQueryClient();
+
+  // ── Auto-continue RUNNING jobs ────────────────────────────────
+  // Chaque invocation traite 18s et retourne. Le frontend relance
+  // automatiquement jusqu'à DONE. La boucle est résiliente aux erreurs
+  // réseau : si le job a encore des cellules non traitées, elle continue.
+  const loopActive = useRef<Map<string, boolean>>(new Map());
+
+  useEffect(() => {
+    const activeJobs = jobs.filter((j) => j.status === "RUNNING" || j.status === "PENDING");
+    const inactiveIds = jobs.filter((j) => j.status === "DONE" || j.status === "STOPPED").map((j) => j.id);
+
+    // Arrêter les boucles pour les jobs terminés
+    inactiveIds.forEach((id) => loopActive.current.set(id, false));
+
+    // Démarrer une boucle pour chaque job actif qui n'en a pas encore
+    activeJobs.forEach((job) => {
+      if (loopActive.current.get(job.id) === true) return;
+      loopActive.current.set(job.id, true);
+
+      (async () => {
+        let consecutiveErrors = 0;
+
+        while (loopActive.current.get(job.id)) {
+          // Toujours vérifier l'état réel en DB avant d'invoquer
+          const { data: fresh } = await supabase
+            .from("lead_jobs" as any)
+            .select("status, processed_cells, total_cells")
+            .eq("id", job.id)
+            .single();
+
+          if (!fresh) { loopActive.current.set(job.id, false); break; }
+
+          // Si DONE → terminé
+          if (fresh.status === "DONE") {
+            loopActive.current.set(job.id, false);
+            qc.invalidateQueries({ queryKey: ["lead_jobs"] });
+            toast({ title: "✅ Génération terminée !", description: `${job.dept_code} — ${job.dept_name ?? ""} — ${fresh.processed_cells ?? 0} zones traitées.` });
+            break;
+          }
+
+          // Si STOPPED manuellement → arrêt
+          if (fresh.status === "STOPPED") {
+            loopActive.current.set(job.id, false);
+            qc.invalidateQueries({ queryKey: ["lead_jobs"] });
+            break;
+          }
+
+          // Si FAILED mais qu'il reste des cellules → on remet en RUNNING et on continue
+          if (fresh.status === "FAILED") {
+            if (fresh.total_cells > 0 && fresh.processed_cells < fresh.total_cells) {
+              await supabase.from("lead_jobs" as any).update({ status: "RUNNING" }).eq("id", job.id);
+            } else {
+              loopActive.current.set(job.id, false);
+              qc.invalidateQueries({ queryKey: ["lead_jobs"] });
+              break;
+            }
+          }
+
+          // Invoquer le prochain lot de traitement
+          const { data, error } = await supabase.functions.invoke("lead-generator", {
+            body: { job_id: job.id },
+          });
+
+          qc.invalidateQueries({ queryKey: ["lead_jobs"] });
+
+          if (data?.done) {
+            loopActive.current.set(job.id, false);
+            toast({ title: "✅ Génération terminée !", description: `${job.dept_code} — ${job.dept_name ?? ""} terminé.` });
+            break;
+          }
+
+          if (error) {
+            consecutiveErrors++;
+            // Jusqu'à 5 erreurs consécutives → on retente après pause
+            if (consecutiveErrors >= 5) {
+              loopActive.current.set(job.id, false);
+              qc.invalidateQueries({ queryKey: ["lead_jobs"] });
+              toast({ title: "⚠️ Génération interrompue", description: "Trop d'erreurs consécutives. Clique Relancer.", variant: "destructive" });
+              break;
+            }
+            // Pause progressive avant de réessayer
+            await new Promise((r) => setTimeout(r, 2000 * consecutiveErrors));
+            continue;
+          }
+
+          consecutiveErrors = 0;
+          // Pause courte entre les lots
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      })().catch(console.error);
+    });
+
+    return () => {
+      jobs.forEach((j) => loopActive.current.set(j.id, false));
+    };
+  // Réagir uniquement aux changements de statut
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs.map((j) => `${j.id}:${j.status}`).join(",")]);
 
   const handleStop = async (job: LeadJob) => {
     try {
@@ -263,20 +346,20 @@ function SectionGenerate() {
 
 function SectionAssign() {
   const [dept, setDept] = useState("");
-  const [closerId, setCloserId] = useState("");
+  const [closerEmail, setCloserEmail] = useState("");
   const { toast } = useToast();
   const assign = useAssignLeads();
-  const { data: closers = [] } = useClosersList();
+  const { data: closerRows = [] } = useClosers();
   const { data: generatedDepts = [], isLoading: deptsLoading } = useGeneratedDepts();
   const { data: stats } = useLeadStats(dept);
   const { data: jobs = [] } = useLeadJobs();
   const isGenerating = dept ? jobs.some((j) => j.dept_code === dept && j.status === "RUNNING") : false;
 
   const handleAssign = async () => {
-    if (!dept || !closerId) return toast({ title: "Sélectionnez département et closer", variant: "destructive" });
+    if (!dept || !closerEmail) return toast({ title: "Sélectionnez département et closer", variant: "destructive" });
     if (!stats?.available) return toast({ title: "Aucun lead disponible", description: isGenerating ? "La génération est encore en cours, réessaie dans quelques secondes." : "Tous les leads de ce département sont déjà assignés.", variant: "destructive" });
     try {
-      const count = await assign.mutateAsync({ deptCode: dept, closerEmail: closerId });
+      const count = await assign.mutateAsync({ deptCode: dept, closerEmail });
       toast({ title: `✅ ${count} leads assignés au closer` });
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
@@ -311,21 +394,11 @@ function SectionAssign() {
             </SelectTrigger>
             <SelectContent>
               {generatedDepts.length === 0 ? (
-                <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                  Aucun lead généré pour l'instant
-                </div>
+                <SelectItem value="_empty" disabled>Aucun lead généré pour l'instant</SelectItem>
               ) : (
                 generatedDepts.map((d) => (
                   <SelectItem key={d.code} value={d.code}>
-                    <span className="flex items-center gap-2">
-                      <span>{d.code} — {d.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {d.available > 0
-                          ? <span className="text-blue-400">{d.available} dispo</span>
-                          : <span className="text-muted-foreground/50">0 dispo</span>
-                        }
-                      </span>
-                    </span>
+                    {d.code} — {d.name} ({d.available > 0 ? `${d.available} dispo` : "0 dispo"})
                   </SelectItem>
                 ))
               )}
@@ -333,17 +406,26 @@ function SectionAssign() {
           </Select>
         </div>
         <div>
-          <label className="text-sm font-medium mb-1.5 block">Closer</label>
-          <Select value={closerId} onValueChange={setCloserId}>
+          <label className="text-sm font-medium mb-1.5 block">
+            Closer
+            {closerRows.length === 0 && !deptsLoading && (
+              <span className="ml-2 text-xs text-red-400 font-normal">— aucun closer ajouté</span>
+            )}
+          </label>
+          <Select value={closerEmail} onValueChange={setCloserEmail}>
             <SelectTrigger>
-              <SelectValue placeholder="Sélectionner un closer…" />
+              <SelectValue placeholder={closerRows.length === 0 ? "Ajoutez d'abord un closer →" : "Sélectionner un closer…"} />
             </SelectTrigger>
             <SelectContent>
-              {closers.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} ({c.email})
-                </SelectItem>
-              ))}
+              {closerRows.length === 0 ? (
+                <SelectItem value="_empty" disabled>Aucun closer — ajoutez-en dans l'onglet Closers</SelectItem>
+              ) : (
+                closerRows.map((c) => (
+                  <SelectItem key={c.email} value={c.email}>
+                    {c.email.split("@")[0]} ({c.email})
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -366,7 +448,7 @@ function SectionAssign() {
 
       <Button
         onClick={handleAssign}
-        disabled={!dept || !closerId || assign.isPending || !stats?.available}
+        disabled={!dept || !closerEmail || assign.isPending || !stats?.available}
         className="w-full sm:w-auto bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold"
       >
         {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Users className="h-4 w-4 mr-2" />}
