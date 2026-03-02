@@ -14,15 +14,12 @@ import {
 export const CompanySelector = () => {
   const { user, isCloser } = useAuth();
   const { companyId: currentCompany } = useCompanyId();
-
-  // Les closers ne sont dans aucune entreprise — on masque le sélecteur
-  if (isCloser) return null;
   const queryClient = useQueryClient();
   const [companies, setCompanies] = useState<Array<{id: string, name: string}>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isCloser) return;
 
     const loadCompanies = async () => {
       const userCompanies = await getUserCompanies(user.id);
@@ -31,7 +28,7 @@ export const CompanySelector = () => {
     };
 
     loadCompanies();
-  }, [user?.id]);
+  }, [user?.id, isCloser]);
 
   const handleCompanyChange = async (companyId: string) => {
     if (!user) return;
@@ -46,8 +43,9 @@ export const CompanySelector = () => {
     window.location.reload();
   };
 
-  // Ne rien afficher si l'utilisateur n'appartient qu'à une seule entreprise
-  if (loading || companies.length <= 1) {
+  // Les closers ne sont dans aucune entreprise — on masque le sélecteur
+  // (après tous les hooks pour respecter les règles React)
+  if (isCloser || loading || companies.length <= 1) {
     return null;
   }
 
