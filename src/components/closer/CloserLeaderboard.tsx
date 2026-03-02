@@ -119,16 +119,10 @@ export const CloserLeaderboard = () => {
 
   return (
     <div className="space-y-4">
-      {/* Séparateur titre */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-border/60" />
-        <div className="flex items-center gap-2 px-2">
-          <Trophy className="w-4 h-4 text-yellow-500" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Classement — {currentMonth}
-          </span>
-        </div>
-        <div className="flex-1 h-px bg-border/60" />
+      <div className="flex items-center gap-2 mb-2">
+        <Trophy className="w-4 h-4 text-yellow-500" />
+        <span className="text-sm font-semibold capitalize">{currentMonth}</span>
+        <span className="text-xs text-muted-foreground">— Primes Top 3 fin de mois</span>
       </div>
 
       {isLoading ? (

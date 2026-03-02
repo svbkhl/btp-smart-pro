@@ -528,13 +528,6 @@ export const CloserResources = () => {
 
   return (
     <div className="space-y-4">
-      {/* Séparateur titre */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-border/60" />
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Ressources Closer</span>
-        <div className="flex-1 h-px bg-border/60" />
-      </div>
-
       <Tabs defaultValue="documentation" className="w-full">
         <TabsList className="w-full grid grid-cols-3 rounded-xl h-11">
           <TabsTrigger value="documentation" className="gap-1.5 rounded-lg text-xs sm:text-sm">

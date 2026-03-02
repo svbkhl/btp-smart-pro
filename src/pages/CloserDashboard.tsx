@@ -4,13 +4,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useAllCompanies,
@@ -30,8 +24,9 @@ import {
   MonitorPlay,
   Eye,
   ArrowRight,
-  LayoutDashboard,
   Tag,
+  Trophy,
+  BookOpen,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -74,7 +69,7 @@ const CompanyMembersList = ({ companyId, companyName }: { companyId: string; com
   );
 };
 
-/* ─── Tuile d'action principale ─── */
+/* ─── Tuile d'action compacte ─── */
 const ActionTile = ({
   icon: Icon,
   title,
@@ -91,59 +86,41 @@ const ActionTile = ({
   active?: boolean;
 }) => {
   const colorMap = {
-    primary: {
-      bg: "bg-primary/10 hover:bg-primary/20",
-      icon: "bg-primary/20 text-primary",
-      border: "border-primary/20 hover:border-primary/40",
-      active: "bg-primary/20 border-primary/50",
-    },
-    orange: {
-      bg: "bg-orange-500/10 hover:bg-orange-500/20",
-      icon: "bg-orange-500/20 text-orange-500",
-      border: "border-orange-500/20 hover:border-orange-500/40",
-      active: "bg-orange-500/20 border-orange-500/50",
-    },
-    blue: {
-      bg: "bg-blue-500/10 hover:bg-blue-500/20",
-      icon: "bg-blue-500/20 text-blue-500",
-      border: "border-blue-500/20 hover:border-blue-500/40",
-      active: "bg-blue-500/20 border-blue-500/50",
-    },
-    green: {
-      bg: "bg-green-500/10 hover:bg-green-500/20",
-      icon: "bg-green-500/20 text-green-500",
-      border: "border-green-500/20 hover:border-green-500/40",
-      active: "bg-green-500/20 border-green-500/50",
-    },
+    primary: { bg: "bg-primary/10 hover:bg-primary/20", icon: "bg-primary/20 text-primary", border: "border-primary/20 hover:border-primary/40", active: "bg-primary/20 border-primary/50" },
+    orange:  { bg: "bg-orange-500/10 hover:bg-orange-500/20", icon: "bg-orange-500/20 text-orange-500", border: "border-orange-500/20 hover:border-orange-500/40", active: "bg-orange-500/20 border-orange-500/50" },
+    blue:    { bg: "bg-blue-500/10 hover:bg-blue-500/20", icon: "bg-blue-500/20 text-blue-500", border: "border-blue-500/20 hover:border-blue-500/40", active: "bg-blue-500/20 border-blue-500/50" },
+    green:   { bg: "bg-green-500/10 hover:bg-green-500/20", icon: "bg-green-500/20 text-green-500", border: "border-green-500/20 hover:border-green-500/40", active: "bg-green-500/20 border-green-500/50" },
   };
-
   const c = colorMap[color];
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        "group relative w-full rounded-2xl border p-6 sm:p-8 text-left transition-all duration-200 cursor-pointer",
+        "group relative w-full rounded-2xl border p-4 sm:p-5 text-left transition-all duration-200 cursor-pointer",
         "backdrop-blur-xl shadow-sm hover:shadow-md",
         active ? c.active : `${c.bg} ${c.border}`
       )}
     >
-      <div className="flex flex-col items-center text-center gap-4">
-        <div className={cn("p-4 rounded-2xl transition-transform group-hover:scale-110", c.icon)}>
-          <Icon className="w-8 h-8" />
+      <div className="flex items-center gap-4">
+        <div className={cn("p-3 rounded-xl flex-shrink-0 transition-transform group-hover:scale-110", c.icon)}>
+          <Icon className="w-6 h-6" />
         </div>
-        <div>
-          <p className="text-lg font-bold">{title}</p>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{description}</p>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-sm sm:text-base leading-tight">{title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{description}</p>
         </div>
-        <div className={cn("flex items-center gap-1 text-sm font-medium opacity-70 group-hover:opacity-100 transition-opacity", active ? "text-foreground" : "text-muted-foreground")}>
-          {active ? "Actif — cliquer pour quitter" : "Cliquer pour démarrer"}
-          <ArrowRight className="w-4 h-4" />
+        <div className="flex-shrink-0">
+          {active ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-green-500">
+              <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse inline-block" />
+              Actif
+            </span>
+          ) : (
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          )}
         </div>
       </div>
-      {active && (
-        <span className="absolute top-3 right-3 h-2.5 w-2.5 rounded-full bg-green-400 animate-pulse" />
-      )}
     </button>
   );
 };
@@ -151,12 +128,11 @@ const ActionTile = ({
 /* ─── Dashboard principal ─── */
 const CloserDashboard = () => {
   const navigate = useNavigate();
-  const { data: companies = [], isLoading, error } = useAllCompanies();
+  const { data: companies = [], isLoading } = useAllCompanies();
   const createCompany = useCreateCompany();
   const { toast } = useToast();
   const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [showCompanies, setShowCompanies] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [newCompanyData, setNewCompanyData] = useState({
     name: "",
@@ -173,8 +149,6 @@ const CloserDashboard = () => {
     navigate("/dashboard");
   };
 
-  // "Quitter" la démo = revenir à l'espace closer et sortir du mode employé
-  // fakeDataEnabled reste true car les closers ont toujours les données fictives
   const handleStopDemo = () => {
     setCloserEmployeeMode(false);
     navigate("/closer");
@@ -187,7 +161,7 @@ const CloserDashboard = () => {
     }
     try {
       await createCompany.mutateAsync(newCompanyData);
-      toast({ title: "Entreprise créée", description: "L'entreprise a été créée avec succès." });
+      toast({ title: "Entreprise créée ✓", description: "L'entreprise a été créée avec succès." });
       setIsCreateDialogOpen(false);
       setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
     } catch (err: any) {
@@ -208,29 +182,26 @@ const CloserDashboard = () => {
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
 
-      {/* Titre */}
-      <div className="relative text-center pt-4">
-        <div className="absolute right-0 top-4">
-          <ThemeToggle />
+      {/* ── Header ── */}
+      <div className="relative flex items-center justify-between pt-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-medium mb-2">
+            <Building2 className="w-3.5 h-3.5" />
+            Espace Closer
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Que voulez-vous faire ?</h1>
         </div>
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-sm font-medium mb-4">
-          <Building2 className="w-4 h-4" />
-          Espace Closer
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Que voulez-vous faire ?</h1>
-        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-          Choisissez une action pour démarrer
-        </p>
+        <ThemeToggle />
       </div>
 
-      {/* Tuiles principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* ── Tuiles d'action ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ActionTile
           icon={MonitorPlay}
           title="Démo Patron"
-          description="Lancez une démo complète en vue dirigeant avec toutes les fonctionnalités et données réalistes."
+          description="Vue dirigeant avec toutes les fonctionnalités et données réalistes."
           onClick={() => (fakeDataEnabled && !closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(false)}
           color="blue"
           active={fakeDataEnabled && !closerEmployeeMode}
@@ -238,7 +209,7 @@ const CloserDashboard = () => {
         <ActionTile
           icon={Eye}
           title="Démo Employé"
-          description="Montrez la vue employé avec le planning, les affectations chantiers et l'espace personnel."
+          description="Vue employé : planning, affectations chantiers et espace personnel."
           onClick={() => (fakeDataEnabled && closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(true)}
           color="green"
           active={fakeDataEnabled && closerEmployeeMode}
@@ -246,99 +217,133 @@ const CloserDashboard = () => {
         <ActionTile
           icon={Tag}
           title="Présenter les offres"
-          description="Affichez la page tarifaire Starter / Pro / Elite pour présenter les plans à votre client pendant la visio."
+          description="Page tarifaire Starter / Pro / Elite à montrer au client en visio."
           onClick={() => navigate("/start")}
           color="orange"
         />
         <ActionTile
           icon={Plus}
           title="Nouvelle Entreprise"
-          description="Créez l'espace d'un nouveau client, choisissez son plan et inscrivez-le sur BTP Smart Pro."
+          description="Créer l'espace d'un nouveau client et l'inscrire sur BTP Smart Pro."
           onClick={() => setIsCreateDialogOpen(true)}
           color="primary"
         />
       </div>
 
-      {/* Bouton voir les entreprises */}
-      <div className="text-center">
-        <Button
-          variant="ghost"
-          onClick={() => setShowCompanies(!showCompanies)}
-          className="gap-2 rounded-xl text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          {showCompanies ? "Masquer" : "Voir"} les entreprises créées
-          <Badge variant="secondary" className="ml-1">{companiesList.length}</Badge>
-          {showCompanies ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </Button>
-      </div>
+      {/* ── Section tabulée : Classement / Entreprises / Ressources ── */}
+      <Tabs defaultValue="classement" className="w-full">
+        <TabsList className="w-full grid grid-cols-3 rounded-xl h-11">
+          <TabsTrigger value="classement" className="gap-1.5 rounded-lg text-xs sm:text-sm">
+            <Trophy className="w-4 h-4" />
+            <span className="hidden sm:inline">Classement</span>
+            <span className="sm:hidden">Top</span>
+          </TabsTrigger>
+          <TabsTrigger value="entreprises" className="gap-1.5 rounded-lg text-xs sm:text-sm">
+            <Building2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Mes entreprises</span>
+            <span className="sm:hidden">Entreprises</span>
+            {companiesList.length > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0 ml-0.5">{companiesList.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="ressources" className="gap-1.5 rounded-lg text-xs sm:text-sm">
+            <BookOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Ressources</span>
+            <span className="sm:hidden">Docs</span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Liste des entreprises */}
-      {showCompanies && (
-        <div className="grid grid-cols-1 gap-4">
+        {/* Classement */}
+        <TabsContent value="classement" className="mt-4">
+          <CloserLeaderboard />
+        </TabsContent>
+
+        {/* Mes entreprises */}
+        <TabsContent value="entreprises" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {companiesList.length === 0
+                ? "Aucune entreprise créée pour l'instant."
+                : `${companiesList.length} entreprise${companiesList.length > 1 ? "s" : ""} créée${companiesList.length > 1 ? "s" : ""}.`}
+            </p>
+            <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} className="gap-2 rounded-xl">
+              <Plus className="w-4 h-4" />
+              Nouvelle
+            </Button>
+          </div>
+
           {companiesList.length === 0 ? (
-            <GlassCard className="p-8 text-center">
+            <GlassCard className="p-12 text-center">
               <Building2 className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-              <p className="text-muted-foreground text-sm">Aucune entreprise créée pour l'instant</p>
+              <p className="text-muted-foreground text-sm">Cliquez sur "Nouvelle Entreprise" pour créer votre premier client.</p>
             </GlassCard>
-          ) : companiesList.map((company) => (
-            <GlassCard key={company.id} className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-semibold truncate">{company.name}</h3>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">{company.plan}</Badge>
-                      <Badge variant="secondary" className="text-xs">{company.status}</Badge>
+          ) : (
+            <div className="space-y-3">
+              {companiesList.map((company) => (
+                <GlassCard key={company.id} className="p-4 sm:p-5">
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold truncate">{company.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <Badge variant="outline" className="text-xs">{company.plan}</Badge>
+                          <Badge variant="secondary" className="text-xs">{company.status}</Badge>
+                        </div>
+                      </div>
+                      <InviteUserDialog
+                        companyId={company.id}
+                        companyName={company.name}
+                        trigger={
+                          <Button variant="outline" size="sm" className="gap-2 rounded-xl w-full sm:w-auto flex-shrink-0">
+                            <Mail className="w-4 h-4" />
+                            Inviter dirigeant
+                          </Button>
+                        }
+                        onSuccess={() => {}}
+                      />
+                    </div>
+                    <div className="border-t pt-2">
+                      <Button variant="ghost" size="sm" onClick={() => toggleExpansion(company.id)} className="w-full justify-between rounded-xl h-8">
+                        <div className="flex items-center gap-2 text-xs"><Users className="w-3.5 h-3.5" /><span>Membres</span></div>
+                        {expandedCompanies.has(company.id) ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </Button>
+                      {expandedCompanies.has(company.id) && <CompanyMembersList companyId={company.id} companyName={company.name} />}
                     </div>
                   </div>
-                  <InviteUserDialog
-                    companyId={company.id}
-                    companyName={company.name}
-                    trigger={
-                      <Button variant="outline" size="sm" className="gap-2 rounded-xl w-full sm:w-auto flex-shrink-0">
-                        <Mail className="w-4 h-4" />
-                        Inviter dirigeant
-                      </Button>
-                    }
-                    onSuccess={() => {}}
-                  />
-                </div>
+                </GlassCard>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
-                <div className="pt-3 border-t">
-                  <Button variant="ghost" size="sm" onClick={() => toggleExpansion(company.id)} className="w-full justify-between rounded-xl">
-                    <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span>Voir les membres</span></div>
-                    {expandedCompanies.has(company.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </Button>
-                  {expandedCompanies.has(company.id) && <CompanyMembersList companyId={company.id} companyName={company.name} />}
-                </div>
-              </div>
-            </GlassCard>
-          ))}
-        </div>
-      )}
-
-      {/* Classement des closers */}
-      <CloserLeaderboard />
-
-      {/* Ressources Closer : Documentation, Prospects, Calendly */}
-      <CloserResources />
+        {/* Ressources */}
+        <TabsContent value="ressources" className="mt-4">
+          <CloserResources />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog créer entreprise */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
+        <DialogContent className="max-w-md mx-4 sm:mx-auto">
           <DialogHeader>
             <DialogTitle>Créer une nouvelle entreprise</DialogTitle>
-            <DialogDescription>Remplissez les informations pour créer l'entreprise du client et activez ses modules.</DialogDescription>
+            <DialogDescription>Renseignez le nom du client pour créer son espace.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
+          <div className="space-y-4 mt-2">
             <div>
               <Label htmlFor="name">Nom de l'entreprise *</Label>
-              <Input id="name" value={newCompanyData.name} onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })} placeholder="Ex: Maçonnerie Dupont" />
+              <Input
+                id="name"
+                value={newCompanyData.name}
+                onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })}
+                placeholder="Ex: Maçonnerie Dupont"
+                onKeyDown={(e) => e.key === "Enter" && handleCreateCompany()}
+                autoFocus
+              />
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="rounded-xl">Annuler</Button>
-              <Button onClick={handleCreateCompany} disabled={createCompany.isPending} className="gap-2 rounded-xl">
+              <Button onClick={handleCreateCompany} disabled={createCompany.isPending || !newCompanyData.name.trim()} className="gap-2 rounded-xl">
                 {createCompany.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Création...</> : <><Save className="w-4 h-4" />Créer</>}
               </Button>
             </div>
