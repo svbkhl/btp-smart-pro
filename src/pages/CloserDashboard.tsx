@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,8 @@ import {
   BookOpen,
   Phone,
   CalendarDays,
+  UserCircle,
+  LogOut,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -208,7 +211,27 @@ const CloserDashboard = () => {
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight mt-0.5">Que voulez-vous faire ?</h1>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
+            onClick={() => navigate("/settings")}
+            title="Mon profil"
+          >
+            <UserCircle className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl text-muted-foreground hover:text-red-500"
+            onClick={async () => { await supabase.auth.signOut(); navigate("/auth"); }}
+            title="Se déconnecter"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* ── Tuiles d'action ── */}
