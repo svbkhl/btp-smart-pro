@@ -26,8 +26,7 @@ import {
   Pin,
   PinOff,
   ShieldCheck,
-  UserCog,
-  Zap
+  UserCog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -907,23 +906,6 @@ export default function Sidebar() {
           <div className="pt-2 space-y-1">
             {user ? (
               <>
-                {/* Accès rapide Leads BTP pour les admins système */}
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    className={cn(
-                      "w-full justify-start gap-2 mb-1",
-                      location.pathname === "/admin/leads"
-                        ? "bg-yellow-500/10 text-yellow-500"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => navigate("/admin/leads")}
-                  >
-                    <Zap className="w-4 h-4 shrink-0" />
-                    {isOpen && <span className="truncate">Leads BTP</span>}
-                  </Button>
-                )}
-
                 {/* Toggle Mode démo uniquement pour les admins (pas pour les closers) */}
                 {userRole === 'admin' && !isCloser && !isOwner && !isEmployee && (
                   <div className="space-y-1.5 mb-2">

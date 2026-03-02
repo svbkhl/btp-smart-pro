@@ -26,7 +26,6 @@ import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
-import { AdminCompanySettings } from "@/components/settings/AdminCompanySettings";
 import { CloserSettings } from "@/components/settings/CloserSettings";
 import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
@@ -35,8 +34,6 @@ import AdminCompanies from "@/pages/AdminCompanies";
 import AdminLeads from "@/pages/AdminLeads";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 import DelegationsManagement from "@/pages/DelegationsManagement";
-import RolesManagement from "@/pages/RolesManagement";
-import UsersManagementRBAC from "@/pages/UsersManagementRBAC";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { isSystemAdmin, isAdminEmail } from "@/config/admin";
@@ -264,10 +261,6 @@ const Settings = () => {
                   <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Entreprise</span>
                 </TabsTrigger>
-                <TabsTrigger value="employees" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Employés</span>
-                </TabsTrigger>
                 <TabsTrigger value="billing" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <Receipt className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Abonnement</span>
@@ -283,24 +276,6 @@ const Settings = () => {
                 <TabsTrigger value="contact-requests" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Demandes de contact</span>
-                </TabsTrigger>
-                <TabsTrigger value="users" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Utilisateurs</span>
-                </TabsTrigger>
-                <TabsTrigger value="roles" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Rôles</span>
-                </TabsTrigger>
-                {canManageDelegations && (
-                  <TabsTrigger value="delegations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                    <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                    <span className="truncate">Délégations</span>
-                  </TabsTrigger>
-                )}
-                <TabsTrigger value="admin-company" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <SettingsIcon2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Config Entreprises</span>
                 </TabsTrigger>
                 <TabsTrigger value="closers" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                   <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -349,12 +324,6 @@ const Settings = () => {
               <TabsContent value="company" className="mt-0">
                 <CompanySettings />
               </TabsContent>
-
-              <TabsContent value="employees" className="mt-0">
-                <div className="[&_div]:!p-0 [&_main]:!p-0">
-                  <UsersManagementRBAC embedded />
-                </div>
-              </TabsContent>
               <TabsContent value="billing" className="mt-0">
                 <BillingSettings />
               </TabsContent>
@@ -368,24 +337,6 @@ const Settings = () => {
               </TabsContent>
               <TabsContent value="contact-requests" className="mt-0">
                 <AdminContactRequests />
-              </TabsContent>
-              <TabsContent value="users" className="mt-0">
-                <div className="[&_div]:!p-0 [&_main]:!p-0">
-                  <UsersManagementRBAC />
-                </div>
-              </TabsContent>
-              <TabsContent value="roles" className="mt-0">
-                <div className="[&_div]:!p-0 [&_main]:!p-0">
-                  <RolesManagement />
-                </div>
-              </TabsContent>
-              {canManageDelegations && (
-                <TabsContent value="delegations" className="mt-0">
-                  <DelegationsManagement />
-                </TabsContent>
-              )}
-              <TabsContent value="admin-company" className="mt-0">
-                <AdminCompanySettings />
               </TabsContent>
               <TabsContent value="closers" className="mt-0">
                 <CloserSettings />
