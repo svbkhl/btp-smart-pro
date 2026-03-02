@@ -232,7 +232,7 @@ const CloserDashboard = () => {
 
       {/* ── Section tabulée : Classement / Entreprises / Ressources ── */}
       <Tabs defaultValue="classement" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 rounded-xl h-11">
+        <TabsList className="w-full grid grid-cols-3 rounded-xl h-11 border-0 bg-transparent p-0 gap-2">
           <TabsTrigger value="classement" className="gap-1.5 rounded-lg text-xs sm:text-sm">
             <Trophy className="w-4 h-4" />
             <span className="hidden sm:inline">Classement</span>
