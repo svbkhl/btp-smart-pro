@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
-  useAssignLeads, LeadJob, Lead,
+  useAssignLeads, LeadJob, Lead, RETRY_NETWORK,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -68,7 +68,7 @@ function useClosersList() {
     queryKey: ["closers_list_admin"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("closer_emails" as any).select("email, name");
+        .from("closer_emails" as any).select("email");
       if (error) throw error;
       return ((data as any[]) || []).map((c: any) => ({
         id: c.email,
@@ -76,6 +76,7 @@ function useClosersList() {
         name: c.name || c.email.split("@")[0],
       }));
     },
+    ...RETRY_NETWORK,
   });
 }
 
@@ -85,7 +86,7 @@ function SectionGenerate() {
   const [dept, setDept] = useState("");
   const { toast } = useToast();
   const generate = useGenerateLeads();
-  const { data: jobs = [], refetch } = useLeadJobs();
+  const { data: jobs = [], refetch, isRefetching } = useLeadJobs();
 
   const handleGenerate = async () => {
     if (!dept) return toast({ title: "Sélectionnez un département", variant: "destructive" });
@@ -136,8 +137,14 @@ function SectionGenerate() {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" /> Jobs en cours / terminés
           </h3>
-          <Button variant="ghost" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            title="Actualiser la liste"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
 

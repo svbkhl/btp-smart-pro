@@ -113,6 +113,18 @@ export const DEPTS: { code: string; name: string }[] = [
 
 // ─── Hooks admin ──────────────────────────────────────────────
 
+export const RETRY_NETWORK = {
+  retry: (failureCount: number, error: unknown) => {
+    if (failureCount >= 5) return false;
+    const e = error as any;
+    const msg = String(e?.message ?? e?.error ?? e?.cause ?? e ?? "");
+    const name = String(e?.name ?? "");
+    if (/network|socket|fetch|ECONNRESET|ETIMEDOUT|ERR_SOCKET|Failed to fetch|load resource|TypeError/i.test(msg + name)) return true;
+    return false;
+  },
+  retryDelay: (n: number) => Math.min(1000 * 2 ** n, 8000),
+};
+
 export function useLeadJobs() {
   return useQuery<LeadJob[]>({
     queryKey: ["lead_jobs"],
@@ -125,7 +137,8 @@ export function useLeadJobs() {
       if (error) throw error;
       return (data as unknown as LeadJob[]) || [];
     },
-    refetchInterval: 5000, // poll toutes les 5s pour voir l'avancement
+    refetchInterval: 5000,
+    ...RETRY_NETWORK,
   });
 }
 
@@ -160,6 +173,7 @@ export function useAdminLeads(filters: {
       return { leads: (data as unknown as Lead[]) || [], count: count || 0 };
     },
     placeholderData: (prev) => prev,
+    ...RETRY_NETWORK,
   });
 }
 
@@ -188,7 +202,7 @@ export function useClosersForAssign() {
     queryKey: ["closers_for_assign"],
     queryFn: async () => {
       const { data: emails, error } = await supabase
-        .from("closer_emails" as any).select("email, name");
+        .from("closer_emails" as any).select("email");
       if (error || !emails) return [];
 
       return (emails as any[]).map((ce: any) => ({
@@ -198,6 +212,7 @@ export function useClosersForAssign() {
         total_assigned: 0,
       }));
     },
+    ...RETRY_NETWORK,
   });
 }
 
@@ -209,21 +224,20 @@ export function useGenerateLeads() {
     mutationFn: async (deptCode: string) => {
       const deptName = DEPTS.find((d) => d.code === deptCode)?.name || deptCode;
 
-      // Créer le job
-      const { data: job, error } = await supabase
-        .from("lead_jobs" as any)
-        .insert({ dept_code: deptCode, dept_name: deptName, status: "PENDING" })
-        .select()
-        .single();
-      if (error) throw error;
+      // Créer le job via RPC (bypass RLS, autorise admin par email)
+      const { data: jobId, error: rpcError } = await supabase.rpc("create_lead_job" as any, {
+        p_dept_code: deptCode,
+        p_dept_name: deptName,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      if (!jobId) throw new Error("Impossible de créer le job");
 
       // Lancer le worker Edge Function
-      const { data: { session } } = await supabase.auth.getSession();
       await supabase.functions.invoke("lead-generator", {
-        body: { job_id: (job as any).id },
+        body: { job_id: jobId },
       });
 
-      return job;
+      return { id: jobId, dept_code: deptCode, dept_name: deptName, status: "PENDING" };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["lead_jobs"] }),
   });
@@ -280,6 +294,7 @@ export function useMyLeads(filters: {
     },
     enabled: !!user?.id,
     placeholderData: (prev) => prev,
+    ...RETRY_NETWORK,
   });
 }
 
@@ -304,6 +319,7 @@ export function useMyLeadStats() {
       };
     },
     enabled: !!user?.id,
+    ...RETRY_NETWORK,
   });
 }
 

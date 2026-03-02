@@ -30,7 +30,7 @@ function useLeaderboard() {
       // 2. Tous les closers inscrits
       const { data: allClosers } = await supabase
         .from("closer_emails" as any)
-        .select("email, name");
+        .select("email");
       const closerList = (allClosers as { email: string; name?: string }[]) || [];
 
       // 3. Fusionner : closers sans score → monthly_closes: 0
