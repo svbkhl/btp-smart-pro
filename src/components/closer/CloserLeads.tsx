@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import {
   DEPTS, useMyLeads, useMyLeadStats, useUpdateLeadStatus, useUpdateLeadNotes,
-  Lead, LeadStatus,
+  Lead, LeadStatus, type MyLeadsSort,
 } from "@/hooks/useLeads";
 
 // ─── Constantes ───────────────────────────────────────────────
@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; next: Le
   NEW:       { label: "Nouveau",   color: "bg-blue-500/10 text-blue-400 border-blue-500/20",      next: ["CONTACTED", "LOST"] },
   CONTACTED: { label: "Contacté",  color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20", next: ["QUALIFIED", "LOST"] },
   QUALIFIED: { label: "Qualifié",  color: "bg-violet-500/10 text-violet-400 border-violet-500/20", next: ["SIGNED", "LOST"] },
-  SIGNED:    { label: "Signé",     color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", next: [] },
+  SIGNED:    { label: "Signé",     color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", next: ["QUALIFIED"] }, // Revenir à Qualifié si pas fait exprès
   LOST:      { label: "Perdu",     color: "bg-red-500/10 text-red-400 border-red-500/20",           next: ["NEW"] },
 };
 
@@ -142,9 +142,12 @@ function LeadCard({ lead }: { lead: Lead }) {
                 {prio && (
                   <span className="text-xs">{prio.icon}</span>
                 )}
-                {(lead as any).category && (
-                  <span className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5 font-medium">
-                    {CATEGORY_ICON[(lead as any).category] || "🏗️"} {(lead as any).category}
+                <span className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5 font-medium">
+                  {CATEGORY_ICON[(lead as any).category] || "🏗️"} {(lead as any).category || "—"}
+                </span>
+                {lead.job_dept && (
+                  <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full px-2 py-0.5 font-medium" title="Lot (campagne d’assignation)">
+                    Lot {lead.job_dept}
                   </span>
                 )}
               </div>
@@ -222,7 +225,9 @@ function LeadCard({ lead }: { lead: Lead }) {
                         <Badge className={`text-xs border mr-2 ${STATUS_CONFIG[s].color}`}>
                           {STATUS_CONFIG[s].label}
                         </Badge>
-                        Marquer comme {STATUS_CONFIG[s].label}
+                        {lead.status === "SIGNED" && s === "QUALIFIED"
+                          ? "Revenir à Qualifié (annuler Signé)"
+                          : `Marquer comme ${STATUS_CONFIG[s].label}`}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -239,9 +244,19 @@ function LeadCard({ lead }: { lead: Lead }) {
                 <p className="font-medium mt-0.5">{lead.size_bucket || "—"} employés</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Département</p>
-                <p className="font-medium mt-0.5">{lead.dept_code}</p>
+                <p className="text-muted-foreground">Adresse (dépt.)</p>
+                <p className="font-medium mt-0.5">
+                  {lead.dept_code} — {DEPTS.find((d) => d.code === lead.dept_code)?.name ?? lead.dept_code}
+                </p>
               </div>
+              {lead.job_dept && (
+                <div>
+                  <p className="text-muted-foreground">Lot (campagne)</p>
+                  <p className="font-medium mt-0.5">
+                    {lead.job_dept} — {DEPTS.find((d) => d.code === lead.job_dept)?.name ?? lead.job_dept}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-muted-foreground">Note Google</p>
                 <p className="font-medium mt-0.5 flex items-center gap-1">
@@ -285,7 +300,9 @@ export default function CloserLeads() {
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
+  const [jobDeptFilter, setJobDeptFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [sortBy, setSortBy] = useState<MyLeadsSort>("dept");
   const [page, setPage] = useState(0);
 
   const { data: statsData } = useMyLeadStats();
@@ -293,7 +310,9 @@ export default function CloserLeads() {
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
     dept: deptFilter || undefined,
+    jobDept: jobDeptFilter || undefined,
     category: categoryFilter || undefined,
+    sortBy,
     page,
   });
 
@@ -342,13 +361,36 @@ export default function CloserLeads() {
 
           <Select value={deptFilter || "_all"} onValueChange={(v) => { setDeptFilter(v === "_all" ? "" : v); setPage(0); }}>
             <SelectTrigger className="w-52">
-              <SelectValue placeholder="Tous les départements" />
+              <SelectValue placeholder="Dépt. adresse" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="_all">Tous les départements</SelectItem>
+              <SelectItem value="_all">Tous (adresse)</SelectItem>
               {DEPTS.map((d) => (
                 <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={jobDeptFilter || "_all"} onValueChange={(v) => { setJobDeptFilter(v === "_all" ? "" : v); setPage(0); }}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="Lot (campagne)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Tous les lots</SelectItem>
+              {DEPTS.map((d) => (
+                <SelectItem key={d.code} value={d.code}>Lot {d.code} — {d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={(v) => { setSortBy(v as MyLeadsSort); setPage(0); }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Trier par" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dept">Département (adresse)</SelectItem>
+              <SelectItem value="date">Date (récent d’abord)</SelectItem>
+              <SelectItem value="priority">Priorité</SelectItem>
             </SelectContent>
           </Select>
 
@@ -394,6 +436,36 @@ export default function CloserLeads() {
               : "Aucun lead pour ces filtres."}
           </p>
         </GlassCard>
+      ) : sortBy === "dept" ? (
+        <div className="space-y-6">
+          {(() => {
+            const groups: { deptCode: string; leads: Lead[] }[] = [];
+            let current: { deptCode: string; leads: Lead[] } | null = null;
+            for (const lead of leads) {
+              const code = lead.dept_code || "";
+              if (!current || current.deptCode !== code) {
+                current = { deptCode: code, leads: [lead] };
+                groups.push(current);
+              } else {
+                current.leads.push(lead);
+              }
+            }
+            return groups.map(({ deptCode, leads: groupLeads }) => {
+              const dept = DEPTS.find((d) => d.code === deptCode);
+              const label = dept ? `${deptCode} — ${dept.name}` : deptCode || "—";
+              return (
+                <div key={deptCode || "unknown"} className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background/95 backdrop-blur py-1.5 border-b border-border/50">
+                    {label} <span className="font-normal">({groupLeads.length})</span>
+                  </h4>
+                  <div className="space-y-3">
+                    {groupLeads.map((lead) => <LeadCard key={lead.id} lead={lead} />)}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
       ) : (
         <div className="space-y-3">
           {leads.map((lead) => <LeadCard key={lead.id} lead={lead} />)}

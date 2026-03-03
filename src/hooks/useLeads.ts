@@ -184,32 +184,18 @@ export function useGeneratedDepts() {
     queryKey: ["generated_depts"],
     refetchInterval: 5000,
     queryFn: async () => {
-      const PAGE = 1000;
-      const map = new Map<string, { total: number; available: number }>();
-      let from = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("leads" as any)
-          .select("job_dept, dept_code, status, owner_id")
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        const rows = (data as any[]) || [];
-        rows.forEach((r) => {
-          const bucket = r.job_dept ?? r.dept_code;
-          const prev = map.get(bucket) || { total: 0, available: 0 };
-          map.set(bucket, {
-            total: prev.total + 1,
-            available: r.status === "NEW" && !r.owner_id ? prev.available + 1 : prev.available,
-          });
-        });
-        hasMore = rows.length === PAGE;
-        from += PAGE;
-      }
-      return Array.from(map.entries())
-        .map(([code, stats]) => {
-          const dept = DEPTS.find((d) => d.code === code);
-          return { code, name: dept?.name || code, ...stats };
+      const { data, error } = await supabase.rpc("get_generated_depts" as any);
+      if (error) throw error;
+      const rows = (data as { code: string; total: number; available: number }[]) || [];
+      return rows
+        .map((r) => {
+          const dept = DEPTS.find((d) => d.code === r.code);
+          return {
+            code: r.code,
+            name: dept?.name ?? r.code,
+            total: Number(r.total),
+            available: Number(r.available),
+          };
         })
         .sort((a, b) => a.code.localeCompare(b.code));
     },
@@ -221,19 +207,15 @@ export function useLeadStats(deptCode: string) {
   return useQuery({
     queryKey: ["lead_stats", deptCode],
     queryFn: async () => {
-      const orFilter = `job_dept.eq.${deptCode},and(dept_code.eq.${deptCode},job_dept.is.null)`;
-      const [totalRes, availableRes, assignedRes] = await Promise.all([
-        supabase.from("leads" as any).select("*", { count: "exact", head: true }).or(orFilter),
-        supabase.from("leads" as any).select("*", { count: "exact", head: true }).or(orFilter).eq("status", "NEW").is("owner_id", null),
-        supabase.from("leads" as any).select("*", { count: "exact", head: true }).or(orFilter).not("owner_id", "is", null),
-      ]);
-      if (totalRes.error) throw totalRes.error;
-      if (availableRes.error) throw availableRes.error;
-      if (assignedRes.error) throw assignedRes.error;
+      const { data, error } = await supabase.rpc("get_lead_stats" as any, {
+        p_dept_code: deptCode,
+      });
+      if (error) throw error;
+      const o = (data as { total?: number; available?: number; assigned?: number }) ?? {};
       return {
-        total: totalRes.count ?? 0,
-        available: availableRes.count ?? 0,
-        assigned: assignedRes.count ?? 0,
+        total: Number(o.total ?? 0),
+        available: Number(o.available ?? 0),
+        assigned: Number(o.assigned ?? 0),
       };
     },
     enabled: !!deptCode,
@@ -335,22 +317,28 @@ export function useAssignLeads() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin_leads"] });
       qc.invalidateQueries({ queryKey: ["lead_stats"] });
+      qc.invalidateQueries({ queryKey: ["generated_depts"] });
     },
   });
 }
 
 // ─── Hooks closer ─────────────────────────────────────────────
 
+export type MyLeadsSort = "dept" | "date" | "priority";
+
 export function useMyLeads(filters: {
   status?: string;
   priority?: string;
   dept?: string;
+  jobDept?: string;
   category?: string;
+  sortBy?: MyLeadsSort;
   page?: number;
 }) {
   const { user } = useAuth();
   const PAGE = 50;
   const from = (filters.page || 0) * PAGE;
+  const sortBy = filters.sortBy ?? "dept";
 
   return useQuery<{ leads: Lead[]; count: number }>({
     queryKey: ["my_leads", user?.id, filters],
@@ -358,15 +346,31 @@ export function useMyLeads(filters: {
       let query = supabase
         .from("leads" as any)
         .select("*", { count: "exact" })
-        .eq("owner_id", user!.id)
-        .order("priority", { ascending: true })
-        .order("created_at", { ascending: false })
-        .range(from, from + PAGE - 1);
+        .eq("owner_id", user!.id);
 
       if (filters.status)   query = query.eq("status", filters.status);
       if (filters.priority) query = query.eq("priority", filters.priority);
       if (filters.dept)     query = query.eq("dept_code", filters.dept);
+      if (filters.jobDept) query = query.eq("job_dept", filters.jobDept);
       if (filters.category) query = query.eq("category", filters.category);
+
+      if (sortBy === "dept") {
+        query = query
+          .order("dept_code", { ascending: true })
+          .order("priority", { ascending: true })
+          .order("created_at", { ascending: false });
+      } else if (sortBy === "date") {
+        query = query
+          .order("created_at", { ascending: false })
+          .order("dept_code", { ascending: true });
+      } else {
+        query = query
+          .order("priority", { ascending: true })
+          .order("dept_code", { ascending: true })
+          .order("created_at", { ascending: false });
+      }
+
+      query = query.range(from, from + PAGE - 1);
 
       const { data, error, count } = await query;
       if (error) throw error;
@@ -383,19 +387,16 @@ export function useMyLeadStats() {
   return useQuery({
     queryKey: ["my_lead_stats", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leads" as any)
-        .select("status")
-        .eq("owner_id", user!.id);
+      const { data, error } = await supabase.rpc("get_my_lead_stats" as any);
       if (error) throw error;
-      const rows = (data as any[]) || [];
+      const o = (data as Record<string, number>) ?? {};
       return {
-        total: rows.length,
-        new: rows.filter((r) => r.status === "NEW").length,
-        contacted: rows.filter((r) => r.status === "CONTACTED").length,
-        qualified: rows.filter((r) => r.status === "QUALIFIED").length,
-        signed: rows.filter((r) => r.status === "SIGNED").length,
-        lost: rows.filter((r) => r.status === "LOST").length,
+        total: Number(o.total ?? 0),
+        new: Number(o.new ?? 0),
+        contacted: Number(o.contacted ?? 0),
+        qualified: Number(o.qualified ?? 0),
+        signed: Number(o.signed ?? 0),
+        lost: Number(o.lost ?? 0),
       };
     },
     enabled: !!user?.id,

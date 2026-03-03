@@ -157,13 +157,14 @@ function normalizePhone(raw: string) {
 
 function isMobile(p: string) { return /^0[67]/.test(p); }
 
-function deptFromAddress(addr: string, fallback: string): string {
+/** Département à partir du code postal dans l'adresse. Retourne "" si pas de CP trouvé → on n'insère pas (strict dept par dept, pas de frontières). */
+function deptFromAddress(addr: string): string {
   const m = addr.match(/\b(\d{5})\b/);
-  if (!m) return fallback;
+  if (!m) return "";
   const cp = m[1];
   if (cp.startsWith("200") || cp.startsWith("201")) return "2A";
   if (cp.startsWith("202") || cp.startsWith("206")) return "2B";
-  if (cp.startsWith("97") || cp.startsWith("98")) return fallback;
+  if (cp.startsWith("97") || cp.startsWith("98")) return ""; // DOM-TOM : on n'insère pas en métropole
   return cp.substring(0, 2);
 }
 
@@ -178,6 +179,24 @@ function calcPriority(bucket: string, rating: number): string {
   if (bucket === "0-3" || bucket === "4-10") return rating >= 1 ? "A" : "B";
   if (bucket === "10-50") return "B";
   return "C";
+}
+
+/** Inférer le métier à partir du nom de l'entreprise (pas Artisan BTP par défaut). */
+function inferCategoryFromName(name: string): string {
+  const n = (name || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  if (!n.trim()) return "Artisan BTP";
+  if (/\b(plomb|sanitaire|canalisation|plomberie)\b/.test(n)) return "Plomberie";
+  if (/\b(elec|electricit[eé]|electricien)\b/.test(n)) return "Électricité";
+  if (/\b(chauffage|chauffagiste|thermique|chaudi[eè]re|gaz|clim)\b/.test(n)) return "Chauffage";
+  if (/\b(couvreur|couverture|toiture|toit|zingueur)\b/.test(n)) return "Couverture";
+  if (/\b(menuisier|menuiserie|bois)\b/.test(n)) return "Menuiserie";
+  if (/\b(peintre|peinture)\b/.test(n)) return "Peinture";
+  if (/\b(r[eé]nov|renovation)\b/.test(n)) return "Rénovation";
+  if (/\b(ma[cç]on|maconnerie|carreleur|carrelage)\b/.test(n)) return "Maçonnerie";
+  if (/\b(photovolta[iï]que|solaire|panneau solaire)\b/.test(n)) return "Photovoltaïque";
+  if (/\b(terrassier|terrassement|excavat|d[eé]molition)\b/.test(n)) return "Terrassement";
+  if (/\b(multi|multiservice|b[aâ]timent|construction|travaux|artisan)\b/.test(n)) return "Multi-services";
+  return "Artisan BTP";
 }
 
 // ─── Moteur de génération browser ────────────────────────────
@@ -196,9 +215,9 @@ async function processPlaceBrowser(
   if (!phoneMobile) { stats.skipped++; return; }
 
   const address = place.formattedAddress || "";
-  const deptCode = deptFromAddress(address, jobDept);
-  // Ne garder que les entreprises dont l'adresse est vraiment dans le département du job
-  if (deptCode !== jobDept) {
+  const deptCode = deptFromAddress(address);
+  // Strict département par département : uniquement si le CP de l'adresse correspond au département du job (pas de frontières)
+  if (!deptCode || deptCode !== jobDept) {
     stats.skipped++;
     return;
   }
@@ -207,6 +226,7 @@ async function processPlaceBrowser(
   const rating = place.rating ?? 0;
   const bucket = sizeBucket(count, name);
   const priority = calcPriority(bucket, rating);
+  const categoryFinal = (category && category.trim()) || inferCategoryFromName(name);
 
   try {
     const { error } = await supabase.from("leads" as any).upsert({
@@ -215,7 +235,7 @@ async function processPlaceBrowser(
       phone_mobile: phoneMobile, phone_fixed: phoneFixed,
       website: place.websiteUri || null, maps_url: place.googleMapsUri,
       rating: rating || null, reviews_count: count,
-      size_bucket: bucket, priority, dept_code: deptCode, job_dept: jobDept, category,
+      size_bucket: bucket, priority, dept_code: deptCode, job_dept: jobDept, category: categoryFinal,
     } as any, { onConflict: "place_id", ignoreDuplicates: true } as any);
     if (!error) stats.inserted++; else stats.skipped++;
   } catch (_) {
@@ -536,6 +556,14 @@ function SectionAssign() {
   const { data: jobs = [] } = useLeadJobs();
   const isGenerating = dept ? jobs.some((j) => j.dept_code === dept && j.status === "RUNNING") : false;
 
+  // Ne garder que les départements pour lesquels un job a été lancé (pas tous les depts qui ont des leads en base)
+  const jobDeptCodes = new Set((jobs || []).map((j) => j.dept_code));
+  const deptsFromJobs = (generatedDepts || []).filter((d) => jobDeptCodes.has(d.code));
+
+  useEffect(() => {
+    if (dept && !jobDeptCodes.has(dept)) setDept("");
+  }, [dept, jobs]);
+
   const handleAssign = async () => {
     if (!dept || !closerEmail) return toast({ title: "Sélectionnez département et closer", variant: "destructive" });
     if (!stats?.available) return toast({
@@ -569,19 +597,19 @@ function SectionAssign() {
         <div>
           <label className="text-sm font-medium mb-1.5 block">
             Département
-            {generatedDepts.length > 0 && (
-              <span className="ml-2 text-xs text-muted-foreground font-normal">({generatedDepts.length} générés)</span>
+            {deptsFromJobs.length > 0 && (
+              <span className="ml-2 text-xs text-muted-foreground font-normal">({deptsFromJobs.length} générés)</span>
             )}
           </label>
           <Select value={dept} onValueChange={setDept}>
             <SelectTrigger>
-              <SelectValue placeholder={deptsLoading ? "Chargement…" : generatedDepts.length === 0 ? "Aucun lead généré" : "Sélectionner…"} />
+              <SelectValue placeholder={deptsLoading ? "Chargement…" : deptsFromJobs.length === 0 ? "Aucun lead généré" : "Sélectionner…"} />
             </SelectTrigger>
             <SelectContent>
-              {generatedDepts.length === 0 ? (
+              {deptsFromJobs.length === 0 ? (
                 <SelectItem value="_empty" disabled>Aucun lead généré pour l'instant</SelectItem>
               ) : (
-                generatedDepts.map((d) => (
+                deptsFromJobs.map((d) => (
                   <SelectItem key={d.code} value={d.code}>
                     {d.code} — {d.name} ({d.available > 0 ? `${d.available} dispo` : "0 dispo"})
                   </SelectItem>
