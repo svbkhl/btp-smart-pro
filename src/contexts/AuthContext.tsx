@@ -58,6 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
+      // Pré-armer isCloserLoading=true si on a un utilisateur avec email
+      // pour éviter la fenêtre de race entre setUser et l'effet async de vérification closer
+      if (session?.user?.email) {
+        setIsCloserLoading(true);
+      }
       setUser(session?.user ?? null);
       setLoading(false);
       
@@ -83,6 +88,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      // Pré-armer isCloserLoading=true si on a un utilisateur avec email
+      if (session?.user?.email) {
+        setIsCloserLoading(true);
+      }
       setUser(session?.user ?? null);
       setLoading(false);
       

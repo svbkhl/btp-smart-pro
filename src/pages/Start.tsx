@@ -43,11 +43,13 @@ interface BonusItem { label: string; value: string }
 interface PlanDef {
   id: PlanId;
   name: string;
+  tagline: string;
+  footerTagline: string; // phrase sous les features (ex. "Parfait pour tester...")
   recommended: boolean;
-  priceAnnuel: number;   // €/mois affiché en mode annuel
-  priceMensuel: number;  // €/mois affiché en mode mensuel
-  annuelTotal: number;   // € facturés annuellement
-  savingsAnnuel: number; // économie vs mensuel sur 12 mois
+  priceAnnuel: number;
+  priceMensuel: number;
+  annuelTotal: number;
+  savingsAnnuel: number;
   trialDays: number;
   bonusItems: BonusItem[];
   bonusTotal: number;
@@ -59,87 +61,72 @@ const PLANS: PlanDef[] = [
   {
     id: "starter",
     name: "Starter",
+    tagline: "Idéal pour démarrer",
+    footerTagline: "Parfait pour tester et structurer son activité.",
     recommended: false,
     priceAnnuel: 79,
     priceMensuel: 99,
     annuelTotal: 948,
     savingsAnnuel: 240,
     trialDays: 14,
-    bonusItems: [
-      { label: "Frais d'entrée",     value: "500 €"  },
-      { label: "Démo visio",         value: "197 €"  },
-      { label: "14j d'essai offert", value: "79 €"   },
-    ],
-    bonusTotal: 776,
+    bonusItems: [],
+    bonusTotal: 0,
     featurePrefix: null,
     features: [
-      "Clients illimités avec fiche complète",
-      "Devis & factures PDF — envoi email inclus",
-      "5 chantiers actifs avec suivi budgétaire",
-      "Relances auto devis (templates personnalisables)",
-      "Tableau de bord CA en temps réel",
-      "Application mobile PWA (iOS & Android)",
+      "Jusqu'à 20 devis / mois",
+      "Jusqu'à 20 factures / mois",
+      "5 chantiers actifs",
+      "Clients illimités",
+      "Devis & factures PDF",
+      "Tableau de bord chiffre d'affaires",
+      "Application mobile",
       "Support email",
     ],
   },
   {
     id: "pro",
     name: "Pro",
+    tagline: "Le plus choisi par les artisans",
+    footerTagline: "Rentabilisé dès le premier chantier optimisé.",
     recommended: true,
     priceAnnuel: 149,
     priceMensuel: 199,
     annuelTotal: 1788,
     savingsAnnuel: 600,
     trialDays: 14,
-    bonusItems: [
-      { label: "Frais d'entrée",          value: "1 000 €" },
-      { label: "Démo Visio",              value: "297 €"   },
-      { label: "Onboarding vidéos",       value: "197 €"   },
-      { label: "Formation BTP Digital",   value: "397 €"   },
-      { label: "14j d'essai offert",      value: "149 €"   },
-    ],
-    bonusTotal: 2040,
-    featurePrefix: "Tout Starter, plus :",
+    bonusItems: [],
+    bonusTotal: 0,
+    featurePrefix: "Toutes les fonctionnalités Starter",
     features: [
-      "Chantiers illimités avec timeline & commentaires",
-      "Planning hebdomadaire + affectation ouvriers",
-      "Rentabilité temps réel par chantier (budget vs dépenses)",
-      "Devis IA : décris le chantier → devis complet en 2 min",
-      "Signatures électroniques devis (valeur légale)",
-      "Relances automatiques factures impayées (3 niveaux)",
-      "Messagerie email intégrée",
-      "Analytics & export stats (CA, projets, clients)",
-      "Support chat prioritaire",
+      "Chantiers illimités",
+      "Planning & affectation ouvriers",
+      "Rentabilité chantier en temps réel",
+      "Devis IA + signature électronique + liens de paiement",
+      "Relances automatiques devis & factures",
+      "Analytics & export",
+      "Support prioritaire",
     ],
   },
   {
     id: "elite",
     name: "Elite",
+    tagline: "Pour les entreprises structurées",
+    footerTagline: "Pilotez votre croissance en temps réel.",
     recommended: false,
     priceAnnuel: 229,
     priceMensuel: 299,
     annuelTotal: 2748,
     savingsAnnuel: 840,
     trialDays: 14,
-    bonusItems: [
-      { label: "Frais d'entrée",          value: "1 000 €" },
-      { label: "Démo Visio",              value: "297 €"   },
-      { label: "Onboarding expert 1h",    value: "497 €"   },
-      { label: "Formation BTP Digital",   value: "397 €"   },
-      { label: "Migration données",       value: "350 €"   },
-      { label: "14j d'essai offert",      value: "229 €"   },
-    ],
-    bonusTotal: 2770,
-    featurePrefix: "Tout Pro, plus :",
+    bonusItems: [],
+    bonusTotal: 0,
+    featurePrefix: "Tout le plan PRO",
     features: [
-      "Estimations IA par photo ou vocal (budget chantier instantané)",
-      "Alertes dérive chantier (budget vs réel)",
-      "Pipeline commercial & taux de conversion devis",
-      "Analytics avancés : rentabilité, tendances, export Excel",
-      "Multi-utilisateurs avec rôles & permissions personnalisés",
-      "Gestion RH : ouvriers, congés, tâches, candidatures",
-      "Synchronisation Google Calendar",
-      "Envoi planning équipe automatique par email",
+      "Multi-utilisateurs & rôles personnalisés",
+      "Gestion RH (ouvriers, congés, tâches)",
+      "Estimations IA avancées",
+      "Alertes dérive budget chantier",
+      "Pipeline commercial & taux de conversion",
       "Support téléphonique dédié",
     ],
   },
@@ -179,13 +166,16 @@ function PlanCard({
       )}
 
       <div className="pt-7 px-6 pb-3">
-        {/* Nom du plan */}
+        {/* Nom du plan + tagline */}
         <p className={cn(
-          "text-xs font-semibold uppercase tracking-widest mb-1",
+          "text-xs font-semibold uppercase tracking-widest mb-0.5",
           plan.recommended ? "text-primary" : "text-muted-foreground"
         )}>
           {plan.name}
         </p>
+        {plan.tagline && (
+          <p className="text-xs text-muted-foreground mb-1">{plan.tagline}</p>
+        )}
 
         {/* Prix */}
         <div className="flex items-end gap-1.5 mb-0.5">
@@ -215,39 +205,41 @@ function PlanCard({
 
       <CardContent className="flex flex-col flex-1 px-6 pb-6 pt-3 space-y-4">
 
-        {/* Boîte "Offert au démarrage" */}
-        <div className={cn(
-          "rounded-xl border p-3.5 space-y-2",
-          plan.recommended
-            ? "bg-green-500/10 border-green-500/30"
-            : "bg-muted border-border"
-        )}>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Gift className="w-3.5 h-3.5 text-green-600 shrink-0" />
-            <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">
-              Offert au démarrage
-            </p>
-          </div>
-          {plan.bonusItems.map((item, i) => (
-            <div key={i} className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-green-500/70 shrink-0" />
-                <span className="line-through opacity-60">{item.label}</span>
+        {/* Boîte "Offert au démarrage" (masquée si pas de bonus) */}
+        {plan.bonusItems.length > 0 && (
+          <div className={cn(
+            "rounded-xl border p-3.5 space-y-2",
+            plan.recommended
+              ? "bg-green-500/10 border-green-500/30"
+              : "bg-muted border-border"
+          )}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Gift className="w-3.5 h-3.5 text-green-600 shrink-0" />
+              <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">
+                Offert au démarrage
+              </p>
+            </div>
+            {plan.bonusItems.map((item, i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-green-500/70 shrink-0" />
+                  <span className="line-through opacity-60">{item.label}</span>
+                </span>
+                <span className="text-xs font-medium text-green-600 dark:text-green-400 shrink-0">
+                  {item.value} offert
+                </span>
+              </div>
+            ))}
+            <div className="border-t border-green-500/20 pt-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-green-700 dark:text-green-400">
+                Total offert
               </span>
-              <span className="text-xs font-medium text-green-600 dark:text-green-400 shrink-0">
-                {item.value} offert
+              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                {plan.bonusTotal.toLocaleString("fr-FR")} €
               </span>
             </div>
-          ))}
-          <div className="border-t border-green-500/20 pt-2 flex items-center justify-between">
-            <span className="text-xs font-semibold text-green-700 dark:text-green-400">
-              Total offert
-            </span>
-            <span className="text-sm font-bold text-green-600 dark:text-green-400">
-              {plan.bonusTotal.toLocaleString("fr-FR")} €
-            </span>
           </div>
-        </div>
+        )}
 
         {/* Features */}
         <div className="space-y-2 flex-1">
@@ -267,8 +259,13 @@ function PlanCard({
           ))}
         </div>
 
-        {/* CTA */}
+        {/* Phrase d'accroche + CTA */}
         <div className="space-y-2 pt-2">
+          {plan.footerTagline && (
+            <p className="text-xs text-muted-foreground text-center italic">
+              {plan.footerTagline}
+            </p>
+          )}
           <Button
             className="w-full h-11 text-sm font-semibold"
             variant={plan.recommended ? "default" : "outline"}
@@ -281,7 +278,7 @@ function PlanCard({
                 Redirection…
               </>
             ) : (
-              "Démarrer mon essai 14j gratuit"
+              "👉 Démarrer mon essai gratuit 14j"
             )}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
@@ -298,11 +295,11 @@ export default function Start() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const invitationId = searchParams.get("invitation_id");
+  const isPresentingOffer = searchParams.get("presenter") === "1";
   const { toast } = useToast();
   const { user, loading: authLoading, isCompanyLoading, currentCompanyId, isCloser } = useAuth();
   const { isOwner } = usePermissions();
   const { isActive, isLoading: subLoading, subscription } = useSubscription();
-
   const [interval, setInterval] = useState<BillingInterval>("annuel");
   const [creatingCheckout, setCreatingCheckout] = useState(false);
 
@@ -311,7 +308,12 @@ export default function Start() {
     if (!authLoading && !user) navigate("/auth", { replace: true });
   }, [user, authLoading, navigate]);
 
-  // Déjà abonné → dashboard (sauf les closers qui peuvent voir la page tarifaire)
+  // Closers : redirection vers espace closer sauf s'ils ont cliqué "Présenter l'offre" (?presenter=1)
+  useEffect(() => {
+    if (user && isCloser && !isPresentingOffer) navigate("/closer", { replace: true });
+  }, [user, isCloser, isPresentingOffer, navigate]);
+
+  // Déjà abonné → dashboard (closers exclus : ils vont sur /closer ci-dessus)
   useEffect(() => {
     if (authLoading || subLoading || !user || isCloser) return;
     if (isActive) navigate("/dashboard", { replace: true });
@@ -372,9 +374,7 @@ export default function Start() {
   };
 
   // ─── Chargement ───────────────────────────────────────────────────────────
-  // Attendre que l'auth ET le fetch de la company soient terminés
-  // Évite d'afficher "Rejoignez une entreprise" par erreur juste après la connexion
-  const waitingForCompany = user && isCompanyLoading && !currentCompanyId;
+  const waitingForCompany = user && isCompanyLoading && !currentCompanyId && !(isCloser && isPresentingOffer);
   if (authLoading || waitingForCompany || (user && currentCompanyId && subLoading && !subscription)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -387,9 +387,9 @@ export default function Start() {
   }
 
   if (!user) return null;
+  if (user && isCloser && !isPresentingOffer) return null; // redirection vers /closer dans l'effet ci-dessus
 
-  // ─── Pas d'entreprise (confirmé : fetch terminé et toujours null) ──────────
-  // Les closers n'ont pas de company mais doivent voir la page tarifaire
+  // ─── Pas d'entreprise (closers exclus : ils peuvent présenter l'offre sans company)
   if (!currentCompanyId && !isCompanyLoading && !isCloser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">

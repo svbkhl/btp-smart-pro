@@ -63,7 +63,7 @@ Qualifier le prospect et décrocher un R2 démo.
 "Vous commencez à voir comment ça peut changer votre quotidien ? Le plan Pro c''est 149€/mois, on vous offre 14 jours d''essai totalement gratuit. On démarre ensemble maintenant ?"
 
 ## Objections fréquentes
-**"C''est trop cher"** → "Combien vous perdez par mois sur des devis qui ne sont pas relancés ? Un seul devis récupéré rembourse 2 mois d''abonnement."
+**"C''est trop cher"** → "Combien vous perdez par mois sur des devis qui ne sont pas relancés ? Un devis à 2000 € rentabilise l''abonnement annuel."
 **"Je dois en parler à mon associé"** → "Bien sûr, on peut planifier une démo avec les deux. Quand est-ce qu''il est dispo ?"
 **"Je verrai plus tard"** → "Je comprends. L''offre d''essai 14j est disponible maintenant, après ce sera moins avantageux."',
   1
@@ -93,8 +93,8 @@ Logiciel de gestion tout-en-un pensé pour les artisans et PME du BTP. Devis, fa
 - **Elite** : 229€/mois (annuel) — 299€/mois
 
 ## Arguments ROI
-- 1 devis récupéré grâce aux relances auto = 2 mois d''abonnement remboursés
-- 2h/semaine économisées sur la gestion administrative
+- 1 devis à 2000 € = abonnement annuel rentabilisé
+- Jusqu''à 14 h/semaine économisées sur la gestion administrative
 - 14 jours d''essai offerts, résiliation possible pendant l''essai',
   2
 ),

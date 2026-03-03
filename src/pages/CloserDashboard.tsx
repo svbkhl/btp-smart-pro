@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CloserResources, CloserCalendly } from "@/components/closer/CloserResources";
 import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
+import { CloserPerformanceWidget } from "@/components/closer/CloserPerformanceWidget";
 import CloserLeads from "@/components/closer/CloserLeads";
 
 /* ─── Membres d'une entreprise ─── */
@@ -146,6 +147,7 @@ const CloserDashboard = () => {
   const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
   // Rejoindre le canal de présence dès que le closer est connecté
   useCloserPresence(user?.email);
+  const [activeTab, setActiveTab] = useState("entreprises");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [newCompanyData, setNewCompanyData] = useState({
@@ -209,7 +211,7 @@ const CloserDashboard = () => {
             <Building2 className="w-3.5 h-3.5" />
             Espace Closer
           </div>
-          <p className="text-sm text-muted-foreground font-medium">
+          <p className="text-xl sm:text-2xl text-muted-foreground font-medium">
             {greeting}, <span className="text-foreground font-semibold capitalize">{firstName}</span> 👋
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight mt-0.5">Que voulez-vous faire ?</h1>
@@ -237,6 +239,9 @@ const CloserDashboard = () => {
         </div>
       </div>
 
+      {/* ── Widget performance ── */}
+      <CloserPerformanceWidget onViewClassement={() => setActiveTab("classement")} />
+
       {/* ── Tuiles d'action ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ActionTile
@@ -261,7 +266,7 @@ const CloserDashboard = () => {
           icon={Tag}
           title="Présenter les offres"
           description="Page tarifaire Starter / Pro / Elite à montrer au client en visio."
-          onClick={() => navigate("/start")}
+          onClick={() => navigate("/start?presenter=1")}
           color="orange"
           gradient="bg-gradient-to-br from-orange-500 to-rose-700"
         />
@@ -276,7 +281,7 @@ const CloserDashboard = () => {
       </div>
 
       {/* ── Section tabulée ── */}
-      <Tabs defaultValue="entreprises" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full grid grid-cols-5 rounded-xl h-11 border-0 bg-transparent p-0 gap-1.5">
           <TabsTrigger value="entreprises" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
             <Building2 className="w-4 h-4 shrink-0" />
