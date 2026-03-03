@@ -1,6 +1,5 @@
--- Mise à jour des arguments ROI : un devis à 2000 € rentabilise l'abonnement annuel (pas 2 mois)
--- + jusqu'à 14 h/semaine économisées (au lieu de 2h/semaine)
--- Plusieurs variantes pour couvrir le texte déjà en base (avec/sans "aux", 2h vs 2 h).
+-- À exécuter dans Supabase → SQL Editor si la fiche produit affiche encore
+-- "2 mois d'abonnement" ou "2h/semaine". Corrige les arguments ROI en base.
 UPDATE public.closer_resources
 SET content = replace(
   replace(

@@ -84,6 +84,7 @@ Logiciel de gestion tout-en-un pensé pour les artisans et PME du BTP. Devis, fa
 |---|---|
 | Devis longs à faire | IA génère un devis en 2 min |
 | Impayés qui s''accumulent | Relances automatiques par email |
+| Devis oubliés ou non signés | Devis récupérés grâce à la relance automatique |
 | Planning manuel sur papier | Affectation ouvriers digitale |
 | Compta en fin d''année | Export comptable intégré |
 
@@ -94,7 +95,9 @@ Logiciel de gestion tout-en-un pensé pour les artisans et PME du BTP. Devis, fa
 
 ## Arguments ROI
 - 1 devis à 2000 € = abonnement annuel rentabilisé
-- Jusqu''à 14 h/semaine économisées sur la gestion administrative
+- Jusqu''à 50 000 € gagnés grâce aux relances auto devis & factures
+- 14 h/semaine = 728 h/an économisées (ou un outil pour ton assistante — poste à 30 k€/an en moins)
+- Avec cette économie temps + argent, tu peux même partir en vacances
 - 14 jours d''essai offerts, résiliation possible pendant l''essai',
   2
 ),
@@ -124,15 +127,7 @@ Checklist R2 :
 - [ ] Proposer le plan adapté
 - [ ] Lancer l''essai en direct
 
-## Étape 3 : Suivi no-show
-- J+1 : SMS + email de relance
-- J+3 : Appel de rappel
-- J+7 : Dernière tentative + email "porte ouverte"
-
-## Étape 4 : Suivi post-démo sans closing
-- J+2 : Email récap avantages
-- J+7 : Appel de suivi
-- J+14 : Email offre limitée',
+- Appel de relance avant la fin de l''essai',
   3
 )
 ON CONFLICT DO NOTHING;
