@@ -804,7 +804,6 @@ export default function Sidebar() {
               </div>
             );
           })}
-          
 
           {/* Paramètres (toujours visible) */}
           {settingsMenuGroup.items.map((item) => {

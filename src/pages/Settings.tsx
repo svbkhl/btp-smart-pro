@@ -21,18 +21,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Mail, Shield, Bell, Users, UserPlus, Play, UserCog, Settings as SettingsIcon2, Calendar, Receipt, Send, Zap } from "lucide-react";
+import { Building2, FileText, CreditCard, Shield, Bell, UserPlus, Play, Settings as SettingsIcon2, Calendar, Receipt, Send } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
-import { CloserSettings } from "@/components/settings/CloserSettings";
 import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import { PlanningEmailSettings } from "@/components/settings/PlanningEmailSettings";
-import AdminCompanies from "@/pages/AdminCompanies";
-import AdminLeads from "@/pages/AdminLeads";
-import AdminContactRequests from "@/pages/AdminContactRequests";
 import DelegationsManagement from "@/pages/DelegationsManagement";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
@@ -268,26 +264,6 @@ const Settings = () => {
               </>
             )}
             {isReallyAdmin && (
-              <>
-                <TabsTrigger value="companies" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Gestion Entreprises</span>
-                </TabsTrigger>
-                <TabsTrigger value="contact-requests" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Demandes de contact</span>
-                </TabsTrigger>
-                <TabsTrigger value="closers" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <UserCog className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Closers</span>
-                </TabsTrigger>
-                <TabsTrigger value="leads" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Zap className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Leads BTP</span>
-                </TabsTrigger>
-              </>
-            )}
-            {isReallyAdmin && (
               <TabsTrigger value="demo" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
                 <Play className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="truncate">Mode démo</span>
@@ -331,23 +307,9 @@ const Settings = () => {
           )}
 
           {isReallyAdmin && (
-            <>
-              <TabsContent value="companies" className="mt-0">
-                <AdminCompanies />
-              </TabsContent>
-              <TabsContent value="contact-requests" className="mt-0">
-                <AdminContactRequests />
-              </TabsContent>
-              <TabsContent value="closers" className="mt-0">
-                <CloserSettings />
-              </TabsContent>
-              <TabsContent value="leads" className="mt-0">
-                <AdminLeads />
-              </TabsContent>
-              <TabsContent value="demo" className="mt-0">
-                <DemoModeSettings />
-              </TabsContent>
-            </>
+            <TabsContent value="demo" className="mt-0">
+              <DemoModeSettings />
+            </TabsContent>
           )}
 
           {!isEmployee && (

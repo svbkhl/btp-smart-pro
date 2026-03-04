@@ -57,9 +57,12 @@ import RHEmployees from './pages/RHEmployees';
 import RHCandidatures from './pages/RHCandidatures';
 import RHTaches from './pages/RHTaches';
 import AdminEmployees from './pages/AdminEmployees';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminActions from './pages/AdminActions';
 import AdminCompanies from './pages/AdminCompanies';
 import AdminLeads from './pages/AdminLeads';
 import CloserDashboard from './pages/CloserDashboard';
+import CloserActions from './pages/CloserActions';
 import AcceptInvitation from './pages/AcceptInvitation';
 import InviteAccept from './pages/InviteAccept';
 import StripeCallback from './pages/StripeCallback';
@@ -398,6 +401,22 @@ function App() {
           }
         />
         <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/actions"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminActions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/employees"
           element={
             <ProtectedRoute requireAdmin>
@@ -426,6 +445,14 @@ function App() {
           element={
             <ProtectedRoute requireCloser>
               <CloserDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/closer/actions"
+          element={
+            <ProtectedRoute requireCloser>
+              <CloserActions />
             </ProtectedRoute>
           }
         />

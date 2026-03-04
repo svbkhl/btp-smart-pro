@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useCloserPresence } from "@/hooks/useCloserPresence";
@@ -140,6 +140,7 @@ const ActionTile = ({
 /* ─── Dashboard principal ─── */
 const CloserDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { data: companies = [], isLoading } = useAllCompanies();
   const createCompany = useCreateCompany();
@@ -149,6 +150,21 @@ const CloserDashboard = () => {
   useCloserPresence(user?.email);
   const [activeTab, setActiveTab] = useState("entreprises");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Ouvrir le dialog "Nouvelle entreprise" si on revient de /closer/actions avec state.openCreate
+  useEffect(() => {
+    const state = location.state as { openCreate?: boolean } | null;
+    if (state?.openCreate) {
+      setIsCreateDialogOpen(true);
+      setCreateStep("create");
+      navigate("/closer", { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
+  const [createStep, setCreateStep] = useState<"create" | "invite">("create");
+  const [createdCompanyId, setCreatedCompanyId] = useState<string | null>(null);
+  const [createdCompanyName, setCreatedCompanyName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [newCompanyData, setNewCompanyData] = useState({
     name: "",
@@ -176,13 +192,62 @@ const CloserDashboard = () => {
       return;
     }
     try {
-      await createCompany.mutateAsync(newCompanyData);
-      toast({ title: "Entreprise créée ✓", description: "L'entreprise a été créée avec succès." });
-      setIsCreateDialogOpen(false);
-      setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
+      const company = await createCompany.mutateAsync(newCompanyData);
+      toast({ title: "Entreprise créée ✓", description: "Invitez le dirigeant ci-dessous ou fermez pour terminer." });
+      setCreatedCompanyId(company?.id ?? null);
+      setCreatedCompanyName(newCompanyData.name.trim());
+      setCreateStep("invite");
+      setInviteEmail("");
     } catch (err: any) {
       toast({ title: "Erreur", description: err.message || "Impossible de créer l'entreprise", variant: "destructive" });
     }
+  };
+
+  const handleInviteDirigeant = async () => {
+    if (!createdCompanyId || !inviteEmail?.trim() || !inviteEmail.includes("@")) {
+      toast({ title: "Erreur", description: "Veuillez entrer un email valide.", variant: "destructive" });
+      return;
+    }
+    setInviteLoading(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        toast({ title: "Erreur", description: "Session expirée. Reconnectez-vous.", variant: "destructive" });
+        setInviteLoading(false);
+        return;
+      }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-company-invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+        },
+        body: JSON.stringify({ company_id: createdCompanyId, email: inviteEmail.trim().toLowerCase(), role: "owner" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.message || data?.error || "Erreur lors de l'invitation";
+        toast({ title: "Erreur", description: msg, variant: "destructive" });
+        setInviteLoading(false);
+        return;
+      }
+      toast({ title: "Invitation envoyée ✓", description: "Le dirigeant recevra un email pour rejoindre l'entreprise." });
+      setInviteEmail("");
+      setInviteLoading(false);
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e?.message || "Impossible d'envoyer l'invitation", variant: "destructive" });
+      setInviteLoading(false);
+    }
+  };
+
+  const closeCreateDialog = () => {
+    setIsCreateDialogOpen(false);
+    setCreateStep("create");
+    setCreatedCompanyId(null);
+    setCreatedCompanyName("");
+    setInviteEmail("");
+    setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
   };
 
   const toggleExpansion = (id: string) => {
@@ -239,46 +304,26 @@ const CloserDashboard = () => {
         </div>
       </div>
 
-      {/* ── Widget performance ── */}
-      <CloserPerformanceWidget onViewClassement={() => setActiveTab("classement")} />
+      {/* ── Widget performance (plus gros pour la vue démo) ── */}
+      <CloserPerformanceWidget onViewClassement={() => setActiveTab("classement")} size="large" />
 
-      {/* ── Tuiles d'action ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <ActionTile
-          icon={MonitorPlay}
-          title="Démo Patron"
-          description="Vue dirigeant avec toutes les fonctionnalités et données réalistes."
-          onClick={() => (fakeDataEnabled && !closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(false)}
-          color="blue"
-          active={fakeDataEnabled && !closerEmployeeMode}
-          gradient="bg-gradient-to-br from-blue-600 to-blue-800"
-        />
-        <ActionTile
-          icon={Eye}
-          title="Démo Employé"
-          description="Vue employé : planning, affectations chantiers et espace personnel."
-          onClick={() => (fakeDataEnabled && closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(true)}
-          color="green"
-          active={fakeDataEnabled && closerEmployeeMode}
-          gradient="bg-gradient-to-br from-emerald-600 to-teal-800"
-        />
-        <ActionTile
-          icon={Tag}
-          title="Présenter les offres"
-          description="Page tarifaire Starter / Pro / Elite à montrer au client en visio."
-          onClick={() => navigate("/start?presenter=1")}
-          color="orange"
-          gradient="bg-gradient-to-br from-orange-500 to-rose-700"
-        />
-        <ActionTile
-          icon={Plus}
-          title="Nouvelle Entreprise"
-          description="Créer l'espace d'un nouveau client et l'inscrire sur BTP Smart Pro."
-          onClick={() => setIsCreateDialogOpen(true)}
-          color="primary"
-          gradient="bg-gradient-to-br from-violet-600 to-purple-900"
-        />
-      </div>
+      {/* ── Un seul gros bouton : ouvre la page des 4 actions (sans le reste en dessous) ── */}
+      <button
+        type="button"
+        onClick={() => navigate("/closer/actions")}
+        className="group relative w-full rounded-2xl border-2 border-dashed border-violet-500/40 bg-violet-500/5 hover:bg-violet-500/10 hover:border-violet-500/60 text-left transition-all duration-300 cursor-pointer overflow-hidden min-h-[160px] sm:min-h-[180px] flex items-center justify-center p-8"
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-500 group-hover:scale-110 transition-transform">
+            <MonitorPlay className="h-7 w-7" />
+          </div>
+          <div>
+            <p className="font-bold text-lg sm:text-xl text-foreground">Choisir une action</p>
+            <p className="text-sm text-muted-foreground mt-1">Démo patron, démo employé, offres ou nouvelle entreprise</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-violet-500/60 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </button>
 
       {/* ── Section tabulée ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -386,32 +431,65 @@ const CloserDashboard = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog créer entreprise */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      {/* Dialog créer entreprise + inviter dirigeant (sans quitter) */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => { if (open) { setCreateStep("create"); setCreatedCompanyId(null); setCreatedCompanyName(""); setInviteEmail(""); } if (!open) closeCreateDialog(); setIsCreateDialogOpen(open); }}>
         <DialogContent className="max-w-md mx-4 sm:mx-auto">
-          <DialogHeader>
-            <DialogTitle>Créer une nouvelle entreprise</DialogTitle>
-            <DialogDescription>Renseignez le nom du client pour créer son espace.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label htmlFor="name">Nom de l'entreprise *</Label>
-              <Input
-                id="name"
-                value={newCompanyData.name}
-                onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })}
-                placeholder="Ex: Maçonnerie Dupont"
-                onKeyDown={(e) => e.key === "Enter" && handleCreateCompany()}
-                autoFocus
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="rounded-xl">Annuler</Button>
-              <Button onClick={handleCreateCompany} disabled={createCompany.isPending || !newCompanyData.name.trim()} className="gap-2 rounded-xl">
-                {createCompany.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Création...</> : <><Save className="w-4 h-4" />Créer</>}
-              </Button>
-            </div>
-          </div>
+          {createStep === "create" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Créer une nouvelle entreprise</DialogTitle>
+                <DialogDescription>Renseignez le nom du client pour créer son espace.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label htmlFor="name">Nom de l'entreprise *</Label>
+                  <Input
+                    id="name"
+                    value={newCompanyData.name}
+                    onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })}
+                    placeholder="Ex: Maçonnerie Dupont"
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateCompany()}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={closeCreateDialog} className="rounded-xl">Annuler</Button>
+                  <Button onClick={handleCreateCompany} disabled={createCompany.isPending || !newCompanyData.name.trim()} className="gap-2 rounded-xl">
+                    {createCompany.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Création...</> : <><Save className="w-4 h-4" />Créer</>}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Inviter le dirigeant</DialogTitle>
+                <DialogDescription>
+                  Entreprise <strong>{createdCompanyName}</strong> créée. Envoyez l&apos;invitation au dirigeant (il pourra s&apos;inscrire et gérer l&apos;abonnement).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label htmlFor="invite-email">Email du dirigeant *</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="dirigeant@exemple.fr"
+                    onKeyDown={(e) => e.key === "Enter" && handleInviteDirigeant()}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={closeCreateDialog} className="rounded-xl">Terminer</Button>
+                  <Button onClick={handleInviteDirigeant} disabled={inviteLoading || !inviteEmail.trim()} className="gap-2 rounded-xl">
+                    {inviteLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Envoi...</> : <><Mail className="w-4 h-4" />Envoyer l&apos;invitation</>}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

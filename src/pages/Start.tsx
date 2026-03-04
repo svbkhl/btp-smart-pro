@@ -374,7 +374,8 @@ export default function Start() {
   };
 
   // ─── Chargement ───────────────────────────────────────────────────────────
-  const waitingForCompany = user && isCompanyLoading && !currentCompanyId && !(isCloser && isPresentingOffer);
+  // En mode présentateur (?presenter=1), ne pas attendre la company pour afficher la page offre
+  const waitingForCompany = user && isCompanyLoading && !currentCompanyId && !isPresentingOffer;
   if (authLoading || waitingForCompany || (user && currentCompanyId && subLoading && !subscription)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -389,8 +390,8 @@ export default function Start() {
   if (!user) return null;
   if (user && isCloser && !isPresentingOffer) return null; // redirection vers /closer dans l'effet ci-dessus
 
-  // ─── Pas d'entreprise (closers exclus : ils peuvent présenter l'offre sans company)
-  if (!currentCompanyId && !isCompanyLoading && !isCloser) {
+  // ─── Pas d'entreprise (closers et mode présentateur exclus : ils peuvent présenter l'offre sans company)
+  if (!currentCompanyId && !isCompanyLoading && !isCloser && !isPresentingOffer) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
@@ -416,8 +417,8 @@ export default function Start() {
     );
   }
 
-  // ─── Pas owner (les closers peuvent voir la page tarifaire sans être owner) ──
-  if (!isOwner && !isCloser) {
+  // ─── Pas owner (closers et mode présentateur peuvent voir la page tarifaire sans être owner) ──
+  if (!isOwner && !isCloser && !isPresentingOffer) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">

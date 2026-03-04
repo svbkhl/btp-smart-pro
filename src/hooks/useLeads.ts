@@ -404,6 +404,35 @@ export function useMyLeadStats() {
   });
 }
 
+export interface CloserActivity {
+  stats: { total: number; new: number; contacted: number; qualified: number; signed: number; lost: number };
+  by_dept: { dept_code: string; count: number }[];
+}
+
+export function useCloserActivity(closerEmail: string | null) {
+  return useQuery({
+    queryKey: ["closer_activity", closerEmail],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_closer_activity" as any, { p_closer_email: closerEmail ?? "" });
+      if (error) throw error;
+      const raw = (data as { stats?: Record<string, number>; by_dept?: { dept_code: string; count: number }[] }) ?? {};
+      return {
+        stats: {
+          total: Number(raw.stats?.total ?? 0),
+          new: Number(raw.stats?.new ?? 0),
+          contacted: Number(raw.stats?.contacted ?? 0),
+          qualified: Number(raw.stats?.qualified ?? 0),
+          signed: Number(raw.stats?.signed ?? 0),
+          lost: Number(raw.stats?.lost ?? 0),
+        },
+        by_dept: Array.isArray(raw.by_dept) ? raw.by_dept : [],
+      } as CloserActivity;
+    },
+    enabled: !!closerEmail?.trim(),
+    ...RETRY_NETWORK,
+  });
+}
+
 export function useUpdateLeadStatus() {
   const qc = useQueryClient();
   return useMutation({

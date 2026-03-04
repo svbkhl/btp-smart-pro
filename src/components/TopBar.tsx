@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, X, Sparkles, UserCog } from "lucide-react";
+import { Menu, X, Sparkles, UserCog, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/components/ui/use-toast";
 
 export const TopBar = () => {
-  const { user, isCloser } = useAuth();
+  const { user, isCloser, isAdmin } = useAuth();
   const { isOwner } = usePermissions();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -112,6 +112,20 @@ export const TopBar = () => {
           <div className="flex-initial sm:max-w-xs min-w-0">
             <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
           </div>
+
+          {/* Bouton Admin (à côté de la recherche, visible uniquement pour les admins) */}
+          {isAdmin && !isCloser && (
+            <Link to="/admin">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50 text-xs sm:text-sm px-2.5 sm:px-3 flex-shrink-0"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Button>
+            </Link>
+          )}
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0 min-w-0">

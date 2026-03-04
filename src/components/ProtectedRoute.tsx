@@ -155,15 +155,20 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
 
   // Rediriger les closers vers /closer s'ils atterrissent sur une page non appropriée
   // En mode démo (fakeDataEnabled), les closers peuvent naviguer sur toutes les pages
+  // Autoriser /start?presenter=1 pour présenter l'offre sans company
   useEffect(() => {
     if (!isCloser || loading || !user) return;
     if (fakeDataEnabled) return; // démo active → accès complet à toute l'app
     const closerAllowedPaths = ["/closer", "/demo", "/settings", "/dashboard"];
-    const isAllowed = closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
+    const isStartPresenter =
+      location.pathname === "/start" && new URLSearchParams(location.search).get("presenter") === "1";
+    const isAllowed =
+      closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/")) ||
+      isStartPresenter;
     if (!isAllowed) {
       navigate("/closer", { replace: true });
     }
-  }, [isCloser, loading, user, fakeDataEnabled, location.pathname, navigate]);
+  }, [isCloser, loading, user, fakeDataEnabled, location.pathname, location.search, navigate]);
 
   // En mode démo (fakeDataEnabled), permettre l'accès si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)

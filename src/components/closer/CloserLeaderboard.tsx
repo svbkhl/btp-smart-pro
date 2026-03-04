@@ -8,6 +8,7 @@ import { Loader2, Trophy, Crown, Flame, Star, ChevronLeft, ChevronRight } from "
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnlineClosers } from "@/hooks/useCloserPresence";
+import { CloserActivityDialog } from "@/components/closer/CloserActivityDialog";
 
 interface CloserRank {
   closer_email: string;
@@ -75,7 +76,7 @@ const OnlineDot = () => (
 );
 
 /* ─── Podium top 3 ─────────────────────────────────────────────────────────── */
-const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; userEmail?: string; onlineEmails: Set<string> }) => {
+const PodiumTop3 = ({ top3, userEmail, onlineEmails, onSelectCloser }: { top3: CloserRank[]; userEmail?: string; onlineEmails: Set<string>; onSelectCloser?: (entry: CloserRank) => void }) => {
   if (top3.length < 3) return null;
 
   const [first, second, third] = [top3[0], top3[1], top3[2]];
@@ -98,6 +99,7 @@ const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; use
     borderColor,
     avatarColor,
     rankIcon,
+    onSelect,
   }: {
     entry: CloserRank;
     height: string;
@@ -108,11 +110,16 @@ const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; use
     borderColor: string;
     avatarColor: string;
     rankIcon: React.ReactNode;
+    onSelect?: (entry: CloserRank) => void;
   }) => {
     const isSelf = entry.closer_email?.toLowerCase() === userEmail?.toLowerCase();
     const isOnline = onlineEmails.has(entry.closer_email?.toLowerCase() ?? "");
     return (
-      <div className="flex flex-col items-center gap-2 flex-1">
+      <div
+        className={cn("flex flex-col items-center gap-2 flex-1", onSelect && "cursor-pointer hover:opacity-90 transition-opacity")}
+        onClick={() => onSelect?.(entry)}
+        role={onSelect ? "button" : undefined}
+      >
         {/* Info au-dessus du podium */}
         <div className="flex flex-col items-center gap-1 mb-1">
           <div className="relative">
@@ -157,6 +164,7 @@ const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; use
         borderColor="border-slate-400/30"
         avatarColor="bg-slate-400/20 text-slate-300"
         rankIcon={<span className="text-lg">🥈</span>}
+        onSelect={onSelectCloser}
       />
       <div className="relative">
         {/* Halo animé autour du 1er */}
@@ -171,6 +179,7 @@ const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; use
           borderColor="border-yellow-400/30"
           avatarColor="bg-yellow-500/20 text-yellow-400"
           rankIcon={<Crown className="w-5 h-5 text-yellow-400 animate-bounce" />}
+          onSelect={onSelectCloser}
         />
       </div>
       <PodiumSlot
@@ -183,19 +192,24 @@ const PodiumTop3 = ({ top3, userEmail, onlineEmails }: { top3: CloserRank[]; use
         borderColor="border-amber-600/30"
         avatarColor="bg-amber-600/20 text-amber-600"
         rankIcon={<span className="text-lg">🥉</span>}
+        onSelect={onSelectCloser}
       />
     </div>
   );
 };
 
 /* ─── Ligne classement (rang 4+) ──────────────────────────────────────────── */
-const RankRow = ({ entry, userEmail, maxCloses, onlineEmails }: { entry: CloserRank; userEmail?: string; maxCloses: number; onlineEmails: Set<string> }) => {
+const RankRow = ({ entry, userEmail, maxCloses, onlineEmails, onSelectCloser }: { entry: CloserRank; userEmail?: string; maxCloses: number; onlineEmails: Set<string>; onSelectCloser?: (entry: CloserRank) => void }) => {
   const isSelf = entry.closer_email?.toLowerCase() === userEmail?.toLowerCase();
   const isOnline = onlineEmails.has(entry.closer_email?.toLowerCase() ?? "");
   const pct = Math.round((entry.monthly_closes / maxCloses) * 100);
 
   return (
-    <div className={cn("flex items-center gap-3 px-4 py-3 transition-colors", isSelf && "bg-primary/5")}>
+    <div
+      className={cn("flex items-center gap-3 px-4 py-3 transition-colors", isSelf && "bg-primary/5", onSelectCloser && "cursor-pointer hover:bg-muted/50")}
+      onClick={() => onSelectCloser?.(entry)}
+      role={onSelectCloser ? "button" : undefined}
+    >
       <span className="w-6 text-center text-xs font-bold text-muted-foreground">#{entry.rank}</span>
       <div className="relative w-9 h-9 flex-shrink-0">
         <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
@@ -239,6 +253,7 @@ export const CloserLeaderboard = () => {
   const { data: realData = [], isLoading, error } = useLeaderboard();
   const onlineEmails = useOnlineClosers();
   const [monthOffset, setMonthOffset] = useState(0);
+  const [activityCloser, setActivityCloser] = useState<{ email: string; name: string } | null>(null);
 
   const leaderboard = realData;
 
@@ -312,7 +327,12 @@ export const CloserLeaderboard = () => {
           {/* Podium */}
           {top3.length === 3 && (
             <div className="px-4 pt-6 pb-0 relative">
-              <PodiumTop3 top3={top3} userEmail={user?.email} onlineEmails={onlineEmails} />
+              <PodiumTop3
+                top3={top3}
+                userEmail={user?.email}
+                onlineEmails={onlineEmails}
+                onSelectCloser={(e) => setActivityCloser({ email: e.closer_email ?? "", name: e.closer_name ?? "" })}
+              />
             </div>
           )}
 
@@ -326,22 +346,33 @@ export const CloserLeaderboard = () => {
                   userEmail={user?.email}
                   maxCloses={maxCloses}
                   onlineEmails={onlineEmails}
+                  onSelectCloser={(e) => setActivityCloser({ email: e.closer_email ?? "", name: e.closer_name ?? "" })}
                 />
               ))}
             </div>
           )}
 
+          <CloserActivityDialog
+            open={!!activityCloser}
+            onOpenChange={(open) => !open && setActivityCloser(null)}
+            closerEmail={activityCloser?.email ?? null}
+            closerName={activityCloser?.name ?? ""}
+          />
+
           {/* Légende */}
-          <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-border/40 mt-1 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" /> En ligne maintenant
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <Flame className="w-3 h-3 text-orange-400" /> Prospects chauds
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <Trophy className="w-3 h-3 text-yellow-500" /> Close = abonnement signé
-            </span>
+          <div className="flex flex-col items-center gap-2 px-4 py-3 border-t border-border/40 mt-1 flex-wrap">
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" /> En ligne maintenant
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Flame className="w-3 h-3 text-orange-400" /> Prospects chauds
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Trophy className="w-3 h-3 text-yellow-500" /> Close = abonnement signé
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">Cliquez sur un closer pour voir son activité et les départements dont il a les leads.</p>
           </div>
         </GlassCard>
       )}
