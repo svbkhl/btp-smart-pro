@@ -121,7 +121,7 @@ export const useClients = () => {
         "useClients"
       );
     },
-    enabled: !!user && !isLoadingCompanyId && (!!companyId || fakeDataEnabled),
+    enabled: !!user && (fakeDataEnabled || (!isLoadingCompanyId && !!companyId)),
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes - données fraîches pendant 5 min
     gcTime: 10 * 60 * 1000, // 10 minutes - garde en mémoire 10 min après non-utilisation
@@ -188,7 +188,7 @@ export const useClient = (id: string | undefined) => {
         "useClient"
       );
     },
-    enabled: !!user && !!id && !isLoadingCompanyId && (!!companyId || fakeDataEnabled),
+    enabled: !!user && !!id && (fakeDataEnabled || (!isLoadingCompanyId && !!companyId)),
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes

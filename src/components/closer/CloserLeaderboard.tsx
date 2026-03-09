@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnlineClosers } from "@/hooks/useCloserPresence";
 import { CloserActivityDialog } from "@/components/closer/CloserActivityDialog";
+import { isHiddenCloser } from "@/config/closerLeaderboard";
 
 interface CloserRank {
   closer_email: string;
@@ -18,7 +19,6 @@ interface CloserRank {
   trials_active: number;
   rank: number;
 }
-
 
 function useLeaderboard() {
   return useQuery<CloserRank[]>({
@@ -57,9 +57,11 @@ function useLeaderboard() {
         }
       });
 
-      return merged
+      const sorted = merged
+        .filter((e) => !isHiddenCloser(e))
         .sort((a, b) => b.monthly_closes - a.monthly_closes)
         .map((e, i) => ({ ...e, rank: i + 1 }));
+      return sorted;
     },
     refetchInterval: 60_000,
   });

@@ -26,7 +26,8 @@ import {
   Pin,
   PinOff,
   ShieldCheck,
-  UserCog
+  UserCog,
+  Target
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -804,6 +805,75 @@ export default function Sidebar() {
               </div>
             );
           })}
+
+          {/* Espace Closers (visible uniquement pour les closers) */}
+          {isCloser && (
+            <div className="space-y-1 pt-2 border-t border-white/20 dark:border-white/10">
+              <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Closers
+              </div>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Link
+                  to="/closer"
+                  onClick={() => handleNavigation("/closer")}
+                  className={cn(
+                    "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
+                    "hover:shadow-lg hover:shadow-primary/20",
+                    isActive("/closer")
+                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                  )}
+                >
+                  {isActive("/closer") && (
+                    <motion.div
+                      layoutId="activeTabCloser"
+                      className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                  <Target className={cn("w-5 h-5 relative z-10", isActive("/closer") && "text-primary")} />
+                  <span className="relative z-10">Espace Closers</span>
+                </Link>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Link
+                  to="/closer/actions"
+                  onClick={() => handleNavigation("/closer/actions")}
+                  className={cn(
+                    "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ml-0",
+                    "hover:shadow-lg hover:shadow-primary/20",
+                    location.pathname === "/closer/actions"
+                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
+                  )}
+                >
+                  {location.pathname === "/closer/actions" && (
+                    <motion.div
+                      layoutId="activeTabCloserActions"
+                      className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                  <span className="w-5 h-5 relative z-10 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                  </span>
+                  <span className="relative z-10">Actions</span>
+                </Link>
+              </motion.div>
+            </div>
+          )}
 
           {/* Paramètres (toujours visible) */}
           {settingsMenuGroup.items.map((item) => {

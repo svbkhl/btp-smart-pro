@@ -1,11 +1,25 @@
 /**
  * Page dédiée : uniquement les 4 actions (Démo Patron, Démo Employé, Offres, Nouvelle Entreprise).
  * Ouverte depuis le gros bouton "Choisir une action" sur /closer, sans header ni onglets en dessous.
+ * Le clic sur "Nouvelle Entreprise" ouvre le dialog sur cette page (pas de navigation).
  */
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
+import { useCreateCompany, type Company } from "@/hooks/useCompany";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { MonitorPlay, Eye, Tag, Plus, ArrowRight, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MonitorPlay, Eye, Tag, Plus, ArrowRight, ArrowLeft, Loader2, Mail, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ActionTile = ({
@@ -62,12 +76,27 @@ const ActionTile = ({
 
 export default function CloserActions() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
+  const createCompany = useCreateCompany();
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<"create" | "invite">("create");
+  const [createdCompanyId, setCreatedCompanyId] = useState<string | null>(null);
+  const [createdCompanyName, setCreatedCompanyName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [newCompanyData, setNewCompanyData] = useState({
+    name: "",
+    plan: "basic" as Company["plan"],
+    support_level: 0 as Company["support_level"],
+    features: {} as Company["features"],
+  });
 
   const handleLancerDemo = (employeeMode: boolean) => {
     setFakeDataEnabled(true);
     setCloserEmployeeMode(employeeMode);
-    navigate("/dashboard");
+    navigate("/dashboard", { replace: true });
   };
 
   const handleStopDemo = () => {
@@ -76,7 +105,77 @@ export default function CloserActions() {
   };
 
   const handleNouvelleEntreprise = () => {
-    navigate("/closer", { state: { openCreate: true } });
+    setIsCreateDialogOpen(true);
+    setCreateStep("create");
+    setCreatedCompanyId(null);
+    setCreatedCompanyName("");
+    setInviteEmail("");
+    setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
+  };
+
+  const handleCreateCompany = async () => {
+    if (!newCompanyData.name.trim()) {
+      toast({ title: "Erreur", description: "Le nom de l'entreprise est requis", variant: "destructive" });
+      return;
+    }
+    try {
+      const company = await createCompany.mutateAsync(newCompanyData);
+      toast({ title: "Entreprise créée ✓", description: "Invitez le dirigeant ci-dessous ou fermez pour terminer." });
+      setCreatedCompanyId(company?.id ?? null);
+      setCreatedCompanyName(newCompanyData.name.trim());
+      setCreateStep("invite");
+      setInviteEmail("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Impossible de créer l'entreprise";
+      toast({ title: "Erreur", description: String(msg), variant: "destructive" });
+    }
+  };
+
+  const handleInviteDirigeant = async () => {
+    if (!createdCompanyId || !inviteEmail?.trim() || !inviteEmail.includes("@")) {
+      toast({ title: "Erreur", description: "Veuillez entrer un email valide.", variant: "destructive" });
+      return;
+    }
+    setInviteLoading(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        toast({ title: "Erreur", description: "Session expirée. Reconnectez-vous.", variant: "destructive" });
+        setInviteLoading(false);
+        return;
+      }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-company-invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+        },
+        body: JSON.stringify({ company_id: createdCompanyId, email: inviteEmail.trim().toLowerCase(), role: "owner" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.message || data?.error || "Erreur lors de l'invitation";
+        toast({ title: "Erreur", description: String(msg), variant: "destructive" });
+        setInviteLoading(false);
+        return;
+      }
+      toast({ title: "Invitation envoyée ✓", description: "Le dirigeant recevra un email pour rejoindre l'entreprise." });
+      setInviteEmail("");
+      setInviteLoading(false);
+    } catch (e: unknown) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible d'envoyer l'invitation", variant: "destructive" });
+      setInviteLoading(false);
+    }
+  };
+
+  const closeCreateDialog = () => {
+    setIsCreateDialogOpen(false);
+    setCreateStep("create");
+    setCreatedCompanyId(null);
+    setCreatedCompanyName("");
+    setInviteEmail("");
+    setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
   };
 
   return (
@@ -125,6 +224,68 @@ export default function CloserActions() {
           />
         </div>
       </div>
+
+      {/* Dialog Nouvelle entreprise + inviter dirigeant (sur cette page, sans naviguer) */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => { if (!open) closeCreateDialog(); setIsCreateDialogOpen(open); }}>
+        <DialogContent className="max-w-md mx-4 sm:mx-auto">
+          {createStep === "create" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Créer une nouvelle entreprise</DialogTitle>
+                <DialogDescription>Renseignez le nom du client pour créer son espace.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label htmlFor="create-company-name">Nom de l'entreprise *</Label>
+                  <Input
+                    id="create-company-name"
+                    value={newCompanyData.name}
+                    onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })}
+                    placeholder="Ex: Maçonnerie Dupont"
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateCompany()}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={closeCreateDialog} className="rounded-xl">Annuler</Button>
+                  <Button onClick={handleCreateCompany} disabled={createCompany.isPending || !newCompanyData.name.trim()} className="gap-2 rounded-xl">
+                    {createCompany.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Création...</> : <><Save className="w-4 h-4" />Créer</>}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Inviter le dirigeant</DialogTitle>
+                <DialogDescription>
+                  Entreprise <strong>{createdCompanyName}</strong> créée. Envoyez l&apos;invitation au dirigeant (il pourra s&apos;inscrire et gérer l&apos;abonnement).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label htmlFor="invite-email-actions">Email du dirigeant *</Label>
+                  <Input
+                    id="invite-email-actions"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="dirigeant@exemple.fr"
+                    onKeyDown={(e) => e.key === "Enter" && handleInviteDirigeant()}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={closeCreateDialog} className="rounded-xl">Terminer</Button>
+                  <Button onClick={handleInviteDirigeant} disabled={inviteLoading || !inviteEmail.trim()} className="gap-2 rounded-xl">
+                    {inviteLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Envoi...</> : <><Mail className="w-4 h-4" />Envoyer l&apos;invitation</>}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

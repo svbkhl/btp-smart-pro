@@ -25,15 +25,14 @@ import {
   ChevronDown,
   ChevronUp,
   MonitorPlay,
-  Eye,
   ArrowRight,
-  Tag,
   Trophy,
   BookOpen,
   Phone,
   CalendarDays,
   UserCircle,
   LogOut,
+  BarChart3,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -51,6 +50,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CloserResources, CloserCalendly } from "@/components/closer/CloserResources";
 import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
 import { CloserPerformanceWidget } from "@/components/closer/CloserPerformanceWidget";
+import { CloserKPITable } from "@/components/closer/CloserKPITable";
 import CloserLeads from "@/components/closer/CloserLeads";
 
 /* ─── Membres d'une entreprise ─── */
@@ -327,7 +327,7 @@ const CloserDashboard = () => {
 
       {/* ── Section tabulée ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full grid grid-cols-5 rounded-xl h-11 border-0 bg-transparent p-0 gap-1.5">
+        <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 rounded-xl h-11 border-0 bg-transparent p-0 gap-1.5">
           <TabsTrigger value="entreprises" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
             <Building2 className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">Entreprises</span>
@@ -335,6 +335,10 @@ const CloserDashboard = () => {
           <TabsTrigger value="leads" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
             <Phone className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">Mes leads</span>
+          </TabsTrigger>
+          <TabsTrigger value="kpi" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">KPI</span>
           </TabsTrigger>
           <TabsTrigger value="documentation" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
             <BookOpen className="w-4 h-4 shrink-0" />
@@ -413,6 +417,11 @@ const CloserDashboard = () => {
         {/* Mes Leads */}
         <TabsContent value="leads" className="mt-4">
           <CloserLeads />
+        </TabsContent>
+
+        {/* KPI */}
+        <TabsContent value="kpi" className="mt-4">
+          <CloserKPITable />
         </TabsContent>
 
         {/* Documentation */}

@@ -92,7 +92,7 @@ export const useProjects = () => {
         "useProjects"
       );
     },
-    enabled: !!user && !isLoadingCompanyId && (!!companyId || fakeDataEnabled),
+    enabled: !!user && (fakeDataEnabled || (!isLoadingCompanyId && !!companyId)),
     ...QUERY_CONFIG.MODERATE,
   });
 };

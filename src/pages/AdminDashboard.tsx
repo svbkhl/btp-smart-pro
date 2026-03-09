@@ -36,6 +36,7 @@ import {
   LogOut,
   ShieldCheck,
   ExternalLink,
+  BarChart3,
 } from "lucide-react";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -50,7 +51,9 @@ import {
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
+import { isHiddenCloser } from "@/config/closerLeaderboard";
 import { CloserSettings } from "@/components/settings/CloserSettings";
+import { AdminKPIClosers } from "@/components/admin/AdminKPIClosers";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminLeads from "@/pages/AdminLeads";
@@ -84,7 +87,8 @@ function AdminCloserPerformanceWidget({ onViewClassement }: { onViewClassement?:
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_closer_leaderboard" as any);
       if (error) throw error;
-      return ((data as any[]) || []).slice(0, 5);
+      const raw = (data as any[]) || [];
+      return raw.filter((row: any) => !isHiddenCloser(row)).slice(0, 5);
     },
   });
 
@@ -297,6 +301,10 @@ export default function AdminDashboard() {
             <Trophy className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">Performances</span>
           </TabsTrigger>
+          <TabsTrigger value="kpi" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline truncate">KPI Closers</span>
+          </TabsTrigger>
           <TabsTrigger value="employes" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
             <UserCog className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">Employés</span>
@@ -321,6 +329,10 @@ export default function AdminDashboard() {
 
         <TabsContent value="performances" className="mt-4">
           <CloserLeaderboard />
+        </TabsContent>
+
+        <TabsContent value="kpi" className="mt-4">
+          <AdminKPIClosers />
         </TabsContent>
 
         <TabsContent value="employes" className="mt-4">

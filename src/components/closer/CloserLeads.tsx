@@ -24,12 +24,15 @@ import {
 
 // ─── Constantes ───────────────────────────────────────────────
 
+// Funnel : Nouveau → À rappeler / Pas de réponse / Pas intéressé → Qualifié / Perdu → Signé
 const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; next: LeadStatus[] }> = {
-  NEW:       { label: "Nouveau",   color: "bg-blue-500/10 text-blue-400 border-blue-500/20",      next: ["CONTACTED", "LOST"] },
-  CONTACTED: { label: "Contacté",  color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20", next: ["QUALIFIED", "LOST"] },
-  QUALIFIED: { label: "Qualifié",  color: "bg-violet-500/10 text-violet-400 border-violet-500/20", next: ["SIGNED", "LOST"] },
-  SIGNED:    { label: "Signé",     color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", next: ["QUALIFIED"] }, // Revenir à Qualifié si pas fait exprès
-  LOST:      { label: "Perdu",     color: "bg-red-500/10 text-red-400 border-red-500/20",           next: ["NEW"] },
+  NEW:            { label: "Nouveau",        color: "bg-blue-500/10 text-blue-400 border-blue-500/20",       next: ["TO_CALLBACK", "NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "LOST"] },
+  TO_CALLBACK:    { label: "À rappeler",     color: "bg-amber-500/10 text-amber-400 border-amber-500/20",     next: ["NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "LOST"] },
+  NO_ANSWER:      { label: "Pas de réponse", color: "bg-slate-500/10 text-slate-400 border-slate-500/20",     next: ["TO_CALLBACK", "NOT_INTERESTED", "LOST"] },
+  NOT_INTERESTED: { label: "Pas intéressé",  color: "bg-orange-500/10 text-orange-400 border-orange-500/20", next: ["TO_CALLBACK", "LOST"] },
+  QUALIFIED:      { label: "Qualifié",       color: "bg-violet-500/10 text-violet-400 border-violet-500/20", next: ["SIGNED", "LOST"] },
+  SIGNED:         { label: "Signé",          color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", next: ["QUALIFIED"] },
+  LOST:           { label: "Perdu",          color: "bg-red-500/10 text-red-400 border-red-500/20",           next: ["TO_CALLBACK"] },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
@@ -118,7 +121,11 @@ function LeadCard({ lead }: { lead: Lead }) {
   const { toast } = useToast();
   const updateStatus = useUpdateLeadStatus();
 
-  const cfg = STATUS_CONFIG[lead.status];
+  const cfg = STATUS_CONFIG[lead.status] ?? {
+    label: lead.status,
+    color: "bg-muted text-muted-foreground border-border",
+    next: ["TO_CALLBACK", "NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "LOST", "SIGNED"] as LeadStatus[],
+  };
   const prio = lead.priority ? PRIORITY_CONFIG[lead.priority] : null;
 
   const handleStatus = async (s: LeadStatus) => {
@@ -319,17 +326,22 @@ export default function CloserLeads() {
   const leads = data?.leads || [];
   const count = data?.count || 0;
   const PAGE = 50;
-  const stats = statsData || { total: 0, new: 0, contacted: 0, qualified: 0, signed: 0, lost: 0 };
+  const stats = statsData || {
+    total: 0, new: 0, to_callback: 0, no_answer: 0, not_interested: 0, qualified: 0, signed: 0, lost: 0,
+  };
 
   return (
     <div className="space-y-6">
       {/* Compteurs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard label="Total assignés"  value={stats.total}     color="text-foreground" />
-        <StatCard label="Nouveaux"         value={stats.new}       color="text-blue-400" />
-        <StatCard label="Contactés"        value={stats.contacted} color="text-yellow-400" />
-        <StatCard label="Qualifiés"        value={stats.qualified} color="text-violet-400" />
-        <StatCard label="Signés"           value={stats.signed}    color="text-emerald-400" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+        <StatCard label="Total"           value={stats.total}          color="text-foreground" />
+        <StatCard label="Nouveaux"       value={stats.new}            color="text-blue-400" />
+        <StatCard label="À rappeler"      value={stats.to_callback ?? 0}    color="text-amber-400" />
+        <StatCard label="Pas de réponse"  value={stats.no_answer ?? 0}      color="text-slate-400" />
+        <StatCard label="Pas intéressé"   value={stats.not_interested ?? 0} color="text-orange-400" />
+        <StatCard label="Qualifiés"      value={stats.qualified}       color="text-violet-400" />
+        <StatCard label="Signés"          value={stats.signed}         color="text-emerald-400" />
+        <StatCard label="Perdus"          value={stats.lost}            color="text-red-400" />
       </div>
 
       {/* Filtres */}

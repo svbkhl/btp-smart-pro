@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -10,10 +13,15 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   Loader2, Zap, Users, List, RefreshCw, ExternalLink, Phone,
   Globe, ChevronLeft, ChevronRight, CheckCircle2, XCircle, AlertCircle, Clock,
+  Linkedin, UserSearch, Plus, Trash2,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DEPTS, useLeadJobs, useAdminLeads, useLeadStats, useGenerateLeads,
-  useAssignLeads, useRetryJob, useStopJob, useGeneratedDepts, useLeadsFixed,
+  useAssignLeads, useUnassignLeadsFromCloser, useAssignOrphanLeads,
+  useClosersWithAssignedLeads, useAllOwnersLeadKpi,
+  useRetryJob, useStopJob, useGeneratedDepts, useLeadsFixed,
   useLeadsFixedDepts, LeadJob, Lead, LeadFixed,
 } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,10 +32,22 @@ import { useClosers } from "@/hooks/useClosers";
 
 const STATUS_COLORS: Record<string, string> = {
   NEW: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  CONTACTED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  TO_CALLBACK: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  NO_ANSWER: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+  NOT_INTERESTED: "bg-orange-500/10 text-orange-400 border-orange-500/20",
   QUALIFIED: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  LOST: "bg-red-500/10 text-red-400 border-red-500/20",
   SIGNED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  LOST: "bg-red-500/10 text-red-400 border-red-500/20",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  NEW: "Nouveau",
+  TO_CALLBACK: "À rappeler",
+  NO_ANSWER: "Pas de réponse",
+  NOT_INTERESTED: "Pas intéressé",
+  QUALIFIED: "Qualifié",
+  SIGNED: "Signé",
+  LOST: "Perdu",
 };
 
 const JOB_ICONS: Record<string, React.ReactNode> = {
@@ -84,6 +104,7 @@ const KEYWORD_CATEGORY: Record<string, string> = {
 
 // Ordre : du plus facile au moins facile à closer (plombiers en premier)
 const METIER_OPTIONS: { value: string; label: string }[] = [
+  { value: "Cherche Assistante", label: "🔥 Cherche Assistante" },
   { value: "Plomberie", label: "Plomberie" },
   { value: "Chauffage", label: "Chauffage" },
   { value: "Électricité", label: "Électricité" },
@@ -548,9 +569,35 @@ function SectionGenerate() {
 function SectionAssign() {
   const [dept, setDept] = useState("");
   const [closerEmail, setCloserEmail] = useState("");
+  const [unassignEmail, setUnassignEmail] = useState("");
   const { toast } = useToast();
   const assign = useAssignLeads();
+  const unassign = useUnassignLeadsFromCloser();
+  const assignOrphan = useAssignOrphanLeads();
   const { data: closerRows = [] } = useClosers();
+  const { data: closersWithLeads = [], isLoading: closersWithLeadsLoading, isError: closersWithLeadsError } = useClosersWithAssignedLeads();
+  const { data: ownersKpi = [] } = useAllOwnersLeadKpi();
+
+  // Liste pour "Closer à libérer" : RPC (anciens + actuels avec leads) ou fallback propriétaires de leads + complément closers actuels sans leads
+  const unassignList = useMemo(() => {
+    const fromRpc =
+      closersWithLeads.length > 0
+        ? closersWithLeads
+        : ownersKpi.map((o) => ({
+            owner_email: o.closer_email,
+            owner_name: o.closer_name,
+            lead_count: o.total,
+          }));
+    const emailsFromRpc = new Set(fromRpc.map((c) => c.owner_email.toLowerCase()));
+    const fromCloserEmails = closerRows
+      .filter((c) => !emailsFromRpc.has((c.email || "").toLowerCase()))
+      .map((c) => ({
+        owner_email: c.email,
+        owner_name: (c as { name?: string }).name || c.email?.split("@")[0] || "—",
+        lead_count: 0,
+      }));
+    return [...fromRpc, ...fromCloserEmails].sort((a, b) => b.lead_count - a.lead_count);
+  }, [closersWithLeads, closerRows, ownersKpi]);
   const { data: generatedDepts = [], isLoading: deptsLoading } = useGeneratedDepts();
   const { data: stats } = useLeadStats(dept);
   const { data: jobs = [] } = useLeadJobs();
@@ -574,8 +621,36 @@ function SectionAssign() {
     try {
       const count = await assign.mutateAsync({ deptCode: dept, closerEmail });
       toast({ title: `✅ ${count} leads assignés au closer` });
-    } catch (e: any) {
-      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleUnassign = async () => {
+    if (!unassignEmail?.trim() || !unassignEmail.includes("@")) {
+      return toast({ title: "Entrez l'email du closer à libérer", variant: "destructive" });
+    }
+    try {
+      const count = await unassign.mutateAsync(unassignEmail.trim());
+      toast({ title: `✅ ${count} leads libérés (sans propriétaire)`, description: "Réassignez-les ci-dessous en choisissant le département et le nouveau closer." });
+      setUnassignEmail("");
+    } catch (e: unknown) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAssignOrphan = async () => {
+    if (!dept || !closerEmail) return toast({ title: "Sélectionnez département et closer", variant: "destructive" });
+    if (!stats?.orphan) return toast({
+      title: "Aucun lead sans propriétaire",
+      description: "Libérez d'abord les leads d'un closer (bloc ci-dessus).",
+      variant: "destructive",
+    });
+    try {
+      const count = await assignOrphan.mutateAsync({ deptCode: dept, closerEmail });
+      toast({ title: `✅ ${count} leads réassignés au closer` });
+    } catch (e: unknown) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     }
   };
 
@@ -591,6 +666,59 @@ function SectionAssign() {
             Génération en cours — les leads s'ajoutent au fur et à mesure
           </span>
         )}
+      </div>
+
+      {/* Réassignation : libérer les leads d'un closer (ex. supprimé) */}
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+        <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Réassignation — closer supprimé</p>
+        <p className="text-xs text-muted-foreground">
+          Sélectionnez un closer (actuel ou ancien) qui a des leads assignés pour les libérer. Ils deviennent « sans propriétaire » et vous pourrez les assigner à un autre closer ci-dessous.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[200px] space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Closer à libérer</Label>
+            <Select
+              value={unassignEmail || "_none"}
+              onValueChange={(v) => setUnassignEmail(v === "_none" ? "" : v)}
+            >
+              <SelectTrigger className="rounded-lg">
+                <SelectValue placeholder={closersWithLeadsLoading ? "Chargement…" : unassignList.length === 0 ? "Aucun closer" : "Sélectionner un closer…"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">— Choisir —</SelectItem>
+                {unassignList.map((c) => (
+                  <SelectItem key={c.owner_email} value={c.owner_email}>
+                    {c.owner_name} — {c.lead_count} lead{c.lead_count !== 1 ? "s" : ""} ({c.owner_email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {closersWithLeadsError && unassignList.every((c) => c.lead_count === 0) && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                Liste complétée par les closers actuels. Exécutez la migration &quot;get_closers_with_assigned_leads&quot; ou &quot;get_all_owners_lead_kpi&quot; dans Supabase pour afficher les closers avec leads.
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">Ou saisir l&apos;email ci-dessous si le closer n&apos;apparaît pas</p>
+            <Input
+              id="unassign-email"
+              type="email"
+              placeholder="email@du-closer-supprimé.com"
+              value={unassignEmail}
+              onChange={(e) => setUnassignEmail(e.target.value)}
+              className="rounded-lg"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="default"
+            className="rounded-lg border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+            onClick={handleUnassign}
+            disabled={unassign.isPending || !unassignEmail?.trim()?.includes("@")}
+          >
+            {unassign.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Libérer les leads de ce closer
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -640,11 +768,12 @@ function SectionAssign() {
       </div>
 
       {dept && stats && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Total leads", value: stats.total, color: "text-foreground" },
             { label: "Disponibles (NEW)", value: stats.available, color: "text-blue-400" },
             { label: "Déjà assignés", value: stats.assigned, color: "text-yellow-400" },
+            { label: "Sans propriétaire", value: stats.orphan ?? 0, color: "text-amber-400" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-xl border border-border/50 bg-card/30 p-3 text-center">
               <p className={`text-2xl font-bold ${color}`}>{value}</p>
@@ -654,14 +783,25 @@ function SectionAssign() {
         </div>
       )}
 
-      <Button
-        onClick={handleAssign}
-        disabled={!dept || !closerEmail || assign.isPending || !stats?.available}
-        className="w-full sm:w-auto bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold"
-      >
-        {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Users className="h-4 w-4 mr-2" />}
-        Assigner tous les leads NEW
-      </Button>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          onClick={handleAssign}
+          disabled={!dept || !closerEmail || assign.isPending || !stats?.available}
+          className="bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold rounded-xl"
+        >
+          {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Users className="h-4 w-4 mr-2" />}
+          Assigner tous les leads NEW
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleAssignOrphan}
+          disabled={!dept || !closerEmail || assignOrphan.isPending || !(stats?.orphan ?? 0)}
+          className="border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 rounded-xl"
+        >
+          {assignOrphan.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Assigner les leads sans propriétaire (réassignation)
+        </Button>
+      </div>
     </GlassCard>
   );
 }
@@ -703,8 +843,8 @@ function SectionLeads() {
             <SelectTrigger className="w-40"><SelectValue placeholder="Tous statuts" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">Tous statuts</SelectItem>
-              {["NEW", "CONTACTED", "QUALIFIED", "LOST", "SIGNED"].map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
+              {["NEW", "TO_CALLBACK", "NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "SIGNED", "LOST"].map((s) => (
+                <SelectItem key={s} value={s}>{STATUS_LABELS[s] ?? s}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -740,7 +880,12 @@ function SectionLeads() {
                 {leads.map((lead, i) => (
                   <tr key={lead.id} className={`border-b border-border/30 hover:bg-card/30 transition-colors ${i % 2 === 0 ? "" : "bg-card/10"}`}>
                     <td className="px-4 py-3">
-                      <div className="font-medium truncate max-w-[200px]">{lead.name}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium truncate max-w-[180px]">{lead.name}</span>
+                        {(lead as any).source === "linkedin" && (
+                          <span title="Lead LinkedIn" className="text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-1 py-0.5 shrink-0">in</span>
+                        )}
+                      </div>
                       {lead.address && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{lead.address}</div>}
                     </td>
                     <td className="px-4 py-3">
@@ -757,12 +902,20 @@ function SectionLeads() {
                           </a>
                         : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs text-muted-foreground">{lead.category || "—"}</span></td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {lead.category === "Cherche Assistante" ? (
+                        <Badge className="text-xs border bg-orange-500/15 text-orange-400 border-orange-500/30 gap-1">
+                          🔥 Cherche Assistante
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{lead.category || "—"}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs text-muted-foreground">{lead.size_bucket || "—"}</span></td>
                     <td className="px-4 py-3">
                       {lead.priority ? <Badge className={`text-xs border ${PRIORITY_COLORS[lead.priority]}`}>{lead.priority}</Badge> : "—"}
                     </td>
-                    <td className="px-4 py-3"><Badge className={`text-xs border ${STATUS_COLORS[lead.status]}`}>{lead.status}</Badge></td>
+                    <td className="px-4 py-3"><Badge className={`text-xs border ${STATUS_COLORS[lead.status] || ""}`}>{STATUS_LABELS[lead.status] ?? lead.status}</Badge></td>
                     <td className="px-4 py-3 text-muted-foreground">{lead.dept_code}</td>
                   </tr>
                 ))}
@@ -872,6 +1025,396 @@ function SectionIgnored() {
   );
 }
 
+// ─── Section 5 : LinkedIn — Leads "Cherche Assistante" + Import formulaire ──────────
+
+interface LinkedInLeadRow {
+  name: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  linkedin_url?: string;
+  dept_code?: string;
+  category?: string;
+  cherche_assistante?: boolean;
+}
+
+const emptyRow = (): LinkedInLeadRow => ({
+  name: "",
+  address: "",
+  phone: "",
+  website: "",
+  linkedin_url: "",
+  dept_code: "",
+  category: "Artisan BTP",
+  cherche_assistante: false,
+});
+
+function SectionLinkedIn() {
+  const [rows, setRows] = useState<LinkedInLeadRow[]>([emptyRow()]);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [vibeDept, setVibeDept] = useState("73");
+  const [vibeCategory, setVibeCategory] = useState("Artisan BTP");
+  const [vibeChercheAssistante, setVibeChercheAssistante] = useState(true);
+  const [vibeRunning, setVibeRunning] = useState(false);
+  const [vibeResult, setVibeResult] = useState<{ inserted: number; skipped: number; total: number; error?: string } | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const runVibeProspecting = async () => {
+    const dept = vibeDept || "73";
+    setVibeRunning(true);
+    setVibeResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("vibe-prospecting", {
+        body: {
+          dept_code: dept,
+          category: vibeCategory,
+          cherche_assistante: vibeChercheAssistante,
+          limit: 30,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        setVibeResult({ inserted: 0, skipped: 0, total: 0, error: data.detail || data.error });
+        toast({ title: data.error, description: data.detail, variant: "destructive" });
+      } else {
+        setVibeResult({
+          inserted: data.inserted ?? 0,
+          skipped: data.skipped ?? 0,
+          total: data.total ?? 0,
+        });
+        queryClient.invalidateQueries({ queryKey: ["leads_cherche_assistante"] });
+        queryClient.invalidateQueries({ queryKey: ["admin_leads"] });
+        toast({ title: "Prospection terminée", description: `${data.inserted ?? 0} lead(s) importé(s).` });
+      }
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      setVibeResult({ inserted: 0, skipped: 0, total: 0, error: msg });
+      toast({ title: "Erreur prospection", description: msg, variant: "destructive" });
+    } finally {
+      setVibeRunning(false);
+    }
+  };
+
+  // Leads déjà en base qui recherchent une assistante
+  const { data: chercheAssistanteData, isLoading: loadingAssistante } = useQuery({
+    queryKey: ["leads_cherche_assistante"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads" as any)
+        .select("*")
+        .eq("category", "Cherche Assistante")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data as (Lead & { source?: string })[]) || [];
+    },
+  });
+  const leadsAssistante = chercheAssistanteData ?? [];
+
+  const addRow = () => setRows((r) => [...r, emptyRow()]);
+  const removeRow = (index: number) => {
+    if (rows.length <= 1) return;
+    setRows((r) => r.filter((_, i) => i !== index));
+  };
+  const updateRow = (index: number, field: keyof LinkedInLeadRow, value: string | boolean) => {
+    setRows((r) => r.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const validRows = rows.filter((r) => r.name.trim());
+  const handleImport = async () => {
+    if (validRows.length === 0) {
+      toast({ title: "Ajoutez au moins une entreprise avec un nom.", variant: "destructive" });
+      return;
+    }
+    setImporting(true);
+    setResult(null);
+    let inserted = 0;
+    let skipped = 0;
+    for (const row of validRows) {
+      const phone = row.phone?.replace(/[\s()\-\.]/g, "").replace(/^\+33/, "0").replace(/^0033/, "0") || null;
+      const { error } = await supabase.rpc("upsert_linkedin_lead" as any, {
+        p_name: row.name.trim(),
+        p_address: row.address?.trim() || null,
+        p_phone: phone,
+        p_website: row.website?.trim() || null,
+        p_linkedin_url: row.linkedin_url?.trim() || null,
+        p_dept_code: row.dept_code || null,
+        p_category: row.category || "Artisan BTP",
+        p_cherche_assistante: row.cherche_assistante ?? false,
+      });
+      if (error) skipped++;
+      else inserted++;
+    }
+    setImporting(false);
+    setResult({ inserted, skipped });
+    queryClient.invalidateQueries({ queryKey: ["leads_cherche_assistante"] });
+    queryClient.invalidateQueries({ queryKey: ["admin_leads"] });
+    toast({ title: `✅ Import terminé — ${inserted} insérés, ${skipped} ignorés` });
+    setRows([emptyRow()]);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* 0. Prospection automatique Vibe Prospecting */}
+      <GlassCard className="p-6 border-blue-500/20 bg-blue-500/5">
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <UserSearch className="h-5 w-5 text-blue-400" />
+          Prospection automatique (Vibe Prospecting)
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Les leads sont trouvés et importés automatiquement selon le département et les critères. Aucune saisie manuelle.
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs">Département</Label>
+            <Select value={vibeDept} onValueChange={setVibeDept}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Département" /></SelectTrigger>
+              <SelectContent>
+                {DEPTS.map((d) => (
+                  <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Catégorie</Label>
+            <Select value={vibeCategory} onValueChange={setVibeCategory}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {METIER_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="vibe-cherche-assistante"
+              checked={vibeChercheAssistante}
+              onCheckedChange={(c) => setVibeChercheAssistante(!!c)}
+            />
+            <Label htmlFor="vibe-cherche-assistante" className="text-xs font-normal cursor-pointer text-orange-400">
+              Uniquement qui recrutent (assistante / secrétaire)
+            </Label>
+          </div>
+          <Button
+            onClick={runVibeProspecting}
+            disabled={vibeRunning}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold gap-2"
+          >
+            {vibeRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserSearch className="h-4 w-4" />}
+            {vibeRunning ? "Recherche en cours…" : "Lancer la prospection"}
+          </Button>
+        </div>
+        {vibeResult && (
+          <div className={`mt-4 p-4 rounded-lg border flex items-center gap-3 ${vibeResult.error ? "border-destructive/50 bg-destructive/10" : "border-emerald-500/30 bg-emerald-500/10"}`}>
+            {vibeResult.error ? (
+              <>
+                <XCircle className="h-5 w-5 text-destructive shrink-0" />
+                <p className="text-sm text-destructive">{vibeResult.error}</p>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                <p className="text-sm text-emerald-200">
+                  {vibeResult.inserted} importé(s) · {vibeResult.skipped} ignoré(s) · {vibeResult.total} trouvé(s)
+                </p>
+              </>
+            )}
+          </div>
+        )}
+      </GlassCard>
+
+      {/* 1. Leads déjà générés qui recherchent une assistante */}
+      <GlassCard className="p-6 border-orange-500/20 bg-orange-500/5">
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <UserSearch className="h-5 w-5 text-orange-400" />
+          Leads qui recherchent une assistante
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Ces entreprises sont en priorité A — BTP Smart Pro peut remplacer leur assistante.
+        </p>
+        {loadingAssistante ? (
+          <div className="flex items-center gap-2 text-muted-foreground py-6">
+            <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+          </div>
+        ) : leadsAssistante.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">Aucun lead « Cherche Assistante » pour le moment. Ajoutez-en via le formulaire ci-dessous.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-border/50">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50 bg-card/50">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Entreprise</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Téléphone</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dept</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Statut</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">LinkedIn</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leadsAssistante.map((lead) => (
+                  <tr key={lead.id} className="border-b border-border/30 hover:bg-card/30">
+                    <td className="px-4 py-3">
+                      <span className="font-medium">{lead.name}</span>
+                      {lead.address && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{lead.address}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {lead.phone_mobile ? (
+                        <a href={`tel:${lead.phone_mobile}`} className="text-primary hover:underline flex items-center gap-1"><Phone className="h-3 w-3" />{lead.phone_mobile}</a>
+                      ) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{lead.dept_code}</td>
+                    <td className="px-4 py-3"><Badge className={`text-xs border ${STATUS_COLORS[lead.status] || ""}`}>{STATUS_LABELS[lead.status] ?? lead.status}</Badge></td>
+                    <td className="px-4 py-3">
+                      {lead.maps_url ? (
+                        <a href={lead.maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1">
+                          <Linkedin className="h-3.5 w-3.5" /> Voir
+                        </a>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassCard>
+
+      {/* 2. Ajouter des entreprises — formulaire sans code */}
+      <GlassCard className="p-6 border-blue-500/20 bg-blue-500/5">
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <Plus className="h-5 w-5 text-blue-400" />
+          Ajouter des entreprises (LinkedIn / prospection)
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Renseignez les champs pour chaque entreprise. Cochez « Cherche une assistante » pour les marquer en priorité A.
+        </p>
+
+        <div className="space-y-4">
+          {rows.map((row, index) => (
+            <div key={index} className="p-4 rounded-lg border border-border/50 bg-card/30 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">Entreprise {index + 1}</span>
+                {rows.length > 1 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-7 text-muted-foreground hover:text-destructive" onClick={() => removeRow(index)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nom de l'entreprise *</Label>
+                  <Input
+                    placeholder="Ex. Plomberie Dupont"
+                    value={row.name}
+                    onChange={(e) => updateRow(index, "name", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Adresse</Label>
+                  <Input
+                    placeholder="Ville, code postal"
+                    value={row.address ?? ""}
+                    onChange={(e) => updateRow(index, "address", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Téléphone</Label>
+                  <Input
+                    placeholder="06 12 34 56 78"
+                    value={row.phone ?? ""}
+                    onChange={(e) => updateRow(index, "phone", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Site web</Label>
+                  <Input
+                    placeholder="https://..."
+                    value={row.website ?? ""}
+                    onChange={(e) => updateRow(index, "website", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">URL LinkedIn</Label>
+                  <Input
+                    placeholder="https://linkedin.com/company/..."
+                    value={row.linkedin_url ?? ""}
+                    onChange={(e) => updateRow(index, "linkedin_url", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Département</Label>
+                  <Select value={row.dept_code || "_"} onValueChange={(v) => updateRow(index, "dept_code", v === "_" ? "" : v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Choisir" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_">—</SelectItem>
+                      {DEPTS.map((d) => (
+                        <SelectItem key={d.code} value={d.code}>{d.code} — {d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Catégorie</Label>
+                  <Select value={row.category || "Artisan BTP"} onValueChange={(v) => updateRow(index, "category", v)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {METIER_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    id={`assistante-${index}`}
+                    checked={row.cherche_assistante ?? false}
+                    onCheckedChange={(c) => updateRow(index, "cherche_assistante", !!c)}
+                  />
+                  <Label htmlFor={`assistante-${index}`} className="text-xs font-normal cursor-pointer text-orange-400">
+                    Cherche une assistante (priorité A)
+                  </Label>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 mt-4">
+          <Button type="button" variant="outline" size="sm" onClick={addRow} className="gap-2">
+            <Plus className="h-4 w-4" /> Ajouter une entreprise
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={importing || validRows.length === 0}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold gap-2"
+          >
+            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Importer {validRows.length} entreprise{validRows.length !== 1 ? "s" : ""}
+          </Button>
+        </div>
+
+        {result && (
+          <div className="mt-4 p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+            <p className="text-sm text-emerald-200">
+              {result.inserted} insérés · {result.skipped} ignorés (doublons ou erreurs)
+            </p>
+          </div>
+        )}
+      </GlassCard>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────
 
 export default function AdminLeads() {
@@ -889,13 +1432,15 @@ export default function AdminLeads() {
         </div>
 
         <Tabs defaultValue="generate">
-          <TabsList className="w-full sm:w-auto">
+          <TabsList className="w-full sm:w-auto flex-wrap">
             <TabsTrigger value="generate" className="gap-2"><Zap className="h-4 w-4" /> Générer</TabsTrigger>
+            <TabsTrigger value="linkedin" className="gap-2"><UserSearch className="h-4 w-4 text-blue-400" /> LinkedIn</TabsTrigger>
             <TabsTrigger value="assign" className="gap-2"><Users className="h-4 w-4" /> Assigner</TabsTrigger>
             <TabsTrigger value="leads" className="gap-2"><List className="h-4 w-4" /> Vue leads</TabsTrigger>
             <TabsTrigger value="ignored" className="gap-2"><AlertCircle className="h-4 w-4 text-orange-400" /> Ignorés</TabsTrigger>
           </TabsList>
           <TabsContent value="generate" className="mt-6"><SectionGenerate /></TabsContent>
+          <TabsContent value="linkedin" className="mt-6"><SectionLinkedIn /></TabsContent>
           <TabsContent value="assign" className="mt-6"><SectionAssign /></TabsContent>
           <TabsContent value="leads" className="mt-6"><SectionLeads /></TabsContent>
           <TabsContent value="ignored" className="mt-6"><SectionIgnored /></TabsContent>

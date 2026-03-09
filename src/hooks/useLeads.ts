@@ -4,7 +4,14 @@ import { useAuth } from "@/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────
 
-export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "LOST" | "SIGNED";
+export type LeadStatus =
+  | "NEW"
+  | "TO_CALLBACK"   // À rappeler
+  | "NO_ANSWER"     // Pas de réponse
+  | "NOT_INTERESTED" // Pas intéressé
+  | "QUALIFIED"
+  | "SIGNED"
+  | "LOST";
 export type LeadPriority = "A" | "B" | "C";
 export type SizeBucket = "0-3" | "4-10" | "10-50" | "50+";
 export type JobStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "STOPPED";
@@ -211,11 +218,12 @@ export function useLeadStats(deptCode: string) {
         p_dept_code: deptCode,
       });
       if (error) throw error;
-      const o = (data as { total?: number; available?: number; assigned?: number }) ?? {};
+      const o = (data as { total?: number; available?: number; assigned?: number; orphan?: number }) ?? {};
       return {
         total: Number(o.total ?? 0),
         available: Number(o.available ?? 0),
         assigned: Number(o.assigned ?? 0),
+        orphan: Number(o.orphan ?? 0),
       };
     },
     enabled: !!deptCode,
@@ -322,6 +330,72 @@ export function useAssignLeads() {
   });
 }
 
+/** Liste des closers (actuels ou anciens) qui ont au moins un lead assigné — pour sélectionner qui libérer. */
+export interface CloserWithAssignedLeads {
+  owner_email: string;
+  owner_name: string;
+  lead_count: number;
+}
+
+export function useClosersWithAssignedLeads() {
+  return useQuery<CloserWithAssignedLeads[]>({
+    queryKey: ["closers_with_assigned_leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_closers_with_assigned_leads" as any);
+      if (error) throw error;
+      const rows = (data as any[]) || [];
+      return rows.map((r: any) => ({
+        owner_email: r.owner_email ?? "",
+        owner_name: r.owner_name ?? r.owner_email?.split("@")[0] ?? "—",
+        lead_count: Number(r.lead_count ?? 0),
+      }));
+    },
+    ...RETRY_NETWORK,
+  });
+}
+
+/** Libère tous les leads assignés à un closer (ex. closer supprimé). Ils deviennent "sans propriétaire" et peuvent être réassignés. */
+export function useUnassignLeadsFromCloser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (closerEmail: string) => {
+      const { data, error } = await supabase.rpc("unassign_leads_from_closer" as any, {
+        p_closer_email: closerEmail.trim(),
+      });
+      if (error) throw new Error(error.message);
+      return data as number;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_leads"] });
+      qc.invalidateQueries({ queryKey: ["lead_stats"] });
+      qc.invalidateQueries({ queryKey: ["generated_depts"] });
+      qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["closers_with_assigned_leads"] });
+    },
+  });
+}
+
+/** Assigner tous les leads sans propriétaire d'un département à un closer (réassignation après libération). */
+export function useAssignOrphanLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deptCode, closerEmail }: { deptCode: string; closerEmail: string }) => {
+      const { data, error } = await supabase.rpc("assign_orphan_leads_to_closer" as any, {
+        p_dept_code: deptCode,
+        p_closer_email: closerEmail,
+      });
+      if (error) throw new Error(error.message);
+      return data as number;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_leads"] });
+      qc.invalidateQueries({ queryKey: ["lead_stats"] });
+      qc.invalidateQueries({ queryKey: ["generated_depts"] });
+      qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+    },
+  });
+}
+
 // ─── Hooks closer ─────────────────────────────────────────────
 
 export type MyLeadsSort = "dept" | "date" | "priority";
@@ -393,7 +467,9 @@ export function useMyLeadStats() {
       return {
         total: Number(o.total ?? 0),
         new: Number(o.new ?? 0),
-        contacted: Number(o.contacted ?? 0),
+        to_callback: Number(o.to_callback ?? 0),
+        no_answer: Number(o.no_answer ?? 0),
+        not_interested: Number(o.not_interested ?? 0),
         qualified: Number(o.qualified ?? 0),
         signed: Number(o.signed ?? 0),
         lost: Number(o.lost ?? 0),
@@ -405,8 +481,143 @@ export function useMyLeadStats() {
 }
 
 export interface CloserActivity {
-  stats: { total: number; new: number; contacted: number; qualified: number; signed: number; lost: number };
+  stats: { total: number; new: number; to_callback: number; no_answer: number; not_interested: number; qualified: number; signed: number; lost: number };
   by_dept: { dept_code: string; count: number }[];
+}
+
+export interface CloserKPIRow {
+  closer_id: string;
+  closer_email: string;
+  closer_name: string;
+  total: number;
+  new: number;
+  to_callback: number;
+  no_answer: number;
+  not_interested: number;
+  qualified: number;
+  signed: number;
+  lost: number;
+}
+
+export function useAllClosersKpi() {
+  return useQuery<CloserKPIRow[]>({
+    queryKey: ["admin_all_closers_kpi"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_all_closers_kpi" as any);
+      if (error) throw error;
+      const rows = (data as any[]) || [];
+      return rows.map((r: any) => ({
+        closer_id: r.closer_id ?? "",
+        closer_email: r.closer_email ?? "",
+        closer_name: r.closer_name ?? r.closer_email?.split("@")[0] ?? "—",
+        total: Number(r.total ?? 0),
+        new: Number(r.new ?? 0),
+        to_callback: Number(r.to_callback ?? 0),
+        no_answer: Number(r.no_answer ?? 0),
+        not_interested: Number(r.not_interested ?? 0),
+        qualified: Number(r.qualified ?? 0),
+        signed: Number(r.signed ?? 0),
+        lost: Number(r.lost ?? 0),
+      }));
+    },
+    ...RETRY_NETWORK,
+  });
+}
+
+/** KPI par propriétaire de leads (tous ceux qui ont au moins un lead). Fallback quand aucun closer dans closer_emails. */
+export function useAllOwnersLeadKpi() {
+  return useQuery<CloserKPIRow[]>({
+    queryKey: ["admin_all_owners_lead_kpi"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_all_owners_lead_kpi" as any);
+      if (error) throw error;
+      const rows = (data as any[]) || [];
+      return rows.map((r: any) => ({
+        closer_id: r.closer_id ?? "",
+        closer_email: r.closer_email ?? "",
+        closer_name: r.closer_name ?? r.closer_email?.split("@")[0] ?? "—",
+        total: Number(r.total ?? 0),
+        new: Number(r.new ?? 0),
+        to_callback: Number(r.to_callback ?? 0),
+        no_answer: Number(r.no_answer ?? 0),
+        not_interested: Number(r.not_interested ?? 0),
+        qualified: Number(r.qualified ?? 0),
+        signed: Number(r.signed ?? 0),
+        lost: Number(r.lost ?? 0),
+      }));
+    },
+    ...RETRY_NETWORK,
+  });
+}
+
+/** KPI globaux : tous les closers réunis. */
+export interface GlobalClosersKpi {
+  total: number;
+  new: number;
+  to_callback: number;
+  no_answer: number;
+  not_interested: number;
+  qualified: number;
+  signed: number;
+  lost: number;
+}
+
+export function useGlobalClosersKpi() {
+  return useQuery<GlobalClosersKpi>({
+    queryKey: ["admin_global_closers_kpi"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_global_closers_kpi" as any);
+      if (error) throw error;
+      const o = (data as Record<string, number>) ?? {};
+      return {
+        total: Number(o.total ?? 0),
+        new: Number(o.new ?? 0),
+        to_callback: Number(o.to_callback ?? 0),
+        no_answer: Number(o.no_answer ?? 0),
+        not_interested: Number(o.not_interested ?? 0),
+        qualified: Number(o.qualified ?? 0),
+        signed: Number(o.signed ?? 0),
+        lost: Number(o.lost ?? 0),
+      };
+    },
+    ...RETRY_NETWORK,
+  });
+}
+
+/** KPI par jour : évolution sur les N derniers jours (leads mis à jour ce jour-là, par statut). */
+export interface LeadKpiByDayRow {
+  day: string;
+  total: number;
+  new: number;
+  to_callback: number;
+  no_answer: number;
+  not_interested: number;
+  qualified: number;
+  signed: number;
+  lost: number;
+}
+
+export function useLeadKpiByDay(days: number = 30) {
+  return useQuery<LeadKpiByDayRow[]>({
+    queryKey: ["admin_lead_kpi_by_day", days],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_lead_kpi_by_day" as any, { p_days: days });
+      if (error) throw error;
+      const rows = (data as any[]) || [];
+      return rows.map((r: any) => ({
+        day: r.day ?? "",
+        total: Number(r.total ?? 0),
+        new: Number(r.new ?? 0),
+        to_callback: Number(r.to_callback ?? 0),
+        no_answer: Number(r.no_answer ?? 0),
+        not_interested: Number(r.not_interested ?? 0),
+        qualified: Number(r.qualified ?? 0),
+        signed: Number(r.signed ?? 0),
+        lost: Number(r.lost ?? 0),
+      }));
+    },
+    ...RETRY_NETWORK,
+  });
 }
 
 export function useCloserActivity(closerEmail: string | null) {
@@ -420,7 +631,9 @@ export function useCloserActivity(closerEmail: string | null) {
         stats: {
           total: Number(raw.stats?.total ?? 0),
           new: Number(raw.stats?.new ?? 0),
-          contacted: Number(raw.stats?.contacted ?? 0),
+          to_callback: Number(raw.stats?.to_callback ?? 0),
+          no_answer: Number(raw.stats?.no_answer ?? 0),
+          not_interested: Number(raw.stats?.not_interested ?? 0),
           qualified: Number(raw.stats?.qualified ?? 0),
           signed: Number(raw.stats?.signed ?? 0),
           lost: Number(raw.stats?.lost ?? 0),
@@ -446,6 +659,8 @@ export function useUpdateLeadStatus() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my_leads"] });
       qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
+      qc.invalidateQueries({ queryKey: ["closer_activity"] });
+      qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
     },
   });
 }

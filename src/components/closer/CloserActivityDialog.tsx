@@ -69,7 +69,9 @@ export function CloserActivityDialog({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <StatCard label="Total" value={data.stats.total} />
                 <StatCard label="Nouveaux" value={data.stats.new} className="text-blue-500" />
-                <StatCard label="Contactés" value={data.stats.contacted} className="text-amber-500" />
+                <StatCard label="À rappeler" value={data.stats.to_callback} className="text-amber-500" />
+                <StatCard label="Pas de réponse" value={data.stats.no_answer} className="text-slate-500" />
+                <StatCard label="Pas intéressé" value={data.stats.not_interested} className="text-orange-500" />
                 <StatCard label="Qualifiés" value={data.stats.qualified} className="text-violet-500" />
                 <StatCard label="Signés" value={data.stats.signed} className="text-emerald-500" />
                 <StatCard label="Perdus" value={data.stats.lost} className="text-muted-foreground" />
