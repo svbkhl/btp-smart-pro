@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { KPIBlock } from "@/components/ui/KPIBlock";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -33,27 +33,31 @@ import { RecentProjectsWidget, CalendarWidget, MessagesWidget } from "@/componen
 
 const Demo = () => {
   const navigate = useNavigate();
-  const { user, userRole } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const { setFakeDataEnabled } = useFakeDataStore();
   const { activateDemo, deactivateDemo } = useLandingDemoStore();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Activer automatiquement les fake data quand on arrive sur la page Demo
+  // Activer le mode démo immédiatement au montage (avant le premier paint) pour que la démo fonctionne directement
+  useLayoutEffect(() => {
+    activateDemo();
+    setFakeDataEnabled(true);
+  }, [activateDemo, setFakeDataEnabled]);
+
+  // Redirection et focus une fois l'auth connue
   useEffect(() => {
-    console.log("🎮 Activation du mode fake data pour la page Demo");
-    
-    // Si l'utilisateur est connecté mais n'est pas administrateur, rediriger vers le dashboard réel
+    // Attendre la fin du chargement auth avant de décider
+    if (authLoading) return;
+
+    // Utilisateur connecté mais non-admin → quitter la démo et aller sur le dashboard réel
     if (user && userRole !== 'admin') {
-      console.log("🔒 Utilisateur connecté (non-admin) détecté - Redirection vers dashboard réel");
       setFakeDataEnabled(false);
       deactivateDemo();
       navigate("/dashboard", { replace: true });
       return;
     }
-    
-    // Activer le mode démo seulement si :
-    // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
-    // 2. OU l'utilisateur est administrateur (démo dans l'app)
+
+    // Démo publique (non connecté) ou admin : s'assurer que le mode démo reste actif
     if (!user || userRole === 'admin') {
       activateDemo();
       setFakeDataEnabled(true);
@@ -110,7 +114,7 @@ const Demo = () => {
         clearTimeout(timeout);
       };
     }
-  }, [user, userRole, setFakeDataEnabled, navigate]);
+  }, [user, userRole, authLoading, setFakeDataEnabled, navigate, activateDemo, deactivateDemo]);
 
   // Utiliser directement les fake data
   const stats = FAKE_USER_STATS;
