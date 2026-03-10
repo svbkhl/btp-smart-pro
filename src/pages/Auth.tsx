@@ -31,19 +31,14 @@ const Auth = () => {
   const [error, setError] = useState<string | null>(null);
 
   // ─── Navigation post-auth (définie ici pour être réutilisée) ─────────────
+  // Ordre : admin → closer → invitation → abo → dashboard (les closers ne doivent jamais tomber sur /start)
   const handlePostAuthNavigation = useCallback(async (sessionUser: User) => {
-    const params = new URLSearchParams(window.location.search);
-    const invitationId = params.get("invitation_id");
-    if (invitationId) {
-      navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
-      return;
-    }
     if (isSystemAdmin(sessionUser)) {
       navigate("/dashboard", { replace: true });
       return;
     }
 
-    // Vérifier closer (config statique + base de données)
+    // Vérifier closer (config statique + base de données) avant invitation_id
     const emailLower = sessionUser.email?.toLowerCase() || "";
     let userIsCloser = isCloserEmail(emailLower);
     if (!userIsCloser && emailLower) {
@@ -56,6 +51,13 @@ const Auth = () => {
     }
     if (userIsCloser) {
       navigate("/closer", { replace: true });
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const invitationId = params.get("invitation_id");
+    if (invitationId) {
+      navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
       return;
     }
 
