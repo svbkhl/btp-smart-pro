@@ -33,7 +33,7 @@ import { RecentProjectsWidget, CalendarWidget, MessagesWidget } from "@/componen
 
 const Demo = () => {
   const navigate = useNavigate();
-  const { user, userRole, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading, isCloser, isCloserLoading } = useAuth();
   const { setFakeDataEnabled } = useFakeDataStore();
   const { activateDemo, deactivateDemo } = useLandingDemoStore();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -46,19 +46,19 @@ const Demo = () => {
 
   // Redirection et focus une fois l'auth connue
   useEffect(() => {
-    // Attendre la fin du chargement auth avant de décider
-    if (authLoading) return;
+    if (authLoading || isCloserLoading) return;
 
-    // Utilisateur connecté mais non-admin → quitter la démo et aller sur le dashboard réel
-    if (user && userRole !== 'admin') {
+    // Utilisateur connecté, non-admin et non-closer → quitter la démo et aller sur le dashboard réel
+    // Les closers peuvent lancer la démo patron/employé depuis leur espace, on les laisse sur /demo
+    if (user && userRole !== 'admin' && !isCloser) {
       setFakeDataEnabled(false);
       deactivateDemo();
       navigate("/dashboard", { replace: true });
       return;
     }
 
-    // Démo publique (non connecté) ou admin : s'assurer que le mode démo reste actif
-    if (!user || userRole === 'admin') {
+    // Démo publique (non connecté), admin ou closer : s'assurer que le mode démo reste actif
+    if (!user || userRole === 'admin' || isCloser) {
       activateDemo();
       setFakeDataEnabled(true);
     }
@@ -114,7 +114,7 @@ const Demo = () => {
         clearTimeout(timeout);
       };
     }
-  }, [user, userRole, authLoading, setFakeDataEnabled, navigate, activateDemo, deactivateDemo]);
+  }, [user, userRole, authLoading, isCloser, isCloserLoading, setFakeDataEnabled, navigate, activateDemo, deactivateDemo]);
 
   // Utiliser directement les fake data
   const stats = FAKE_USER_STATS;

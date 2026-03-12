@@ -96,7 +96,7 @@ export default function CloserActions() {
   const handleLancerDemo = (employeeMode: boolean) => {
     setFakeDataEnabled(true);
     setCloserEmployeeMode(employeeMode);
-    navigate("/dashboard", { replace: true });
+    navigate("/demo", { replace: true });
   };
 
   const handleStopDemo = () => {
