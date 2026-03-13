@@ -24,15 +24,17 @@ import {
 
 // ─── Constantes ───────────────────────────────────────────────
 
-// Funnel : Nouveau → À rappeler / Pas de réponse / Pas intéressé → Qualifié / Perdu → Signé
+// Tous les statuts : on peut passer de n'importe quel statut à n'importe quel autre
+const ALL_LEAD_STATUSES: LeadStatus[] = ["NEW", "TO_CALLBACK", "NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "SIGNED", "LOST"];
+
 const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; next: LeadStatus[] }> = {
-  NEW:            { label: "Nouveau",        color: "bg-blue-500/10 text-blue-400 border-blue-500/20",       next: ["TO_CALLBACK", "NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "LOST"] },
-  TO_CALLBACK:    { label: "À rappeler",     color: "bg-amber-500/10 text-amber-400 border-amber-500/20",     next: ["NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "LOST"] },
-  NO_ANSWER:      { label: "Pas de réponse", color: "bg-slate-500/10 text-slate-400 border-slate-500/20",     next: ["TO_CALLBACK", "NOT_INTERESTED", "LOST"] },
-  NOT_INTERESTED: { label: "Pas intéressé",  color: "bg-orange-500/10 text-orange-400 border-orange-500/20", next: ["TO_CALLBACK", "LOST"] },
-  QUALIFIED:      { label: "Qualifié",       color: "bg-violet-500/10 text-violet-400 border-violet-500/20", next: ["SIGNED", "LOST"] },
-  SIGNED:         { label: "Signé",          color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", next: ["QUALIFIED"] },
-  LOST:           { label: "Perdu",          color: "bg-red-500/10 text-red-400 border-red-500/20",           next: ["TO_CALLBACK"] },
+  NEW:            { label: "Nouveau",        color: "bg-blue-500/10 text-blue-400 border-blue-500/20",       next: ALL_LEAD_STATUSES.filter((s) => s !== "NEW") },
+  TO_CALLBACK:    { label: "À rappeler",     color: "bg-amber-500/10 text-amber-400 border-amber-500/20",     next: ALL_LEAD_STATUSES.filter((s) => s !== "TO_CALLBACK") },
+  NO_ANSWER:      { label: "Pas de réponse", color: "bg-slate-500/10 text-slate-400 border-slate-500/20",     next: ALL_LEAD_STATUSES.filter((s) => s !== "NO_ANSWER") },
+  NOT_INTERESTED: { label: "Pas intéressé",  color: "bg-orange-500/10 text-orange-400 border-orange-500/20", next: ALL_LEAD_STATUSES.filter((s) => s !== "NOT_INTERESTED") },
+  QUALIFIED:      { label: "Qualifié",       color: "bg-violet-500/10 text-violet-400 border-violet-500/20", next: ALL_LEAD_STATUSES.filter((s) => s !== "QUALIFIED") },
+  SIGNED:         { label: "Signé",          color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", next: ALL_LEAD_STATUSES.filter((s) => s !== "SIGNED") },
+  LOST:           { label: "Perdu",          color: "bg-red-500/10 text-red-400 border-red-500/20",           next: ALL_LEAD_STATUSES.filter((s) => s !== "LOST") },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
@@ -124,7 +126,7 @@ function LeadCard({ lead }: { lead: Lead }) {
   const cfg = STATUS_CONFIG[lead.status] ?? {
     label: lead.status,
     color: "bg-muted text-muted-foreground border-border",
-    next: ["TO_CALLBACK", "NO_ANSWER", "NOT_INTERESTED", "QUALIFIED", "LOST", "SIGNED"] as LeadStatus[],
+    next: ALL_LEAD_STATUSES.filter((s) => s !== lead.status),
   };
   const prio = lead.priority ? PRIORITY_CONFIG[lead.priority] : null;
 
@@ -132,8 +134,9 @@ function LeadCard({ lead }: { lead: Lead }) {
     try {
       await updateStatus.mutateAsync({ id: lead.id, status: s });
       toast({ title: `Statut mis à jour → ${STATUS_CONFIG[s].label}` });
-    } catch {
-      toast({ title: "Erreur de mise à jour", variant: "destructive" });
+    } catch (e: any) {
+      const msg = e?.message || e?.error_description || (e?.error ? String(e.error) : "Erreur de mise à jour");
+      toast({ title: "Impossible de modifier le statut", description: msg, variant: "destructive" });
     }
   };
 
@@ -166,11 +169,31 @@ function LeadCard({ lead }: { lead: Lead }) {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Badges */}
-              {prio && (
-                <Badge className={`text-xs border ${prio.color} hidden sm:flex`}>{lead.priority}</Badge>
+              {/* Bouton Changer statut (compact en haut) */}
+              {cfg.next.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" className="h-7 text-[11px] gap-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20">
+                      <CheckCircle2 className="h-3 w-3" /> Statut
+                      <ChevronDown className="h-2.5 w-2.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {cfg.next.map((s) => (
+                      <DropdownMenuItem
+                        key={s}
+                        onSelect={() => handleStatus(s)}
+                        disabled={updateStatus.isPending}
+                      >
+                        <Badge className={`text-xs border mr-2 ${STATUS_CONFIG[s].color}`}>
+                          {STATUS_CONFIG[s].label}
+                        </Badge>
+                        Marquer comme {STATUS_CONFIG[s].label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-              <Badge className={`text-xs border ${cfg.color}`}>{cfg.label}</Badge>
 
               {/* Bouton développer */}
               <Button
@@ -183,8 +206,14 @@ function LeadCard({ lead }: { lead: Lead }) {
             </div>
           </div>
 
-          {/* Actions rapides */}
+          {/* Actions rapides : statut + priorité (plus visibles) puis téléphone, site, notes */}
           <div className="flex flex-wrap items-center gap-2 mt-3">
+            <div className="flex items-center gap-1.5">
+              {prio && (
+                <Badge className={`text-sm px-2.5 py-0.5 border ${prio.color}`}>{lead.priority}</Badge>
+              )}
+              <Badge className={`text-sm px-2.5 py-0.5 border ${cfg.color}`}>{cfg.label}</Badge>
+            </div>
             {lead.phone_mobile && (
               <Button asChild size="sm" variant="outline" className="h-8 text-xs gap-1">
                 <a href={`tel:${lead.phone_mobile}`}>
@@ -213,33 +242,6 @@ function LeadCard({ lead }: { lead: Lead }) {
                 <StickyNote className="h-3.5 w-3.5" />
                 {lead.notes ? "Modifier notes" : "Ajouter note"}
               </Button>
-
-              {cfg.next.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" className="h-8 text-xs gap-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Changer statut
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {cfg.next.map((s) => (
-                      <DropdownMenuItem
-                        key={s}
-                        onClick={() => handleStatus(s)}
-                        disabled={updateStatus.isPending}
-                      >
-                        <Badge className={`text-xs border mr-2 ${STATUS_CONFIG[s].color}`}>
-                          {STATUS_CONFIG[s].label}
-                        </Badge>
-                        {lead.status === "SIGNED" && s === "QUALIFIED"
-                          ? "Revenir à Qualifié (annuler Signé)"
-                          : `Marquer comme ${STATUS_CONFIG[s].label}`}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
             </div>
           </div>
 
@@ -337,11 +339,9 @@ export default function CloserLeads() {
         <StatCard label="Total"           value={stats.total}          color="text-foreground" />
         <StatCard label="Nouveaux"       value={stats.new}            color="text-blue-400" />
         <StatCard label="À rappeler"      value={stats.to_callback ?? 0}    color="text-amber-400" />
-        <StatCard label="Pas de réponse"  value={stats.no_answer ?? 0}      color="text-slate-400" />
         <StatCard label="Pas intéressé"   value={stats.not_interested ?? 0} color="text-orange-400" />
         <StatCard label="Qualifiés"      value={stats.qualified}       color="text-violet-400" />
         <StatCard label="Signés"          value={stats.signed}         color="text-emerald-400" />
-        <StatCard label="Perdus"          value={stats.lost}            color="text-red-400" />
       </div>
 
       {/* Filtres */}

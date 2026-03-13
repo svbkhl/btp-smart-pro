@@ -43,11 +43,9 @@ const KPI_ROW = [
   { key: "total", label: "Leads assignés", icon: Users, color: "text-foreground", bg: "bg-muted/50" },
   { key: "new", label: "Nouveaux", icon: Target, color: "text-slate-400 dark:text-slate-300", bg: "bg-slate-500/10" },
   { key: "to_callback", label: "À rappeler", icon: Phone, color: "text-amber-500", bg: "bg-amber-500/10" },
-  { key: "no_answer", label: "Pas de réponse", icon: Phone, color: "text-slate-500", bg: "bg-slate-500/10" },
   { key: "not_interested", label: "Pas intéressé", icon: Phone, color: "text-orange-500", bg: "bg-orange-500/10" },
   { key: "qualified", label: "Qualifiés", icon: MessageSquare, color: "text-violet-500", bg: "bg-violet-500/10" },
   { key: "signed", label: "Signés", icon: FileSignature, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  { key: "lost", label: "Perdus", icon: XCircle, color: "text-rose-500", bg: "bg-rose-500/10" },
 ] as const;
 
 export function CloserKPITable() {

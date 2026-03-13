@@ -96,7 +96,8 @@ export default function CloserActions() {
   const handleLancerDemo = (employeeMode: boolean) => {
     setFakeDataEnabled(true);
     setCloserEmployeeMode(employeeMode);
-    navigate("/demo", { replace: true });
+    // Navigation complète pour atterrir à coup sûr sur la démo (évite races SPA / redirect accueil)
+    window.location.href = "/demo";
   };
 
   const handleStopDemo = () => {
