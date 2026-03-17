@@ -520,6 +520,8 @@ export function useAllClosersKpi() {
         lost: Number(r.lost ?? 0),
       }));
     },
+    staleTime: 0,
+    refetchInterval: 60_000,
     ...RETRY_NETWORK,
   });
 }
@@ -546,6 +548,8 @@ export function useAllOwnersLeadKpi() {
         lost: Number(r.lost ?? 0),
       }));
     },
+    staleTime: 0,
+    refetchInterval: 60_000,
     ...RETRY_NETWORK,
   });
 }
@@ -642,6 +646,8 @@ export function useCloserActivity(closerEmail: string | null) {
       } as CloserActivity;
     },
     enabled: !!closerEmail?.trim(),
+    staleTime: 0,
+    refetchInterval: 60_000,
     ...RETRY_NETWORK,
   });
 }
@@ -650,17 +656,19 @@ export function useUpdateLeadStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: LeadStatus }) => {
-      const { error } = await supabase
-        .from("leads" as any)
-        .update({ status })
-        .eq("id", id);
+      const { data, error } = await supabase.rpc("update_lead_status" as any, {
+        p_lead_id: id,
+        p_status: status,
+      });
       if (error) throw error;
+      if (!data) throw new Error("Aucune ligne modifiée.");
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ["my_leads"] });
       qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
       qc.invalidateQueries({ queryKey: ["closer_activity"] });
       qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      await qc.refetchQueries({ queryKey: ["my_lead_stats"] });
     },
   });
 }
@@ -675,7 +683,12 @@ export function useUpdateLeadNotes() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["my_leads"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my_leads"] });
+      qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
+      qc.invalidateQueries({ queryKey: ["closer_activity"] });
+      qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+    },
   });
 }
 
