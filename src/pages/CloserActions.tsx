@@ -96,8 +96,22 @@ export default function CloserActions() {
   const handleLancerDemo = (employeeMode: boolean) => {
     setFakeDataEnabled(true);
     setCloserEmployeeMode(employeeMode);
-    // Navigation complète pour atterrir à coup sûr sur la démo (évite races SPA / redirect accueil)
-    window.location.href = "/demo";
+    // Persister tout de suite en localStorage avant navigation (Zustand persist peut être asynchrone)
+    try {
+      const key = "fake-data-storage";
+      const raw = localStorage.getItem(key);
+      const current = raw ? JSON.parse(raw) : {};
+      const state = typeof current.state === "object" ? current.state : {};
+      const payload = {
+        ...current,
+        state: { ...state, fakeDataEnabled: true, closerEmployeeMode: employeeMode },
+        version: current.version ?? 1,
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+    } catch (_) {}
+    // URL avec vue= pour appliquer le mode au chargement de /demo (sécurité si localStorage pas encore lu)
+    const vue = employeeMode ? "employe" : "patron";
+    window.location.href = `/demo?vue=${vue}`;
   };
 
   const handleStopDemo = () => {
@@ -193,7 +207,7 @@ export default function CloserActions() {
             icon={MonitorPlay}
             title="Démo Patron"
             description="Vue dirigeant avec toutes les fonctionnalités et données réalistes."
-            onClick={() => (fakeDataEnabled && !closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(false)}
+            onClick={() => handleLancerDemo(false)}
             color="blue"
             active={fakeDataEnabled && !closerEmployeeMode}
             gradient="bg-gradient-to-br from-blue-600 to-blue-800"
@@ -202,7 +216,7 @@ export default function CloserActions() {
             icon={Eye}
             title="Démo Employé"
             description="Vue employé : planning, affectations chantiers et espace personnel."
-            onClick={() => (fakeDataEnabled && closerEmployeeMode) ? handleStopDemo() : handleLancerDemo(true)}
+            onClick={() => handleLancerDemo(true)}
             color="green"
             active={fakeDataEnabled && closerEmployeeMode}
             gradient="bg-gradient-to-br from-emerald-600 to-teal-800"

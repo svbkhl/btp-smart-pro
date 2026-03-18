@@ -521,7 +521,8 @@ export function useAllClosersKpi() {
       }));
     },
     staleTime: 0,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
+    refetchOnMount: "always",
     ...RETRY_NETWORK,
   });
 }
@@ -532,7 +533,10 @@ export function useAllOwnersLeadKpi() {
     queryKey: ["admin_all_owners_lead_kpi"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_all_owners_lead_kpi" as any);
-      if (error) throw error;
+      if (error) {
+        console.warn("[useAllOwnersLeadKpi] RPC non disponible ou erreur:", error.message || error);
+        return [];
+      }
       const rows = (data as any[]) || [];
       return rows.map((r: any) => ({
         closer_id: r.closer_id ?? "",
@@ -549,7 +553,8 @@ export function useAllOwnersLeadKpi() {
       }));
     },
     staleTime: 0,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
+    refetchOnMount: "always",
     ...RETRY_NETWORK,
   });
 }
@@ -647,7 +652,8 @@ export function useCloserActivity(closerEmail: string | null) {
     },
     enabled: !!closerEmail?.trim(),
     staleTime: 0,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
+    refetchOnMount: "always",
     ...RETRY_NETWORK,
   });
 }

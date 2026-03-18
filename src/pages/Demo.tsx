@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { KPIBlock } from "@/components/ui/KPIBlock";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -33,24 +34,40 @@ import { RecentProjectsWidget, CalendarWidget, MessagesWidget } from "@/componen
 
 const Demo = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, userRole, loading: authLoading, isCloser, isCloserLoading } = useAuth();
-  const { setFakeDataEnabled } = useFakeDataStore();
+  const { setFakeDataEnabled, setCloserEmployeeMode } = useFakeDataStore();
   const { activateDemo, deactivateDemo } = useLandingDemoStore();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Activer le mode démo immédiatement au montage (avant le premier paint) pour que la démo fonctionne directement
+  // Activer le mode démo immédiatement au montage + appliquer vue= (patron/employe) depuis l'URL (closers)
   useLayoutEffect(() => {
     activateDemo();
     setFakeDataEnabled(true);
-  }, [activateDemo, setFakeDataEnabled]);
+    const vue = searchParams.get("vue");
+    if (vue === "employe") setCloserEmployeeMode(true);
+    else if (vue === "patron") setCloserEmployeeMode(false);
+  }, [activateDemo, setFakeDataEnabled, setCloserEmployeeMode, searchParams]);
 
   // Redirection et focus une fois l'auth connue
   useEffect(() => {
     if (authLoading || isCloserLoading) return;
 
+    const vue = searchParams.get("vue");
+    const fromCloserDemo = searchParams.has("vue");
+
+    // Démo employé : afficher la vue employé (dashboard en mode employé), pas la vue patron
+    if (vue === "employe") {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+
+    // Si l'URL contient vue= (patron/employe), le closer vient de cliquer sur Démo Patron/Employé : ne jamais rediriger vers sortie démo
+    // (pour patron on reste sur /demo)
+
     // Utilisateur connecté, non-admin et non-closer → quitter la démo et aller sur le dashboard réel
     // Les closers peuvent lancer la démo patron/employé depuis leur espace, on les laisse sur /demo
-    if (user && userRole !== 'admin' && !isCloser) {
+    if (!fromCloserDemo && user && userRole !== 'admin' && !isCloser) {
       setFakeDataEnabled(false);
       deactivateDemo();
       navigate("/dashboard", { replace: true });
@@ -114,7 +131,7 @@ const Demo = () => {
         clearTimeout(timeout);
       };
     }
-  }, [user, userRole, authLoading, isCloser, isCloserLoading, setFakeDataEnabled, navigate, activateDemo, deactivateDemo]);
+  }, [user, userRole, authLoading, isCloser, isCloserLoading, searchParams, setFakeDataEnabled, navigate, activateDemo, deactivateDemo]);
 
   // Utiliser directement les fake data
   const stats = FAKE_USER_STATS;
@@ -263,14 +280,28 @@ const Demo = () => {
     return months;
   }, [invoices, projects]);
 
-  // Si l'utilisateur est connecté (non-admin), ne pas afficher la page Demo
-  if (user && userRole !== 'admin') {
+  // Ne pas afficher la page Demo uniquement si connecté, non-admin et non-closer (hors flux Démo Patron/Employé)
+  const fromCloserDemo = searchParams.has("vue");
+  if (!fromCloserDemo && user && userRole !== 'admin' && !isCloser) {
     return null;
   }
 
   return (
     <PageLayout>
       <div className="p-3 sm:p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-4 sm:space-y-6 md:space-y-8">
+        {/* Retour aux actions (closer venu depuis /closer/actions) */}
+        {fromCloserDemo && isCloser && (
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/closer/actions")}
+              className="gap-2 rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              ← Retour aux actions
+            </Button>
+          </div>
+        )}
         {/* Header - exactement comme Dashboard */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>

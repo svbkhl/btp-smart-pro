@@ -1,6 +1,7 @@
 /**
  * Dialog "Activité closer" : stats leads + leads par département (ex. "Leila, leads des départements 01, 69…").
  */
+import { useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,14 @@ export function CloserActivityDialog({
   closerEmail: string | null;
   closerName: string;
 }) {
-  const { data, isLoading, error } = useCloserActivity(open ? closerEmail : null);
+  const { data, isLoading, error, refetch } = useCloserActivity(open ? closerEmail : null);
+
+  // À chaque ouverture du dialog, refetch pour avoir les données à jour (ex. après les appels du closer)
+  useEffect(() => {
+    if (open && closerEmail?.trim()) {
+      refetch();
+    }
+  }, [open, closerEmail, refetch]);
   const displayName = closerName || closerEmail?.split("@")[0] || "Closer";
 
   return (

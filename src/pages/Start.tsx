@@ -449,17 +449,17 @@ export default function Start() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* ── Bouton retour pour les closers ── */}
+      {/* ── Bouton retour pour les closers (vers /closer/actions pour revenir à la page "Choisir une action") ── */}
       {isCloser && (
         <div className="max-w-6xl mx-auto px-4 pt-4">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/closer")}
+            onClick={() => navigate("/closer/actions")}
             className="gap-2 rounded-xl text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            Retour à l'espace closer
+            {isPresentingOffer ? "Retour aux actions" : "Retour à l'espace closer"}
           </Button>
         </div>
       )}

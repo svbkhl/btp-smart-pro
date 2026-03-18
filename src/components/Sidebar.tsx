@@ -275,11 +275,11 @@ export default function Sidebar() {
     [can]
   );
   
-  // Calcul des menuGroups : vue employé si rôle employé OU si closer en mode vue employé
+  // Démo employé (closer + vue employé) : garder les boutons employé (Tableau de bord, Mes chantiers…), masquer la section CLOSERS
   const menuGroups = useMemo(
-    () => (isEmployee || (isCloser && closerEmployeeMode && fakeDataEnabled)
+    () => (isEmployee || (isCloser && closerEmployeeMode && fakeDataEnabled))
       ? employeeMenuGroups
-      : getMenuGroups(company, isEmployee, canFunc, isOwner)),
+      : getMenuGroups(company, isEmployee, canFunc, isOwner),
     [company, isEmployee, canFunc, isOwner, isCloser, closerEmployeeMode, fakeDataEnabled]
   );
   
@@ -806,8 +806,8 @@ export default function Sidebar() {
             );
           })}
 
-          {/* Espace Closers (visible uniquement pour les closers) */}
-          {isCloser && (
+          {/* Espace Closers (visible pour les closers hors démo ; en démo patron ou employé on masque CLOSERS) */}
+          {isCloser && !fakeDataEnabled && (
             <div className="space-y-1 pt-2 border-t border-white/20 dark:border-white/10">
               <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Closers
@@ -820,24 +820,24 @@ export default function Sidebar() {
                 whileTap={{ scale: 0.98 }}
               >
                 <Link
-                  to="/closer"
-                  onClick={() => handleNavigation("/closer")}
+                  to="/closer/actions"
+                  onClick={() => handleNavigation("/closer/actions")}
                   className={cn(
                     "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative",
                     "hover:shadow-lg hover:shadow-primary/20",
-                    isActive("/closer")
+                    location.pathname === "/closer" || location.pathname === "/closer/actions"
                       ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-foreground shadow-md shadow-blue-500/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-gray-800/60 hover:scale-105"
                   )}
                 >
-                  {isActive("/closer") && (
+                  {(location.pathname === "/closer" || location.pathname === "/closer/actions") && (
                     <motion.div
                       layoutId="activeTabCloser"
                       className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl"
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     />
                   )}
-                  <Target className={cn("w-5 h-5 relative z-10", isActive("/closer") && "text-primary")} />
+                  <Target className={cn("w-5 h-5 relative z-10", (location.pathname === "/closer" || location.pathname === "/closer/actions") && "text-primary")} />
                   <span className="relative z-10">Espace Closers</span>
                 </Link>
               </motion.div>

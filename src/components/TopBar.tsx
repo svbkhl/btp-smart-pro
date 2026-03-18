@@ -93,9 +93,9 @@ export const TopBar = () => {
         )}
         {/* Right Actions - Serrés vers la droite avec recherche */}
         <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 ml-auto">
-          {/* Bouton Espace Closer (visible uniquement pour les closers) */}
+          {/* Bouton Espace Closer → page des 4 actions (/closer/actions) */}
           {isCloser && (
-            <Link to="/closer">
+            <Link to="/closer/actions">
               <Button
                 variant="outline"
                 size="sm"
