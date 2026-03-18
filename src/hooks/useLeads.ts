@@ -326,6 +326,10 @@ export function useAssignLeads() {
       qc.invalidateQueries({ queryKey: ["admin_leads"] });
       qc.invalidateQueries({ queryKey: ["lead_stats"] });
       qc.invalidateQueries({ queryKey: ["generated_depts"] });
+      qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
+      qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_global_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["closers_with_assigned_leads"] });
     },
   });
 }
@@ -369,7 +373,9 @@ export function useUnassignLeadsFromCloser() {
       qc.invalidateQueries({ queryKey: ["admin_leads"] });
       qc.invalidateQueries({ queryKey: ["lead_stats"] });
       qc.invalidateQueries({ queryKey: ["generated_depts"] });
+      qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
       qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_global_closers_kpi"] });
       qc.invalidateQueries({ queryKey: ["closers_with_assigned_leads"] });
     },
   });
@@ -391,7 +397,10 @@ export function useAssignOrphanLeads() {
       qc.invalidateQueries({ queryKey: ["admin_leads"] });
       qc.invalidateQueries({ queryKey: ["lead_stats"] });
       qc.invalidateQueries({ queryKey: ["generated_depts"] });
+      qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
       qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_global_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["closers_with_assigned_leads"] });
     },
   });
 }
@@ -476,6 +485,10 @@ export function useMyLeadStats() {
       };
     },
     enabled: !!user?.id,
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     ...RETRY_NETWORK,
   });
 }
@@ -674,6 +687,8 @@ export function useUpdateLeadStatus() {
       qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
       qc.invalidateQueries({ queryKey: ["closer_activity"] });
       qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_global_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_lead_kpi_by_day"] });
       await qc.refetchQueries({ queryKey: ["my_lead_stats"] });
     },
   });
@@ -689,11 +704,14 @@ export function useUpdateLeadNotes() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ["my_leads"] });
       qc.invalidateQueries({ queryKey: ["my_lead_stats"] });
       qc.invalidateQueries({ queryKey: ["closer_activity"] });
       qc.invalidateQueries({ queryKey: ["admin_all_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_global_closers_kpi"] });
+      qc.invalidateQueries({ queryKey: ["admin_lead_kpi_by_day"] });
+      await qc.refetchQueries({ queryKey: ["my_lead_stats"] });
     },
   });
 }

@@ -265,7 +265,7 @@ const Quotes = () => {
 
         {/* Dialog de visualisation avec vue détaillée complète */}
         <Dialog open={!!viewingQuote} onOpenChange={(open) => !open && setViewingQuote(null)}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-[95vw] max-h-[95vh] overflow-y-auto">
             {viewingQuote && (
               <QuoteDetailView
                 quote={viewingQuote}

@@ -986,7 +986,7 @@ const Facturation = () => {
 
         {/* Dialog de visualisation des devis - Aperçu en grand */}
         <Dialog open={!!viewingQuote} onOpenChange={(open) => !open && setViewingQuote(null)}>
-          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto p-0">
+          <DialogContent className="w-[95vw] max-w-[95vw] max-h-[95vh] overflow-y-auto p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
               <DialogTitle className="text-2xl">Détails du devis</DialogTitle>
               <DialogDescription>
@@ -1029,7 +1029,7 @@ const Facturation = () => {
 
         {/* Dialog de visualisation des factures - Aperçu en grand */}
         <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
-          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto p-0">
+          <DialogContent className="w-[95vw] max-w-[95vw] max-h-[95vh] overflow-y-auto p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
               <DialogTitle className="text-2xl">Détails de la facture</DialogTitle>
               <DialogDescription>
