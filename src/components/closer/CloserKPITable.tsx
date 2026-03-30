@@ -1,7 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { useAuth } from "@/hooks/useAuth";
 import { useMyLeadStats } from "@/hooks/useLeads";
 import {
   Loader2,
@@ -11,33 +8,10 @@ import {
   CheckCircle2,
   FileSignature,
   XCircle,
-  Trophy,
   TrendingUp,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface CloserRank {
-  closer_email: string;
-  monthly_closes: number;
-  rank: number;
-}
-
-function useMyRank() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["closer_my_rank", user?.email],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_closer_leaderboard" as any);
-      if (error) throw error;
-      const list = (data as CloserRank[]) || [];
-      const sorted = [...list].sort((a, b) => b.monthly_closes - a.monthly_closes);
-      const idx = sorted.findIndex((r) => r.closer_email?.toLowerCase() === user?.email?.toLowerCase());
-      return idx >= 0 ? idx + 1 : null;
-    },
-    enabled: !!user?.email,
-  });
-}
 
 const KPI_ROW = [
   { key: "total", label: "Leads assignés", icon: Users, color: "text-foreground", bg: "bg-muted/50" },
@@ -50,7 +24,6 @@ const KPI_ROW = [
 
 export function CloserKPITable() {
   const { data: stats, isLoading: statsLoading } = useMyLeadStats();
-  const { data: myRank, isLoading: rankLoading } = useMyRank();
 
   if (statsLoading && !stats) {
     return (
@@ -121,17 +94,7 @@ export function CloserKPITable() {
             <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{conversionRate} %</p>
           </div>
         </div>
-        {!rankLoading && myRank != null && (
-          <div className="flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500">
-              <Trophy className="h-5 w-5" />
-            </span>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Classement ce mois</p>
-              <p className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">#{myRank}</p>
-            </div>
-          </div>
-        )}
+        {/* Classement masqué temporairement (nouvel ordre à venir) */}
       </div>
     </GlassCard>
   );

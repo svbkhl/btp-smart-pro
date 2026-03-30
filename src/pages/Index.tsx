@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle, Building2, Brain, Zap, Image, Bell } from "lucide-react";
+import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle, Brain, Zap, Image, Bell } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { ContactForm } from "@/components/ContactForm";
@@ -59,8 +59,8 @@ const Index = () => {
         <div className="absolute top-1/3 right-1/4 w-56 h-56 bg-[hsl(320_80%_60%)]/15 rounded-full blur-3xl animate-pulse" style={{ willChange: 'opacity', transform: 'translateZ(0)', animationDelay: '0.5s' }} />
       </div>
 
-      {/* Navigation avec effet glassmorphism amélioré */}
-      <nav className="border-b border-border/50 bg-card/80 backdrop-blur-xl fixed top-0 left-0 right-0 z-50 transition-opacity duration-150 shadow-sm" style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}>
+      {/* Navigation — couleurs thème (primary / accent) */}
+      <nav className="border-b border-border/50 bg-card/80 backdrop-blur-xl fixed top-0 left-0 right-0 z-50 transition-opacity duration-150 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 group">
             <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center transition-all duration-150 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-lg">
@@ -69,8 +69,8 @@ const Index = () => {
             <span className="font-bold text-base sm:text-lg md:text-xl text-foreground">BTP Smart Pro</span>
           </div>
           <Link to="/auth" className="group">
-            <Button variant="ghost" className="gap-2 text-sm md:text-base hover:scale-105 transition-all duration-200 hover:shadow-lg">
-              <span className="hidden sm:inline">Accéder à l'app</span>
+            <Button variant="ghost" className="gap-2 text-sm md:text-base hover:scale-105 transition-all duration-200 hover:shadow-lg text-primary hover:text-primary hover:bg-primary/10">
+              <span className="hidden sm:inline">Accéder à l'application</span>
               <span className="sm:hidden">App</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Button>
@@ -78,91 +78,90 @@ const Index = () => {
         </div>
       </nav>
 
-      {/* Hero Section avec animations optimisées */}
-      <section 
+      {/* Hero — minimal centré, palette identique au reste du site */}
+      <section
         ref={heroRef}
-        className={`pt-20 md:pt-32 pb-12 md:pb-20 px-4 relative overflow-hidden transition-opacity duration-200 ${
-          heroInitialized || heroVisible ? 'opacity-100' : 'opacity-0'
+        className={`relative z-10 bg-background pt-24 md:pt-32 pb-16 md:pb-24 px-4 transition-opacity duration-200 ${
+          heroInitialized || heroVisible ? "opacity-100" : "opacity-0"
         }`}
-        style={{ 
-          willChange: heroInitialized || heroVisible ? 'auto' : 'transform, opacity',
-          transform: heroInitialized || heroVisible ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'opacity 0.7s ease-out, transform 0.7s ease-out'
+        style={{
+          willChange: heroInitialized || heroVisible ? "auto" : "transform, opacity",
+          transform: heroInitialized || heroVisible ? "translateY(0)" : "translateY(12px)",
+          transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
         }}
       >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-accent/8 pointer-events-none" />
-        <div className="container mx-auto relative z-10">
-          <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
-            <div className="space-y-4 md:space-y-6">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="inline-block px-3 md:px-4 py-1.5 md:py-2 bg-primary/10 rounded-full text-primary font-medium text-xs md:text-sm hover:scale-105 transition-transform cursor-default select-none">
-                Nouvelle génération de gestion BTP
-                </div>
-                <div className="inline-flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-[hsl(320_80%_60%)]/10 to-[hsl(320_80%_60%)]/20 rounded-full text-[hsl(320_80%_60%)] font-medium text-xs md:text-sm border border-[hsl(320_80%_60%)]/30 hover:border-[hsl(320_80%_60%)]/50 transition-all hover:scale-105 select-none">
-                  <Sparkles className="w-3 h-3 md:w-4 md:h-4 animate-spin-slow" />
-                  Propulsé par l'IA
-                </div>
-              </div>
-              
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground leading-tight">
-                <span className="inline-block animate-fade-in-up delay-100">
-                  Devis, chantiers, clients —
-                </span>
-                <br />
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent animate-gradient-shift inline-block delay-200">
-                  tout dans une seule app
-                </span>
-              </h1>
-              
-              <p className="text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground animate-fade-in-up delay-400">
-                L'application complète pour les artisans, TPE et PME du bâtiment. 
-                Gérez vos chantiers, suivez vos clients et boostez votre rentabilité grâce à l'IA.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-5 animate-fade-in-up delay-500">
-                <Button 
-                  size="lg"
-                  onClick={() => setContactFormOpen(true)}
-                  className="gap-2.5 text-base sm:text-lg md:text-xl px-6 sm:px-8 md:px-10 py-3.5 sm:py-4 h-14 sm:h-16 w-full sm:w-auto hover:scale-105 transition-all duration-200 hover:shadow-xl relative overflow-hidden group rounded-xl"
-                >
-                  <span className="relative z-10">Demander un essai gratuit</span>
-                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform relative z-10" />
-                  <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Button>
-                <Link to="/demo" className="w-full sm:w-auto">
-                  <Button 
-                    size="lg"
-                    variant="outline" 
-                    className="gap-2 text-base sm:text-lg md:text-xl px-6 sm:px-8 md:px-10 py-3.5 sm:py-4 h-14 sm:h-16 w-full sm:w-auto hover:scale-105 transition-all duration-200 hover:border-primary/50 hover:bg-primary/5 rounded-xl"
-                  >
-                    Voir la démo
-                  </Button>
-                </Link>
-              </div>
-            </div>
-            
-            {/* Hero Image avec effet 3D et animations optimisées */}
-            <div className="relative mt-8 lg:mt-0 group" style={{ willChange: 'transform', transform: 'translateZ(0)' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/20 rounded-2xl md:rounded-3xl blur-3xl group-hover:blur-2xl transition-all duration-150" style={{ willChange: 'opacity, filter' }} />
-              <div className="relative rounded-2xl md:rounded-3xl shadow-2xl w-full h-auto bg-gradient-to-br from-primary via-primary/80 to-primary aspect-video flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-150" style={{ willChange: 'transform' }}>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent)] rounded-2xl md:rounded-3xl" />
-                <div className="text-center space-y-4 p-4 sm:p-6 md:p-8 relative z-10">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm group-hover:rotate-12 transition-transform duration-150 animate-float">
-                    <Building2 className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-white">Gestion BTP Moderne</h3>
-                  <p className="text-white/80 text-xs sm:text-sm">Tout votre chantier dans une seule application</p>
-                </div>
-              </div>
+        <div className="max-w-3xl mx-auto text-center space-y-8 md:space-y-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary border border-primary/20">
+            <Sparkles className="h-4 w-4 text-[hsl(320_80%_60%)] shrink-0" aria-hidden />
+            Application professionnelle BTP
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+            Gérez vos chantiers avec{" "}
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              intelligence
+            </span>
+          </h1>
+
+          <p className="text-sm sm:text-base md:text-lg text-primary font-medium leading-relaxed flex flex-wrap items-center justify-center gap-x-2 gap-y-2 max-w-2xl mx-auto">
+            <a
+              href="#features"
+              className="underline decoration-primary/40 underline-offset-4 hover:decoration-primary transition-colors"
+            >
+              Devis &amp; Factures IA automatiques
+            </a>
+            <span className="text-primary/50 select-none" aria-hidden>
+              •
+            </span>
+            <a
+              href="#features"
+              className="underline decoration-primary/40 underline-offset-4 hover:decoration-primary transition-colors"
+            >
+              Gestion de projets
+            </a>
+            <span className="text-primary/50 select-none" aria-hidden>
+              •
+            </span>
+            <a
+              href="#features"
+              className="underline decoration-primary/40 underline-offset-4 hover:decoration-primary transition-colors"
+            >
+              CRM intégré
+            </a>
+          </p>
+
+          <div className="flex flex-col items-center gap-5">
+            <Link to="/auth">
+              <Button
+                size="lg"
+                className="h-auto rounded-xl px-8 py-3.5 text-base md:text-lg font-semibold gap-2 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] transition-all"
+              >
+                Accéder à l&apos;application
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 text-sm text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => setContactFormOpen(true)}
+                className="underline underline-offset-4 hover:text-foreground transition-colors"
+              >
+                Demander un essai gratuit
+              </button>
+              <span className="hidden sm:inline text-border">|</span>
+              <Link to="/demo" className="underline underline-offset-4 hover:text-foreground transition-colors">
+                Voir la démo
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section avec animations optimisées */}
-      <section 
+      <section
+        id="features"
         ref={featuresRef}
-        className={`py-12 md:py-20 px-4 transition-opacity duration-200 ${
+        className={`scroll-mt-24 py-12 md:py-20 px-4 transition-opacity duration-200 ${
           featuresVisible ? 'opacity-100' : 'opacity-0'
         }`}
         style={{ 
@@ -274,7 +273,7 @@ const Index = () => {
             <div className="relative text-center">
               <Sparkles className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-90 animate-spin-slow group-hover:scale-110 transition-transform" />
               <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 md:mb-4 px-2">
-                Gagnez jusqu'à 10 heures par semaine
+                Gagnez jusqu'à 14 heures par semaine
               </h3>
               <p className="text-sm sm:text-base md:text-lg mb-4 sm:mb-6 md:mb-8 text-white/90 max-w-2xl mx-auto px-2">
                 L'IA prend en charge vos tâches répétitives : génération de devis, analyse de photos, 

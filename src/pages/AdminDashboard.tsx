@@ -50,7 +50,6 @@ import {
 } from "@/components/ui/dialog";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
 import { isHiddenCloser } from "@/config/closerLeaderboard";
 import { CloserSettings } from "@/components/settings/CloserSettings";
 import { AdminKPIClosers } from "@/components/admin/AdminKPIClosers";
@@ -82,6 +81,9 @@ const CompanyMembersList = ({ companyId, companyName }: { companyId: string; com
 
 /** Widget compact : top closers + lien vers l'onglet classement */
 function AdminCloserPerformanceWidget({ onViewClassement }: { onViewClassement?: () => void }) {
+  // Classement masqué temporairement (jusqu'à nouvel ordre).
+  return null;
+
   const { data: list, isLoading } = useQuery({
     queryKey: ["closer_leaderboard"],
     queryFn: async () => {
@@ -297,10 +299,6 @@ export default function AdminDashboard() {
             <Phone className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">Leads BTP</span>
           </TabsTrigger>
-          <TabsTrigger value="performances" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
-            <Trophy className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline truncate">Performances</span>
-          </TabsTrigger>
           <TabsTrigger value="kpi" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
             <BarChart3 className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">KPI Closers</span>
@@ -327,9 +325,7 @@ export default function AdminDashboard() {
           <AdminLeads />
         </TabsContent>
 
-        <TabsContent value="performances" className="mt-4">
-          <CloserLeaderboard />
-        </TabsContent>
+        {/* Classement masqué temporairement (jusqu'à nouvel ordre) */}
 
         <TabsContent value="kpi" className="mt-4">
           <AdminKPIClosers />

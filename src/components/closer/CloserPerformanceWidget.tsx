@@ -1,44 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
 import { useMyLeadStats } from "@/hooks/useLeads";
-import { Loader2, Trophy, TrendingUp, Phone, CheckCircle2 } from "lucide-react";
+import { Loader2, TrendingUp, Phone, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface CloserRank {
-  closer_email: string;
-  monthly_closes: number;
-  rank: number;
-}
-
-function useMyRank() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["closer_my_rank", user?.email],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_closer_leaderboard" as any);
-      if (error) throw error;
-      const list = (data as CloserRank[]) || [];
-      const sorted = [...list].sort((a, b) => b.monthly_closes - a.monthly_closes);
-      const idx = sorted.findIndex((r) => r.closer_email?.toLowerCase() === user?.email?.toLowerCase());
-      return idx >= 0 ? idx + 1 : null;
-    },
-    enabled: !!user?.email,
-  });
-}
-
 interface CloserPerformanceWidgetProps {
-  onViewClassement?: () => void;
   /** Vue agrandie pour l’écran d’accueil (démo avec prospect) */
   size?: "default" | "large";
 }
 
-export function CloserPerformanceWidget({ onViewClassement, size = "default" }: CloserPerformanceWidgetProps) {
-  const { user } = useAuth();
+export function CloserPerformanceWidget({ size = "default" }: CloserPerformanceWidgetProps) {
   const { data: stats, isLoading: statsLoading } = useMyLeadStats();
-  const { data: myRank, isLoading: rankLoading } = useMyRank();
   const isLarge = size === "large";
 
   if (statsLoading && !stats) {
@@ -94,20 +65,7 @@ export function CloserPerformanceWidget({ onViewClassement, size = "default" }: 
               <span className={cn("text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>taux</span>
             </div>
           )}
-          {!rankLoading && myRank != null && (
-            <div className={cn("flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1 border border-amber-500/20", isLarge && "px-3 py-1.5")}>
-              <Trophy className={cn("text-amber-500", isLarge ? "h-5 w-5" : "h-4 w-4")} />
-              <span className={cn("font-bold text-amber-600 dark:text-amber-400", isLarge ? "text-base" : "text-sm")}>#{myRank}</span>
-              <span className={cn("text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>ce mois</span>
-            </div>
-          )}
         </div>
-        {onViewClassement && (
-          <Button variant="outline" size={isLarge ? "default" : "sm"} className="rounded-xl gap-1.5" onClick={onViewClassement}>
-            <Trophy className="h-3.5 w-3.5" />
-            Voir le classement
-          </Button>
-        )}
       </div>
     </GlassCard>
   );

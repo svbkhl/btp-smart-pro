@@ -26,7 +26,6 @@ import {
   ChevronUp,
   MonitorPlay,
   ArrowRight,
-  Trophy,
   BookOpen,
   Phone,
   CalendarDays,
@@ -48,7 +47,6 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CloserResources, CloserCalendly } from "@/components/closer/CloserResources";
-import { CloserLeaderboard } from "@/components/closer/CloserLeaderboard";
 import { CloserPerformanceWidget } from "@/components/closer/CloserPerformanceWidget";
 import { CloserKPITable } from "@/components/closer/CloserKPITable";
 import CloserLeads from "@/components/closer/CloserLeads";
@@ -305,7 +303,7 @@ const CloserDashboard = () => {
       </div>
 
       {/* ── Widget performance (plus gros pour la vue démo) ── */}
-      <CloserPerformanceWidget onViewClassement={() => setActiveTab("classement")} size="large" />
+      <CloserPerformanceWidget size="large" />
 
       {/* ── Un seul gros bouton : ouvre la page des 4 actions (sans le reste en dessous) ── */}
       <button
@@ -349,11 +347,7 @@ const CloserDashboard = () => {
             <CalendarDays className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline truncate">Calendly</span>
           </TabsTrigger>
-          <TabsTrigger value="classement" className="gap-1 rounded-lg text-xs sm:text-sm px-1 sm:px-3">
-            <Trophy className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline truncate">Classement</span>
-            <span className="sm:hidden">Top</span>
-          </TabsTrigger>
+          {/* Classement masqué temporairement (jusqu'à nouvelle annonce) */}
         </TabsList>
 
         {/* Mes entreprises */}
@@ -434,10 +428,7 @@ const CloserDashboard = () => {
           <CloserCalendly />
         </TabsContent>
 
-        {/* Classement */}
-        <TabsContent value="classement" className="mt-4">
-          <CloserLeaderboard />
-        </TabsContent>
+        {/* Classement masqué temporairement (jusqu'à nouvelle annonce) */}
       </Tabs>
 
       {/* Dialog créer entreprise + inviter dirigeant (sans quitter) */}
