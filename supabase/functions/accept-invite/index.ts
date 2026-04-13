@@ -312,6 +312,45 @@ serve(async (req) => {
       );
     }
 
+    // Table public.user_roles (app_role) : dirigeant / administrateur / salarié — requis pour l’UI et politiques RLS héritées
+    const appRole: "dirigeant" | "administrateur" | "salarie" =
+      effectiveRoleSlug === "owner"
+        ? "dirigeant"
+        : effectiveRoleSlug === "admin"
+        ? "administrateur"
+        : "salarie";
+
+    try {
+      const { data: existingUr } = await adminClient
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (existingUr) {
+        const { error: urUpdateErr } = await adminClient
+          .from("user_roles")
+          .update({ role: appRole })
+          .eq("user_id", userId);
+        if (urUpdateErr) {
+          console.warn("[accept-invite] user_roles update:", urUpdateErr.message);
+        } else {
+          console.log("[accept-invite] user_roles mis à jour:", appRole);
+        }
+      } else {
+        const { error: urInsertErr } = await adminClient
+          .from("user_roles")
+          .insert({ user_id: userId, role: appRole });
+        if (urInsertErr) {
+          console.warn("[accept-invite] user_roles insert:", urInsertErr.message);
+        } else {
+          console.log("[accept-invite] user_roles créé:", appRole);
+        }
+      }
+    } catch (urEx) {
+      console.warn("[accept-invite] user_roles sync exception:", urEx);
+    }
+
     // Mettre à jour l'invitation
     const { error: updateError } = await adminClient
       .from('company_invites')

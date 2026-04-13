@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useCreateCompany, type Company } from "@/hooks/useCompany";
+import { DEFAULT_FULL_COMPANY_FEATURES } from "@/utils/companyFeatures";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -86,12 +87,7 @@ export default function CloserActions() {
   const [createdCompanyName, setCreatedCompanyName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [newCompanyData, setNewCompanyData] = useState({
-    name: "",
-    plan: "basic" as Company["plan"],
-    support_level: 0 as Company["support_level"],
-    features: {} as Company["features"],
-  });
+  const [newCompanyName, setNewCompanyName] = useState("");
 
   const handleLancerDemo = (employeeMode: boolean) => {
     setFakeDataEnabled(true);
@@ -125,19 +121,24 @@ export default function CloserActions() {
     setCreatedCompanyId(null);
     setCreatedCompanyName("");
     setInviteEmail("");
-    setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
+    setNewCompanyName("");
   };
 
   const handleCreateCompany = async () => {
-    if (!newCompanyData.name.trim()) {
+    if (!newCompanyName.trim()) {
       toast({ title: "Erreur", description: "Le nom de l'entreprise est requis", variant: "destructive" });
       return;
     }
     try {
-      const company = await createCompany.mutateAsync(newCompanyData);
+      const company = await createCompany.mutateAsync({
+        name: newCompanyName.trim(),
+        plan: "pro" as Company["plan"],
+        features: { ...DEFAULT_FULL_COMPANY_FEATURES },
+        support_level: 0 as Company["support_level"],
+      });
       toast({ title: "Entreprise créée ✓", description: "Invitez le dirigeant ci-dessous ou fermez pour terminer." });
       setCreatedCompanyId(company?.id ?? null);
-      setCreatedCompanyName(newCompanyData.name.trim());
+      setCreatedCompanyName(newCompanyName.trim());
       setCreateStep("invite");
       setInviteEmail("");
     } catch (err: unknown) {
@@ -190,7 +191,7 @@ export default function CloserActions() {
     setCreatedCompanyId(null);
     setCreatedCompanyName("");
     setInviteEmail("");
-    setNewCompanyData({ name: "", plan: "basic", support_level: 0, features: {} });
+    setNewCompanyName("");
   };
 
   return (
@@ -254,8 +255,8 @@ export default function CloserActions() {
                   <Label htmlFor="create-company-name">Nom de l'entreprise *</Label>
                   <Input
                     id="create-company-name"
-                    value={newCompanyData.name}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, name: e.target.value })}
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
                     placeholder="Ex: Maçonnerie Dupont"
                     onKeyDown={(e) => e.key === "Enter" && handleCreateCompany()}
                     autoFocus
@@ -263,7 +264,7 @@ export default function CloserActions() {
                 </div>
                 <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={closeCreateDialog} className="rounded-xl">Annuler</Button>
-                  <Button onClick={handleCreateCompany} disabled={createCompany.isPending || !newCompanyData.name.trim()} className="gap-2 rounded-xl">
+                  <Button onClick={handleCreateCompany} disabled={createCompany.isPending || !newCompanyName.trim()} className="gap-2 rounded-xl">
                     {createCompany.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Création...</> : <><Save className="w-4 h-4" />Créer</>}
                   </Button>
                 </div>

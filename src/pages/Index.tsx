@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle, Clapperboard } from "lucide-react";
+import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { ContactForm } from "@/components/ContactForm";
@@ -20,11 +20,11 @@ declare global {
 
 type LandingFaqItem = { q: string; a: string };
 
-/** Objections les plus fréquentes — affichées en premier (ordre 6, 7, 8, 2, 13). */
-const LANDING_FAQ_PRIORITY: LandingFaqItem[] = [
+/** Uniquement les questions 6, 7, 8, 2, 13 — ordre d'affichage prioritaire. */
+const LANDING_FAQ_ITEMS: LandingFaqItem[] = [
   {
     q: "Pourquoi c'est un paiement unique et pas un abonnement ?",
-    a: "Un paiement unique clarifie votre budget : pas de mensualité surprise, pas de renouvellement automatique à anticiper. Vous investissez une fois pour l’accès à la plateforme dans le cadre de l’offre qui vous est présentée, ce qui correspond souvent aux habitudes des artisans et dirigeants de TPE qui veulent une vision simple de leurs coûts logiciels.",
+    a: "L’accès à la plateforme peut être proposé en paiement unique pour la part « logiciel » : vous savez ce que vous payez une fois pour cette composante. En revanche, selon votre dossier, des frais récurrents peuvent s’ajouter — par exemple hébergement, maintenance ou service après-vente (SAV) — au niveau et à la fréquence prévus dans votre proposition commerciale. Rien n’est facturé sans que ce soit écrit noir sur blanc avant engagement.",
   },
   {
     q: "Est-ce que j'aurai les mises à jour futures incluses ?",
@@ -32,78 +32,15 @@ const LANDING_FAQ_PRIORITY: LandingFaqItem[] = [
   },
   {
     q: "Que se passe-t-il si je ne suis pas satisfait ? Y a-t-il une garantie ?",
-    a: "Votre réussite avec l’outil nous importe. En cas de difficulté, contactez-nous : nous privilégions l’accompagnement (prise en main, paramétrage) pour lever le blocage. Les modalités exactes — délai, remboursement ou avoir — sont celles portées sur votre proposition commerciale ou vos conditions générales au moment de l’achat, afin que tout soit transparent avant paiement.",
+    a: "Votre réussite avec l'outil nous importe. En cas de difficulté, contactez-nous : nous privilégions l'accompagnement (prise en main, paramétrage) pour lever le blocage. Les modalités exactes — délai, remboursement ou avoir — sont celles portées sur votre proposition commerciale ou vos conditions générales au moment de l'achat, afin que tout soit transparent avant paiement.",
   },
   {
     q: "Est-ce que c'est difficile à prendre en main ? Je ne suis pas à l'aise avec les logiciels.",
-    a: "L’interface est pensée pour le terrain : peu de jargon, parcours guidés, et vous pouvez commencer petit (clients, un premier devis) puis enrichir. L’essai gratuit permet de tester sans pression, et nous pouvons vous aider à démarrer selon l’accompagnement prévu dans votre dossier.",
+    a: "L'interface est pensée pour le terrain : peu de jargon, parcours guidés, et vous pouvez commencer petit (clients, un premier devis) puis enrichir. L'essai gratuit permet de tester sans pression, et nous pouvons vous aider à démarrer selon l'accompagnement prévu dans votre dossier.",
   },
   {
     q: "Est-ce que BTP Smart Pro est conforme aux normes françaises (TVA, facturation électronique 2026) ?",
-    a: "L’application est orientée facturation et devis à la française (TVA, mentions courantes, numérotation). La réglementation évolue — notamment vers la facturation électronique à horizon 2026 — et nous suivons ces évolutions pour adapter le produit. En revanche, la conformité définitive dépend aussi de votre activité, de votre expert-comptable et de la façon dont vous utilisez l’outil : vous restez responsable du respect de vos obligations légales et fiscales.",
-  },
-];
-
-const LANDING_FAQ_SECTIONS: { title: string; items: LandingFaqItem[] }[] = [
-  {
-    title: "Sur le produit",
-    items: [
-      {
-        q: "C'est quoi exactement BTP Smart Pro ? C'est pour quel type d'entreprise ?",
-        a: "BTP Smart Pro est une application web tout-en-un pour piloter devis, factures, chantiers, clients et équipes, avec des fonctions d'intelligence artificielle pour accélérer la rédaction et l'analyse. Elle s'adresse aux artisans, auto-entrepreneurs, TPE et PME du bâtiment : second œuvre, gros œuvre, rénovation, plusieurs corps d'état, etc.",
-      },
-      {
-        q: "Est-ce que ça fonctionne sur mobile ? Je suis souvent sur chantier.",
-        a: "Oui. L’interface s’adapte au navigateur de votre smartphone ou tablette : consultation, suivi et actions courantes sur le terrain. Pour de longues saisies ou la mise en page de devis, un ordinateur reste souvent plus confortable.",
-      },
-      {
-        q: "Est-ce que je peux importer mes clients et chantiers existants ?",
-        a: "Vous pouvez ressaisir ou recharger progressivement votre base. Selon votre ancien outil, un import via fichier (format défini avec vous) ou un accompagnement pour la reprise de données peut être proposé — indiquez-le lors de votre demande d’essai ou à votre interlocuteur pour qu’on prévoie la meilleure option.",
-      },
-      {
-        q: "L'IA génère vraiment les devis automatiquement ? Comment ça marche concrètement ?",
-        a: "Vous décrivez le besoin (texte, parfois photos) : l’IA propose une ébauche structurée — libellés, lignes, quantités, indications de prix à partir de votre contexte et de bibliothèques. Ce n’est pas une validation comptable automatique : vous relisez, ajustez les montants, vos taux et votre marge, puis vous validez avant envoi au client. L’objectif est de gagner du temps sur la mise en forme, pas de remplacer votre jugement métier.",
-      },
-    ],
-  },
-  {
-    title: "Sur le paiement",
-    items: [
-      {
-        q: "Quels moyens de paiement acceptez-vous ?",
-        a: "Les modalités précises (carte bancaire via un prestataire sécurisé, virement, etc.) vous sont indiquées sur la proposition ou le lien de paiement communiqué lors de votre adhésion. Vous savez toujours par quel canal régler avant de valider.",
-      },
-      {
-        q: "Combien coûte l'accès exactement ? Y a-t-il des frais cachés ?",
-        a: "Le montant et le périmètre inclus vous sont communiqués clairement avant tout engagement, comme sur la page offre ou la proposition signée. Il n’y a pas de frais « cachés » sur les postes annoncés dans cette offre. Des prestations externes (conseil, comptabilité) ou des options non retenues restent à votre charge si vous les choisissez ailleurs.",
-      },
-    ],
-  },
-  {
-    title: "Sur la confiance / sécurité",
-    items: [
-      {
-        q: "Mes données sont-elles sécurisées ? Où sont-elles stockées ?",
-        a: "Les données sont hébergées sur une infrastructure cloud professionnelle (serveurs et sauvegardes gérés selon les pratiques courantes du secteur), avec connexion chiffrée et authentification sécurisée. Limitez aussi les risques côté usage : mot de passe robuste, déconnexion sur les appareils partagés.",
-      },
-      {
-        q: "Que se passe-t-il si votre entreprise ferme ? Je perds tout ?",
-        a: "Vos données vous concernent : en cas d’arrêt du service, les modalités de préavis, d’export ou de récupération sont prévues dans les engagements contractuels communiqués à l’achat, pour réduire le risque de blocage. Nous vous invitons à conserver aussi des exports réguliers (PDF, exports disponibles) selon vos besoins de continuité.",
-      },
-    ],
-  },
-  {
-    title: "Sur le support",
-    items: [
-      {
-        q: "Est-ce qu'il y a un accompagnement pour démarrer ?",
-        a: "Oui. Vous bénéficiez d’un essai pour explorer l’application, de ressources à l’intérieur du produit et, selon votre dossier, d’échanges pour paramétrer votre espace, vos modèles et vos premiers flux (devis, clients, chantiers).",
-      },
-      {
-        q: "Qui contacter si j'ai un problème ?",
-        a: "Utilisez le formulaire « Demander un essai gratuit » sur cette page pour une première prise de contact, ou les coordonnées / canaux indiqués dans l’application et par votre interlocuteur commercial pour le support technique et les questions liées à votre contrat.",
-      },
-    ],
+    a: "L'application est orientée facturation et devis à la française (TVA, mentions courantes, numérotation). La réglementation évolue — notamment vers la facturation électronique à horizon 2026 — et nous suivons ces évolutions pour adapter le produit. En revanche, la conformité définitive dépend aussi de votre activité, de votre expert-comptable et de la façon dont vous utilisez l'outil : vous restez responsable du respect de vos obligations légales et fiscales.",
   },
 ];
 
@@ -241,24 +178,6 @@ const Index = () => {
               <Link to="/demo" className="underline underline-offset-4 hover:text-foreground transition-colors">
                 Voir la démo
               </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Emplacement vidéo motion design — juste sous le pitch (remplacer par <video> ou iframe) */}
-        <div className="max-w-4xl mx-auto mt-8 md:mt-10 w-full">
-          <div
-            className="w-full rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-primary/5 overflow-hidden aspect-video flex items-center justify-center"
-            aria-label="Vidéo de présentation"
-          >
-            <div className="flex flex-col items-center gap-3 px-6 py-12 text-muted-foreground">
-              <Clapperboard className="h-12 w-12 opacity-50" aria-hidden />
-              <p className="text-sm sm:text-base font-medium text-muted-foreground/90">
-                Vidéo motion design à intégrer ici
-              </p>
-              <p className="text-xs sm:text-sm max-w-md text-muted-foreground/70">
-                Collez votre balise <span className="font-mono text-[0.7rem] sm:text-xs">video</span> ou votre lecteur embarqué dans ce bloc.
-              </p>
             </div>
           </div>
         </div>
@@ -414,57 +333,28 @@ const Index = () => {
           transition: "opacity 0.7s ease-out, transform 0.7s ease-out",
         }}
       >
-        <div className="container mx-auto max-w-3xl space-y-10 sm:space-y-12">
-          <div className="text-center mb-2 px-2">
+        <div className="container mx-auto max-w-3xl">
+          <div className="text-center mb-8 sm:mb-10 px-2">
             <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3 md:mb-4">
               Questions fréquentes
             </h2>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
-              Réponses sur le produit, le paiement, la confiance et le support
+              Les réponses aux objections les plus fréquentes avant de vous engager
             </p>
           </div>
 
-          <div className="space-y-3">
-            <h3 className="text-center text-sm sm:text-base font-semibold text-primary tracking-wide uppercase px-2">
-              En priorité — avant de vous engager
-            </h3>
-            <Accordion type="single" collapsible className="w-full rounded-xl border border-border bg-card px-4 sm:px-6">
-              {LANDING_FAQ_PRIORITY.map((item, index) => (
-                <AccordionItem key={item.q} value={`faq-priority-${index}`} className="border-border/80">
-                  <AccordionTrigger className="text-left text-foreground hover:no-underline py-4 sm:py-5 text-[0.95rem] sm:text-base leading-snug">
-                    {item.q}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground leading-relaxed pb-4 sm:pb-5">
-                    {item.a}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </div>
-
-          {LANDING_FAQ_SECTIONS.map((section) => (
-            <div key={section.title} className="space-y-3">
-              <h3 className="text-lg sm:text-xl font-bold text-foreground px-1 border-l-4 border-primary pl-3">
-                {section.title}
-              </h3>
-              <Accordion type="single" collapsible className="w-full rounded-xl border border-border bg-card px-4 sm:px-6">
-                {section.items.map((item, index) => (
-                  <AccordionItem
-                    key={item.q}
-                    value={`faq-${section.title}-${index}`}
-                    className="border-border/80"
-                  >
-                    <AccordionTrigger className="text-left text-foreground hover:no-underline py-4 sm:py-5 text-[0.95rem] sm:text-base leading-snug">
-                      {item.q}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground leading-relaxed pb-4 sm:pb-5">
-                      {item.a}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
-          ))}
+          <Accordion type="single" collapsible className="w-full rounded-xl border border-border bg-card px-4 sm:px-6">
+            {LANDING_FAQ_ITEMS.map((item, index) => (
+              <AccordionItem key={item.q} value={`faq-${index}`} className="border-border/80">
+                <AccordionTrigger className="text-left text-foreground hover:no-underline py-4 sm:py-5 text-[0.95rem] sm:text-base leading-snug">
+                  {item.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground leading-relaxed pb-4 sm:pb-5">
+                  {item.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </section>
 

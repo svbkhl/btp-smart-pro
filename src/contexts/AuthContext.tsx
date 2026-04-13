@@ -186,8 +186,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const finalRole = role || statut || 'member';
             const determinedRole = getRoleFromString(finalRole);
             setUserRole(determinedRole);
-            setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
-            setIsEmployee(determinedRole === 'salarie');
+            setIsAdmin(determinedRole === 'admin');
+            setIsEmployee(determinedRole === 'member');
             return;
           }
           
@@ -195,8 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const finalRole = role || statut || 'salarie';
           const determinedRole = getRoleFromString(finalRole);
           setUserRole(determinedRole);
-          setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
-          setIsEmployee(determinedRole === 'salarie');
+          setIsAdmin(determinedRole === 'admin');
+          setIsEmployee(determinedRole === 'member');
           return;
         }
 
@@ -204,8 +204,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const finalRole = role || statut || 'member';
           const determinedRole = getRoleFromString(finalRole);
           setUserRole(determinedRole);
-          setIsAdmin(determinedRole === 'administrateur' || determinedRole === 'dirigeant');
-          setIsEmployee(determinedRole === 'salarie');
+          setIsAdmin(determinedRole === 'admin');
+          setIsEmployee(determinedRole === 'member');
           return;
         }
 
@@ -237,7 +237,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const getRoleFromString = (roleStr: string | undefined): 'admin' | 'member' => {
     if (!roleStr) return 'member';
     const roleLower = roleStr.toLowerCase();
-    if (roleLower === 'admin' || roleLower === 'administrateur') {
+    if (
+      roleLower === 'admin' ||
+      roleLower === 'administrateur' ||
+      roleLower === 'dirigeant'
+    ) {
       return 'admin';
     }
     return 'member';
@@ -245,7 +249,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const getRoleFromEnum = (roleEnum: string): 'admin' | 'member' => {
     const roleLower = roleEnum.toLowerCase();
-    if (roleLower === 'admin') {
+    if (
+      roleLower === 'admin' ||
+      roleLower === 'administrateur' ||
+      roleLower === 'dirigeant'
+    ) {
       return 'admin';
     }
     return 'member';

@@ -76,6 +76,16 @@ export const ALL_FEATURES: Array<{
   },
 ];
 
+/** Toutes les fonctionnalités activées — même périmètre app pour chaque entreprise. */
+export const DEFAULT_FULL_COMPANY_FEATURES: Company["features"] = {
+  planning: true,
+  facturation: true,
+  projets: true,
+  messagerie: true,
+  ia_assistant: true,
+  employes: true,
+};
+
 /**
  * Niveaux de support
  */
