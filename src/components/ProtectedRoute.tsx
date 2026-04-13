@@ -11,15 +11,12 @@ interface ProtectedRouteProps {
   requireCloser?: boolean;
 }
 
-const PAYWALL_PATHS = ["/start", "/start/success", "/start/cancel"];
-
 export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, isAdmin, isCloser, isCloserLoading, userRole, currentCompanyId } = useAuth();
   const { fakeDataEnabled, setFakeDataEnabled } = useFakeDataStore();
-  const { isActive: subscriptionActive, isLoading: subscriptionLoading } = useSubscription();
-  const isPaywallPath = PAYWALL_PATHS.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
+  const { isLoading: subscriptionLoading } = useSubscription();
 
   // Timeout de sécurité : après 5 secondes, afficher le contenu même si loading
   // pour éviter les chargements infinis
@@ -136,39 +133,17 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
     }
   }, [user, showContent, fakeDataEnabled, navigate]);
 
-  // Gate abonnement B2B : rediriger vers /start dans un effet (pas pendant le render)
-  // Ne jamais rediriger les admins système (même sans company) pour éviter /start au refresh
-  // Ne jamais rediriger les closers (ils n'ont pas de company et n'ont pas besoin d'abonnement)
-  useEffect(() => {
-    const adminSystem = isSystemAdmin(user);
-    // isCloserLoading : en attente de la vérification DB → on bloque toute redirection
-    const skipGate = isPaywallPath || !user || isAdmin || adminSystem || isCloser || isCloserLoading;
-    if (skipGate) return;
-    if (currentCompanyId && !subscriptionLoading && !subscriptionActive) {
-      navigate("/start", { replace: true });
-      return;
-    }
-    if (!currentCompanyId && !subscriptionLoading) {
-      navigate("/start", { replace: true });
-    }
-  }, [isPaywallPath, user, isAdmin, isCloser, isCloserLoading, currentCompanyId, subscriptionLoading, subscriptionActive, navigate]);
-
   // Rediriger les closers vers /closer s'ils atterrissent sur une page non appropriée
   // En mode démo (fakeDataEnabled), les closers peuvent naviguer sur toutes les pages
-  // Autoriser /start?presenter=1 pour présenter l'offre sans company
   useEffect(() => {
     if (!isCloser || loading || !user) return;
     if (fakeDataEnabled) return; // démo active → accès complet à toute l'app
     const closerAllowedPaths = ["/closer", "/demo", "/settings", "/dashboard"];
-    const isStartPresenter =
-      location.pathname === "/start" && new URLSearchParams(location.search).get("presenter") === "1";
-    const isAllowed =
-      closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/")) ||
-      isStartPresenter;
+    const isAllowed = closerAllowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
     if (!isAllowed) {
       navigate("/closer", { replace: true });
     }
-  }, [isCloser, loading, user, fakeDataEnabled, location.pathname, location.search, navigate]);
+  }, [isCloser, loading, user, fakeDataEnabled, location.pathname, navigate]);
 
   // En mode démo (fakeDataEnabled), permettre l'accès si :
   // 1. L'utilisateur n'est pas connecté (démo publique depuis landing page)
@@ -198,19 +173,8 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
     return null;
   }
 
-  // Si on doit rediriger vers /start (gate abo), ne pas afficher les children pendant la redirection
-  // Exclure aussi les admins système (ex. sabri.khalfallah6@gmail.com) qui n'ont pas de company
-  // Exclure les closers (ils n'ont pas de company non plus)
-  const adminSystem = isSystemAdmin(user);
-  const shouldRedirectToStart =
-    !isPaywallPath && user && !isAdmin && !adminSystem && !isCloser && !subscriptionLoading &&
-    ((currentCompanyId && !subscriptionActive) || !currentCompanyId);
-  if (shouldRedirectToStart) {
-    return null; // l'effet ci-dessus fait la redirection
-  }
-
-  // Afficher le spinner seulement si loading ET pas encore de timeout (ou attente abonnement)
-  const waitingSubscription = !isPaywallPath && user && currentCompanyId && subscriptionLoading;
+  // Afficher le spinner seulement si loading ET pas encore de timeout (ou attente données abonnement)
+  const waitingSubscription = user && currentCompanyId && subscriptionLoading;
   if ((loading && !showContent) || waitingSubscription) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">

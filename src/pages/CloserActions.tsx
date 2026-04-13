@@ -223,9 +223,9 @@ export default function CloserActions() {
           />
           <ActionTile
             icon={Tag}
-            title="Présenter les offres"
-            description="Page tarifaire Starter / Pro / Elite à montrer au client en visio."
-            onClick={() => navigate("/start?presenter=1")}
+            title="Présenter l'offre"
+            description="Fonctionnalités complètes de BTP Smart Pro, sans prix — pour vos visios."
+            onClick={() => navigate("/closer/offre")}
             color="orange"
             gradient="bg-gradient-to-br from-orange-500 to-rose-700"
           />
@@ -274,7 +274,7 @@ export default function CloserActions() {
               <DialogHeader>
                 <DialogTitle>Inviter le dirigeant</DialogTitle>
                 <DialogDescription>
-                  Entreprise <strong>{createdCompanyName}</strong> créée. Envoyez l&apos;invitation au dirigeant (il pourra s&apos;inscrire et gérer l&apos;abonnement).
+                  Entreprise <strong>{createdCompanyName}</strong> créée. Envoyez l&apos;invitation au dirigeant (essai sans carte ; le paiement se fera via le lien que vous lui transmettrez).
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-2">

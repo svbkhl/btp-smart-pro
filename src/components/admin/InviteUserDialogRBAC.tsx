@@ -4,7 +4,7 @@
  * Version améliorée avec support du système de rôles RBAC
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,14 +26,12 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Mail, UserPlus, Shield, Crown, Users, User, Receipt } from 'lucide-react';
+import { Loader2, Mail, UserPlus, Shield, Crown, Users, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useSubscription } from '@/hooks/useSubscription';
 import { AuditLogHelpers } from '@/services/auditLogService';
-import { getStripePlanOptions, type StripePlanOption } from '@/config/stripePlans';
 
 interface InviteUserDialogRBACProps {
   trigger?: React.ReactNode;
@@ -54,17 +52,10 @@ export const InviteUserDialogRBAC = ({
   const { user, currentCompanyId } = useAuth();
   const { can, isOwner, isAdmin } = usePermissions();
   const { roles, isLoading: rolesLoading } = useRoles();
-  const { isActive: companyHasSubscription, isLoading: subscriptionLoading } = useSubscription();
-
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
-  const [selectedPlan, setSelectedPlan] = useState<StripePlanOption | null>(null);
-
-  const planOptions = useMemo(() => getStripePlanOptions(), []);
-  // Si l'entreprise a déjà un abonnement actif, l'invité a accès sans payer. Pendant le chargement, on ne demande pas de plan.
-  const requirePlan = !subscriptionLoading && !companyHasSubscription && planOptions.length > 0;
 
   // Dirigeant et administrateur peuvent toujours inviter ; sinon permission employees.access
   const canInvite = can('employees.access') || isOwner || isAdmin;
@@ -96,16 +87,6 @@ export const InviteUserDialogRBAC = ({
       return;
     }
 
-    // Validation offre / plan uniquement si l'entreprise n'a pas encore d'abonnement
-    if (requirePlan && (!selectedPlan || !selectedPlan.price_id)) {
-      toast({
-        title: 'Erreur',
-        description: 'Veuillez choisir une offre (prix et période d\'essai) avant d\'envoyer l\'invitation',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     // Validation company
     if (!currentCompanyId) {
       toast({
@@ -128,19 +109,11 @@ export const InviteUserDialogRBAC = ({
       // Récupérer le rôle sélectionné pour le log
       const selectedRole = roles.find(r => r.id === selectedRoleId);
 
-      // Créer l'invitation (offre/prix uniquement si entreprise pas encore abonnée)
       const { data, error } = await supabase.functions.invoke('send-invitation', {
         body: {
           email: email.trim().toLowerCase(),
           role_id: selectedRoleId,
           company_id: currentCompanyId,
-          ...(requirePlan && selectedPlan
-            ? {
-                stripe_price_id: selectedPlan.price_id,
-                trial_days: selectedPlan.trial_days,
-                offer_label: selectedPlan.label,
-              }
-            : {}),
         },
       });
 
@@ -168,7 +141,6 @@ export const InviteUserDialogRBAC = ({
       // Reset et fermer
       setEmail('');
       setSelectedRoleId('');
-      setSelectedPlan(null);
       setOpen(false);
 
       // Callback de succès
@@ -205,59 +177,12 @@ export const InviteUserDialogRBAC = ({
             Inviter un employé
           </DialogTitle>
           <DialogDescription>
-            Envoyez une invitation par email. L'utilisateur pourra créer son compte et rejoindre votre entreprise.
+            Envoyez une invitation par email. L&apos;utilisateur pourra créer son compte et rejoindre votre entreprise sans saisir de carte bancaire (essai géré avec votre interlocuteur commercial).
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleInvite}>
           <div className="grid gap-4 py-4">
-            {/* Offre / Plan : masqué pendant chargement ; si entreprise abonnée → message ; sinon → sélecteur */}
-            {subscriptionLoading ? (
-              <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                Vérification de l'abonnement...
-              </div>
-            ) : companyHasSubscription ? (
-              <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-3 text-sm text-green-700 dark:text-green-400">
-                Votre entreprise est déjà abonnée. L'invité aura accès directement sans souscription.
-              </div>
-            ) : planOptions.length > 0 ? (
-              <div className="grid gap-2">
-                <Label>
-                  Offre / Plan <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={selectedPlan ? selectedPlan.price_id : ""}
-                  onValueChange={(value) => {
-                    const plan = planOptions.find((p) => p.price_id === value) ?? null;
-                    setSelectedPlan(plan);
-                  }}
-                  disabled={loading}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir l'offre, le prix et la période d'essai" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {planOptions.map((plan) => (
-                      <SelectItem key={plan.price_id} value={plan.price_id}>
-                        <div className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4 text-muted-foreground" />
-                          <span>{plan.label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            — {plan.trial_days} j. d'essai
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  L'invité pourra souscrire à cette offre à l'acceptation de l'invitation.
-                </p>
-              </div>
-            ) : null}
-
             {/* Email */}
             <div className="grid gap-2">
               <Label htmlFor="email">
@@ -340,7 +265,7 @@ export const InviteUserDialogRBAC = ({
             </Button>
             <Button
               type="submit"
-              disabled={loading || subscriptionLoading || !selectedRoleId || (requirePlan && !selectedPlan)}
+              disabled={loading || !selectedRoleId}
             >
               {loading ? (
                 <>

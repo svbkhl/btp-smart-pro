@@ -1,37 +1,29 @@
 /**
- * Service pour générer et gérer les liens de paiement
+ * Après signature : notification client (plus de page de paiement publique dans l’app).
+ * Le lien de règlement est envoyé manuellement par l’artisan / le commercial.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { sendEmail } from "./emailService";
 
 /**
- * Génère un lien de paiement pour un devis ou une facture
+ * @deprecated Les URLs /payment/* ne sont plus servies — préférez un lien Stripe ou autre envoyé manuellement.
  */
 export async function generatePaymentLink(
-  quoteId?: string,
-  invoiceId?: string
+  _quoteId?: string,
+  _invoiceId?: string
 ): Promise<string> {
-  const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-  
-  if (quoteId) {
-    return `${baseUrl}/payment/quote/${quoteId}`;
-  } else if (invoiceId) {
-    return `${baseUrl}/payment/invoice/${invoiceId}`;
-  }
-  
-  throw new Error("quoteId ou invoiceId requis");
+  return "";
 }
 
 /**
- * Envoie automatiquement le lien de paiement après signature
+ * Envoie un email post-signature sans lien de paiement in-app (message à personnaliser côté client).
  */
 export async function sendPaymentLinkAfterSignature(
   signatureId: string
 ): Promise<void> {
-  console.log("💳 [paymentLinkService] Envoi du lien de paiement après signature:", signatureId);
+  console.log("💳 [paymentLinkService] Notification après signature:", signatureId);
 
-  // Récupérer la signature
   const { data: signature, error: sigError } = await supabase
     .from("signatures")
     .select("*")
@@ -46,21 +38,16 @@ export async function sendPaymentLinkAfterSignature(
     throw new Error("Le document n'est pas encore signé");
   }
 
-  // Générer le lien de paiement
-  const paymentLink = await generatePaymentLink(signature.quote_id || undefined, signature.invoice_id || undefined);
-
-  // Enregistrer le lien dans la signature
   await supabase
     .from("signatures")
     .update({
-      payment_link: paymentLink,
+      payment_link: null,
       payment_link_sent_at: new Date().toISOString(),
     })
     .eq("id", signatureId);
 
-  // Envoyer l'email avec le lien de paiement
   const documentType = signature.quote_id ? "devis" : "facture";
-  const documentNumber = signature.quote_id ? "DEV-XXX" : "FAC-XXX"; // TODO: Récupérer le numéro réel
+  const documentNumber = signature.quote_id ? "DEV-XXX" : "FAC-XXX";
 
   const emailHtml = `
     <!DOCTYPE html>
@@ -72,7 +59,6 @@ export async function sendPaymentLinkAfterSignature(
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background-color: #10b981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { padding: 20px; background-color: #f9fafb; border-radius: 0 0 8px 8px; }
-        .button { display: inline-block; padding: 12px 24px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
       </style>
     </head>
@@ -84,12 +70,7 @@ export async function sendPaymentLinkAfterSignature(
         <div class="content">
           <p>Bonjour ${signature.client_name || "Client"},</p>
           <p>Merci d'avoir signé le ${documentType} ${documentNumber}.</p>
-          <p>Vous pouvez maintenant procéder au paiement en cliquant sur le lien ci-dessous :</p>
-          <div style="text-align: center;">
-            <a href="${paymentLink}" class="button">Payer maintenant</a>
-          </div>
-          <p>Ou copiez ce lien dans votre navigateur :</p>
-          <p style="word-break: break-all; color: #2563eb;">${paymentLink}</p>
+          <p>Vous recevrez prochainement un lien ou les modalités de règlement de la part de votre interlocuteur.</p>
           <p>Cordialement,<br>L'équipe</p>
         </div>
         <div class="footer">
@@ -102,21 +83,10 @@ export async function sendPaymentLinkAfterSignature(
 
   await sendEmail({
     to: signature.client_email,
-    subject: `Lien de paiement - ${documentType} ${documentNumber}`,
+    subject: `Document signé — ${documentType} ${documentNumber}`,
     html: emailHtml,
     type: "payment_confirmation",
   });
 
-  console.log("✅ [paymentLinkService] Lien de paiement envoyé à:", signature.client_email);
+  console.log("✅ [paymentLinkService] Email post-signature envoyé à:", signature.client_email);
 }
-
-
-
-
-
-
-
-
-
-
-

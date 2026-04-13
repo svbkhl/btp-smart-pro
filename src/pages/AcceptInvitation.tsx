@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2, CheckCircle2, XCircle, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -20,6 +21,7 @@ const AcceptInvitation = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { refetchCurrentCompanyId } = useAuth();
   const token = searchParams.get('token');
 
   const [loading, setLoading] = useState(true);
@@ -157,6 +159,9 @@ const AcceptInvitation = () => {
         throw acceptError;
       }
 
+      // Recharger l’entreprise courante (évite une course avec onAuthStateChange avant la ligne company_users)
+      await refetchCurrentCompanyId();
+
       // Créer le profil dans employees si nécessaire (avec company_id pour respecter la contrainte NOT NULL)
       // L'invitation doit toujours avoir company_id quand un owner invite un employé
       const companyId = invitation.company_id ?? invitation.companies?.id;
@@ -173,11 +178,11 @@ const AcceptInvitation = () => {
 
       toast({
         title: 'Compte créé avec succès !',
-        description: `Vous avez rejoint ${invitation.companies?.name || 'l\'entreprise'}. Connectez-vous puis choisissez votre abonnement si besoin.`,
+        description: `Vous avez rejoint ${invitation.companies?.name || 'l\'entreprise'}. Connectez-vous pour accéder à l’application.`,
       });
 
-      // Rediriger vers la connexion (avec invitation_id pour /start après login)
       const invitationIdParam = invitation.id ? `&invitation_id=${encodeURIComponent(invitation.id)}` : '';
+      setCreating(false);
       setTimeout(() => {
         navigate(`/auth?message=account-created${invitationIdParam}`);
       }, 2000);

@@ -291,6 +291,7 @@ export const useCreateCompany = () => {
       // Récupérer l'utilisateur actuel pour définir owner_id
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       
+      const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("companies")
         .insert({
@@ -301,6 +302,8 @@ export const useCreateCompany = () => {
           settings: companyData.settings || {},
           support_level: companyData.support_level || 0,
           status: "active",
+          subscription_status: "trialing",
+          trial_end: trialEnd,
         })
         .select()
         .single();

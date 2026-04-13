@@ -21,12 +21,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Shield, Bell, UserPlus, Play, Settings as SettingsIcon2, Calendar, Receipt, Send } from "lucide-react";
+import { Building2, FileText, CreditCard, Shield, Bell, UserPlus, Play, Settings as SettingsIcon2, Calendar, Send } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
 import { DemoModeSettings } from "@/components/settings/DemoModeSettings";
-import { BillingSettings } from "@/components/settings/BillingSettings";
 import { GoogleCalendarConnection } from "@/components/GoogleCalendarConnection";
 import { PlanningEmailSettings } from "@/components/settings/PlanningEmailSettings";
 import DelegationsManagement from "@/pages/DelegationsManagement";
@@ -50,7 +49,7 @@ const Settings = () => {
   const oauthCodeRef = useRef<string | null>(null);
   
   // Sections autorisées pour les OWNERS (8 sections : company, employees, billing, stripe, integrations, notifications, relances, security)
-  const ownerAllowedSections = ['company', 'employees', 'billing', 'stripe', 'integrations', 'notifications', 'relances', 'security'];
+  const ownerAllowedSections = ['company', 'employees', 'stripe', 'integrations', 'notifications', 'relances', 'security'];
   
   // Sections autorisées pour les EMPLOYÉS (3 sections uniquement : sécurité, intégrations pour plannings, notifications)
   const employeeAllowedSections = ['security', 'integrations', 'notifications'];
@@ -66,6 +65,13 @@ const Settings = () => {
   const isAdminByEmail = isAdminEmail(user?.email);
   const isAdminEmailLiteral = user?.email?.toLowerCase() === "sabri.khalfallah6@gmail.com";
   const isReallyAdmin = isAdmin || isAdminSystem || isAdminByEmail || isAdminEmailLiteral || (roleSlug === 'admin' && !isOwner);
+
+  // Ancien lien ?tab=billing (onglet supprimé)
+  useEffect(() => {
+    if (tabFromUrl === "billing") {
+      setSearchParams({ tab: "company" }, { replace: true });
+    }
+  }, [tabFromUrl, setSearchParams]);
 
   // Protection : si owner ou employé essaye d'accéder à un onglet non autorisé, rediriger (pas pour les admins système)
   useEffect(() => {
@@ -188,14 +194,14 @@ const Settings = () => {
   
   // Ajuster le nombre de colonnes selon les onglets
   // EMPLOYÉS (3 onglets) : security, integrations, notifications
-  // OWNERS (8 onglets) : company, employees, billing, stripe, integrations, notifications, relances, security
+  // OWNERS (7 onglets) : company, employees, stripe, integrations, notifications, relances, security
   // ADMINS (12-13 onglets) : 7 de base + companies, contact-requests, users, roles, delegations (optionnel), admin-company, demo
   // Note: "legal" a été déplacé en haut à droite comme bouton
   const tabCount = isEmployee
     ? 3 // Employés: 3 onglets uniquement (security, integrations, notifications)
     : isReallyAdmin 
     ? (canManageDelegations ? 13 : 12) // Admins: 12 ou 13 onglets
-    : 8; // Owners: 8 onglets (company, employees, billing, stripe, integrations, notifications, relances, security)
+    : 7; // Owners: 7 onglets (company, employees, stripe, integrations, notifications, relances, security)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -257,10 +263,6 @@ const Settings = () => {
                   <Building2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="truncate">Entreprise</span>
                 </TabsTrigger>
-                <TabsTrigger value="billing" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
-                  <Receipt className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Abonnement</span>
-                </TabsTrigger>
               </>
             )}
             {isReallyAdmin && (
@@ -299,9 +301,6 @@ const Settings = () => {
             <>
               <TabsContent value="company" className="mt-0">
                 <CompanySettings />
-              </TabsContent>
-              <TabsContent value="billing" className="mt-0">
-                <BillingSettings />
               </TabsContent>
             </>
           )}

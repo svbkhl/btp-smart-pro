@@ -11,8 +11,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { isSystemAdmin, isCloserEmail } from "@/config/admin";
-import { hasActiveSubscription } from "@/lib/checkSubscription";
-
 // Déclaration de type pour la propriété globale window
 declare global {
   interface Window {
@@ -31,7 +29,7 @@ const Auth = () => {
   const [error, setError] = useState<string | null>(null);
 
   // ─── Navigation post-auth (définie ici pour être réutilisée) ─────────────
-  // Ordre : admin → closer → invitation → abo → dashboard (les closers ne doivent jamais tomber sur /start)
+  // Ordre : admin → closer → invitation → dashboard (pas de paywall in-app)
   const handlePostAuthNavigation = useCallback(async (sessionUser: User) => {
     if (isSystemAdmin(sessionUser)) {
       navigate("/dashboard", { replace: true });
@@ -57,15 +55,10 @@ const Auth = () => {
     const params = new URLSearchParams(window.location.search);
     const invitationId = params.get("invitation_id");
     if (invitationId) {
-      navigate(`/start?invitation_id=${encodeURIComponent(invitationId)}`, { replace: true });
+      navigate("/dashboard", { replace: true });
       return;
     }
 
-    const hasSub = await hasActiveSubscription(sessionUser.id, sessionUser.email);
-    if (!hasSub) {
-      navigate("/start", { replace: true });
-      return;
-    }
     navigate("/dashboard", { replace: true });
   }, [navigate]);
 

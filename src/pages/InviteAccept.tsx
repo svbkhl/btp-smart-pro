@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, XCircle, Mail, AlertCircle, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -35,7 +36,8 @@ const InviteAccept = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+  const { refetchCurrentCompanyId } = useAuth();
+
   const inviteId = searchParams.get('invite_id');
   const token = searchParams.get('token');
 
@@ -363,14 +365,15 @@ const InviteAccept = () => {
 
           console.log('✅ Sign in successful:', signInData);
 
+          await refetchCurrentCompanyId();
+
           toast({
             title: 'Invitation acceptée !',
-            description: `Bienvenue chez ${data.company_name || inviteInfo?.company_name || 'l\'entreprise'}. Choisissez votre abonnement si besoin.`,
+            description: `Bienvenue chez ${data.company_name || inviteInfo?.company_name || 'l\'entreprise'}.`,
           });
 
-          // Rediriger vers la page de souscription (offre liée à l'invitation)
           setTimeout(() => {
-            navigate(`/start?invitation_id=${encodeURIComponent(inviteId || '')}`);
+            navigate("/dashboard");
           }, 1500);
         } else if (data.already_member) {
           // L'utilisateur était déjà membre

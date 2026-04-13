@@ -29,7 +29,6 @@ export interface SubscriptionData {
   stripe_price_id: string | null;
 }
 
-const ACTIVE_STATUSES: SubscriptionStatus[] = ["trialing", "active"];
 
 /** Entreprises qui ont accès sans abonnement (ex: partenaires). Match par inclusion (ex: "First Payout SARL" → ok) */
 const SUBSCRIPTION_BYPASS_PATTERNS = ["first payout"];
@@ -107,10 +106,9 @@ export function useSubscription() {
   const data = query.data ?? null;
   const companyName = data && "name" in data ? (data as { name?: string | null }).name : null;
   const bypassSubscription = emailBypass || isBypassCompany(companyName);
-  // Strict : accès si abonnement actif (trialing ou active) OU bypass (email ou entreprise partenaire)
-  const isActive =
-    bypassSubscription ||
-    (data != null && data.subscription_status != null && ACTIVE_STATUSES.includes(data.subscription_status));
+  const st = data?.subscription_status ?? null;
+  const isBlockedByStripe = st === "canceled" || st === "unpaid";
+  const isActive = bypassSubscription || (data != null && !isBlockedByStripe);
 
   return {
     ...query,

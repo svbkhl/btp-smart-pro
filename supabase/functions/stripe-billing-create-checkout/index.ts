@@ -149,13 +149,15 @@ serve(async (req) => {
     }
 
     const successUrl = `${SITE_URL}/dashboard?onboarding_step=0`;
-    const cancelUrl = `${SITE_URL}/start`;
+    const cancelUrl = `${SITE_URL}/dashboard`;
 
     // trial_period_days : uniquement à la création. Stripe renouvelle ensuite sans jamais réappliquer d'essai.
+    // Essai à 0 € : ne pas exiger de carte à l'entrée (le client ajoutera un moyen de paiement avant fin d'essai si besoin).
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
+      payment_method_collection: "if_required",
       subscription_data: {
         trial_period_days: trialPeriodDays,
         metadata: {

@@ -7,7 +7,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { User } from "@supabase/supabase-js";
 import { isSystemAdmin, isCloserEmail } from "@/config/admin";
-import { hasActiveSubscription } from "@/lib/checkSubscription";
 
 // Déclaration de type pour la propriété globale window
 declare global {
@@ -27,7 +26,7 @@ declare global {
  * Flow :
  * 1. Lit les paramètres URL (code, token, error, etc.)
  * 2. Établit la session Supabase
- * 3. Redirige vers /dashboard ou /start
+ * 3. Redirige vers /dashboard
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -37,8 +36,7 @@ const AuthCallback = () => {
   const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
 
   /**
-   * Redirige l'utilisateur après authentification réussie.
-   * Si pas de forfait actif → /start (choix forfait). Sinon → /dashboard.
+   * Redirige l'utilisateur après authentification réussie vers le tableau de bord.
    */
   const handlePostAuthNavigation = async (user: User) => {
     if (isSystemAdmin(user)) {
@@ -62,11 +60,6 @@ const AuthCallback = () => {
       return;
     }
 
-    const hasSub = await hasActiveSubscription(user.id, user.email);
-    if (!hasSub) {
-      navigate("/start", { replace: true });
-      return;
-    }
     navigate("/dashboard", { replace: true });
   };
 

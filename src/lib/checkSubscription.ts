@@ -1,12 +1,12 @@
 /**
- * Vérifie si l'utilisateur a un abonnement actif (trialing ou active).
- * Utilisé après auth pour rediriger vers /start si pas de forfait.
- * Exception : employés de "first payout" ont accès sans abonnement.
+ * Vérifie si l'utilisateur peut accéder à l'app avec son entreprise.
+ * Abonnement Stripe optionnel : essai / facturation manuelle → subscription_status souvent null ou trialing.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
-const ACTIVE_STATUSES = ["trialing", "active"];
+/** Accès refusé uniquement pour ces statuts (résiliation / impayé côté Stripe). */
+const BLOCKED_STATUSES = ["canceled", "unpaid"];
 const BYPASS_PATTERNS = ["first payout"];
 const BYPASS_EMAILS = ["khalfallahs.ndrc@gmail.com"];
 
@@ -45,8 +45,10 @@ export async function hasActiveSubscription(
 
     if (cError || !company) return false;
     if (isBypassCompany(company.name)) return true;
-    if (!company.subscription_status) return false;
-    return ACTIVE_STATUSES.includes(company.subscription_status);
+    const st = company.subscription_status;
+    if (st == null) return true;
+    if (BLOCKED_STATUSES.includes(st)) return false;
+    return true;
   } catch {
     return false;
   }

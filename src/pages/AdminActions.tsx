@@ -114,8 +114,8 @@ export default function AdminActions() {
           <ActionTile
             icon={Tag}
             title="Présenter l'offre"
-            description="Page tarifaire Starter / Pro / Elite à montrer au client en visio."
-            onClick={() => navigate("/start?presenter=1")}
+            description="Fonctionnalités complètes de BTP Smart Pro, sans prix — pour vos visios."
+            onClick={() => navigate("/admin/offre")}
             color="orange"
             gradient="bg-gradient-to-br from-orange-500 to-rose-700"
           />

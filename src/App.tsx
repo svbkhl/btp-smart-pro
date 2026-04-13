@@ -17,10 +17,6 @@ import AuthCallback from './pages/AuthCallback';
 import Demo from './pages/Demo';
 import PublicSignature from './pages/PublicSignature';
 import PublicCandidature from './pages/PublicCandidature';
-import PaymentSuccess from './pages/PaymentSuccess';
-import PaymentError from './pages/PaymentError';
-import PaymentFinal from './pages/PaymentFinal';
-import PaymentPage from './pages/PaymentPage';
 import SignatureQuote from './pages/SignatureQuote';
 import Signature from './pages/Signature';
 import SignaturePage from './pages/SignaturePage';
@@ -69,9 +65,7 @@ import StripeCallback from './pages/StripeCallback';
 import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
 import NotFound from './pages/NotFound';
-import Start from './pages/Start';
-import StartSuccess from './pages/StartSuccess';
-import StartCancel from './pages/StartCancel';
+import CloserOffer from './pages/CloserOffer';
 
 // Pages RBAC (Gestion des rôles et utilisateurs)
 import { RolesManagementGuarded } from './pages/RolesManagement';
@@ -109,7 +103,6 @@ function App() {
     location.pathname === '/demo' ||
     location.pathname.startsWith('/sign/') ||
     location.pathname.startsWith('/signature/') ||
-    location.pathname.startsWith('/payment/') ||
     location.pathname.startsWith('/candidature/') ||
     location.pathname.startsWith('/quote/') ||
     location.pathname.startsWith('/reset-password') ||
@@ -148,17 +141,6 @@ function App() {
         <Route path="/signature/document/:id" element={<Signature />} />
         <Route path="/signature-quote/:id" element={<SignatureQuote />} />
         <Route path="/candidature/:id" element={<PublicCandidature />} />
-        <Route path="/payment/success" element={<PaymentSuccess />} />
-        <Route path="/payment/error" element={<PaymentError />} />
-        <Route path="/payment/final" element={<PaymentFinal />} />
-        <Route path="/payment/quote/:id" element={<PaymentPage />} />
-        <Route path="/payment/invoice/:id" element={<PaymentPage />} />
-
-        {/* Paywall / souscription B2B (protégé auth, pas de gate abonnement) */}
-        <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
-        <Route path="/start/success" element={<ProtectedRoute><StartSuccess /></ProtectedRoute>} />
-        <Route path="/start/cancel" element={<ProtectedRoute><StartCancel /></ProtectedRoute>} />
-
         {/* Routes protégées */}
         <Route
           path="/dashboard"
@@ -417,6 +399,14 @@ function App() {
           }
         />
         <Route
+          path="/admin/offre"
+          element={
+            <ProtectedRoute requireAdmin>
+              <CloserOffer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/employees"
           element={
             <ProtectedRoute requireAdmin>
@@ -453,6 +443,14 @@ function App() {
           element={
             <ProtectedRoute requireCloser>
               <CloserActions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/closer/offre"
+          element={
+            <ProtectedRoute requireCloser>
+              <CloserOffer />
             </ProtectedRoute>
           }
         />

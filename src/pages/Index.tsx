@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle, Brain, Zap, Image, Bell } from "lucide-react";
+import { ArrowRight, BarChart3, Users, Calendar, MessageSquare, Sparkles, CheckCircle, Clapperboard } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { ContactForm } from "@/components/ContactForm";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Déclaration de type pour la propriété globale window
 declare global {
@@ -11,13 +17,95 @@ declare global {
     __IS_PASSWORD_RESET_PAGE__?: boolean;
   }
 }
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
+
+type LandingFaqItem = { q: string; a: string };
+
+/** Objections les plus fréquentes — affichées en premier (ordre 6, 7, 8, 2, 13). */
+const LANDING_FAQ_PRIORITY: LandingFaqItem[] = [
+  {
+    q: "Pourquoi c'est un paiement unique et pas un abonnement ?",
+    a: "Un paiement unique clarifie votre budget : pas de mensualité surprise, pas de renouvellement automatique à anticiper. Vous investissez une fois pour l’accès à la plateforme dans le cadre de l’offre qui vous est présentée, ce qui correspond souvent aux habitudes des artisans et dirigeants de TPE qui veulent une vision simple de leurs coûts logiciels.",
+  },
+  {
+    q: "Est-ce que j'aurai les mises à jour futures incluses ?",
+    a: "Les correctifs, la sécurité et les évolutions nécessaires au bon fonctionnement du service font partie de notre engagement produit. Les ajouts majeurs ou options très spécifiques peuvent être précisés au moment de votre souscription ; tout ce qui est annoncé comme inclus dans votre offre le reste sans supplément caché.",
+  },
+  {
+    q: "Que se passe-t-il si je ne suis pas satisfait ? Y a-t-il une garantie ?",
+    a: "Votre réussite avec l’outil nous importe. En cas de difficulté, contactez-nous : nous privilégions l’accompagnement (prise en main, paramétrage) pour lever le blocage. Les modalités exactes — délai, remboursement ou avoir — sont celles portées sur votre proposition commerciale ou vos conditions générales au moment de l’achat, afin que tout soit transparent avant paiement.",
+  },
+  {
+    q: "Est-ce que c'est difficile à prendre en main ? Je ne suis pas à l'aise avec les logiciels.",
+    a: "L’interface est pensée pour le terrain : peu de jargon, parcours guidés, et vous pouvez commencer petit (clients, un premier devis) puis enrichir. L’essai gratuit permet de tester sans pression, et nous pouvons vous aider à démarrer selon l’accompagnement prévu dans votre dossier.",
+  },
+  {
+    q: "Est-ce que BTP Smart Pro est conforme aux normes françaises (TVA, facturation électronique 2026) ?",
+    a: "L’application est orientée facturation et devis à la française (TVA, mentions courantes, numérotation). La réglementation évolue — notamment vers la facturation électronique à horizon 2026 — et nous suivons ces évolutions pour adapter le produit. En revanche, la conformité définitive dépend aussi de votre activité, de votre expert-comptable et de la façon dont vous utilisez l’outil : vous restez responsable du respect de vos obligations légales et fiscales.",
+  },
+];
+
+const LANDING_FAQ_SECTIONS: { title: string; items: LandingFaqItem[] }[] = [
+  {
+    title: "Sur le produit",
+    items: [
+      {
+        q: "C'est quoi exactement BTP Smart Pro ? C'est pour quel type d'entreprise ?",
+        a: "BTP Smart Pro est une application web tout-en-un pour piloter devis, factures, chantiers, clients et équipes, avec des fonctions d'intelligence artificielle pour accélérer la rédaction et l'analyse. Elle s'adresse aux artisans, auto-entrepreneurs, TPE et PME du bâtiment : second œuvre, gros œuvre, rénovation, plusieurs corps d'état, etc.",
+      },
+      {
+        q: "Est-ce que ça fonctionne sur mobile ? Je suis souvent sur chantier.",
+        a: "Oui. L’interface s’adapte au navigateur de votre smartphone ou tablette : consultation, suivi et actions courantes sur le terrain. Pour de longues saisies ou la mise en page de devis, un ordinateur reste souvent plus confortable.",
+      },
+      {
+        q: "Est-ce que je peux importer mes clients et chantiers existants ?",
+        a: "Vous pouvez ressaisir ou recharger progressivement votre base. Selon votre ancien outil, un import via fichier (format défini avec vous) ou un accompagnement pour la reprise de données peut être proposé — indiquez-le lors de votre demande d’essai ou à votre interlocuteur pour qu’on prévoie la meilleure option.",
+      },
+      {
+        q: "L'IA génère vraiment les devis automatiquement ? Comment ça marche concrètement ?",
+        a: "Vous décrivez le besoin (texte, parfois photos) : l’IA propose une ébauche structurée — libellés, lignes, quantités, indications de prix à partir de votre contexte et de bibliothèques. Ce n’est pas une validation comptable automatique : vous relisez, ajustez les montants, vos taux et votre marge, puis vous validez avant envoi au client. L’objectif est de gagner du temps sur la mise en forme, pas de remplacer votre jugement métier.",
+      },
+    ],
+  },
+  {
+    title: "Sur le paiement",
+    items: [
+      {
+        q: "Quels moyens de paiement acceptez-vous ?",
+        a: "Les modalités précises (carte bancaire via un prestataire sécurisé, virement, etc.) vous sont indiquées sur la proposition ou le lien de paiement communiqué lors de votre adhésion. Vous savez toujours par quel canal régler avant de valider.",
+      },
+      {
+        q: "Combien coûte l'accès exactement ? Y a-t-il des frais cachés ?",
+        a: "Le montant et le périmètre inclus vous sont communiqués clairement avant tout engagement, comme sur la page offre ou la proposition signée. Il n’y a pas de frais « cachés » sur les postes annoncés dans cette offre. Des prestations externes (conseil, comptabilité) ou des options non retenues restent à votre charge si vous les choisissez ailleurs.",
+      },
+    ],
+  },
+  {
+    title: "Sur la confiance / sécurité",
+    items: [
+      {
+        q: "Mes données sont-elles sécurisées ? Où sont-elles stockées ?",
+        a: "Les données sont hébergées sur une infrastructure cloud professionnelle (serveurs et sauvegardes gérés selon les pratiques courantes du secteur), avec connexion chiffrée et authentification sécurisée. Limitez aussi les risques côté usage : mot de passe robuste, déconnexion sur les appareils partagés.",
+      },
+      {
+        q: "Que se passe-t-il si votre entreprise ferme ? Je perds tout ?",
+        a: "Vos données vous concernent : en cas d’arrêt du service, les modalités de préavis, d’export ou de récupération sont prévues dans les engagements contractuels communiqués à l’achat, pour réduire le risque de blocage. Nous vous invitons à conserver aussi des exports réguliers (PDF, exports disponibles) selon vos besoins de continuité.",
+      },
+    ],
+  },
+  {
+    title: "Sur le support",
+    items: [
+      {
+        q: "Est-ce qu'il y a un accompagnement pour démarrer ?",
+        a: "Oui. Vous bénéficiez d’un essai pour explorer l’application, de ressources à l’intérieur du produit et, selon votre dossier, d’échanges pour paramétrer votre espace, vos modèles et vos premiers flux (devis, clients, chantiers).",
+      },
+      {
+        q: "Qui contacter si j'ai un problème ?",
+        a: "Utilisez le formulaire « Demander un essai gratuit » sur cette page pour une première prise de contact, ou les coordonnées / canaux indiqués dans l’application et par votre interlocuteur commercial pour le support technique et les questions liées à votre contrat.",
+      },
+    ],
+  },
+];
 
 const Index = () => {
   const [contactFormOpen, setContactFormOpen] = useState(false);
@@ -36,6 +124,7 @@ const Index = () => {
   const [heroRef, heroVisible] = useScrollAnimation(0.2);
   const [aiRef, aiVisible] = useScrollAnimation(0.1);
   const [featuresRef, featuresVisible] = useScrollAnimation(0.1);
+  const [faqRef, faqVisible] = useScrollAnimation(0.1);
   const [ctaRef, ctaVisible] = useScrollAnimation(0.2);
   
   // La section hero doit être visible immédiatement
@@ -152,6 +241,24 @@ const Index = () => {
               <Link to="/demo" className="underline underline-offset-4 hover:text-foreground transition-colors">
                 Voir la démo
               </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Emplacement vidéo motion design — juste sous le pitch (remplacer par <video> ou iframe) */}
+        <div className="max-w-4xl mx-auto mt-8 md:mt-10 w-full">
+          <div
+            className="w-full rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-primary/5 overflow-hidden aspect-video flex items-center justify-center"
+            aria-label="Vidéo de présentation"
+          >
+            <div className="flex flex-col items-center gap-3 px-6 py-12 text-muted-foreground">
+              <Clapperboard className="h-12 w-12 opacity-50" aria-hidden />
+              <p className="text-sm sm:text-base font-medium text-muted-foreground/90">
+                Vidéo motion design à intégrer ici
+              </p>
+              <p className="text-xs sm:text-sm max-w-md text-muted-foreground/70">
+                Collez votre balise <span className="font-mono text-[0.7rem] sm:text-xs">video</span> ou votre lecteur embarqué dans ce bloc.
+              </p>
             </div>
           </div>
         </div>
@@ -294,133 +401,70 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-12 md:py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-8 sm:mb-10 md:mb-16 px-2">
+      {/* FAQ */}
+      <section
+        id="faq"
+        ref={faqRef}
+        className={`scroll-mt-24 py-12 md:py-20 px-4 transition-opacity duration-200 ${
+          faqVisible ? "opacity-100" : "opacity-0"
+        }`}
+        style={{
+          willChange: faqVisible ? "auto" : "transform, opacity",
+          transform: faqVisible ? "translateY(0)" : "translateY(20px)",
+          transition: "opacity 0.7s ease-out, transform 0.7s ease-out",
+        }}
+      >
+        <div className="container mx-auto max-w-3xl space-y-10 sm:space-y-12">
+          <div className="text-center mb-2 px-2">
             <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3 md:mb-4">
-              Des professionnels témoignent
+              Questions fréquentes
             </h2>
-            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Découvrez comment des entreprises du BTP optimisent leur gestion quotidienne grâce à des outils modernes comme le nôtre
+            <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
+              Réponses sur le produit, le paiement, la confiance et le support
             </p>
           </div>
 
-          <div className="relative max-w-7xl mx-auto">
-            <Carousel
-              opts={{
-                align: "start",
-                loop: true,
-              }}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-2 md:-ml-4">
-                {[
-                  {
-                    name: "Marc Dubois",
-                    role: "Artisan carreleur",
-                    company: "Carrelage Dubois",
-                    review: "La génération de devis par IA me fait gagner un temps fou. J'arrive à répondre aux clients en quelques minutes au lieu de passer une heure sur chaque devis."
-                  },
-                  {
-                    name: "Sophie Martin",
-                    role: "Gérante",
-                    company: "Martin Électricité",
-                    review: "Le planning intégré change tout. Je vois d'un coup d'œil où sont mes équipes et ce qui est prévu pour la semaine. Plus de doublons ni d'oublis."
-                  },
-                  {
-                    name: "Pierre Lefebvre",
-                    role: "Chef d'entreprise",
-                    company: "Lefebvre Maçonnerie",
-                    review: "Le suivi client est beaucoup plus fluide. Tous les échanges et documents sont au même endroit. Mes clients apprécient cette transparence."
-                  },
-                  {
-                    name: "Julie Bernard",
-                    role: "Auto-entrepreneur",
-                    company: "Peinture Bernard",
-                    review: "Simple et efficace. L'analyse d'images par IA m'aide à mieux estimer les surfaces et les besoins en matériaux. Moins d'erreurs dans mes devis."
-                  },
-                  {
-                    name: "Thomas Moreau",
-                    role: "Gérant",
-                    company: "Moreau Plomberie",
-                    review: "Le tableau de bord me donne une vision claire de ma rentabilité. Je peux identifier rapidement les chantiers les plus rentables et ajuster mes tarifs."
-                  },
-                  {
-                    name: "Laure Petit",
-                    role: "Directrice",
-                    company: "Petit Charpente",
-                    review: "La gestion des documents est un vrai gain de temps. Plus besoin de chercher dans mes emails, tout est centralisé. L'interface est intuitive."
-                  },
-                  {
-                    name: "Nicolas Durand",
-                    role: "Artisan plâtrier",
-                    company: "Durand Enduits",
-                    review: "L'assistant IA répond à mes questions pratiques rapidement. Pour les normes ou les techniques, c'est comme avoir un collègue expert disponible 24/7."
-                  },
-                  {
-                    name: "Céline Roux",
-                    role: "Chef d'entreprise",
-                    company: "Roux Isolation",
-                    review: "Depuis que j'utilise le système, j'ai réduit mes erreurs de devis de moitié. La vérification automatique des prix me rassure avant d'envoyer aux clients."
-                  },
-                  {
-                    name: "Fabien Girard",
-                    role: "Gérant",
-                    company: "Girard Menuiserie",
-                    review: "La communication avec les clients est simplifiée. Ils reçoivent leurs devis directement et peuvent suivre l'avancement des travaux. Ça crée de la confiance."
-                  },
-                  {
-                    name: "Sandrine Blanc",
-                    role: "Auto-entrepreneur",
-                    company: "Blanc Rénovation",
-                    review: "Pour une petite structure comme la mienne, c'est parfait. Je gère mes chantiers, mes clients et mes devis sans avoir besoin de plusieurs outils. Très pratique."
-                  },
-                  {
-                    name: "Julien Leroy",
-                    role: "Chef d'entreprise",
-                    company: "Leroy Couverture",
-                    review: "Le planning m'aide à optimiser mes déplacements. Je regroupe les interventions par secteur et ça réduit mes temps de trajet. Économies de carburant en bonus."
-                  },
-                  {
-                    name: "Marie Dubois",
-                    role: "Gérante",
-                    company: "Dubois Sols & Murs",
-                    review: "L'historique complet de chaque client facilite le suivi. Je vois tout ce qu'on a fait ensemble, les devis précédents, les factures. Ça aide pour les devis de maintenance."
-                  }
-                ].map((testimonial, index) => (
-                  <CarouselItem key={index} className="pl-2 sm:pl-3 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3">
-                    <div className="bg-card p-4 sm:p-5 md:p-6 lg:p-8 rounded-xl md:rounded-2xl border border-border hover:shadow-xl transition-all duration-150 hover:-translate-y-1 group h-full">
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                          <span className="text-primary font-semibold text-lg">
-                            {testimonial.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-foreground mb-1">{testimonial.name}</h3>
-                          <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                          <p className="text-xs text-muted-foreground/80">{testimonial.company}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-4">
-                        "{testimonial.review}"
-                      </p>
-                      <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <svg key={i} className="w-4 h-4 fill-yellow-400" viewBox="0 0 20 20">
-                            <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                          </svg>
-                        ))}
-                      </div>
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="hidden md:flex -left-12 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-white/20 dark:border-gray-700/30 hover:bg-white dark:hover:bg-gray-900 shadow-lg" />
-              <CarouselNext className="hidden md:flex -right-12 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-white/20 dark:border-gray-700/30 hover:bg-white dark:hover:bg-gray-900 shadow-lg" />
-            </Carousel>
+          <div className="space-y-3">
+            <h3 className="text-center text-sm sm:text-base font-semibold text-primary tracking-wide uppercase px-2">
+              En priorité — avant de vous engager
+            </h3>
+            <Accordion type="single" collapsible className="w-full rounded-xl border border-border bg-card px-4 sm:px-6">
+              {LANDING_FAQ_PRIORITY.map((item, index) => (
+                <AccordionItem key={item.q} value={`faq-priority-${index}`} className="border-border/80">
+                  <AccordionTrigger className="text-left text-foreground hover:no-underline py-4 sm:py-5 text-[0.95rem] sm:text-base leading-snug">
+                    {item.q}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground leading-relaxed pb-4 sm:pb-5">
+                    {item.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
+
+          {LANDING_FAQ_SECTIONS.map((section) => (
+            <div key={section.title} className="space-y-3">
+              <h3 className="text-lg sm:text-xl font-bold text-foreground px-1 border-l-4 border-primary pl-3">
+                {section.title}
+              </h3>
+              <Accordion type="single" collapsible className="w-full rounded-xl border border-border bg-card px-4 sm:px-6">
+                {section.items.map((item, index) => (
+                  <AccordionItem
+                    key={item.q}
+                    value={`faq-${section.title}-${index}`}
+                    className="border-border/80"
+                  >
+                    <AccordionTrigger className="text-left text-foreground hover:no-underline py-4 sm:py-5 text-[0.95rem] sm:text-base leading-snug">
+                      {item.q}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground leading-relaxed pb-4 sm:pb-5">
+                      {item.a}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -447,7 +491,7 @@ const Index = () => {
               </h2>
               </div>
               <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-4 sm:mb-6 md:mb-8 text-white/90 px-2">
-                Rejoignez les centaines d'entreprises qui utilisent déjà l'intelligence artificielle pour optimiser leur productivité
+                Essayez la gestion chantier et les outils IA pour fluidifier devis, facturation et suivi client au quotidien.
               </p>
               <Button 
                 size="lg" 
