@@ -4,6 +4,7 @@
  * Le clic sur "Nouvelle Entreprise" ouvre le dialog sur cette page (pas de navigation).
  */
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useCreateCompany, type Company } from "@/hooks/useCompany";
@@ -80,6 +81,7 @@ export default function CloserActions() {
   const { toast } = useToast();
   const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
   const createCompany = useCreateCompany();
+  const queryClient = useQueryClient();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"create" | "invite">("create");
@@ -177,6 +179,7 @@ export default function CloserActions() {
         return;
       }
       toast({ title: "Invitation envoyée ✓", description: "Le dirigeant recevra un email pour rejoindre l'entreprise." });
+      void queryClient.invalidateQueries({ queryKey: ["company-members-admin", createdCompanyId] });
       setInviteEmail("");
       setInviteLoading(false);
     } catch (e: unknown) {

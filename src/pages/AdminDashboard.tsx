@@ -56,7 +56,7 @@ import { AdminKPIClosers } from "@/components/admin/AdminKPIClosers";
 import AdminContactRequests from "@/pages/AdminContactRequests";
 import AdminCompanies from "@/pages/AdminCompanies";
 import AdminLeads from "@/pages/AdminLeads";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const CompanyMembersList = ({ companyId, companyName }: { companyId: string; companyName: string }) => {
@@ -72,7 +72,7 @@ const CompanyMembersList = ({ companyId, companyName }: { companyId: string; com
             <div className="font-medium text-sm">{[m.prenom, m.nom].filter(Boolean).join(" ") || "—"}</div>
             <div className="text-xs text-muted-foreground">{m.email && <span>{m.email}</span>}</div>
           </div>
-          {(m.role_slug || m.role_name) && <Badge variant="secondary" className="text-xs">{m.role_slug || m.role_name}</Badge>}
+          {(m.role_name || m.role_slug) && <Badge variant="secondary" className="text-xs">{m.role_name || m.role_slug}</Badge>}
         </div>
       ))}
     </div>
@@ -134,6 +134,7 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const { data: companies = [], isLoading } = useAllCompanies();
   const createCompany = useCreateCompany();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("entreprises");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -207,6 +208,7 @@ export default function AdminDashboard() {
         return;
       }
       toast({ title: "Invitation envoyée ✓", description: "Le dirigeant recevra un email." });
+      void queryClient.invalidateQueries({ queryKey: ["company-members-admin", createdCompanyId] });
       setInviteEmail("");
     } catch (e: any) {
       toast({ title: "Erreur", description: e?.message || "Impossible d'envoyer l'invitation", variant: "destructive" });

@@ -33,6 +33,39 @@ interface AcceptInviteRequest {
   password?: string; // Optionnel si compte existe déjà
 }
 
+/** Rôle RBAC (table roles.slug) : si absent, tente create_system_roles_for_company puis re-lookup */
+async function resolveRbacRoleId(
+  adminClient: ReturnType<typeof createClient>,
+  companyId: string,
+  rbacSlug: "owner" | "admin" | "employee",
+): Promise<string | null> {
+  const { data: first } = await adminClient
+    .from("roles")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("slug", rbacSlug)
+    .maybeSingle();
+
+  if (first?.id) return first.id;
+
+  const { error: seedErr } = await adminClient.rpc("create_system_roles_for_company", {
+    company_uuid: companyId,
+  });
+  if (seedErr) {
+    console.warn("[accept-invite] create_system_roles_for_company:", seedErr.message);
+    return null;
+  }
+
+  const { data: retry } = await adminClient
+    .from("roles")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("slug", rbacSlug)
+    .maybeSingle();
+
+  return retry?.id ?? null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -282,13 +315,15 @@ serve(async (req) => {
       }
     }
 
-    // Récupérer le role_id depuis la table roles (company_id + slug)
-    const { data: roleData } = await adminClient
-      .from('roles')
-      .select('id')
-      .eq('company_id', invite.company_id)
-      .eq('slug', effectiveRoleSlug)
-      .maybeSingle();
+    // Rôle company_users : contrainte CHECK souvent (owner | member) uniquement
+    const companyUsersRole: "owner" | "member" =
+      effectiveRoleSlug === "owner" || effectiveRoleSlug === "admin" ? "owner" : "member";
+
+    const roleIdResolved = await resolveRbacRoleId(
+      adminClient,
+      invite.company_id,
+      effectiveRoleSlug,
+    );
 
     // Ajouter à company_users (UPSERT pour éviter doublons)
     const { error: companyUserError } = await adminClient
@@ -296,8 +331,8 @@ serve(async (req) => {
       .upsert({
         company_id: invite.company_id,
         user_id: userId,
-        role: effectiveRoleLabel,
-        role_id: roleData?.id || null,
+        role: companyUsersRole,
+        role_id: roleIdResolved,
         status: 'active',
       }, {
         onConflict: 'company_id,user_id'
@@ -373,7 +408,8 @@ serve(async (req) => {
       is_new_user: isNewUser,
       company_id: invite.company_id,
       company_name: (invite.companies as any)?.name,
-      role: effectiveRoleLabel,
+      role: companyUsersRole,
+      invitation_role: invite.role,
       // Pour nouveau user, retourner les infos pour connexion
       ...(isNewUser && {
         email: normalizedEmail,

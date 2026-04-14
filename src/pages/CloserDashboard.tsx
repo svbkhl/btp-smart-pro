@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,7 +70,7 @@ const CompanyMembersList = ({ companyId, companyName }: { companyId: string; com
               {member.email && <span className="ml-2">• {member.email}</span>}
             </div>
           </div>
-          {(member.role_slug || member.role_name) && <Badge variant="secondary" className="ml-2 text-xs">{member.role_slug || member.role_name}</Badge>}
+          {(member.role_name || member.role_slug) && <Badge variant="secondary" className="ml-2 text-xs">{member.role_name || member.role_slug}</Badge>}
         </div>
       ))}
     </div>
@@ -142,6 +143,7 @@ const CloserDashboard = () => {
   const { user } = useAuth();
   const { data: companies = [], isLoading } = useAllCompanies();
   const createCompany = useCreateCompany();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { setFakeDataEnabled, fakeDataEnabled, closerEmployeeMode, setCloserEmployeeMode } = useFakeDataStore();
   // Rejoindre le canal de présence dès que le closer est connecté
@@ -231,6 +233,7 @@ const CloserDashboard = () => {
         return;
       }
       toast({ title: "Invitation envoyée ✓", description: "Le dirigeant recevra un email pour rejoindre l'entreprise." });
+      void queryClient.invalidateQueries({ queryKey: ["company-members-admin", createdCompanyId] });
       setInviteEmail("");
       setInviteLoading(false);
     } catch (e: any) {

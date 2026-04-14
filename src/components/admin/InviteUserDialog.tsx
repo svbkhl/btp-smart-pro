@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ export const InviteUserDialog = ({
   onSuccess,
 }: InviteUserDialogProps) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -208,6 +210,7 @@ export const InviteUserDialog = ({
             title: 'Invitation envoyée avec succès !',
             description: responseData?.message || `Une invitation a été envoyée à ${emailToSend}`,
           });
+          void queryClient.invalidateQueries({ queryKey: ['company-members-admin', companyId] });
           
           // Réinitialiser après 2 secondes pour permettre de voir le message
           setTimeout(() => {
