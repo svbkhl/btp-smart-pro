@@ -1,5 +1,5 @@
 /**
- * Contenus légaux réutilisables (RGPD, cookies, CGU, mentions) — utilisés par Paramètres et pages /legal/*
+ * Contenus légaux réutilisables (RGPD inclut cookies, mentions, CGU) — Paramètres et pages /legal/*
  */
 
 import { cn } from "@/lib/utils";
@@ -39,7 +39,11 @@ export function PrivacyPolicySection({ className }: { className?: string }) {
         </p>
         <h3 className="font-semibold text-foreground mt-4">6. Sécurité</h3>
         <p>
-          Nous mettons en œuvre des mesures techniques et organisationnelles adaptées pour protéger vos données (accès sécurisé, hébergement conforme, sauvegardes).
+          Nous appliquons des mesures techniques et organisationnelles adaptées pour protéger vos données (accès sécurisé, hébergement conforme, sauvegardes).
+        </p>
+        <h3 className="font-semibold text-foreground mt-4">7. Cookies et traceurs</h3>
+        <p>
+          Le site et l’application peuvent déposer des cookies ou équivalents (par ex. stockage local) <strong>strictement nécessaires</strong> au fonctionnement et à la sécurité : session, connexion, préférences d’affichage. Nous limitons tout autre traceur au strict nécessaire. Vous pouvez paramétrer votre navigateur pour bloquer ou supprimer les cookies ; le refus des cookies indispensables peut empêcher une utilisation normale du service. Questions : contact@btpsmartpro.com.
         </p>
       </div>
     </section>
@@ -70,35 +74,6 @@ export function MentionsLegalesSection({ className }: { className?: string }) {
         <h3 className="font-semibold text-foreground mt-4">Contact</h3>
         <p>
           Pour toute question relative aux mentions légales : contact@btpsmartpro.com
-        </p>
-      </div>
-    </section>
-  );
-}
-
-export function CookiePolicySection({ className }: { className?: string }) {
-  return (
-    <section className={className}>
-      <h2 className="text-xl font-semibold mb-4 text-foreground">Politique relative aux cookies</h2>
-      <div className={sectionClass}>
-        <p>
-          Lors de la visite du site ou de l’application BTP Smart Pro, des cookies ou traceurs peuvent être déposés sur votre terminal (ordinateur, tablette, smartphone), sous réserve des choix que vous avez exprimés.
-        </p>
-        <h3 className="font-semibold text-foreground mt-4">1. Qu’est-ce qu’un cookie ?</h3>
-        <p>
-          Un cookie est un petit fichier texte enregistré sur votre appareil lors de la consultation d’un site. Il permet notamment d’assurer le bon fonctionnement du service, de mémoriser vos préférences ou d’établir des statistiques d’audience anonymisées.
-        </p>
-        <h3 className="font-semibold text-foreground mt-4">2. Cookies strictement nécessaires</h3>
-        <p>
-          Certains cookies sont indispensables à la navigation et à la sécurité (session, authentification, préférences d’affichage). Ils ne peuvent pas être désactivés sans impacter le fonctionnement du service.
-        </p>
-        <h3 className="font-semibold text-foreground mt-4">3. Cookies de mesure d’audience</h3>
-        <p>
-          Le cas échéant, des cookies peuvent être utilisés pour comprendre l’utilisation du service et l’améliorer. Ils sont configurés pour limiter au maximum les données personnelles et peuvent être refusés lorsque la loi l’exige.
-        </p>
-        <h3 className="font-semibold text-foreground mt-4">4. Vos choix</h3>
-        <p>
-          Vous pouvez configurer votre navigateur pour refuser les cookies ou être alerté avant tout dépôt. Pour toute question : contact@btpsmartpro.com
         </p>
       </div>
     </section>
@@ -151,7 +126,6 @@ export function LegalPagesContent() {
           <div className="space-y-10">
             <PrivacyPolicySection />
             <MentionsLegalesSection />
-            <CookiePolicySection className="pt-6 border-t border-border/50" />
             <TermsOfUseSection />
           </div>
         </ScrollArea>

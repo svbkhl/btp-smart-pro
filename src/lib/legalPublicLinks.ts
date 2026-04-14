@@ -2,7 +2,7 @@
 
 export const LEGAL_PUBLIC_PATHS = {
   confidentialite: "/legal/politique-confidentialite",
-  cookies: "/legal/politique-cookies",
+  mentionsLegales: "/legal/mentions-legales",
   conditionsGenerales: "/legal/conditions-generales",
 } as const;
 

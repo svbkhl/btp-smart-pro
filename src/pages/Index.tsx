@@ -418,12 +418,12 @@ const Index = () => {
               |
             </span>
             <a
-              href={legalAbsoluteUrl(LEGAL_PUBLIC_PATHS.cookies)}
+              href={legalAbsoluteUrl(LEGAL_PUBLIC_PATHS.mentionsLegales)}
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-2 transition-colors hover:text-foreground"
             >
-              Politique cookies
+              Mentions légales
             </a>
             <span className="hidden text-border sm:inline" aria-hidden>
               |

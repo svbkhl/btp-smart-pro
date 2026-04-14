@@ -1,18 +1,23 @@
 import { Link, useParams, Navigate } from "react-router-dom";
 import {
   PrivacyPolicySection,
-  CookiePolicySection,
+  MentionsLegalesSection,
   TermsOfUseSection,
 } from "@/components/legal/LegalSections";
 
 const titles: Record<string, string> = {
   "politique-confidentialite": "Politique de confidentialité",
-  "politique-cookies": "Politique cookies",
+  "mentions-legales": "Mentions légales",
   "conditions-generales": "Conditions générales",
 };
 
 export default function LegalPublicPage() {
   const { page } = useParams<{ page: string }>();
+
+  if (page === "politique-cookies") {
+    return <Navigate to="/legal/politique-confidentialite" replace />;
+  }
+
   const title = page ? titles[page] : "";
 
   if (!page || !title) {
@@ -22,8 +27,8 @@ export default function LegalPublicPage() {
   let body: React.ReactNode;
   if (page === "politique-confidentialite") {
     body = <PrivacyPolicySection />;
-  } else if (page === "politique-cookies") {
-    body = <CookiePolicySection />;
+  } else if (page === "mentions-legales") {
+    body = <MentionsLegalesSection className="border-0 pt-0" />;
   } else if (page === "conditions-generales") {
     body = <TermsOfUseSection className="border-0 pt-0" />;
   } else {
