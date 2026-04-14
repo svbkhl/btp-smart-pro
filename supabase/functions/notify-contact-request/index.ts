@@ -77,7 +77,7 @@ serve(async (req) => {
         ${entreprise ? `<p><strong>Entreprise :</strong> ${entreprise}</p>` : ''}
         ${message ? `<p><strong>Message :</strong><br>${message.replace(/\n/g, '<br>')}</p>` : ''}
         <p><strong>Type de demande :</strong> ${request_type === 'essai_gratuit' ? 'Essai gratuit' : request_type === 'contact' ? 'Contact' : 'Information'}</p>
-        ${trial_requested ? '<p style="color: #059669; font-weight: bold;">✅ Essai gratuit de 30 jours demandé</p>' : ''}
+        ${trial_requested ? '<p style="color: #059669; font-weight: bold;">✅ Essai gratuit de 14 jours demandé</p>' : ''}
       </div>
 
       ${trial_requested ? `

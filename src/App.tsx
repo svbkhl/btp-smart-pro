@@ -66,6 +66,7 @@ import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
 import NotFound from './pages/NotFound';
 import CloserOffer from './pages/CloserOffer';
+import LegalPublicPage from './pages/LegalPublicPage';
 
 // Pages RBAC (Gestion des rôles et utilisateurs)
 import { RolesManagementGuarded } from './pages/RolesManagement';
@@ -108,7 +109,8 @@ function App() {
     location.pathname.startsWith('/reset-password') ||
     location.pathname.startsWith('/forgot-password') ||
     location.pathname.startsWith('/invite/') ||
-    location.pathname.startsWith('/accept-invitation');
+    location.pathname.startsWith('/accept-invitation') ||
+    location.pathname.startsWith('/legal/');
   
   return (
     <ErrorBoundary>
@@ -141,6 +143,7 @@ function App() {
         <Route path="/signature/document/:id" element={<Signature />} />
         <Route path="/signature-quote/:id" element={<SignatureQuote />} />
         <Route path="/candidature/:id" element={<PublicCandidature />} />
+        <Route path="/legal/:page" element={<LegalPublicPage />} />
         {/* Routes protégées */}
         <Route
           path="/dashboard"
