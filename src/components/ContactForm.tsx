@@ -23,17 +23,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Mail, Phone, Building2, User, MessageSquare, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-const LEGAL_PATHS = {
-  confidentialite: '/legal/politique-confidentialite',
-  cookies: '/legal/politique-cookies',
-  conditionsGenerales: '/legal/conditions-generales',
-} as const;
-
-function legalAbsoluteUrl(path: string) {
-  if (typeof window === 'undefined') return path;
-  return new URL(path, window.location.origin).href;
-}
-
 interface ContactFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -292,41 +281,6 @@ export const ContactForm = ({
             </Button>
           </DialogFooter>
         </form>
-
-        <div className="mt-4 border-t border-border/50 pt-4">
-          <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-[11px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-            <a
-              href={legalAbsoluteUrl(LEGAL_PATHS.confidentialite)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              Politique de confidentialité
-            </a>
-            <span className="hidden text-border sm:inline" aria-hidden>
-              |
-            </span>
-            <a
-              href={legalAbsoluteUrl(LEGAL_PATHS.cookies)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              Politique cookies
-            </a>
-            <span className="hidden text-border sm:inline" aria-hidden>
-              |
-            </span>
-            <a
-              href={legalAbsoluteUrl(LEGAL_PATHS.conditionsGenerales)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              Conditions générales
-            </a>
-          </p>
-        </div>
       </DialogContent>
     </Dialog>
   );

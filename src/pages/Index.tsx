@@ -10,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { LEGAL_PUBLIC_PATHS, legalAbsoluteUrl } from "@/lib/legalPublicLinks";
 
 // Déclaration de type pour la propriété globale window
 declare global {
@@ -399,8 +400,43 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-6 md:py-8 px-4">
-        <div className="container mx-auto text-center text-muted-foreground">
+      <footer className="border-t border-border/40 py-6 md:py-8 px-4">
+        <div className="container mx-auto text-center text-muted-foreground space-y-4">
+          <nav
+            aria-label="Informations légales"
+            className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[11px] uppercase tracking-wide sm:text-xs"
+          >
+            <a
+              href={legalAbsoluteUrl(LEGAL_PUBLIC_PATHS.confidentialite)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Politique de confidentialité
+            </a>
+            <span className="hidden text-border sm:inline" aria-hidden>
+              |
+            </span>
+            <a
+              href={legalAbsoluteUrl(LEGAL_PUBLIC_PATHS.cookies)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Politique cookies
+            </a>
+            <span className="hidden text-border sm:inline" aria-hidden>
+              |
+            </span>
+            <a
+              href={legalAbsoluteUrl(LEGAL_PUBLIC_PATHS.conditionsGenerales)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Conditions générales
+            </a>
+          </nav>
           <p className="text-sm md:text-base">&copy; 2026 BTP Smart Pro. Tous droits réservés.</p>
         </div>
       </footer>
