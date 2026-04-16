@@ -1,0 +1,27 @@
+---
+description: Exécuter automatiquement les commandes utiles (dev, migrations, git) sans attendre que l'utilisateur le demande
+alwaysApply: true
+---
+
+# Exécution automatique
+
+Dans ce projet, exécute les commandes nécessaires **de toi-même, à chaque fois**, sans que l'utilisateur ait à demander.
+
+## À faire systématiquement
+
+1. **Serveur de dev**  
+   Si on travaille sur le frontend et qu'aucun terminal ne fait déjà `npm run dev`, lance `npm run dev` en arrière-plan.
+
+2. **Après des changements de code ou de migrations**  
+   - Si l'utilisateur a dit « push », « pousse », « commit » ou équivalent : faire `git add` des fichiers concernés, `git commit` avec un message clair, puis `git push`.  
+   - Si on a ajouté ou modifié des migrations Supabase dans `supabase/migrations/` ou `supabase/scripts/*.sql` : rappeler d’exécuter le SQL dans le Supabase Dashboard (SQL Editor) ou proposer `supabase db push` si le projet est lié.
+
+3. **Quand une migration est mentionnée**  
+   Indiquer comment l’appliquer (SQL Editor ou `supabase db push`) et, si un script existe dans `supabase/scripts/`, donner le chemin du fichier à exécuter.
+
+## Résumé
+
+- Lancer le dev server si besoin.  
+- Faire commit + push quand l’utilisateur le souhaite (même s’il ne redemande pas explicitement à chaque fois).  
+- Pour les migrations : dire comment les exécuter et quel fichier utiliser.  
+- Ne pas attendre une demande explicite pour ces exécutions.
