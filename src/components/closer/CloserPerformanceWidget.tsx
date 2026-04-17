@@ -24,6 +24,7 @@ export function CloserPerformanceWidget({ size = "default" }: CloserPerformanceW
 
   const total = stats?.total ?? 0;
   const newCount = stats?.new ?? 0;
+  const toCallback = stats?.to_callback ?? 0;
   const signed = stats?.signed ?? 0;
   const conversion = total > 0 ? Math.round((signed / total) * 100) : 0;
 
@@ -53,6 +54,10 @@ export function CloserPerformanceWidget({ size = "default" }: CloserPerformanceW
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span className={cn("font-bold text-blue-400", isLarge ? "text-xl sm:text-2xl" : "text-lg")}>{newCount}</span>
             <span className={cn("text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>nouveaux</span>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className={cn("font-bold text-amber-400", isLarge ? "text-xl sm:text-2xl" : "text-lg")}>{toCallback}</span>
+            <span className={cn("text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>à rappeler</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <CheckCircle2 className={cn("text-emerald-400", isLarge ? "h-5 w-5" : "h-4 w-4")} />

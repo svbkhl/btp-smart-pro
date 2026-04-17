@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { normalizeCloserLeadStatsRecord } from "@/lib/closerLeadKpi";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -472,17 +473,8 @@ export function useMyLeadStats() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_my_lead_stats" as any);
       if (error) throw error;
-      const o = (data as Record<string, number>) ?? {};
-      return {
-        total: Number(o.total ?? 0),
-        new: Number(o.new ?? 0),
-        to_callback: Number(o.to_callback ?? 0),
-        no_answer: Number(o.no_answer ?? 0),
-        not_interested: Number(o.not_interested ?? 0),
-        qualified: Number(o.qualified ?? 0),
-        signed: Number(o.signed ?? 0),
-        lost: Number(o.lost ?? 0),
-      };
+      const o = (data as Record<string, unknown>) ?? {};
+      return normalizeCloserLeadStatsRecord(o);
     },
     enabled: !!user?.id,
     staleTime: 0,
@@ -525,7 +517,7 @@ export function useAllClosersKpi() {
         closer_name: r.closer_name ?? r.closer_email?.split("@")[0] ?? "—",
         total: Number(r.total ?? 0),
         new: Number(r.new ?? 0),
-        to_callback: Number(r.to_callback ?? 0),
+        to_callback: Number(r.to_callback ?? r.contacted ?? 0),
         no_answer: Number(r.no_answer ?? 0),
         not_interested: Number(r.not_interested ?? 0),
         qualified: Number(r.qualified ?? 0),
@@ -557,7 +549,7 @@ export function useAllOwnersLeadKpi() {
         closer_name: r.closer_name ?? r.closer_email?.split("@")[0] ?? "—",
         total: Number(r.total ?? 0),
         new: Number(r.new ?? 0),
-        to_callback: Number(r.to_callback ?? 0),
+        to_callback: Number(r.to_callback ?? r.contacted ?? 0),
         no_answer: Number(r.no_answer ?? 0),
         not_interested: Number(r.not_interested ?? 0),
         qualified: Number(r.qualified ?? 0),
@@ -590,17 +582,8 @@ export function useGlobalClosersKpi() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_global_closers_kpi" as any);
       if (error) throw error;
-      const o = (data as Record<string, number>) ?? {};
-      return {
-        total: Number(o.total ?? 0),
-        new: Number(o.new ?? 0),
-        to_callback: Number(o.to_callback ?? 0),
-        no_answer: Number(o.no_answer ?? 0),
-        not_interested: Number(o.not_interested ?? 0),
-        qualified: Number(o.qualified ?? 0),
-        signed: Number(o.signed ?? 0),
-        lost: Number(o.lost ?? 0),
-      };
+      const o = (data as Record<string, unknown>) ?? {};
+      return normalizeCloserLeadStatsRecord(o);
     },
     ...RETRY_NETWORK,
   });
@@ -630,7 +613,7 @@ export function useLeadKpiByDay(days: number = 30) {
         day: r.day ?? "",
         total: Number(r.total ?? 0),
         new: Number(r.new ?? 0),
-        to_callback: Number(r.to_callback ?? 0),
+        to_callback: Number(r.to_callback ?? r.contacted ?? 0),
         no_answer: Number(r.no_answer ?? 0),
         not_interested: Number(r.not_interested ?? 0),
         qualified: Number(r.qualified ?? 0),
@@ -648,18 +631,9 @@ export function useCloserActivity(closerEmail: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_closer_activity" as any, { p_closer_email: closerEmail ?? "" });
       if (error) throw error;
-      const raw = (data as { stats?: Record<string, number>; by_dept?: { dept_code: string; count: number }[] }) ?? {};
+      const raw = (data as { stats?: Record<string, unknown>; by_dept?: { dept_code: string; count: number }[] }) ?? {};
       return {
-        stats: {
-          total: Number(raw.stats?.total ?? 0),
-          new: Number(raw.stats?.new ?? 0),
-          to_callback: Number(raw.stats?.to_callback ?? 0),
-          no_answer: Number(raw.stats?.no_answer ?? 0),
-          not_interested: Number(raw.stats?.not_interested ?? 0),
-          qualified: Number(raw.stats?.qualified ?? 0),
-          signed: Number(raw.stats?.signed ?? 0),
-          lost: Number(raw.stats?.lost ?? 0),
-        },
+        stats: normalizeCloserLeadStatsRecord(raw.stats ?? {}),
         by_dept: Array.isArray(raw.by_dept) ? raw.by_dept : [],
       } as CloserActivity;
     },

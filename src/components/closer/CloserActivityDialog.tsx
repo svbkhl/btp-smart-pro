@@ -12,6 +12,7 @@ import {
 import { Loader2, User, Mail, BarChart3, MapPin } from "lucide-react";
 import { useCloserActivity, DEPTS } from "@/hooks/useLeads";
 import { cn } from "@/lib/utils";
+import { CLOSER_LEAD_KPI_FOUR, type CloserLeadKpiFourKey } from "@/lib/closerLeadKpi";
 
 const deptName = (code: string) => DEPTS.find((d) => d.code === code)?.name ?? code;
 
@@ -74,13 +75,23 @@ export function CloserActivityDialog({
                 <BarChart3 className="w-4 h-4" />
                 Leads assignés
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <StatCard label="Total" value={data.stats.total} />
-                <StatCard label="Nouveaux" value={data.stats.new} className="text-blue-500" />
-                <StatCard label="À rappeler" value={data.stats.to_callback} className="text-amber-500" />
-                <StatCard label="Pas intéressé" value={data.stats.not_interested} className="text-orange-500" />
-                <StatCard label="Qualifiés" value={data.stats.qualified} className="text-violet-500" />
-                <StatCard label="Signés" value={data.stats.signed} className="text-emerald-500" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {CLOSER_LEAD_KPI_FOUR.map(({ key, label }) => {
+                  const color: Record<CloserLeadKpiFourKey, string> = {
+                    total: "text-foreground",
+                    new: "text-blue-500",
+                    to_callback: "text-amber-500",
+                    signed: "text-emerald-500",
+                  };
+                  return (
+                    <StatCard
+                      key={key}
+                      label={label}
+                      value={data.stats[key]}
+                      className={color[key]}
+                    />
+                  );
+                })}
               </div>
             </div>
 

@@ -4,23 +4,26 @@ import {
   Loader2,
   Target,
   Phone,
-  MessageSquare,
   CheckCircle2,
   FileSignature,
-  XCircle,
   TrendingUp,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CLOSER_LEAD_KPI_FOUR, type CloserLeadKpiFourKey } from "@/lib/closerLeadKpi";
 
-const KPI_ROW = [
+const KPI_ROW: {
+  key: CloserLeadKpiFourKey;
+  label: string;
+  icon: typeof Users;
+  color: string;
+  bg: string;
+}[] = [
   { key: "total", label: "Leads assignés", icon: Users, color: "text-foreground", bg: "bg-muted/50" },
   { key: "new", label: "Nouveaux", icon: Target, color: "text-slate-400 dark:text-slate-300", bg: "bg-slate-500/10" },
   { key: "to_callback", label: "À rappeler", icon: Phone, color: "text-amber-500", bg: "bg-amber-500/10" },
-  { key: "not_interested", label: "Pas intéressé", icon: Phone, color: "text-orange-500", bg: "bg-orange-500/10" },
-  { key: "qualified", label: "Qualifiés", icon: MessageSquare, color: "text-violet-500", bg: "bg-violet-500/10" },
   { key: "signed", label: "Signés", icon: FileSignature, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-] as const;
+];
 
 export function CloserKPITable() {
   const { data: stats, isLoading: statsLoading } = useMyLeadStats();

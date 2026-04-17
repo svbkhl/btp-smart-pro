@@ -15,28 +15,19 @@ import {
 } from "@/components/ui/select";
 import {
   Loader2,
-  Target,
-  Phone,
-  MessageSquare,
-  FileSignature,
-  XCircle,
   CheckCircle2,
   UserCircle,
   TrendingUp,
   BarChart3,
   Calendar,
 } from "lucide-react";
+import { CLOSER_LEAD_KPI_FOUR } from "@/lib/closerLeadKpi";
 
-const KPI_KEYS = [
-  { key: "total", label: "Assignés", icon: Target },
-  { key: "new", label: "Nouveaux", icon: Target },
-  { key: "to_callback", label: "À rappeler", icon: Phone },
-  { key: "no_answer", label: "Pas de réponse", icon: Phone },
-  { key: "not_interested", label: "Pas intéressé", icon: Phone },
-  { key: "qualified", label: "Qualifiés", icon: MessageSquare },
-  { key: "signed", label: "Signés", icon: FileSignature },
-  { key: "lost", label: "Perdus", icon: XCircle },
-] as const;
+/** 4 KPI alignés sur l’app closer (libellés admin pour la 1ère colonne). */
+const ADMIN_KPI_FOUR = CLOSER_LEAD_KPI_FOUR.map(({ key, labelAdmin }) => ({
+  key,
+  label: labelAdmin,
+}));
 
 function formatDay(dayStr: string) {
   try {
@@ -84,8 +75,8 @@ export function AdminKPIClosers() {
           </GlassCard>
         ) : (
           <GlassCard className="p-0 overflow-hidden">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-px bg-border/50">
-              {KPI_KEYS.map(({ key, label }) => {
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/50">
+              {ADMIN_KPI_FOUR.map(({ key, label }) => {
                 const value = global ? (global[key as keyof typeof global] as number) : 0;
                 return (
                   <div key={key} className="bg-card p-4 text-center">
@@ -131,7 +122,7 @@ export function AdminKPIClosers() {
           </Select>
         </div>
         <p className="text-sm text-muted-foreground mb-3">
-          Nombre de leads (assignés) mis à jour chaque jour, par statut.
+          Leads mis à jour chaque jour — mêmes 4 indicateurs que sur l’app closer.
         </p>
         {byDayLoading && dayRows.length === 0 ? (
           <GlassCard className="p-8">
@@ -150,14 +141,10 @@ export function AdminKPIClosers() {
                 <thead>
                   <tr className="border-b border-white/10 bg-white/5">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Jour</th>
-                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Total</th>
-                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">New</th>
+                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Assignés</th>
+                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Nouveaux</th>
                     <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">À rappeler</th>
-                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Pas de répo.</th>
-                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Pas intér.</th>
-                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Qualifiés</th>
                     <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Signés</th>
-                    <th className="text-right py-3 px-3 font-medium text-muted-foreground tabular-nums">Perdus</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -170,11 +157,7 @@ export function AdminKPIClosers() {
                       <td className="py-2.5 px-3 text-right tabular-nums">{row.total}</td>
                       <td className="py-2.5 px-3 text-right tabular-nums">{row.new}</td>
                       <td className="py-2.5 px-3 text-right tabular-nums">{row.to_callback ?? 0}</td>
-                      <td className="py-2.5 px-3 text-right tabular-nums">{row.no_answer ?? 0}</td>
-                      <td className="py-2.5 px-3 text-right tabular-nums">{row.not_interested ?? 0}</td>
-                      <td className="py-2.5 px-3 text-right tabular-nums">{row.qualified}</td>
                       <td className="py-2.5 px-3 text-right tabular-nums text-emerald-500">{row.signed}</td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-rose-500">{row.lost}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -235,7 +218,7 @@ export function AdminKPIClosers() {
                         </tr>
                       </thead>
                       <tbody>
-                        {KPI_KEYS.map(({ key, label }) => {
+                        {ADMIN_KPI_FOUR.map(({ key, label }) => {
                           const value = row[key as keyof typeof row] as number;
                           const pct = row.total > 0 ? Math.round((value / row.total) * 100) : 0;
                           return (

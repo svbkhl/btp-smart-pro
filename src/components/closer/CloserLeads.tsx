@@ -21,6 +21,7 @@ import {
   DEPTS, useMyLeads, useMyLeadStats, useUpdateLeadStatus, useUpdateLeadNotes,
   Lead, LeadStatus, type MyLeadsSort,
 } from "@/hooks/useLeads";
+import { CLOSER_LEAD_KPI_FOUR, type CloserLeadKpiFourKey } from "@/lib/closerLeadKpi";
 
 // ─── Constantes ───────────────────────────────────────────────
 
@@ -332,16 +333,25 @@ export default function CloserLeads() {
     total: 0, new: 0, to_callback: 0, no_answer: 0, not_interested: 0, qualified: 0, signed: 0, lost: 0,
   };
 
+  const kpiFourColors: Record<CloserLeadKpiFourKey, string> = {
+    total: "text-foreground",
+    new: "text-blue-400",
+    to_callback: "text-amber-400",
+    signed: "text-emerald-400",
+  };
+
   return (
     <div className="space-y-6">
-      {/* Compteurs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-        <StatCard label="Total"           value={stats.total}          color="text-foreground" />
-        <StatCard label="Nouveaux"       value={stats.new}            color="text-blue-400" />
-        <StatCard label="À rappeler"      value={stats.to_callback ?? 0}    color="text-amber-400" />
-        <StatCard label="Pas intéressé"   value={stats.not_interested ?? 0} color="text-orange-400" />
-        <StatCard label="Qualifiés"      value={stats.qualified}       color="text-violet-400" />
-        <StatCard label="Signés"          value={stats.signed}         color="text-emerald-400" />
+      {/* Compteurs — 4 KPI uniquement (aligné admin) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {CLOSER_LEAD_KPI_FOUR.map(({ key, label }) => (
+          <StatCard
+            key={key}
+            label={label}
+            value={stats[key]}
+            color={kpiFourColors[key]}
+          />
+        ))}
       </div>
 
       {/* Filtres */}
