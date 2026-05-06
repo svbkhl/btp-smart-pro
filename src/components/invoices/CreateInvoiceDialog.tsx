@@ -22,7 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateInvoice, CreateInvoiceData } from "@/hooks/useInvoices";
+import { useCreateInvoice, CreateInvoiceData, VatRegimeMismatchError } from "@/hooks/useInvoices";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useClients, useCreateClient, getClientFullName } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { Loader2, Plus } from "lucide-react";
@@ -52,6 +62,10 @@ interface CreateInvoiceDialogProps {
 export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoiceDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isNewClient, setIsNewClient] = useState(false);
+  const [vatMismatch, setVatMismatch] = useState<{
+    message: string;
+    pendingData: CreateInvoiceData;
+  } | null>(null);
   const navigate = useNavigate();
   const createInvoice = useCreateInvoice();
   const { data: clients } = useClients();
@@ -173,7 +187,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
       console.log("💰 [CreateInvoiceDialog] Données facture:", invoiceData);
 
       await createInvoice.mutateAsync(invoiceData);
-      
+
       toast({
         title: "Facture créée",
         description: "La facture a été créée avec succès",
@@ -183,10 +197,40 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
       reset();
       setIsNewClient(false);
     } catch (error: any) {
+      // Bug #1 — divergence régime TVA devis vs entreprise courante : modal de confirmation.
+      if (error instanceof VatRegimeMismatchError) {
+        setVatMismatch({ message: error.userMessage, pendingData: invoiceData });
+        return;
+      }
       console.error("Error creating invoice:", error);
       toast({
         title: "Erreur",
         description: error.message || "Impossible de créer la facture",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const confirmVatChangeAndCreate = async () => {
+    if (!vatMismatch) return;
+    setIsSubmitting(true);
+    try {
+      await createInvoice.mutateAsync({
+        ...vatMismatch.pendingData,
+        vat_regime_change_confirmed: true,
+      });
+      toast({ title: "Facture créée", description: "La facture a été créée avec succès" });
+      onOpenChange(false);
+      reset();
+      setIsNewClient(false);
+      setVatMismatch(null);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Impossible de créer la facture";
+      toast({
+        title: "Erreur",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -429,6 +473,28 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <AlertDialog
+        open={!!vatMismatch}
+        onOpenChange={(o) => !o && setVatMismatch(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Le régime de TVA a changé</AlertDialogTitle>
+            <AlertDialogDescription>
+              {vatMismatch?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setVatMismatch(null)}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmVatChangeAndCreate} disabled={isSubmitting}>
+              {isSubmitting ? "Création..." : "Continuer avec le régime actuel"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };

@@ -31,6 +31,16 @@ export interface UserSettings {
   auto_send_email?: boolean;
   app_base_url?: string;
   onboarding_completed?: boolean;
+  // Régime TVA courant de l'entreprise (Bug #1)
+  vat_regime?: "STANDARD" | "FRANCHISE_293B" | "AUTOLIQUIDATION_BTP";
+  // Refonte design éditorial v2 (feature-flag par entreprise)
+  invoice_template_version?: "v1" | "v2-editorial";
+  brand_color?: string | null;
+  // Mentions légales obligatoires
+  ape_code?: string | null;
+  capital_social?: number | null;
+  // Champ legacy potentiel (autre nom de logo_url) — toléré par le code PDF
+  logo_url?: string | null;
   created_at: string;
   updated_at: string;
 }

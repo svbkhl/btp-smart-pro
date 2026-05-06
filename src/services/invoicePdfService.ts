@@ -4,6 +4,26 @@ import { Invoice } from '@/hooks/useInvoices';
 import { UserSettings } from '@/hooks/useUserSettings';
 import { calculateFromTTC } from '@/utils/priceCalculations';
 import { supabase } from '@/integrations/supabase/client';
+import { formatClientBlock, clientRowToBlockInput } from '@/utils/formatClientBlock';
+import { resolveVatLegalMention, type VatRegime } from '@/utils/vatRegime';
+import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
+
+/**
+ * Charge les infos client utilisées par les renderers (V1 inline / V2 éditorial).
+ */
+async function fetchClientRow(invoice: Invoice) {
+  if (!invoice.client_id) return undefined;
+  const { data } = await supabase
+    .from('clients')
+    .select('name, titre, prenom, phone, location')
+    .eq('id', invoice.client_id)
+    .single();
+  return data ?? undefined;
+}
+
+function shouldUseEditorialV2(companyInfo?: UserSettings): boolean {
+  return companyInfo?.invoice_template_version === 'v2-editorial';
+}
 
 interface DownloadInvoicePDFParams {
   invoice: Invoice;
@@ -58,34 +78,53 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Génère et télécharge un PDF de facture professionnel
+ * Génère et télécharge un PDF de facture professionnel.
+ * Dispatch sur le template V2 éditorial si activé via `companyInfo.invoice_template_version`.
  */
 export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Promise<void> {
   try {
     const { invoice, companyInfo } = params;
 
+    if (shouldUseEditorialV2(companyInfo)) {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const clientRow = await fetchClientRow(invoice);
+      await renderInvoiceEditorial(doc, { invoice, companyInfo, clientRow, mode: 'facture' });
+      const fileName = invoice.invoice_number
+        ? `Facture-${invoice.invoice_number}.pdf`
+        : `Facture-${formatDate(invoice.created_at).replace(/\s/g, '-')}.pdf`;
+      doc.save(fileName);
+      console.log('[Invoice PDF V2] PDF éditorial généré:', fileName);
+      return;
+    }
+
     // Récupérer les informations complètes du client si client_id est disponible
-    let clientCivility = '';
-    let clientFirstName = '';
+    let clientRow: { titre?: string | null; prenom?: string | null; name?: string | null } = {};
     let clientPhone = '';
     let clientAddress = invoice.client_address || '';
-    
+
     if (invoice.client_id) {
       const { data: client } = await supabase
         .from("clients")
-        .select("titre, prenom, phone, location")
+        .select("name, titre, prenom, phone, location")
         .eq("id", invoice.client_id)
         .single();
-      
+
       if (client) {
-        clientCivility = client.titre || '';
-        clientFirstName = client.prenom || '';
+        clientRow = { titre: client.titre, prenom: client.prenom, name: client.name };
         clientPhone = client.phone || '';
         if (client.location && !clientAddress) {
           clientAddress = client.location;
         }
       }
     }
+
+    // Bloc client centralisé via formatClientBlock (Bug #2)
+    const clientBlockInput = clientRowToBlockInput({
+      name: clientRow.name ?? invoice.client_name ?? null,
+      titre: clientRow.titre ?? null,
+      prenom: clientRow.prenom ?? null,
+    });
+    const clientLines = formatClientBlock(clientBlockInput);
 
     // Créer le document PDF en format A4 portrait
     const doc = new jsPDF({
@@ -115,21 +154,21 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
     // Logo (si disponible) - utiliser company_logo_url depuis user_settings
     const logoUrl = companyInfo?.company_logo_url || companyInfo?.logo_url;
     let logoLoaded = false;
-    
+
     console.log('[Invoice PDF] Logo URL:', logoUrl ? `${logoUrl.substring(0, 50)}...` : 'non fourni');
-    
+
     if (logoUrl) {
       try {
         // Valider l'URL avant de charger
         const trimmedUrl = logoUrl.trim();
         console.log('[Invoice PDF] Tentative de chargement du logo:', trimmedUrl.substring(0, 50));
-        
+
         if (trimmedUrl && (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('data:image'))) {
           const logoImg = await loadImage(trimmedUrl);
           const logoSize = 30;
           // Déterminer le format de l'image depuis l'URL ou utiliser PNG par défaut
-          const imageFormat = trimmedUrl.startsWith('data:image/jpeg') || trimmedUrl.includes('.jpg') || trimmedUrl.includes('.jpeg') 
-            ? 'JPEG' 
+          const imageFormat = trimmedUrl.startsWith('data:image/jpeg') || trimmedUrl.includes('.jpg') || trimmedUrl.includes('.jpeg')
+            ? 'JPEG'
             : 'PNG';
           doc.addImage(logoImg, imageFormat, margin + 5, yPosition + 5, logoSize, logoSize);
           logoLoaded = true;
@@ -236,25 +275,20 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    
-    // Construire le nom complet avec civilité et prénom
-    let clientName = '';
-    if (clientCivility) {
-      clientName += `${clientCivility} `;
-    }
-    if (clientFirstName) {
-      clientName += `${clientFirstName} `;
-    }
-    clientName += invoice.client_name || 'Non spécifié';
-    
-    doc.text(clientName.trim(), margin + 5, yPosition + 14);
-    
-    // Adresse complète
+
+    // Bloc client : utiliser formatClientBlock (Bug #2 fix)
+    const linesToPrint = clientLines.length > 0 ? clientLines : ['Non spécifié'];
+    let clientBlockY = yPosition + 14;
+    linesToPrint.slice(0, 2).forEach((line) => {
+      doc.text(line, margin + 5, clientBlockY);
+      clientBlockY += 6;
+    });
+    // Adresse + contact alignés sous le bloc client
+    let metaY = Math.max(clientBlockY, yPosition + 20);
     if (clientAddress) {
-      doc.text(clientAddress, margin + 5, yPosition + 20);
+      doc.text(clientAddress, margin + 5, metaY);
+      metaY += 6;
     }
-    
-    // Téléphone et email sur la même ligne
     let contactLine = '';
     if (clientPhone) {
       contactLine += `Tél: ${clientPhone}`;
@@ -264,7 +298,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
       contactLine += `Email: ${invoice.client_email}`;
     }
     if (contactLine) {
-      doc.text(contactLine, margin + 5, yPosition + 26);
+      doc.text(contactLine, margin + 5, metaY);
     }
 
     yPosition += 35;
@@ -410,7 +444,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
-        doc.text('TVA non applicable (Art. 293B du CGI)', rightX, yPosition, { align: 'right' });
+        doc.text((invoice.vat_legal_mention || 'TVA non applicable, art. 293 B du CGI.'), rightX, yPosition, { align: 'right' });
         doc.setTextColor(...textColor);
         yPosition += 10;
       }
@@ -438,7 +472,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
-        doc.text('TVA non applicable (Art. 293B du CGI)', rightX, yPosition, { align: 'right' });
+        doc.text((invoice.vat_legal_mention || 'TVA non applicable, art. 293 B du CGI.'), rightX, yPosition, { align: 'right' });
         doc.setTextColor(...textColor);
         yPosition += 10;
       } else {
@@ -582,28 +616,40 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
   try {
     const { invoice, companyInfo } = params;
 
+    if (shouldUseEditorialV2(companyInfo)) {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const clientRow = await fetchClientRow(invoice);
+      await renderInvoiceEditorial(doc, { invoice, companyInfo, clientRow, mode: 'facture' });
+      return doc.output('dataurlstring').split(',')[1] ?? '';
+    }
+
     // Récupérer les informations complètes du client si client_id est disponible
-    let clientCivility = '';
-    let clientFirstName = '';
+    let clientRow: { titre?: string | null; prenom?: string | null; name?: string | null } = {};
     let clientPhone = '';
     let clientAddress = invoice.client_address || '';
-    
+
     if (invoice.client_id) {
       const { data: client } = await supabase
         .from("clients")
-        .select("titre, prenom, phone, location")
+        .select("name, titre, prenom, phone, location")
         .eq("id", invoice.client_id)
         .single();
-      
+
       if (client) {
-        clientCivility = client.titre || '';
-        clientFirstName = client.prenom || '';
+        clientRow = { titre: client.titre, prenom: client.prenom, name: client.name };
         clientPhone = client.phone || '';
         if (client.location && !clientAddress) {
           clientAddress = client.location;
         }
       }
     }
+
+    const clientBlockInput = clientRowToBlockInput({
+      name: clientRow.name ?? invoice.client_name ?? null,
+      titre: clientRow.titre ?? null,
+      prenom: clientRow.prenom ?? null,
+    });
+    const clientLines = formatClientBlock(clientBlockInput);
 
     // Créer le document PDF en format A4 portrait
     const doc = new jsPDF({
@@ -750,25 +796,19 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    
-    // Construire le nom complet avec civilité et prénom
-    let clientName = '';
-    if (clientCivility) {
-      clientName += `${clientCivility} `;
-    }
-    if (clientFirstName) {
-      clientName += `${clientFirstName} `;
-    }
-    clientName += invoice.client_name || 'Non spécifié';
-    
-    doc.text(clientName.trim(), margin + 5, yPosition + 14);
-    
-    // Adresse complète
+
+    // Bloc client centralisé (Bug #2)
+    const linesToPrint2 = clientLines.length > 0 ? clientLines : ['Non spécifié'];
+    let clientBlockY2 = yPosition + 14;
+    linesToPrint2.slice(0, 2).forEach((line) => {
+      doc.text(line, margin + 5, clientBlockY2);
+      clientBlockY2 += 6;
+    });
+    let metaY2 = Math.max(clientBlockY2, yPosition + 20);
     if (clientAddress) {
-      doc.text(clientAddress, margin + 5, yPosition + 20);
+      doc.text(clientAddress, margin + 5, metaY2);
+      metaY2 += 6;
     }
-    
-    // Téléphone et email sur la même ligne
     let contactLine = '';
     if (clientPhone) {
       contactLine += `Tél: ${clientPhone}`;
@@ -778,7 +818,7 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
       contactLine += `Email: ${invoice.client_email}`;
     }
     if (contactLine) {
-      doc.text(contactLine, margin + 5, yPosition + 26);
+      doc.text(contactLine, margin + 5, metaY2);
     }
 
     yPosition += 35;
@@ -912,7 +952,7 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
-        doc.text('TVA non applicable (Art. 293B du CGI)', rightX, yPosition, { align: 'right' });
+        doc.text((invoice.vat_legal_mention || 'TVA non applicable, art. 293 B du CGI.'), rightX, yPosition, { align: 'right' });
         doc.setTextColor(...textColor);
         yPosition += 10;
       }
@@ -937,7 +977,7 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
-        doc.text('TVA non applicable (Art. 293B du CGI)', rightX, yPosition, { align: 'right' });
+        doc.text((invoice.vat_legal_mention || 'TVA non applicable, art. 293 B du CGI.'), rightX, yPosition, { align: 'right' });
         doc.setTextColor(...textColor);
         yPosition += 10;
       } else {

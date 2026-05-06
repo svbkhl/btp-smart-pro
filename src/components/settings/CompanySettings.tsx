@@ -16,6 +16,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Building2, Loader2, Save, FileSignature } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { VAT_REGIME_LABEL, type VatRegime } from "@/utils/vatRegime";
 
 export const CompanySettings = () => {
   const { user } = useAuth();
@@ -45,6 +53,11 @@ export const CompanySettings = () => {
     terms_and_conditions: "",
     signature_data: "",
     signature_name: "",
+    vat_regime: "STANDARD" as VatRegime,
+    invoice_template_version: "v1" as "v1" | "v2-editorial",
+    brand_color: "",
+    ape_code: "",
+    capital_social: "",
   });
 
   // Référence pour éviter les réinitialisations pendant la saisie
@@ -75,6 +88,11 @@ export const CompanySettings = () => {
           terms_and_conditions: settings.terms_and_conditions || "",
           signature_data: currentSignature,
           signature_name: settings.signature_name || "",
+          vat_regime: (settings.vat_regime as VatRegime) || "STANDARD",
+          invoice_template_version: (settings.invoice_template_version as "v1" | "v2-editorial") || "v1",
+          brand_color: settings.brand_color ?? "",
+          ape_code: settings.ape_code ?? "",
+          capital_social: settings.capital_social != null ? String(settings.capital_social) : "",
         });
         setSavedSignatureData(currentSignature);
         setSavedSignatureName(settings.signature_name || "");
@@ -190,7 +208,13 @@ export const CompanySettings = () => {
 
     setSaving(true);
     try {
-      await updateSettings.mutateAsync(formData);
+      const payload = {
+        ...formData,
+        capital_social: formData.capital_social ? Number(formData.capital_social) : null,
+        brand_color: formData.brand_color || null,
+        ape_code: formData.ape_code || null,
+      } as any;
+      await updateSettings.mutateAsync(payload);
       // Garder companies.name en sync avec le nom affiché (sidebar + paramètres)
       if (companyId && formData.company_name?.trim()) {
         // Utiliser la fonction RPC pour contourner RLS
@@ -259,6 +283,7 @@ export const CompanySettings = () => {
           <div className="space-y-2">
             <ImageUpload
               label="Logo de l'entreprise"
+              validateAsLogo
               value={settings?.company_logo_url || formData.company_logo_url || ""}
               onChange={async (url) => {
                 // Mettre à jour formData immédiatement pour afficher le logo
@@ -297,6 +322,25 @@ export const CompanySettings = () => {
                 ✓ Logo enregistré. Il apparaîtra sur vos devis et factures.
               </p>
             )}
+
+            {/* Aperçu fond blanc — l'utilisateur voit le rendu réel sur le PDF */}
+            {(formData.company_logo_url || settings?.company_logo_url) && (
+              <div className="mt-3 rounded-lg border border-border bg-white p-4">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Aperçu (fond blanc, taille réelle PDF)
+                </p>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={formData.company_logo_url || settings?.company_logo_url || ""}
+                    alt="Aperçu du logo"
+                    className="max-h-16 max-w-[160px] object-contain"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Voici comment votre logo apparaîtra en haut de vos devis et factures.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Nom et Forme juridique */}
@@ -329,6 +373,100 @@ export const CompanySettings = () => {
               <p className="text-xs text-muted-foreground">
                 Texte libre : forme juridique, capital social, etc. S’affiche en bas au centre des devis et factures.
               </p>
+            </div>
+          </div>
+
+          {/* Régime TVA + design template (Bug #1 + refonte v2) */}
+          <div className="rounded-lg border border-border/50 p-4 space-y-4 bg-muted/20">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold tracking-tight">Facturation &amp; régime TVA</h3>
+              <p className="text-xs text-muted-foreground">
+                Le régime sélectionné s'applique aux nouvelles factures. Les factures déjà émises conservent leur régime d'origine (immutabilité fiscale).
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="vat_regime">Régime de TVA</Label>
+                <Select
+                  value={formData.vat_regime}
+                  onValueChange={(v) => setFormData((p) => ({ ...p, vat_regime: v as VatRegime }))}
+                >
+                  <SelectTrigger id="vat_regime" className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STANDARD">{VAT_REGIME_LABEL.STANDARD}</SelectItem>
+                    <SelectItem value="FRANCHISE_293B">{VAT_REGIME_LABEL.FRANCHISE_293B}</SelectItem>
+                    <SelectItem value="AUTOLIQUIDATION_BTP">
+                      {VAT_REGIME_LABEL.AUTOLIQUIDATION_BTP}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Mention légale ajoutée automatiquement aux factures concernées (293 B / 283-2 nonies CGI).
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoice_template_version">Modèle de facture</Label>
+                <Select
+                  value={formData.invoice_template_version}
+                  onValueChange={(v) =>
+                    setFormData((p) => ({ ...p, invoice_template_version: v as "v1" | "v2-editorial" }))
+                  }
+                >
+                  <SelectTrigger id="invoice_template_version" className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="v1">Classique (modèle historique)</SelectItem>
+                    <SelectItem value="v2-editorial">Éditorial (recommandé)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Le modèle Éditorial offre un rendu plus sobre et premium. Vous pouvez revenir au modèle Classique à tout moment.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="brand_color">Couleur d'accent (modèle Éditorial)</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="brand_color"
+                    type="color"
+                    value={formData.brand_color || "#0F172A"}
+                    onChange={(e) => setFormData((p) => ({ ...p, brand_color: e.target.value }))}
+                    className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent"
+                  />
+                  <Input
+                    value={formData.brand_color}
+                    onChange={(e) => setFormData((p) => ({ ...p, brand_color: e.target.value }))}
+                    placeholder="#0F172A"
+                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ape_code">Code APE (optionnel)</Label>
+                <Input
+                  id="ape_code"
+                  value={formData.ape_code}
+                  onChange={(e) => setFormData((p) => ({ ...p, ape_code: e.target.value.toUpperCase() }))}
+                  placeholder="Ex: 4322A"
+                  maxLength={5}
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="capital_social">Capital social (optionnel, en €)</Label>
+                <Input
+                  id="capital_social"
+                  type="number"
+                  inputMode="numeric"
+                  value={formData.capital_social}
+                  onChange={(e) => setFormData((p) => ({ ...p, capital_social: e.target.value }))}
+                  placeholder="Ex: 10000"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                />
+              </div>
             </div>
           </div>
 

@@ -5,8 +5,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { uploadImage, validateImageFile, getImageUrl } from "@/services/storageService";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload, X, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateLogoFile, type LogoValidationIssue } from "@/utils/logoValidation";
 
 interface ImageUploadProps {
   value?: string;
@@ -15,6 +16,14 @@ interface ImageUploadProps {
   label?: string;
   className?: string;
   disabled?: boolean;
+  /**
+   * Active la validation enrichie pour les logos (Bug #3) :
+   * - check dimensions / ratio
+   * - heuristique capture d'écran (fond uniforme)
+   * - warning JPEG (fond opaque)
+   * Les warnings sont affichés sous le composant ; l'utilisateur peut continuer.
+   */
+  validateAsLogo?: boolean;
 }
 
 export const ImageUpload = ({
@@ -24,17 +33,19 @@ export const ImageUpload = ({
   label = "Image",
   className,
   disabled = false,
+  validateAsLogo = false,
 }: ImageUploadProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logoWarnings, setLogoWarnings] = useState<LogoValidationIssue[]>([]);
 
   // Utiliser directement value au lieu de preview pour éviter les problèmes de synchronisation
   const displayValue = value?.trim() || null;
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0);
-  
+
   // Réinitialiser l'erreur quand la valeur change
   useEffect(() => {
     setImageError(false);
@@ -45,15 +56,31 @@ export const ImageUpload = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Valider le fichier
-    const validation = validateImageFile(file);
-    if (!validation.valid) {
-      toast({
-        title: "Erreur",
-        description: validation.error,
-        variant: "destructive",
-      });
-      return;
+    // Validation logo enrichie (Bug #3) — bloque sur erreur, expose les warnings
+    if (validateAsLogo) {
+      const result = await validateLogoFile(file);
+      const errors = result.issues.filter((i) => i.severity === "error");
+      const warnings = result.issues.filter((i) => i.severity === "warning");
+      if (errors.length > 0) {
+        toast({
+          title: "Logo refusé",
+          description: errors.map((e) => e.message).join(" "),
+          variant: "destructive",
+        });
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+      setLogoWarnings(warnings);
+    } else {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        toast({
+          title: "Erreur",
+          description: validation.error,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // Note: La prévisualisation sera gérée par onChange après l'upload
@@ -244,6 +271,17 @@ export const ImageUpload = ({
             <Upload className="mr-2 h-4 w-4" />
             Choisir une image
           </Button>
+        )}
+
+        {validateAsLogo && logoWarnings.length > 0 && displayValue && (
+          <div className="space-y-1.5 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+            {logoWarnings.map((w) => (
+              <div key={w.code} className="flex gap-2 text-xs text-amber-800 dark:text-amber-200">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{w.message}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

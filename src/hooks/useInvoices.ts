@@ -10,6 +10,12 @@ import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { useCompanyId } from "./useCompanyId";
 import { logger } from "@/utils/logger";
 import { QUERY_CONFIG } from "@/utils/reactQueryConfig";
+import {
+  resolveVatLegalMention,
+  isZeroVatRegime,
+  detectVatRegimeMismatch,
+  type VatRegime,
+} from "@/utils/vatRegime";
 
 // ✅ HELPER P0: Mapper les colonnes DB vers l'interface (compatibilité)
 export function normalizeInvoice(invoice: any): Invoice {
@@ -73,6 +79,11 @@ export interface Invoice {
     unit_price: number;
     total: number;
   }>;
+  // Snapshot TVA (Bug #1) — figé à l'émission, jamais recalculé
+  vat_regime?: VatRegime | null;
+  vat_rate_snapshot?: number | null;
+  vat_legal_mention?: string | null;
+  service_date?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,11 +99,33 @@ export interface CreateInvoiceData {
   amount_ttc?: number; // ✅ NOUVEAU: TTC saisi directement par l'utilisateur (source de vérité)
   vat_rate?: number;
   due_date?: string;
+  service_date?: string; // Date de livraison/prestation (Bug #1 — mention obligatoire)
   service_lines?: Array<{
     description: string;
     quantity: number;
     unit_price: number;
   }>;
+  /**
+   * Confirmation explicite que l'utilisateur a vu et accepté l'avertissement
+   * de divergence régime TVA devis vs entreprise courante.
+   * Si false (ou absent) et qu'un mismatch est détecté, la mutation lève
+   * une VatRegimeMismatchError pour permettre à l'UI d'afficher la modal.
+   */
+  vat_regime_change_confirmed?: boolean;
+}
+
+export class VatRegimeMismatchError extends Error {
+  readonly code = "VAT_REGIME_MISMATCH";
+  readonly quoteRegime: VatRegime;
+  readonly companyRegime: VatRegime;
+  readonly userMessage: string;
+  constructor(quoteRegime: VatRegime, companyRegime: VatRegime, userMessage: string) {
+    super("VAT_REGIME_MISMATCH");
+    this.name = "VatRegimeMismatchError";
+    this.quoteRegime = quoteRegime;
+    this.companyRegime = companyRegime;
+    this.userMessage = userMessage;
+  }
 }
 
 export interface UpdateInvoiceData extends Partial<CreateInvoiceData> {
@@ -131,10 +164,11 @@ export const useInvoices = () => {
           let query = supabase
             .from("invoices")
             .select(`
-              id, user_id, company_id, client_id, quote_id, invoice_number, status, 
+              id, user_id, company_id, client_id, quote_id, invoice_number, status,
               amount, due_date, paid_date, created_at, updated_at,
               client_name, client_email,
-              total_ht, total_ttc, tva
+              total_ht, total_ttc, tva,
+              vat_regime, vat_rate_snapshot, vat_legal_mention, service_date
             `)
             .eq("company_id", companyId);
           if (isEmployee && user) {
@@ -225,10 +259,11 @@ export const useInvoice = (id: string | undefined) => {
           const { data, error } = await supabase
             .from("invoices")
             .select(`
-              id, user_id, company_id, client_id, quote_id, invoice_number, status, 
+              id, user_id, company_id, client_id, quote_id, invoice_number, status,
               amount, due_date, paid_date, created_at, updated_at,
               client_name, client_email,
               total_ht, total_ttc, tva,
+              vat_regime, vat_rate_snapshot, vat_legal_mention, service_date,
               invoice_lines (
                 id, invoice_id, position, label, description, unit,
                 quantity, unit_price_ht, total_ht, tva_rate, total_tva, total_ttc
@@ -311,7 +346,26 @@ export const useCreateInvoice = () => {
       // Toujours générer un numéro de facture (format FACTURE-YYYY-XXX)
       invoiceNumber = await generateInvoiceNumber(user.id);
       logger.debug("useCreateInvoice: Invoice number generated", { invoiceNumber });
-      
+
+      // 🛡️ BUG #1 — Lire le régime TVA COURANT de l'entreprise (jamais le devis seul).
+      // Le régime de l'entreprise au moment T est ce qui fait foi fiscalement.
+      // Si on ne trouve pas user_settings (ex. ancien compte), fallback STANDARD.
+      let companyVatRegime: VatRegime = "STANDARD";
+      try {
+        const { data: companyVat } = await supabase
+          .from("user_settings")
+          .select("vat_regime")
+          .eq("company_id", companyId)
+          .maybeSingle();
+        if (companyVat?.vat_regime) {
+          companyVatRegime = companyVat.vat_regime as VatRegime;
+        }
+      } catch (e: any) {
+        logger.warn("useCreateInvoice: Could not read company vat_regime, falling back to STANDARD", {
+          error: e?.message,
+        });
+      }
+
       if (data.quote_id) {
         logger.debug("useCreateInvoice: Fetching quote", { quoteId: data.quote_id });
         
@@ -336,6 +390,21 @@ export const useCreateInvoice = () => {
           quoteSubtotalHt = quote.subtotal_ht || null;
           quoteTotalTva = quote.total_tva || null;
           quoteTotalTtc = quote.total_ttc || null;
+
+          // 🛡️ BUG #1 — Détection mismatch régime devis vs entreprise courante.
+          // Si l'utilisateur n'a pas confirmé explicitement, on lève une erreur typée
+          // que l'UI peut intercepter pour montrer une modal "continuer ?".
+          const mismatch = detectVatRegimeMismatch(
+            { tva_non_applicable_293b: quoteTva293b, tva_rate: quoteTvaRate },
+            { vat_regime: companyVatRegime }
+          );
+          if (mismatch.hasMismatch && !data.vat_regime_change_confirmed) {
+            throw new VatRegimeMismatchError(
+              mismatch.quoteRegime,
+              mismatch.companyRegime,
+              mismatch.message ?? "Le régime TVA a changé. Confirmer ?"
+            );
+          }
           
           // Copier client_id et client_name depuis le devis si non fournis
           if (!data.client_id && quote.client_id) {
@@ -453,31 +522,34 @@ export const useCreateInvoice = () => {
       // 🎯 ÉTAPE D: Calculer les totaux (priorité: service_lines > quote totals > data.amount_ht)
       // Les valeurs quoteTvaRate, quoteTva293b, quoteSubtotalHt sont déjà récupérées plus haut
       
-      // Taux TVA: devis > data > 20%
-      // ✅ CORRECTION: quoteTvaRate est en décimal (0.20 = 20%), donc multiplier par 100 pour obtenir le pourcentage
-      // Si quoteTvaRate est NULL ou invalide, utiliser data.vat_rate (en %) ou 20% par défaut
-      let vatRatePercent = 20; // Par défaut 20%
-      if (quoteTva293b) {
-        vatRatePercent = 0; // TVA non applicable
-        console.log("💰 [useCreateInvoice] TVA 293B activée → taux = 0%");
+      // 🛡️ BUG #1 — Le régime TVA EFFECTIF est celui de l'entreprise au moment T,
+      // pas celui du devis (qui peut être obsolète après bascule en 293 B).
+      // Le régime courant a été lu plus haut (companyVatRegime).
+      // - Régime à zéro (293B / autoliquidation BTP) → taux forcé à 0
+      // - Sinon → on utilise le taux saisi (devis ou data) — par défaut 20 %
+      let vatRatePercent: number;
+      if (isZeroVatRegime(companyVatRegime)) {
+        vatRatePercent = 0;
+        console.log("💰 [useCreateInvoice] Régime entreprise =", companyVatRegime, "→ TVA forcée à 0 %");
       } else if (quoteTvaRate !== null && quoteTvaRate > 0) {
-        // quoteTvaRate est en décimal (ex: 0.20 pour 20%), multiplier par 100 pour obtenir le pourcentage
         vatRatePercent = quoteTvaRate * 100;
-        // Protection: si le taux calculé est trop bas (< 1%), c'est suspect (probablement une erreur)
         if (vatRatePercent < 1) {
           console.warn("⚠️ [useCreateInvoice] Taux TVA suspect du devis:", quoteTvaRate, "→", vatRatePercent, "% - utilisation de 20% par défaut");
-          vatRatePercent = 20; // Forcer à 20% par défaut si le taux est suspect
+          vatRatePercent = 20;
         }
-        console.log("💰 [useCreateInvoice] Taux TVA depuis devis:", quoteTvaRate, "→", vatRatePercent, "%");
       } else if (data.vat_rate && data.vat_rate > 0) {
-        // data.vat_rate est déjà en pourcentage (ex: 20 pour 20%)
         vatRatePercent = data.vat_rate;
-        console.log("💰 [useCreateInvoice] Taux TVA depuis data.vat_rate:", vatRatePercent, "%");
       } else {
-        console.log("💰 [useCreateInvoice] Taux TVA par défaut: 20%");
+        vatRatePercent = 20;
       }
       const vatRateDecimal = vatRatePercent / 100;
-      console.log("💰 [useCreateInvoice] Taux TVA final:", { vatRatePercent: `${vatRatePercent}%`, vatRateDecimal });
+      // Mettre à jour quoteTva293b pour cohérence avec la suite du code (legacy variable)
+      quoteTva293b = isZeroVatRegime(companyVatRegime);
+      console.log("💰 [useCreateInvoice] Régime/taux finaux:", {
+        regime: companyVatRegime,
+        vatRatePercent: `${vatRatePercent}%`,
+        vatRateDecimal,
+      });
       
       // ✅ CORRECTION: Calculer totalHt: service_lines > quote subtotal_ht > data.amount_ht
       // IMPORTANT: Si data.amount_ttc est fourni, l'utiliser comme source de vérité (évite les arrondis)
@@ -609,6 +681,14 @@ export const useCreateInvoice = () => {
         if (finalVatAmount > 0 || quoteTva293b) {
           updateData.tva = finalVatAmount;
         }
+
+        // 🛡️ BUG #1 — Snapshot TVA figé à l'émission (immutable une fois la facture créée).
+        updateData.vat_regime = companyVatRegime;
+        updateData.vat_rate_snapshot = vatRateDecimal;
+        updateData.vat_legal_mention = resolveVatLegalMention(companyVatRegime);
+        if (data.service_date) {
+          updateData.service_date = data.service_date;
+        }
         
         // ✅ STOCKER LES SERVICE_LINES dans invoice_lines si disponibles
         if (serviceLines.length > 0 && invoice?.id) {
@@ -702,10 +782,11 @@ export const useCreateInvoice = () => {
         const fetchResult = await supabase
           .from("invoices")
           .select(`
-            id, user_id, company_id, client_id, quote_id, invoice_number, status, 
+            id, user_id, company_id, client_id, quote_id, invoice_number, status,
             amount, due_date, paid_date, created_at, updated_at,
             client_name, client_email,
             total_ht, total_ttc, tva,
+            vat_regime, vat_rate_snapshot, vat_legal_mention, service_date,
             invoice_lines (
               id, invoice_id, position, label, description, unit,
               quantity, unit_price_ht, total_ht, tva_rate, total_tva, total_ttc

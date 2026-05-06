@@ -1,6 +1,10 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { calculateFromTTC } from '@/utils/priceCalculations';
+import { formatClientBlock, clientRowToBlockInput } from '@/utils/formatClientBlock';
+import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
+import type { Invoice } from '@/hooks/useInvoices';
+import type { UserSettings } from '@/hooks/useUserSettings';
 
 // Types pour les données du devis
 interface QuoteResult {
@@ -156,6 +160,53 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       total_ttc,
     } = params;
 
+    // V2 éditorial : si activé sur l'entreprise, déléguer au renderer partagé.
+    const editorialEnabled = (companyInfo as any)?.invoice_template_version === 'v2-editorial';
+    if (editorialEnabled) {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const fakeInvoice = {
+        id: 'preview',
+        user_id: '',
+        invoice_number: quoteNumber || '',
+        client_name: clientInfo.name,
+        client_email: clientInfo.email,
+        client_address: clientInfo.address || clientInfo.location,
+        amount: total_ttc ?? 0,
+        total_ht: subtotal_ht,
+        total_ttc: total_ttc,
+        tva: total_tva,
+        vat_rate_snapshot: tva293b ? 0 : tvaRate,
+        vat_legal_mention: tva293b ? 'TVA non applicable, art. 293 B du CGI.' : null,
+        status: 'draft' as const,
+        service_lines: (lines || []).map((l) => ({
+          description: l.label,
+          quantity: l.quantity ?? 1,
+          unit_price: l.unit_price_ht ?? 0,
+          total: l.total_ht,
+        })),
+        created_at: quoteDate.toISOString(),
+        updated_at: quoteDate.toISOString(),
+      } as unknown as Invoice;
+      await renderInvoiceEditorial(doc, {
+        invoice: fakeInvoice,
+        companyInfo: companyInfo as UserSettings,
+        clientRow: {
+          name: clientInfo.name,
+          titre: clientInfo.civility ?? null,
+          prenom: clientInfo.firstName ?? null,
+          phone: clientInfo.phone,
+          location: clientInfo.address || clientInfo.location,
+        },
+        mode: 'devis',
+      });
+      const fileName = quoteNumber
+        ? `Devis-${quoteNumber}.pdf`
+        : `Devis-${formatDate(quoteDate).replace(/\s/g, '-')}.pdf`;
+      doc.save(fileName);
+      console.log('[PDF Service V2] Devis éditorial généré:', fileName);
+      return;
+    }
+
     // Déterminer le mode
     const quoteMode = mode || (quoteFormat === "simplified" ? "simple" : "detailed") || "simple";
     const effectiveTvaRate = tva293b ? 0 : tvaRate; // Forcer à 0 si 293B
@@ -304,25 +355,30 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    
-    // Construire le nom complet avec civilité et prénom
-    let clientName = '';
-    if (clientInfo.civility) {
-      clientName += `${clientInfo.civility} `;
-    }
-    if (clientInfo.firstName) {
-      clientName += `${clientInfo.firstName} `;
-    }
-    clientName += clientInfo.name;
-    
-    doc.text(clientName.trim(), margin + 5, yPosition + 14);
-    
+
+    // Bloc client centralisé via formatClientBlock (Bug #2 fix)
+    const quoteClientLines = formatClientBlock(
+      clientRowToBlockInput({
+        name: clientInfo.name,
+        titre: clientInfo.civility ?? null,
+        prenom: clientInfo.firstName ?? null,
+      })
+    );
+    const linesToPrintQ = quoteClientLines.length > 0 ? quoteClientLines : [clientInfo.name || 'Non spécifié'];
+    let clientBlockYQ = yPosition + 14;
+    linesToPrintQ.slice(0, 2).forEach((line) => {
+      doc.text(line, margin + 5, clientBlockYQ);
+      clientBlockYQ += 6;
+    });
+    let metaYQ = Math.max(clientBlockYQ, yPosition + 20);
+
     // Adresse complète (priorité: address > location)
     const fullAddress = clientInfo.address || clientInfo.location;
     if (fullAddress) {
-      doc.text(fullAddress, margin + 5, yPosition + 20);
+      doc.text(fullAddress, margin + 5, metaYQ);
+      metaYQ += 6;
     }
-    
+
     // Téléphone et email sur la même ligne
     let contactLine = '';
     if (clientInfo.phone) {
@@ -333,7 +389,7 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       contactLine += `Email: ${clientInfo.email}`;
     }
     if (contactLine) {
-      doc.text(contactLine, margin + 5, yPosition + 26);
+      doc.text(contactLine, margin + 5, metaYQ);
     }
 
     yPosition += 35;

@@ -3,6 +3,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { formatClientBlock, clientRowToBlockInput } from "@/utils/formatClientBlock";
 import { 
   FileText, 
   Download, 
@@ -121,7 +122,19 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
               Client
             </h3>
             <div className="space-y-1 text-sm">
-              <p className="font-medium">{invoice.client_name || "Non spécifié"}</p>
+              {(() => {
+                const lines = formatClientBlock(
+                  clientRowToBlockInput({ name: invoice.client_name ?? null })
+                );
+                if (lines.length === 0) {
+                  return <p className="font-medium">Non spécifié</p>;
+                }
+                return lines.map((line, i) => (
+                  <p key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>
+                    {line}
+                  </p>
+                ));
+              })()}
               {invoice.client_email && (
                 <p className="text-muted-foreground flex items-center gap-2">
                   <Mail className="w-3 h-3" />
