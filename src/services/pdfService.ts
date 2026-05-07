@@ -191,6 +191,12 @@ export async function downloadQuotePDF(
         id: 'preview',
         user_id: '',
         invoice_number: quoteNumber || '',
+        description: [
+          (result as any)?.description ? String((result as any).description).trim() : "",
+          (result as any)?.note ? `Note:\n${String((result as any).note).trim()}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
         client_name: clientInfo.name,
         client_email: clientInfo.email,
         client_address: clientInfo.address || clientInfo.location,

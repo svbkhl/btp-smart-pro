@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,33 +24,37 @@ interface ProjectCommentsProps {
   projectId: string;
 }
 
-const FAKE_COMMENTS: Comment[] = [
-  {
-    id: "comment-1",
-    project_id: "fake-project",
-    user_id: "fake-user",
-    content: "Les travaux avancent bien, la charpente est presque terminée.",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    author_name: "Chef de chantier",
-    author_email: "chef@example.com",
-  },
-  {
-    id: "comment-2",
-    project_id: "fake-project",
-    user_id: "fake-user",
-    content: "Pensez à commander les tuiles pour la semaine prochaine.",
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    author_name: "Responsable",
-    author_email: "responsable@example.com",
-  },
-];
-
 export const ProjectComments = ({ projectId }: ProjectCommentsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [comments, setComments] = useState<Comment[]>(FAKE_COMMENTS);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+
+  useEffect(() => {
+    const loadComments = async () => {
+      if (!projectId) return;
+      setLoadingComments(true);
+      try {
+        const { data, error } = await supabase
+          .from("project_comments")
+          .select("id, project_id, user_id, content, created_at")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        setComments((data || []) as Comment[]);
+      } catch (error: any) {
+        console.warn("Impossible de charger les commentaires projet:", error?.message || error);
+        setComments([]);
+      } finally {
+        setLoadingComments(false);
+      }
+    };
+
+    loadComments();
+  }, [projectId]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !user) {
@@ -65,25 +69,32 @@ export const ProjectComments = ({ projectId }: ProjectCommentsProps) => {
     setLoading(true);
 
     try {
-      // En production, on sauvegarderait dans Supabase
-      // Pour l'instant, on ajoute juste localement
       // Utiliser first_name/last_name (format standard) avec fallback sur prenom/nom (ancien format)
       const firstName = user.user_metadata?.first_name || user.user_metadata?.prenom;
       const lastName = user.user_metadata?.last_name || user.user_metadata?.nom;
+      const displayName = firstName && lastName
+        ? `${firstName} ${lastName}`
+        : user.email?.split("@")[0] || "Utilisateur";
       
+      const { data, error } = await supabase
+        .from("project_comments")
+        .insert({
+          project_id: projectId,
+          user_id: user.id,
+          content: newComment.trim(),
+        })
+        .select("id, project_id, user_id, content, created_at")
+        .single();
+
+      if (error) throw error;
+
       const comment: Comment = {
-        id: `comment-${Date.now()}`,
-        project_id: projectId,
-        user_id: user.id,
-        content: newComment.trim(),
-        created_at: new Date().toISOString(),
-        author_name: firstName && lastName
-          ? `${firstName} ${lastName}`
-          : user.email?.split("@")[0] || "Utilisateur",
+        ...(data as Comment),
+        author_name: displayName,
         author_email: user.email || "",
       };
 
-      setComments([comment, ...comments]);
+      setComments((prev) => [comment, ...prev]);
       setNewComment("");
 
       toast({
@@ -147,7 +158,9 @@ export const ProjectComments = ({ projectId }: ProjectCommentsProps) => {
 
       {/* Liste des commentaires */}
       <div className="space-y-4">
-        {comments.length === 0 ? (
+        {loadingComments ? (
+          <p className="text-muted-foreground text-center py-8">Chargement des commentaires...</p>
+        ) : comments.length === 0 ? (
           <p className="text-muted-foreground text-center py-8">
             Aucun commentaire pour le moment
           </p>

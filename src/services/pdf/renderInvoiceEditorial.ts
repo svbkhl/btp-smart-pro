@@ -378,20 +378,20 @@ export async function renderInvoiceEditorial(
     y += 5;
   }
 
-  setDraw(doc, accent);
-  doc.setLineWidth(0.5);
+  setDraw(doc, PDF_COLORS.line);
+  doc.setLineWidth(0.2);
   doc.line(labelX - 5, y, rightX, y);
-  y += 6;
+  y += 5;
 
   // TOTAL TTC — gros, accent color
   doc.setFont("helvetica", "bold");
   doc.setFontSize(PDF_FONT_SIZE.md);
   setColor(doc, PDF_COLORS.ink);
   doc.text(hasVat ? "TOTAL TTC" : "TOTAL", labelX, y, { align: "right" });
-  doc.setFontSize(PDF_FONT_SIZE.xl);
+  doc.setFontSize(PDF_FONT_SIZE.md);
   setColor(doc, accent);
-  doc.text(formatCurrency(totalTtc), rightX, y + 1, { align: "right" });
-  y += 14;
+  doc.text(formatCurrency(totalTtc), rightX, y, { align: "right" });
+  y += 10;
 
   if (invoiceNote) {
     if (y > pageH - 45) {
