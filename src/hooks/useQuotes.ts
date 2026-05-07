@@ -356,7 +356,7 @@ export const useCreateQuote = () => {
           quoteDate: new Date(quote.created_at),
           quoteNumber: quote.quote_number || quote.id.substring(0, 8),
           mode: quote.mode || "simple",
-          tvaRate: quote.tva_rate || 0.20,
+          tvaRate: quote.tva_non_applicable_293b ? 0 : (quote.tva_rate ?? 0.2),
           tva293b: quote.tva_non_applicable_293b || false,
           sections: quote.sections || [],
           lines: quote.lines || [],

@@ -138,19 +138,22 @@ const getMenuGroups = (
   company: ReturnType<typeof useCompany>["data"],
   isEmployee: boolean,
   can: (permission: string) => boolean = () => false,
-  isOwner: boolean = false
+  /** Dirigeant / admin entreprise : menu complet (features seulement), sans filtrer chaque permission */
+  hasFullCompanyNav: boolean = false
 ): MenuGroup[] => {
   // FALLBACK: Si aucune permission n'est disponible, afficher les items de base
   // Cela évite une sidebar vide pendant le chargement ou en cas de problème
-  const shouldShowAll = isOwner || !company;
+  const shouldShowAll = hasFullCompanyNav || !company;
   
   if (shouldShowAll) {
-    // Owner ou pas de company → afficher tous les items (vérifier features uniquement)
+    // Dirigeant / RH / admin entreprise : toujours montrer les modules (les features ne masquent pas la nav)
+    // Sans entreprise : tout afficher ; avec entreprise + simple employé : branche plus bas
     return baseMenuGroups
       .map((group) => ({
         items: group.items
           .filter((item) => {
             if (!company) return true; // Mode démo/pas de company = tout afficher
+            if (hasFullCompanyNav) return true; // Pas de filtre « feature » pour le pilotage entreprise
             if (!item.feature) return true; // Pas de feature = toujours visible
             return isFeatureEnabled(company, item.feature as keyof NonNullable<typeof company>["features"]);
           })
@@ -211,8 +214,8 @@ const getMenuGroups = (
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, isCloser, userRole, loading: authLoading } = useAuth();
-  const { isOwner, can, isEmployee, loading: permissionsLoading } = usePermissions();
+  const { user, isCloser, userRole, isAdmin: isLegacyCompanyAdmin, loading: authLoading } = useAuth();
+  const { isOwner, isAdmin: isRbacAdmin, can, isEmployee, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const fakeDataEnabled = useFakeDataStore((state) => state.fakeDataEnabled);
   const setFakeDataEnabled = useFakeDataStore((state) => state.setFakeDataEnabled);
@@ -276,11 +279,22 @@ export default function Sidebar() {
   );
   
   // Démo employé (closer + vue employé) : garder les boutons employé (Tableau de bord, Mes chantiers…), masquer la section CLOSERS
+  /**
+   * Menu complet : dirigeant, admin / RH RBAC, legacy user_roles, ou tout profil qui n’est pas un employé
+   * (évite une sidebar réduite quand company.features désactive des modules alors que l’utilisateur pilote l’entreprise).
+   */
+  const hasFullCompanyNav =
+    isOwner ||
+    isRbacAdmin ||
+    userRole === "admin" ||
+    isLegacyCompanyAdmin ||
+    !isEmployee;
+
   const menuGroups = useMemo(
     () => (isEmployee || (isCloser && closerEmployeeMode && fakeDataEnabled))
       ? employeeMenuGroups
-      : getMenuGroups(company, isEmployee, canFunc, isOwner),
-    [company, isEmployee, canFunc, isOwner, isCloser, closerEmployeeMode, fakeDataEnabled]
+      : getMenuGroups(company, isEmployee, canFunc, hasFullCompanyNav),
+    [company, isEmployee, canFunc, hasFullCompanyNav, isCloser, closerEmployeeMode, fakeDataEnabled]
   );
   
   // Utiliser isVisible du contexte pour mobile aussi

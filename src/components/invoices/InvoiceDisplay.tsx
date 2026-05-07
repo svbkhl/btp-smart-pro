@@ -34,10 +34,22 @@ interface InvoiceDisplayProps {
   onClose?: () => void;
 }
 
+function displayVatPercent(invoice: Invoice): number {
+  const totalHt = invoice.total_ht ?? invoice.amount_ht ?? 0;
+  const tva = invoice.tva ?? invoice.vat_amount ?? 0;
+  if (invoice.vat_rate != null && invoice.vat_rate !== undefined) return Number(invoice.vat_rate);
+  if (invoice.vat_rate_snapshot != null && invoice.vat_rate_snapshot !== undefined) {
+    return Math.round(Number(invoice.vat_rate_snapshot) * 1000) / 10;
+  }
+  if (totalHt > 0) return Math.round((tva / totalHt) * 10000) / 100;
+  return 0;
+}
+
 export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: InvoiceDisplayProps) => {
   const { data: companyInfo } = useUserSettings();
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
+  const vatPercent = displayVatPercent(invoice);
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
@@ -230,7 +242,7 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">TVA ({invoice.vat_rate || 20}%):</span>
+              <span className="text-muted-foreground">TVA ({vatPercent}%):</span>
               {/* ✅ CORRECTION P0: Lire tva (colonne réelle) avec fallback */}
               <span className="font-medium">
                 {(invoice.tva ?? invoice.vat_amount ?? 0).toFixed(2)}€

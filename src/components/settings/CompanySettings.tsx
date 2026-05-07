@@ -54,7 +54,6 @@ export const CompanySettings = () => {
     signature_data: "",
     signature_name: "",
     vat_regime: "STANDARD" as VatRegime,
-    invoice_template_version: "v1" as "v1" | "v2-editorial",
     brand_color: "",
     ape_code: "",
     capital_social: "",
@@ -89,7 +88,6 @@ export const CompanySettings = () => {
           signature_data: currentSignature,
           signature_name: settings.signature_name || "",
           vat_regime: (settings.vat_regime as VatRegime) || "STANDARD",
-          invoice_template_version: (settings.invoice_template_version as "v1" | "v2-editorial") || "v1",
           brand_color: settings.brand_color ?? "",
           ape_code: settings.ape_code ?? "",
           capital_social: settings.capital_social != null ? String(settings.capital_social) : "",
@@ -376,7 +374,7 @@ export const CompanySettings = () => {
             </div>
           </div>
 
-          {/* Régime TVA + design template (Bug #1 + refonte v2) */}
+          {/* Régime TVA */}
           <div className="rounded-lg border border-border/50 p-4 space-y-4 bg-muted/20">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold tracking-tight">Facturation &amp; régime TVA</h3>
@@ -384,7 +382,7 @@ export const CompanySettings = () => {
                 Le régime sélectionné s'applique aux nouvelles factures. Les factures déjà émises conservent leur régime d'origine (immutabilité fiscale).
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="vat_regime">Régime de TVA</Label>
                 <Select
@@ -407,55 +405,6 @@ export const CompanySettings = () => {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="invoice_template_version">Modèle de facture</Label>
-                <Select
-                  value={formData.invoice_template_version}
-                  onValueChange={(v) =>
-                    setFormData((p) => ({ ...p, invoice_template_version: v as "v1" | "v2-editorial" }))
-                  }
-                >
-                  <SelectTrigger id="invoice_template_version" className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="v1">Classique (modèle historique)</SelectItem>
-                    <SelectItem value="v2-editorial">Éditorial (recommandé)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Le modèle Éditorial offre un rendu plus sobre et premium. Vous pouvez revenir au modèle Classique à tout moment.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="brand_color">Couleur d'accent (modèle Éditorial)</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="brand_color"
-                    type="color"
-                    value={formData.brand_color || "#0F172A"}
-                    onChange={(e) => setFormData((p) => ({ ...p, brand_color: e.target.value }))}
-                    className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent"
-                  />
-                  <Input
-                    value={formData.brand_color}
-                    onChange={(e) => setFormData((p) => ({ ...p, brand_color: e.target.value }))}
-                    placeholder="#0F172A"
-                    className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ape_code">Code APE (optionnel)</Label>
-                <Input
-                  id="ape_code"
-                  value={formData.ape_code}
-                  onChange={(e) => setFormData((p) => ({ ...p, ape_code: e.target.value.toUpperCase() }))}
-                  placeholder="Ex: 4322A"
-                  maxLength={5}
-                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="capital_social">Capital social (optionnel, en €)</Label>
                 <Input
                   id="capital_social"

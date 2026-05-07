@@ -42,6 +42,8 @@ import { InvoiceActionButtons } from "@/components/invoices/InvoiceActionButtons
 import { CreateInvoiceFromQuoteDialog } from "@/components/invoices/CreateInvoiceFromQuoteDialog";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
 import QuoteDetailView from "@/components/quotes/QuoteDetailView";
+import { QuotePdfEmbed } from "@/components/quotes/QuotePdfEmbed";
+import { InvoicePdfEmbed } from "@/components/invoices/InvoicePdfEmbed";
 import { Quote } from "@/hooks/useQuotes";
 import { Invoice } from "@/hooks/useInvoices";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -993,37 +995,51 @@ const Facturation = () => {
                 {viewingQuote ? `Visualisation complète du devis ${viewingQuote.quote_number}` : ""}
               </DialogDescription>
             </DialogHeader>
-            <div className="px-6 py-4">
-              {viewingQuote && (
-                <QuoteDetailView
-                  quote={viewingQuote}
-                  onEdit={() => {
-                    setViewingQuote(null);
-                    setSelectedQuote(viewingQuote);
-                    setIsEditQuoteOpen(true);
-                  }}
-                  onDelete={() => {
-                    setViewingQuote(null);
-                    toast({
-                      title: "Suppression",
-                      description: "Fonctionnalité de suppression à venir",
-                    });
-                  }}
-                  onSendEmail={() => {
-                    toast({
-                      title: "📧 Envoi en cours...",
-                      description: "Le devis sera envoyé par email au client",
-                    });
-                  }}
-                  onDownloadPDF={() => {
-                    toast({
-                      title: "📄 Téléchargement...",
-                      description: "Le PDF du devis est en cours de génération",
-                    });
-                  }}
-                />
-              )}
-            </div>
+            {viewingQuote && (
+              <Tabs defaultValue="pdf" className="w-full">
+                <div className="px-6 border-b">
+                  <TabsList className="mb-0">
+                    <TabsTrigger value="pdf">PDF</TabsTrigger>
+                    <TabsTrigger value="details">Détails</TabsTrigger>
+                  </TabsList>
+                </div>
+                <TabsContent value="pdf" className="m-0 px-6 py-4 focus-visible:outline-none">
+                  <QuotePdfEmbed quote={viewingQuote} />
+                </TabsContent>
+                <TabsContent
+                  value="details"
+                  className="m-0 max-h-[min(75vh,900px)] overflow-y-auto px-6 py-4 focus-visible:outline-none"
+                >
+                  <QuoteDetailView
+                    quote={viewingQuote}
+                    onEdit={() => {
+                      setViewingQuote(null);
+                      setSelectedQuote(viewingQuote);
+                      setIsEditQuoteOpen(true);
+                    }}
+                    onDelete={() => {
+                      setViewingQuote(null);
+                      toast({
+                        title: "Suppression",
+                        description: "Fonctionnalité de suppression à venir",
+                      });
+                    }}
+                    onSendEmail={() => {
+                      toast({
+                        title: "📧 Envoi en cours...",
+                        description: "Le devis sera envoyé par email au client",
+                      });
+                    }}
+                    onDownloadPDF={() => {
+                      toast({
+                        title: "📄 Téléchargement...",
+                        description: "Le PDF du devis est en cours de génération",
+                      });
+                    }}
+                  />
+                </TabsContent>
+              </Tabs>
+            )}
           </DialogContent>
         </Dialog>
 
@@ -1036,14 +1052,28 @@ const Facturation = () => {
                 {viewingInvoice ? `Visualisation complète de la facture ${viewingInvoice.invoice_number}` : ""}
               </DialogDescription>
             </DialogHeader>
-            <div className="px-6 py-4">
-              {viewingInvoice && (
-                <InvoiceDisplay
-                  invoice={viewingInvoice}
-                  onClose={() => setViewingInvoice(null)}
-                />
-              )}
-            </div>
+            {viewingInvoice && (
+              <Tabs defaultValue="pdf" className="w-full">
+                <div className="px-6 border-b">
+                  <TabsList className="mb-0">
+                    <TabsTrigger value="pdf">PDF</TabsTrigger>
+                    <TabsTrigger value="resume">Résumé</TabsTrigger>
+                  </TabsList>
+                </div>
+                <TabsContent value="pdf" className="m-0 px-6 py-4 focus-visible:outline-none">
+                  <InvoicePdfEmbed invoice={viewingInvoice} />
+                </TabsContent>
+                <TabsContent
+                  value="resume"
+                  className="m-0 max-h-[min(75vh,900px)] overflow-y-auto px-6 py-4 focus-visible:outline-none"
+                >
+                  <InvoiceDisplay
+                    invoice={viewingInvoice}
+                    onClose={() => setViewingInvoice(null)}
+                  />
+                </TabsContent>
+              </Tabs>
+            )}
           </DialogContent>
         </Dialog>
       </div>

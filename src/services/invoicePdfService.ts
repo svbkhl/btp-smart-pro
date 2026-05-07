@@ -25,6 +25,20 @@ function shouldUseEditorialV2(companyInfo?: UserSettings): boolean {
   return companyInfo?.invoice_template_version === 'v2-editorial';
 }
 
+/** Taux TVA affiché sur le PDF (%), en tenant compte du snapshot et du cas 0 %. */
+function pdfVatRatePercent(invoice: Invoice, totalHT: number, totalVAT: number): number {
+  if (invoice.vat_rate != null && invoice.vat_rate !== undefined) {
+    return Number(invoice.vat_rate);
+  }
+  if (invoice.vat_rate_snapshot != null && invoice.vat_rate_snapshot !== undefined) {
+    return Math.round(Number(invoice.vat_rate_snapshot) * 1000) / 10;
+  }
+  if (totalHT > 0) {
+    return Math.round((totalVAT / totalHT) * 10000) / 100;
+  }
+  return 0;
+}
+
 interface DownloadInvoicePDFParams {
   invoice: Invoice;
   companyInfo?: UserSettings;
@@ -397,7 +411,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
       const totalTTC = invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0;
       const totalHT = invoice.total_ht ?? invoice.amount_ht ?? calculatedTotalHT ?? (totalTTC && invoice.tva ? totalTTC - invoice.tva : totalTTC);
       const totalVAT = invoice.tva ?? invoice.vat_amount ?? (totalHT > 0 && totalTTC > 0 ? totalTTC - totalHT : 0);
-      const vatRate = invoice.vat_rate ?? (totalHT > 0 && totalVAT > 0 ? (totalVAT / totalHT) * 100 : 0);
+      const vatRate = pdfVatRatePercent(invoice, totalHT, totalVAT);
       
       // Calculer depuis totalHT (source de vérité si service_lines présents)
       const finalHT = totalHT || calculatedTotalHT || 0;
@@ -454,7 +468,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
       const totalTTC = invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0;
       const totalHT = invoice.total_ht ?? invoice.amount_ht ?? (totalTTC && invoice.tva ? totalTTC - invoice.tva : totalTTC);
       const totalVAT = invoice.tva ?? invoice.vat_amount ?? 0;
-      const vatRate = invoice.vat_rate ?? (totalHT > 0 && totalVAT > 0 ? (totalVAT / totalHT) * 100 : 0);
+      const vatRate = pdfVatRatePercent(invoice, totalHT, totalVAT);
       
       const hasVAT = totalVAT > 0 && vatRate > 0;
 
@@ -912,7 +926,7 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
       const totalTTC = invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0;
       const totalHT = invoice.total_ht ?? invoice.amount_ht ?? calculatedTotalHT ?? (totalTTC && invoice.tva ? totalTTC - invoice.tva : totalTTC);
       const totalVAT = invoice.tva ?? invoice.vat_amount ?? (totalHT > 0 && totalTTC > 0 ? totalTTC - totalHT : 0);
-      const vatRate = invoice.vat_rate ?? (totalHT > 0 && totalVAT > 0 ? (totalVAT / totalHT) * 100 : 0);
+      const vatRate = pdfVatRatePercent(invoice, totalHT, totalVAT);
       
       const finalHT = totalHT || calculatedTotalHT || 0;
       const finalVAT = totalVAT || (vatRate > 0 ? Math.round((finalHT * (vatRate / 100)) * 100) / 100 : 0);
@@ -961,7 +975,7 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
       const totalTTC = invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? 0;
       const totalHT = invoice.total_ht ?? invoice.amount_ht ?? (totalTTC && invoice.tva ? totalTTC - invoice.tva : totalTTC);
       const totalVAT = invoice.tva ?? invoice.vat_amount ?? 0;
-      const vatRate = invoice.vat_rate ?? (totalHT > 0 && totalVAT > 0 ? (totalVAT / totalHT) * 100 : 0);
+      const vatRate = pdfVatRatePercent(invoice, totalHT, totalVAT);
       const hasVAT = totalVAT > 0 && vatRate > 0;
 
       yPosition += 5;

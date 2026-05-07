@@ -3,6 +3,7 @@ import { Menu, X, Sparkles, UserCog, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { isSystemAdmin } from "@/config/admin";
 import { useCurrentUserDisplayName } from "@/hooks/useCurrentUserDisplayName";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -27,7 +28,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/components/ui/use-toast";
 
 export const TopBar = () => {
-  const { user, isCloser, isAdmin } = useAuth();
+  const { user, isCloser } = useAuth();
   const { isOwner } = usePermissions();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -113,8 +114,8 @@ export const TopBar = () => {
             <GlobalSearchWrapper query={searchQuery} onQueryChange={setSearchQuery} />
           </div>
 
-          {/* Bouton Admin (à côté de la recherche, visible uniquement pour les admins) */}
-          {isAdmin && !isCloser && (
+          {/* Espace admin plateforme uniquement (pas les dirigeants d’entreprise) */}
+          {user && isSystemAdmin(user) && !isCloser && (
             <Link to="/admin">
               <Button
                 variant="outline"

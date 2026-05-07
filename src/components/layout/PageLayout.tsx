@@ -18,7 +18,7 @@ interface PageLayoutProps {
 
 export const PageLayout = ({ children }: PageLayoutProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const { isPinned, isVisible, isHovered } = useSidebar();
   const { enabled: decorativeBackgroundEnabled } = useDecorativeBackground();
   const isMobile = useIsMobile();
@@ -27,7 +27,7 @@ export const PageLayout = ({ children }: PageLayoutProps) => {
   // Vérification centralisée + email en dur : guide jamais affiché pour l'admin
   const isAdminSystem = isSystemAdmin(user);
   const isAdminByEmail = isAdminEmail(user?.email);
-  const neverShowGuide = !!isAdmin || !!isAdminSystem || !!isAdminByEmail;
+  const neverShowGuide = !!isAdminSystem || !!isAdminByEmail;
 
   useEffect(() => {
     if (neverShowGuide && searchParams.has("onboarding_step")) {

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { useClients, getClientFullName } from "@/hooks/useClients";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { isZeroVatRegime, VAT_REGIME_LABEL, type VatRegime } from "@/utils/vatRegime";
 import { useCreateInvoice, CreateInvoiceData } from "@/hooks/useInvoices";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, FileText, User, MapPin } from "lucide-react";
@@ -57,6 +59,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
   const { toast } = useToast();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: companySettings } = useCompanySettings();
+  const { data: userSettings } = useUserSettings();
   const updateCompanySettings = useUpdateCompanySettings();
   const createInvoice = useCreateInvoice();
   const upsertSectionLibrary = useUpsertQuoteSectionLibrary();
@@ -73,6 +76,9 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
   const [tvaRateInput, setTvaRateInput] = useState<string>(
     ((companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20) * 100).toFixed(2)
   );
+
+  const companyVatZero = isZeroVatRegime(userSettings?.vat_regime);
+  const zeroTva = tva293b || companyVatZero;
   
   // État local des sections et lignes
   const [localSections, setLocalSections] = useState<LocalSection[]>([]);
@@ -90,26 +96,42 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
     total_ttc: 0,
   });
 
-  // Charger les préférences au montage
+  // Préférences : d’abord le régime légal (Paramètres → Facturation & TVA), puis les défauts entreprise
   useEffect(() => {
-    if (companySettings) {
-      setTvaRate(companySettings.default_tva_rate || companySettings.default_quote_tva_rate || 0.20);
-      setTva293b(companySettings.default_tva_293b || false);
+    if (!companySettings && !userSettings) return;
+
+    if (companyVatZero) {
+      setTvaRate(0);
+      setTvaRateInput("0.00");
+      if (userSettings?.vat_regime === "FRANCHISE_293B") {
+        setTva293b(true);
+      } else {
+        // Autoliquidation BTP : ce n’est pas le 293 B — ne pas mélanger les mentions légales
+        setTva293b(false);
+      }
+      return;
     }
-  }, [companySettings]);
+
+    if (companySettings) {
+      const dr = companySettings.default_tva_rate ?? companySettings.default_quote_tva_rate ?? 0.2;
+      setTvaRate(dr);
+      setTva293b(companySettings.default_tva_293b ?? false);
+      setTvaRateInput((dr * 100).toFixed(2));
+    }
+  }, [companySettings, userSettings?.vat_regime, companyVatZero]);
 
   // Recalculer les totaux quand sections/lignes changent
   useEffect(() => {
-    const effectiveTvaRate = tva293b ? 0 : tvaRate;
+    const effectiveTvaRate = zeroTva ? 0 : tvaRate;
     const linesForCalc = localLines.map(line => ({
       quantity: line.quantity ?? 0,
       unit_price_ht: line.unit_price_ht ?? 0,
       tva_rate: effectiveTvaRate,
     }));
     
-    const totals = computeQuoteTotals(linesForCalc, effectiveTvaRate, tva293b);
+    const totals = computeQuoteTotals(linesForCalc, effectiveTvaRate, zeroTva);
     setInvoiceTotals(totals);
-  }, [localLines, tvaRate, tva293b]);
+  }, [localLines, tvaRate, tva293b, companyVatZero, zeroTva]);
 
   const handleTvaRateInputChange = (value: string) => {
     setTvaRateInput(value);
@@ -138,6 +160,11 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
     setTva293b(value);
     if (value) {
       setTvaRate(0);
+      setTvaRateInput("0.00");
+    } else if (!companyVatZero && companySettings) {
+      const dr = companySettings.default_tva_rate ?? companySettings.default_quote_tva_rate ?? 0.2;
+      setTvaRate(dr);
+      setTvaRateInput((dr * 100).toFixed(2));
     }
   };
 
@@ -241,7 +268,8 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
         client_address: selectedClient.location,
         description: descriptionParts.join('\n') || "Facture détaillée",
         amount_ht: invoiceTotals.subtotal_ht,
-        vat_rate: tva293b ? 0 : tvaRate,
+        // useCreateInvoice attend le taux en % (ex. 20), pas en décimal (0.2)
+        vat_rate: zeroTva ? 0 : Math.round(tvaRate * 10000) / 100,
         service_lines: serviceLines.length > 0 ? serviceLines : undefined,
       };
 
@@ -296,7 +324,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
   };
 
   const selectedClient = clients.find((c) => c.id === clientId);
-  const effectiveTvaRate = tva293b ? 0 : tvaRate;
+  const effectiveTvaRate = zeroTva ? 0 : tvaRate;
   const canEdit = !!clientId;
   const hasContent = localSections.length > 0 || localLines.length > 0;
 
@@ -364,22 +392,47 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
             </Select>
           </div>
 
-          {/* TVA 293B */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="tva_293b"
-                checked={tva293b}
-                onCheckedChange={(checked) => handleTva293bChange(checked === true)}
-              />
-              <Label htmlFor="tva_293b" className="cursor-pointer">
-                TVA non applicable - Article 293 B du CGI
-              </Label>
+          {companyVatZero && userSettings?.vat_regime && (
+            <p className="text-sm text-muted-foreground rounded-lg border border-white/20 dark:border-white/10 bg-primary/5 px-3 py-2">
+              Régime entreprise (Paramètres) :{" "}
+              <strong>{VAT_REGIME_LABEL[userSettings.vat_regime as VatRegime]}</strong>
+              {" — "}TVA affichée à <strong>0 %</strong> sur cette facture.
+              {userSettings.vat_regime === "FRANCHISE_293B" && (
+                <>
+                  {" "}
+                  La mention <strong>293 B</strong> sera utilisée sur le document (franchise en base).
+                </>
+              )}
+              {userSettings.vat_regime === "AUTOLIQUIDATION_BTP" && (
+                <>
+                  {" "}
+                  Pas de case à cocher ici : la base légale est l’<strong>autoliquidation</strong>, pas le 293 B.
+                </>
+              )}
+            </p>
+          )}
+
+          {/* 293 B manuel : uniquement si régime réel (TVA collectée) — sinon le régime entreprise suffit */}
+          {!companyVatZero && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="tva_293b"
+                  checked={tva293b}
+                  onCheckedChange={(checked) => handleTva293bChange(checked === true)}
+                />
+                <Label htmlFor="tva_293b" className="cursor-pointer">
+                  TVA non applicable - Article 293 B du CGI
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground pl-6">
+                À utiliser seulement si votre entreprise est au régime réel mais cette facture doit refléter la franchise 293 B (cas rare — en général le régime se règle dans les Paramètres).
+              </p>
             </div>
-          </div>
+          )}
 
           {/* Taux TVA */}
-          {!tva293b && (
+          {!zeroTva && (
             <div className="space-y-2">
               <Label htmlFor="tva_rate">Taux de TVA (%)</Label>
               <Input
@@ -544,12 +597,10 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
                         <span>Total HT:</span>
                         <span className="font-medium">{invoiceTotals.subtotal_ht.toFixed(2)} €</span>
                       </div>
-                      {!tva293b && (
-                        <div className="flex justify-between">
-                          <span>TVA ({effectiveTvaRate * 100}%):</span>
-                          <span className="font-medium">{invoiceTotals.total_tva.toFixed(2)} €</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between">
+                        <span>TVA ({(effectiveTvaRate * 100).toFixed(2)}%) :</span>
+                        <span className="font-medium">{invoiceTotals.total_tva.toFixed(2)} €</span>
+                      </div>
                       <div className="flex justify-between text-lg font-bold border-t pt-2">
                         <span>Total TTC:</span>
                         <span className="text-primary">{invoiceTotals.total_ttc.toFixed(2)} €</span>

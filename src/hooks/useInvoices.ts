@@ -35,7 +35,14 @@ export function normalizeInvoice(invoice: any): Invoice {
     amount_ht: totalHT,
     amount_ttc: totalTTC,
     vat_amount: tvaAmount,
-    vat_rate: invoice.vat_rate ?? (tvaAmount && totalHT && totalHT > 0 ? (tvaAmount / totalHT) * 100 : 20),
+    vat_rate:
+      invoice.vat_rate != null && invoice.vat_rate !== undefined
+        ? invoice.vat_rate
+        : invoice.vat_rate_snapshot != null && invoice.vat_rate_snapshot !== undefined
+          ? Math.round(Number(invoice.vat_rate_snapshot) * 1000) / 10
+          : totalHT > 0
+            ? Math.round((tvaAmount / totalHT) * 10000) / 100
+            : 0,
     // S'assurer que les colonnes réelles sont aussi présentes
     total_ht: invoice.total_ht ?? (totalHT > 0 ? totalHT : undefined),
     total_ttc: invoice.total_ttc ?? (totalTTC > 0 ? totalTTC : undefined),
@@ -385,8 +392,9 @@ export const useCreateInvoice = () => {
         } else if (quote) {
           // Stocker les données du devis pour utilisation ultérieure
           quoteData = quote;
-          quoteTvaRate = quote.tva_rate || 0.20;
           quoteTva293b = quote.tva_non_applicable_293b || false;
+          // 0 % est valide : ne pas utiliser || qui remplacerait 0 par 20 %
+          quoteTvaRate = quoteTva293b ? 0 : (quote.tva_rate ?? 0.2);
           quoteSubtotalHt = quote.subtotal_ht || null;
           quoteTotalTva = quote.total_tva || null;
           quoteTotalTtc = quote.total_ttc || null;
@@ -531,13 +539,14 @@ export const useCreateInvoice = () => {
       if (isZeroVatRegime(companyVatRegime)) {
         vatRatePercent = 0;
         console.log("💰 [useCreateInvoice] Régime entreprise =", companyVatRegime, "→ TVA forcée à 0 %");
-      } else if (quoteTvaRate !== null && quoteTvaRate > 0) {
-        vatRatePercent = quoteTvaRate * 100;
-        if (vatRatePercent < 1) {
+      } else if (quoteTvaRate !== null && quoteTvaRate !== undefined) {
+        vatRatePercent = Math.round(quoteTvaRate * 10000) / 100;
+        // Taux exprimé en décimal (0.2 = 20 %). 0 % est valide ; seuls les taux > 0 mais < 1 % sont suspects
+        if (!quoteTva293b && vatRatePercent > 0 && vatRatePercent < 1) {
           console.warn("⚠️ [useCreateInvoice] Taux TVA suspect du devis:", quoteTvaRate, "→", vatRatePercent, "% - utilisation de 20% par défaut");
           vatRatePercent = 20;
         }
-      } else if (data.vat_rate && data.vat_rate > 0) {
+      } else if (data.vat_rate !== undefined && data.vat_rate !== null) {
         vatRatePercent = data.vat_rate;
       } else {
         vatRatePercent = 20;
@@ -678,9 +687,7 @@ export const useCreateInvoice = () => {
           // Mettre à jour aussi 'amount' qui est NOT NULL dans le schéma de base
           updateData.amount = finalAmountTtc;
         }
-        if (finalVatAmount > 0 || quoteTva293b) {
-          updateData.tva = finalVatAmount;
-        }
+        updateData.tva = finalVatAmount;
 
         // 🛡️ BUG #1 — Snapshot TVA figé à l'émission (immutable une fois la facture créée).
         updateData.vat_regime = companyVatRegime;

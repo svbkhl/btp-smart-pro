@@ -1,14 +1,15 @@
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { isSystemAdmin } from "@/config/admin";
 import { Users, Loader2, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 export const UserManagementSettings = () => {
-  const { isAdmin } = useAuth();
+  const { user } = useAuth();
 
-  if (!isAdmin) {
+  if (!user || !isSystemAdmin(user)) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}

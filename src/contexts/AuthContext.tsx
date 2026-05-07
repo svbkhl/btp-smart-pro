@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { isCloserEmail } from '@/config/admin';
+import { isCloserEmail, isSystemAdmin } from '@/config/admin';
 import { useFakeDataStore } from '@/store/useFakeDataStore';
 
 interface AuthContextValue {
@@ -9,7 +9,10 @@ interface AuthContextValue {
   loading: boolean;
   /** True tant que le fetch initial de currentCompanyId n'est pas terminé */
   isCompanyLoading: boolean;
+  /** Admin / dirigeant côté entreprise (legacy user_roles, metadata, etc.) — pas l’admin plateforme */
   isAdmin: boolean;
+  /** Administrateur plateforme (email liste, is_system_admin, etc.) — routes /admin, KPI closers… */
+  isPlatformAdmin: boolean;
   isEmployee: boolean;
   /** True si l'utilisateur est un closer (hardcoded ou en base) */
   isCloser: boolean;
@@ -353,11 +356,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   }, [user?.email]);
 
+  const isPlatformAdmin = user ? isSystemAdmin(user) : false;
+
   const value: AuthContextValue = {
     user,
     loading,
     isCompanyLoading,
     isAdmin,
+    isPlatformAdmin,
     isEmployee,
     isCloser,
     isCloserLoading,

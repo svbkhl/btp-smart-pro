@@ -94,7 +94,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
   useEffect(() => {
     if (selectedQuote && mode === "from-quote") {
       const quoteTva293b = selectedQuote.tva_non_applicable_293b || false;
-      const quoteTvaRate = selectedQuote.tva_rate || 0.20;
+      const quoteTvaRate = quoteTva293b ? 0 : (selectedQuote.tva_rate ?? 0.2);
       
       if (quoteTva293b) {
         setTva293b(true);
@@ -171,7 +171,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
       } else {
         // TVA normale : convertir HT en TTC
         const montantHT = selectedQuote.subtotal_ht || selectedQuote.estimated_cost || 0;
-        const tvaRateDecimal = (selectedQuote.tva_rate || 0.20);
+        const tvaRateDecimal = quoteTva293b ? 0 : (selectedQuote.tva_rate ?? 0.2);
         const montantTTC = montantHT * (1 + tvaRateDecimal);
         setAmountHt(montantTTC.toString());
       }

@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Save, Building2, Settings, Palette, ToggleLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { isSystemAdmin } from "@/config/admin";
 
 interface UserSettings {
   id: string;
@@ -62,12 +63,13 @@ const STATUS_OPTIONS = [
 
 // Hook pour récupérer tous les utilisateurs (admin seulement)
 const useAllUsers = () => {
-  const { user, isAdmin } = useAuth();
-  
+  const { user } = useAuth();
+  const platformAdmin = user ? isSystemAdmin(user) : false;
+
   return useQuery({
     queryKey: ["all_users"],
     queryFn: async () => {
-      if (!user || !isAdmin) throw new Error("Unauthorized");
+      if (!user || !isSystemAdmin(user)) throw new Error("Unauthorized");
       
       // Récupérer tous les utilisateurs avec leurs settings
       const { data: users, error } = await supabase
@@ -81,18 +83,18 @@ const useAllUsers = () => {
       if (error) throw error;
       return users || [];
     },
-    enabled: !!user && isAdmin,
+    enabled: !!user && platformAdmin,
   });
 };
 
 // Hook pour mettre à jour les settings d'un utilisateur (admin)
 const useUpdateUserSettingsAdmin = () => {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async ({ userId, updates }: { userId: string; updates: Partial<UserSettings> }) => {
-      if (!user || !isAdmin) throw new Error("Unauthorized");
+      if (!user || !isSystemAdmin(user)) throw new Error("Unauthorized");
       
       const { data, error } = await supabase
         .from("user_settings")
@@ -115,7 +117,7 @@ const useUpdateUserSettingsAdmin = () => {
 };
 
 export const AdminCompanySettings = () => {
-  const { isAdmin } = useAuth();
+  const { user } = useAuth();
   const { data: users = [], isLoading } = useAllUsers();
   const updateSettings = useUpdateUserSettingsAdmin();
   const { toast } = useToast();
@@ -147,7 +149,7 @@ export const AdminCompanySettings = () => {
     }
   }, [selectedSettings]);
 
-  if (!isAdmin) {
+  if (!user || !isSystemAdmin(user)) {
     return (
       <GlassCard className="p-12 text-center">
         <p className="text-muted-foreground">Accès réservé aux administrateurs</p>

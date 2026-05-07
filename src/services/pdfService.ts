@@ -61,7 +61,7 @@ interface QuoteSection {
   position: number;
 }
 
-interface DownloadQuotePDFParams {
+export interface DownloadQuotePDFParams {
   result: QuoteResult;
   companyInfo: CompanyInfo;
   clientInfo: ClientInfo;
@@ -130,10 +130,33 @@ function formatDate(date: Date): string {
   }).format(date);
 }
 
+export interface DownloadQuotePDFOptions {
+  /** Si true : ouvre le PDF dans un nouvel onglet au lieu de télécharger */
+  preview?: boolean;
+  /** Si true : retourne le Blob PDF (aperçu iframe, sans téléchargement ni pop-up) */
+  asBlob?: boolean;
+}
+
+function openPdfBlobInNewTab(doc: InstanceType<typeof jsPDF>, fileName: string): void {
+  const blob = doc.output("blob");
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    URL.revokeObjectURL(url);
+    throw new Error(
+      "Impossible d'ouvrir l'aperçu PDF. Vérifiez que les pop-ups ne sont pas bloqués pour ce site."
+    );
+  }
+  win.addEventListener("unload", () => URL.revokeObjectURL(url), { once: true });
+}
+
 /**
- * Génère et télécharge un PDF de devis professionnel
+ * Génère et télécharge un PDF de devis professionnel (ou l'ouvre en aperçu si options.preview)
  */
-export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<void> {
+export async function downloadQuotePDF(
+  params: DownloadQuotePDFParams,
+  options?: DownloadQuotePDFOptions
+): Promise<void | Blob> {
   try {
     console.log('[PDF Service] Début de la génération du PDF');
 
@@ -202,8 +225,16 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       const fileName = quoteNumber
         ? `Devis-${quoteNumber}.pdf`
         : `Devis-${formatDate(quoteDate).replace(/\s/g, '-')}.pdf`;
-      doc.save(fileName);
-      console.log('[PDF Service V2] Devis éditorial généré:', fileName);
+      if (options?.asBlob) {
+        return doc.output("blob");
+      }
+      if (options?.preview) {
+        openPdfBlobInNewTab(doc, fileName);
+        console.log("[PDF Service V2] Aperçu devis éditorial:", fileName);
+      } else {
+        doc.save(fileName);
+        console.log("[PDF Service V2] Devis éditorial généré:", fileName);
+      }
       return;
     }
 
@@ -833,8 +864,16 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
       ? `Devis-${quoteNumber}.pdf`
       : `Devis-${formatDate(quoteDate).replace(/\s/g, '-')}.pdf`;
 
-    doc.save(fileName);
-    console.log('[PDF Service] PDF généré avec succès:', fileName);
+    if (options?.asBlob) {
+      return doc.output("blob");
+    }
+    if (options?.preview) {
+      openPdfBlobInNewTab(doc, fileName);
+      console.log("[PDF Service] Aperçu PDF devis:", fileName);
+    } else {
+      doc.save(fileName);
+      console.log("[PDF Service] PDF généré avec succès:", fileName);
+    }
   } catch (error) {
     console.error('[PDF Service] Erreur lors de la génération du PDF:', error);
     throw new Error(
@@ -843,6 +882,15 @@ export async function downloadQuotePDF(params: DownloadQuotePDFParams): Promise<
         : 'Impossible de générer le PDF. Veuillez réessayer.'
     );
   }
+}
+
+/** Blob PDF devis (même rendu que téléchargement) pour aperçu inline. */
+export async function getQuotePdfBlob(params: DownloadQuotePDFParams): Promise<Blob> {
+  const out = await downloadQuotePDF(params, { asBlob: true });
+  if (!(out instanceof Blob)) {
+    throw new Error("Impossible de générer le PDF du devis.");
+  }
+  return out;
 }
 
 /**

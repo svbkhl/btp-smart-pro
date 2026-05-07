@@ -14,7 +14,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser = false }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, isAdmin, isCloser, isCloserLoading, userRole, currentCompanyId } = useAuth();
+  const { user, loading, isCloser, isCloserLoading, userRole, currentCompanyId } = useAuth();
   const { fakeDataEnabled, setFakeDataEnabled } = useFakeDataStore();
   const { isLoading: subscriptionLoading } = useSubscription();
 
@@ -100,16 +100,8 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
       return () => clearTimeout(timeoutId);
     }
     
-    // Si requireAdmin, mais que user_roles échoue (erreur 500),
-    // permettre l'accès après timeout pour éviter les blocages
-    // L'utilisateur pourra toujours utiliser l'application
-    if (requireAdmin && !isAdmin && !loading && !showContent) {
-      // Attendre le timeout avant de rediriger
-      return () => clearTimeout(timeoutId);
-    }
-    
     return () => clearTimeout(timeoutId);
-  }, [user, loading, isAdmin, requireAdmin, navigate, showContent, fakeDataEnabled]);
+  }, [user, loading, requireAdmin, navigate, showContent, fakeDataEnabled]);
 
   // Redirection Settings en mode démo (dans un effet pour éviter setState pendant le render)
   useEffect(() => {
@@ -121,6 +113,14 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
       }
     }
   }, [fakeDataEnabled, user, userRole, location.pathname, navigate]);
+
+  // Routes /admin : réservées aux administrateurs plateforme (pas aux dirigeants d’entreprise)
+  useEffect(() => {
+    if (!requireAdmin || loading || !user) return;
+    if (!isSystemAdmin(user)) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [requireAdmin, loading, user, navigate]);
 
   // Après timeout, si toujours pas d'utilisateur : redirection (en effet pour éviter setState pendant render)
   useEffect(() => {
@@ -158,7 +158,9 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
       return <>{children}</>;
     }
     if (user && (userRole === 'admin' || isCloser)) {
-      return <>{children}</>;
+      if (!(requireAdmin && !isSystemAdmin(user))) {
+        return <>{children}</>;
+      }
     }
     // Utilisateur connecté mais ni admin ni closer → continuer (mode démo sera désactivé par useEffect)
   }
@@ -191,17 +193,8 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireCloser =
     return null;
   }
   
-  // Si requireAdmin mais pas admin ET après timeout, permettre l'accès quand même
-  // pour éviter les blocages si user_roles n'existe pas
-  // Cela permet à l'application de fonctionner même si le backend n'est pas complètement configuré
-  if (requireAdmin && !isAdmin && showContent) {
-    // Afficher le contenu quand même après timeout
-    // L'utilisateur pourra utiliser l'application même si les rôles ne sont pas chargés
-    return <>{children}</>;
-  }
-
-  // Si requireAdmin et pas admin (mais pas encore de timeout), ne pas afficher
-  if (requireAdmin && !isAdmin && !showContent) {
+  // Si requireAdmin et pas admin plateforme (en attente du chargement user), ne pas afficher
+  if (requireAdmin && user && !isSystemAdmin(user)) {
     return null;
   }
 
