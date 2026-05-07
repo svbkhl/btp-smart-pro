@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -76,6 +77,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
   const [tvaRateInput, setTvaRateInput] = useState<string>(
     ((companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20) * 100).toFixed(2)
   );
+  const [invoiceNote, setInvoiceNote] = useState<string>("");
 
   const companyVatZero = isZeroVatRegime(userSettings?.vat_regime);
   const zeroTva = tva293b || companyVatZero;
@@ -235,22 +237,6 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
         throw new Error("Client introuvable");
       }
 
-      // Construire la description depuis les sections et lignes
-      const descriptionParts: string[] = [];
-      localSections.forEach((section, idx) => {
-        if (section.title.trim()) {
-          descriptionParts.push(`${idx + 1}. ${section.title}`);
-          const sectionLines = localLines.filter(l => l.section_id === section.id);
-          sectionLines.forEach((line, lineIdx) => {
-            if (line.label.trim()) {
-              const qty = line.quantity || 0;
-              const price = line.unit_price_ht || 0;
-              descriptionParts.push(`  ${idx + 1}.${lineIdx + 1} ${line.label} - ${qty} ${line.unit} × ${price.toFixed(2)} € HT`);
-            }
-          });
-        }
-      });
-
       // Créer les service_lines pour la facture
       const serviceLines = localLines
         .filter(line => line.label.trim() && line.quantity && line.unit_price_ht)
@@ -266,7 +252,7 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
         client_name: getClientFullName(selectedClient),
         client_email: selectedClient.email,
         client_address: selectedClient.location,
-        description: descriptionParts.join('\n') || "Facture détaillée",
+        description: invoiceNote.trim() ? `Facture détaillée\n\nNote:\n${invoiceNote.trim()}` : "Facture détaillée",
         amount_ht: invoiceTotals.subtotal_ht,
         // useCreateInvoice attend le taux en % (ex. 20), pas en décimal (0.2)
         vat_rate: zeroTva ? 0 : Math.round(tvaRate * 10000) / 100,
@@ -447,6 +433,17 @@ export const DetailedInvoiceEditor = ({ onSuccess, onCancel, onClose }: Detailed
               />
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="invoice_note">Note sur la facture (optionnel)</Label>
+            <Textarea
+              id="invoice_note"
+              value={invoiceNote}
+              onChange={(e) => setInvoiceNote(e.target.value)}
+              placeholder="Ajoutez un texte libre (précisions, informations complémentaires, etc.)"
+              className="min-h-[100px] bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+            />
+          </div>
         </div>
       </GlassCard>
 

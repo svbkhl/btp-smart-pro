@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -95,6 +96,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
   const [tvaRateInput, setTvaRateInput] = useState<string>(
     ((companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20) * 100).toFixed(2)
   );
+  const [quoteNote, setQuoteNote] = useState<string>("");
   
   // État local des sections et lignes (avant sauvegarde DB)
   const [localSections, setLocalSections] = useState<LocalSection[]>([]);
@@ -427,6 +429,8 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
         console.warn("⚠️ Impossible de créer les lignes : sections non créées");
       }
 
+      const detailsPayload = quoteNote.trim() ? { note: quoteNote.trim() } : {};
+
       // 4. Recalculer les totaux (sans RPC, calcul frontend + UPDATE)
       // Si des lignes ont été créées, recalculer les totaux depuis les lignes
       if (linesCreated && localLines.length > 0) {
@@ -446,6 +450,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
             subtotal_ht: totals.subtotal_ht,
             total_tva: totals.total_tva,
             total_ttc: totals.total_ttc,
+            details: detailsPayload,
           });
           
           console.log("✅ Totaux recalculés et mis à jour:", totals);
@@ -473,6 +478,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
             subtotal_ht: 0,
             total_tva: 0,
             total_ttc: 0,
+            details: detailsPayload,
           });
         } catch (updateError: any) {
           console.warn("⚠️ Erreur mise à jour totaux vides:", updateError);
@@ -603,6 +609,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
         result: {
           estimatedCost: previewQuote.total_ttc || previewQuote.estimated_cost || 0,
           quote_number: previewQuote.quote_number,
+          note: (previewQuote as any)?.details?.note,
         },
         companyInfo,
         clientInfo: {
@@ -965,6 +972,17 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
               </p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="quote_note">Note sur le devis (optionnel)</Label>
+            <Textarea
+              id="quote_note"
+              value={quoteNote}
+              onChange={(e) => setQuoteNote(e.target.value)}
+              placeholder="Ajoutez un texte libre (informations complémentaires, conditions particulières, etc.)"
+              className="min-h-[100px] bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+            />
+          </div>
         </div>
       </GlassCard>
 

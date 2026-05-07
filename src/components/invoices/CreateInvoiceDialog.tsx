@@ -49,6 +49,7 @@ const invoiceSchema = z.object({
   description: z.string().min(1, "La description est requise"),
   amount_ttc: z.string().min(1, "Le montant TTC est requis"),
   due_date: z.string().optional(),
+  note: z.string().optional(),
 });
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
@@ -91,6 +92,7 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
       description: "",
       amount_ttc: "",
       due_date: "",
+      note: "",
     },
   });
 
@@ -177,7 +179,9 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
         client_email: data.client_email || undefined,
         client_address: data.client_address || undefined,
         quote_id: data.quote_id || undefined,
-        description: data.description,
+        description: data.note?.trim()
+          ? `${data.description}\n\nNote:\n${data.note.trim()}`
+          : data.description,
         amount_ht: prices.total_ht,  // HT calculé à partir du TTC
         amount_ttc: parseFloat(data.amount_ttc),  // ✅ TTC saisi directement (source de vérité)
         vat_rate: 20,  // TVA fixe à 20%
@@ -387,6 +391,16 @@ export const CreateInvoiceDialog = ({ open, onOpenChange, quoteId }: CreateInvoi
             {errors.description && (
               <p className="text-sm text-red-500">{errors.description.message}</p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="note">Note (optionnel)</Label>
+            <Textarea
+              id="note"
+              {...register("note")}
+              placeholder="Ajoutez un texte complémentaire à intégrer dans la facture"
+              rows={3}
+              className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+            />
           </div>
 
           {/* Montant TTC */}

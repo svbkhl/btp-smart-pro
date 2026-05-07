@@ -226,17 +226,22 @@ export default function QuoteDetailView({
             </Card>
           </div>
 
-          {/* Description */}
-          {quote.details?.description && (
+          {/* Description / Note */}
+          {(quote.details?.description || quote.details?.note) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Description des travaux
+                  Description / Note
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{quote.details.description}</p>
+                {quote.details?.description && (
+                  <p className="text-sm whitespace-pre-wrap">{quote.details.description}</p>
+                )}
+                {quote.details?.note && (
+                  <p className="text-sm whitespace-pre-wrap mt-2">{quote.details.note}</p>
+                )}
               </CardContent>
             </Card>
           )}

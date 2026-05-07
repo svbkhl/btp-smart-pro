@@ -75,6 +75,19 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+function extractInvoiceNote(description?: string | null): string {
+  if (!description) return "";
+  const marker = /\n\s*Note\s*:\s*/i;
+  const match = description.match(marker);
+  if (!match || match.index == null) return "";
+  return description.slice(match.index).replace(/^\s*Note\s*:\s*/i, "").trim();
+}
+
+function stripInvoiceNote(description?: string | null): string {
+  if (!description) return "";
+  return description.replace(/\n\s*Note\s*:[\s\S]*$/i, "").trim();
+}
+
 /**
  * Renderer principal.
  * Pure (sauf I/O image et le doc passé en paramètre).
@@ -271,100 +284,143 @@ export async function renderInvoiceEditorial(
   // ======================================================================
   // TABLEAU PRESTATIONS
   // ======================================================================
-  const lines = invoice.service_lines ?? [];
-  if (lines.length > 0) {
-    // En-tête de tableau
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(PDF_FONT_SIZE.xs);
-    setColor(doc, PDF_COLORS.label);
-    doc.text("DÉSIGNATION", mx, y);
-    doc.text("QTÉ", mx + contentW * 0.6, y, { align: "right" });
-    doc.text("PU HT", mx + contentW * 0.78, y, { align: "right" });
-    doc.text("TOTAL HT", rightX, y, { align: "right" });
-    y += 3;
+  const totalHtFromInvoice = invoice.total_ht ?? invoice.amount_ht ?? 0;
+  const mainDescription = stripInvoiceNote(invoice.description);
+  const invoiceNote = extractInvoiceNote(invoice.description);
+  const fallbackDescription =
+    mainDescription || (mode === "facture" ? "Prestation" : "Prestation devis");
+  const lines = (invoice.service_lines && invoice.service_lines.length > 0)
+    ? invoice.service_lines
+    : [
+        {
+          description: fallbackDescription,
+          quantity: 1,
+          unit_price: totalHtFromInvoice,
+          total: totalHtFromInvoice,
+        },
+      ];
+
+  // En-tête de tableau
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(PDF_FONT_SIZE.xs);
+  setColor(doc, PDF_COLORS.label);
+  doc.text("DÉSIGNATION", mx, y);
+  doc.text("QTÉ", mx + contentW * 0.6, y, { align: "right" });
+  doc.text("PU HT", mx + contentW * 0.78, y, { align: "right" });
+  doc.text("TOTAL HT", rightX, y, { align: "right" });
+  y += 3;
+  setDraw(doc, PDF_COLORS.line);
+  doc.setLineWidth(0.2);
+  doc.line(mx, y, rightX, y);
+  y += 5;
+
+  let calculatedHt = 0;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(PDF_FONT_SIZE.sm);
+  setColor(doc, PDF_COLORS.ink);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (y > pageH - 80) {
+      doc.addPage();
+      y = my;
+    }
+    const qty = line.quantity || 1;
+    const unit = line.unit_price || 0;
+    const total = line.total ?? qty * unit;
+    calculatedHt += total;
+
+    // Designation (wrap si trop long)
+    const designation = line.description || fallbackDescription;
+    const wrapped = doc.splitTextToSize(designation, contentW * 0.55) as string[];
+    const startY = y;
+    wrapped.forEach((t, idx) => {
+      doc.text(t, mx, startY + idx * 4);
+    });
+    const rowH = Math.max(4, wrapped.length * 4);
+
+    doc.text(String(qty), mx + contentW * 0.6, startY, { align: "right" });
+    doc.text(formatCurrency(unit), mx + contentW * 0.78, startY, { align: "right" });
+    doc.text(formatCurrency(total), rightX, startY, { align: "right" });
+    y = startY + rowH + 2;
+  }
+
+  setDraw(doc, PDF_COLORS.line);
+  doc.setLineWidth(0.2);
+  doc.line(mx, y, rightX, y);
+  y += 6;
+
+  // Totaux : alignés à droite
+  const totalHt = totalHtFromInvoice || calculatedHt;
+  const vatRateSnapshot = invoice.vat_rate_snapshot ?? null;
+  const tva = invoice.tva ?? invoice.vat_amount ?? 0;
+  const totalTtc = invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? totalHt;
+  const hasVat = (tva ?? 0) > 0;
+  const vatPercent = vatRateSnapshot != null
+    ? Math.round(vatRateSnapshot * 1000) / 10
+    : invoice.vat_rate ?? (totalHt > 0 ? Math.round((tva / totalHt) * 1000) / 10 : 0);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(PDF_FONT_SIZE.sm);
+  setColor(doc, PDF_COLORS.muted);
+
+  const labelX = mx + contentW * 0.6;
+  if (hasVat) {
+    doc.text("Sous-total HT", labelX, y, { align: "right" });
+    setColor(doc, PDF_COLORS.ink);
+    doc.text(formatCurrency(totalHt), rightX, y, { align: "right" });
+    y += 5;
+    setColor(doc, PDF_COLORS.muted);
+    doc.text(`TVA (${vatPercent}%)`, labelX, y, { align: "right" });
+    setColor(doc, PDF_COLORS.ink);
+    doc.text(formatCurrency(tva), rightX, y, { align: "right" });
+    y += 5;
+  }
+
+  setDraw(doc, accent);
+  doc.setLineWidth(0.5);
+  doc.line(labelX - 5, y, rightX, y);
+  y += 6;
+
+  // TOTAL TTC — gros, accent color
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(PDF_FONT_SIZE.md);
+  setColor(doc, PDF_COLORS.ink);
+  doc.text(hasVat ? "TOTAL TTC" : "TOTAL", labelX, y, { align: "right" });
+  doc.setFontSize(PDF_FONT_SIZE.xl);
+  setColor(doc, accent);
+  doc.text(formatCurrency(totalTtc), rightX, y + 1, { align: "right" });
+  y += 14;
+
+  if (invoiceNote) {
+    if (y > pageH - 45) {
+      doc.addPage();
+      y = my;
+    }
     setDraw(doc, PDF_COLORS.line);
     doc.setLineWidth(0.2);
     doc.line(mx, y, rightX, y);
-    y += 5;
+    y += 6;
 
-    let calculatedHt = 0;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(PDF_FONT_SIZE.sm);
+    setColor(doc, PDF_COLORS.ink);
+    doc.text("Note :", mx, y);
+    y += 5;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(PDF_FONT_SIZE.sm);
-    setColor(doc, PDF_COLORS.ink);
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      if (y > pageH - 80) {
+    const noteLines = doc.splitTextToSize(invoiceNote, contentW) as string[];
+    noteLines.forEach((line) => {
+      if (y > pageH - 20) {
         doc.addPage();
         y = my;
       }
-      const qty = line.quantity || 1;
-      const unit = line.unit_price || 0;
-      const total = line.total ?? qty * unit;
-      calculatedHt += total;
-
-      // Designation (wrap si trop long)
-      const designation = line.description || "";
-      const wrapped = doc.splitTextToSize(designation, contentW * 0.55) as string[];
-      const startY = y;
-      wrapped.forEach((t, idx) => {
-        doc.text(t, mx, startY + idx * 4);
-      });
-      const rowH = Math.max(4, wrapped.length * 4);
-
-      doc.text(String(qty), mx + contentW * 0.6, startY, { align: "right" });
-      doc.text(formatCurrency(unit), mx + contentW * 0.78, startY, { align: "right" });
-      doc.text(formatCurrency(total), rightX, startY, { align: "right" });
-      y = startY + rowH + 2;
-    }
-
-    setDraw(doc, PDF_COLORS.line);
-    doc.setLineWidth(0.2);
-    doc.line(mx, y, rightX, y);
-    y += 6;
-
-    // Totaux : alignés à droite
-    const totalHt = invoice.total_ht ?? invoice.amount_ht ?? calculatedHt;
-    const vatRateSnapshot = invoice.vat_rate_snapshot ?? null;
-    const tva = invoice.tva ?? invoice.vat_amount ?? 0;
-    const totalTtc = invoice.total_ttc ?? invoice.amount_ttc ?? invoice.amount ?? totalHt;
-    const hasVat = (tva ?? 0) > 0;
-    const vatPercent = vatRateSnapshot != null
-      ? Math.round(vatRateSnapshot * 1000) / 10
-      : invoice.vat_rate ?? (totalHt > 0 ? Math.round((tva / totalHt) * 1000) / 10 : 0);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(PDF_FONT_SIZE.sm);
-    setColor(doc, PDF_COLORS.muted);
-
-    const labelX = mx + contentW * 0.6;
-    if (hasVat) {
-      doc.text("Sous-total HT", labelX, y, { align: "right" });
-      setColor(doc, PDF_COLORS.ink);
-      doc.text(formatCurrency(totalHt), rightX, y, { align: "right" });
-      y += 5;
-      setColor(doc, PDF_COLORS.muted);
-      doc.text(`TVA (${vatPercent}%)`, labelX, y, { align: "right" });
-      setColor(doc, PDF_COLORS.ink);
-      doc.text(formatCurrency(tva), rightX, y, { align: "right" });
-      y += 5;
-    }
-
-    setDraw(doc, accent);
-    doc.setLineWidth(0.5);
-    doc.line(labelX - 5, y, rightX, y);
-    y += 6;
-
-    // TOTAL TTC — gros, accent color
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(PDF_FONT_SIZE.md);
-    setColor(doc, PDF_COLORS.ink);
-    doc.text(hasVat ? "TOTAL TTC" : "TOTAL", labelX, y, { align: "right" });
-    doc.setFontSize(PDF_FONT_SIZE.xl);
-    setColor(doc, accent);
-    doc.text(formatCurrency(totalTtc), rightX, y + 1, { align: "right" });
-    y += 14;
+      doc.text(line, mx, y);
+      y += 4.5;
+    });
+    y += 2;
   }
 
   // ======================================================================
@@ -383,14 +439,7 @@ export async function renderInvoiceEditorial(
   setColor(doc, PDF_COLORS.muted);
 
   const legalLines: string[] = [];
-  if (mode === "facture") {
-    legalLines.push("Pénalités de retard : 3 fois le taux d'intérêt légal en vigueur.");
-    legalLines.push("Indemnité forfaitaire de recouvrement : 40 €.");
-    if (mention) legalLines.push(mention);
-  } else {
-    legalLines.push("Devis gratuit et sans engagement. Valable 30 jours.");
-    if (mention) legalLines.push(mention);
-  }
+  if (mention) legalLines.push(mention);
 
   legalLines.forEach((l) => {
     if (y > pageH - 25) {

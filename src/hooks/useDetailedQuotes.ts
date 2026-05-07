@@ -42,6 +42,7 @@ export interface UpdateDetailedQuoteData {
   subtotal_ht?: number;
   total_tva?: number;
   total_ttc?: number;
+  details?: Record<string, any>;
 }
 
 /**

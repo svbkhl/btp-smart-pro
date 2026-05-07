@@ -42,6 +42,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
   const [clientId, setClientId] = useState<string>("");
   const [quoteId, setQuoteId] = useState<string>("");
   const [description, setDescription] = useState("");
+  const [invoiceNote, setInvoiceNote] = useState("");
   const [amountHt, setAmountHt] = useState("");
   const [loading, setLoading] = useState(false);
   const [invoice, setInvoice] = useState<any>(null);
@@ -162,6 +163,7 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
   useEffect(() => {
     if (selectedQuote) {
       setDescription(selectedQuote.details?.description || `Facture pour ${selectedQuote.client_name}`);
+      setInvoiceNote(selectedQuote.details?.note || "");
       // Si 293B, utiliser directement total_ttc (qui = subtotal_ht), sinon convertir HT en TTC
       const quoteTva293b = selectedQuote.tva_non_applicable_293b || false;
       if (quoteTva293b) {
@@ -256,7 +258,9 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
         client_email: selectedClient.email,
         client_address: selectedClient.location,
         quote_id: quoteId || undefined,
-        description: description.trim(),
+        description: invoiceNote.trim()
+          ? `${description.trim()}\n\nNote:\n${invoiceNote.trim()}`
+          : description.trim(),
         amount_ht: montantHT, // HT calculé depuis TTC saisi
         amount_ttc: montantTTC, // ✅ TTC saisi directement (source de vérité pour éviter les arrondis)
         vat_rate: vatRatePercent, // Taux en pourcentage (0 si 293B, sinon taux saisi)
@@ -528,6 +532,17 @@ export const SimpleInvoiceForm = ({ mode = "normal" }: SimpleInvoiceFormProps) =
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Facture pour rénovation salle de bains"
               className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+              disabled={loading}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="invoice_note">Note (optionnel)</Label>
+            <Textarea
+              id="invoice_note"
+              value={invoiceNote}
+              onChange={(e) => setInvoiceNote(e.target.value)}
+              placeholder="Ajoutez un texte complémentaire à intégrer dans la facture"
+              className="min-h-[90px] bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
               disabled={loading}
             />
           </div>

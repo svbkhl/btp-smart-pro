@@ -767,6 +767,35 @@ export async function downloadQuotePDF(
     }
 
     // ============================================
+    // NOTE CLIENT (optionnelle)
+    // ============================================
+    const quoteNote = cleanText((result as any)?.note);
+    if (quoteNote) {
+      if (yPosition > pageHeight - 60) {
+        doc.addPage();
+        yPosition = margin;
+      }
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...textColor);
+      doc.text("Note :", margin, yPosition);
+      yPosition += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const noteLines = doc.splitTextToSize(quoteNote, contentWidth);
+      noteLines.forEach((line: string) => {
+        if (yPosition > pageHeight - 30) {
+          doc.addPage();
+          yPosition = margin;
+        }
+        doc.text(line, margin, yPosition);
+        yPosition += 4.5;
+      });
+      yPosition += 4;
+    }
+
+    // ============================================
     // SIGNATURE
     // ============================================
     if (signatureData || signedBy) {

@@ -50,6 +50,10 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
   const vatPercent = displayVatPercent(invoice);
+  const rawDescription = invoice.description || "";
+  const noteMatch = rawDescription.match(/\n\s*Note\s*:\s*([\s\S]*)$/i);
+  const invoiceDescription = noteMatch ? rawDescription.slice(0, noteMatch.index).trim() : rawDescription;
+  const invoiceNote = noteMatch?.[1]?.trim() || "";
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
@@ -191,12 +195,18 @@ export const InvoiceDisplay = ({ invoice, showActions = true, onClose }: Invoice
         <Separator />
 
         {/* Description */}
-        {invoice.description && (
+        {invoiceDescription && (
           <div>
             <h3 className="font-semibold mb-2">Description</h3>
             <p className="text-sm text-muted-foreground whitespace-pre-line">
-              {invoice.description}
+              {invoiceDescription}
             </p>
+          </div>
+        )}
+        {invoiceNote && (
+          <div>
+            <h3 className="font-semibold mb-2">Note</h3>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">{invoiceNote}</p>
           </div>
         )}
 

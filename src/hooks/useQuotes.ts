@@ -40,6 +40,7 @@ export interface Quote {
       quantity: number;
       unitPrice: number;
     }>;
+    note?: string;
   };
   created_at: string;
   updated_at: string;
