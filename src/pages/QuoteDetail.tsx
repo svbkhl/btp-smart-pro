@@ -231,8 +231,8 @@ export default function QuoteDetail() {
         {/* Vue détaillée complète */}
         <QuoteDetailView
           quote={quote}
-          onEdit={quote.signed ? undefined : handleEdit}
-          onDelete={quote.signed ? undefined : handleDelete}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
           onSendEmail={handleSendEmail}
           onDownloadPDF={handleDownloadPDF}
           onViewMessages={handleViewMessages}

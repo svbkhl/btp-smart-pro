@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,7 +31,7 @@ import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 const quoteSchema = z.object({
   client_name: z.string().min(1, "Le nom du client est requis"),
   estimated_cost: z.string().min(1, "Le montant est requis"),
-  status: z.enum(["draft", "sent", "accepted", "rejected", "expired"]),
+  status: z.enum(["draft", "sent", "accepted", "rejected", "expired", "signed"]),
   mode: z.enum(["simple", "detailed"]).optional(),
   tva_rate: z.number().min(0).max(1).optional(),
   tva_non_applicable_293b: z.boolean().optional(),
@@ -191,6 +192,7 @@ export const EditQuoteDialog = ({ open, onOpenChange, quote }: EditQuoteDialogPr
                 <SelectItem value="draft">Brouillon</SelectItem>
                 <SelectItem value="sent">Envoyé</SelectItem>
                 <SelectItem value="accepted">Accepté</SelectItem>
+                <SelectItem value="signed">Signé</SelectItem>
                 <SelectItem value="rejected">Refusé</SelectItem>
                 <SelectItem value="expired">Expiré</SelectItem>
               </SelectContent>

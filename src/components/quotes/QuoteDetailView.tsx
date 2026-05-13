@@ -107,13 +107,13 @@ export default function QuoteDetailView({
               Envoyer
             </Button>
           )}
-          {onEdit && !isReadOnly && (
+          {onEdit && (
             <Button variant="outline" onClick={onEdit} className="gap-2">
               <Edit className="h-4 w-4" />
               Modifier
             </Button>
           )}
-          {onDelete && !isReadOnly && (
+          {onDelete && (
             <Button variant="outline" onClick={onDelete} className="gap-2 text-red-600 hover:text-red-700">
               <Trash2 className="h-4 w-4" />
               Supprimer
@@ -127,7 +127,7 @@ export default function QuoteDetailView({
         <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20">
           <Eye className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-900 dark:text-green-100">
-            🔒 <strong>Devis signé</strong> - Ce document est verrouillé et ne peut plus être modifié. Il a une valeur juridique.
+            ✅ <strong>Devis signé</strong> - Ce devis a été signé. Vous pouvez toujours le modifier si nécessaire.
           </AlertDescription>
         </Alert>
       )}

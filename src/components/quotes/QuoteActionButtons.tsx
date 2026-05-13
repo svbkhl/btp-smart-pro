@@ -52,8 +52,8 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
 
   return (
     <div className="flex flex-wrap gap-2">
-      {/* Bouton Modifier - masqué si le devis est signé */}
-      {onEdit && !isSigned && (
+      {/* Bouton Modifier - toujours visible */}
+      {onEdit && (
         <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
           <Edit className="w-4 h-4" />
           Modifier
