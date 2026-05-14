@@ -1,6 +1,6 @@
 /**
  * Hook spécialisé pour les devis détaillés
- * Utilise ai_quotes SANS la colonne mode (qui n'existe pas)
+ * Utilise ai_quotes avec mode: "detailed"
  * Création manuelle uniquement, pas d'IA
  */
 
@@ -46,7 +46,7 @@ export interface UpdateDetailedQuoteData {
 }
 
 /**
- * Crée un devis détaillé dans ai_quotes (SANS colonne mode)
+ * Crée un devis détaillé dans ai_quotes avec mode: "detailed"
  */
 export const useCreateDetailedQuote = () => {
   const { user } = useAuth();
@@ -72,13 +72,13 @@ export const useCreateDetailedQuote = () => {
       const tva293b = quoteData.tva_non_applicable_293b ?? false;
 
       // Préparer les données d'insertion
-      // On inclut les colonnes même si elles peuvent ne pas exister (PostgREST les ignorera)
       const insertData: any = {
         user_id: user.id,
         client_name: quoteData.client_name,
         quote_number: quoteNumber,
         status: "draft",
         estimated_cost: 0,
+        mode: "detailed",
       };
 
       // ⚠️ SÉCURITÉ : Ne JAMAIS passer company_id depuis le frontend
@@ -120,6 +120,7 @@ export const useCreateDetailedQuote = () => {
             quote_number: quoteNumber,
             status: "draft",
             estimated_cost: 0,
+            mode: "detailed",
           };
           
           const { data: retryData, error: retryError } = await supabase

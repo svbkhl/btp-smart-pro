@@ -54,10 +54,12 @@ export default function QuoteDetailView({
 }: QuoteDetailViewProps) {
   const [activeTab, setActiveTab] = useState("details");
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
-  const quoteMode = quote.mode || "simple";
   const tvaRate = quote.tva_rate ?? 0.20;
   const tva293b = quote.tva_non_applicable_293b ?? false;
-  const { data: lines = [] } = useQuoteLines(quoteMode === "detailed" ? quote.id : undefined);
+  // Toujours charger les lignes pour détecter les devis détaillés sans mode en base
+  const { data: lines = [] } = useQuoteLines(quote.id);
+  // Mode détaillé si explicitement marqué OU si des lignes existent (rétrocompat)
+  const quoteMode = quote.mode === "detailed" || lines.length > 0 ? "detailed" : "simple";
   const [quoteTotals, setQuoteTotals] = useState({
     subtotal_ht: quote.subtotal_ht ?? quote.estimated_cost ?? 0,
     total_tva: tva293b ? 0 : (quote.total_tva ?? (quote.estimated_cost ?? 0) * tvaRate),
