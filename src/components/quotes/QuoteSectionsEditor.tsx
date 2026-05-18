@@ -3,9 +3,10 @@
  * Structure : Sections (corps de métier) + Lignes numérotées (1.1, 1.2, etc.)
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -761,12 +762,17 @@ export const QuoteSectionsEditor = ({
                                 </TableCell>
                                 <TableCell>
                                   {isEditing ? (
-                                    <Input
+                                    <Textarea
                                       value={lineData?.label || ""}
-                                      onChange={(e) =>
-                                        setEditingLine({ ...lineData, label: e.target.value })
-                                      }
+                                      rows={1}
+                                      onChange={(e) => {
+                                        setEditingLine({ ...lineData, label: e.target.value });
+                                        const el = e.target;
+                                        el.style.height = "auto";
+                                        el.style.height = el.scrollHeight + "px";
+                                      }}
                                       placeholder="Désignation"
+                                      className="resize-none overflow-hidden min-h-[40px] w-full"
                                     />
                                   ) : (
                                     line.label
@@ -890,10 +896,17 @@ export const QuoteSectionsEditor = ({
                           <TableRow className="bg-muted/50">
                             <TableCell></TableCell>
                             <TableCell>
-                              <Input
+                              <Textarea
                                 value={newLine.label || ""}
-                                onChange={(e) => setNewLine({ ...newLine, label: e.target.value })}
+                                rows={1}
+                                onChange={(e) => {
+                                  setNewLine({ ...newLine, label: e.target.value });
+                                  const el = e.target;
+                                  el.style.height = "auto";
+                                  el.style.height = el.scrollHeight + "px";
+                                }}
                                 placeholder="Désignation"
+                                className="resize-none overflow-hidden min-h-[40px] w-full"
                               />
                             </TableCell>
                             <TableCell>
