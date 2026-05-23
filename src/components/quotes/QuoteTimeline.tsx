@@ -3,13 +3,15 @@
  * Affiche les étapes : Création → Envoi → Signature → Paiement
  */
 
-import { CheckCircle2, Circle, Clock, Send, FileText, DollarSign, Award } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Send, FileText, DollarSign, Award, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuoteTimelineProps {
   quote: {
     created_at: string;
     sent_at?: string | null;
+    client_opened_at?: string | null;
+    details?: { client_opened_at?: string | null } | null;
     signed?: boolean;
     signed_at?: string | null;
     status?: string;
@@ -28,6 +30,8 @@ interface TimelineStep {
 }
 
 export default function QuoteTimeline({ quote, className }: QuoteTimelineProps) {
+  const openedAt = quote.client_opened_at ?? quote.details?.client_opened_at ?? null;
+
   const steps: TimelineStep[] = [
     {
       id: 'created',
@@ -42,7 +46,15 @@ export default function QuoteTimeline({ quote, className }: QuoteTimelineProps) 
       icon: Send,
       completed: !!quote.sent_at,
       date: quote.sent_at,
-      current: !!quote.sent_at && !quote.signed,
+      current: !!quote.sent_at && !openedAt && !quote.signed,
+    },
+    {
+      id: 'opened',
+      label: 'Consulté par le client',
+      icon: Eye,
+      completed: !!openedAt,
+      date: openedAt,
+      current: !!openedAt && !quote.signed,
     },
     {
       id: 'signed',
@@ -147,8 +159,11 @@ export default function QuoteTimeline({ quote, className }: QuoteTimelineProps) 
             {quote.signed && quote.payment_status === 'pending' && (
               <>📧 Prochaine étape : Envoyer le lien de paiement au client</>
             )}
-            {quote.sent_at && !quote.signed && (
-              <>⏳ En attente de signature du client</>
+            {openedAt && !quote.signed && (
+              <>✍️ Le client a consulté le devis — en attente de signature</>
+            )}
+            {quote.sent_at && !openedAt && !quote.signed && (
+              <>⏳ Devis envoyé — en attente d'ouverture par le client</>
             )}
             {!quote.sent_at && (
               <>📤 Prochaine étape : Envoyer le devis au client</>
