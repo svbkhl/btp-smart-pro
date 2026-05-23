@@ -235,81 +235,61 @@ const Dashboard = () => {
     { name: "Planifiés", value: (stats?.total_projects || 0) - (stats?.active_projects || 0) - (stats?.completed_projects || 0), fill: "#8b5cf6" },
   ];
 
-  // Tendances réalistes : mois actuel vs mois précédent
   const trends = useMemo(() => {
-    // En mode démo les calculs dynamiques donnent des % aberrants (±1458%)
-    // On retourne des tendances réalistes hardcodées pour une démo crédible
     if (fakeDataEnabled) {
       return {
-        revenue:  { value: 12, isPositive: true  },  // CA  ↑12%
-        profit:   { value: 8,  isPositive: true  },  // Bénéfice ↑8%
-        projects: { value: 20, isPositive: true  },  // Chantiers ↑20%
-        clients:  { value: 50, isPositive: true  },  // Clients   ↑50%
+        revenue:  { value: 12, isPositive: true },
+        profit:   { value: 8,  isPositive: true },
+        projects: { value: 20, isPositive: true },
+        clients:  { value: 50, isPositive: true },
       };
     }
 
-    const now = new Date();
-    const currentMonthStart = startOfMonth(now);
-    const currentMonthEnd = endOfMonth(now);
-    const prevMonthStart = startOfMonth(subMonths(now, 1));
-    const prevMonthEnd = endOfMonth(subMonths(now, 1));
-
     const calcPct = (current: number, previous: number): { value: number; isPositive: boolean } | undefined => {
       if (current === 0 && previous === 0) return undefined;
-      if (previous === 0 && current > 0) return { value: 100, isPositive: true };
+      if (previous === 0 && current > 0) return undefined; // pas de référence = pas de %
       if (previous === 0) return undefined;
       const pct = Math.round(((current - previous) / previous) * 100);
       if (pct === 0) return undefined;
       return { value: Math.abs(pct), isPositive: pct > 0 };
     };
 
-    // CA : revenus du mois actuel vs mois précédent (depuis revenueData du graphique)
-    const currentRevenue = revenueData[5]?.revenue ?? 0;
-    const prevRevenue = revenueData[4]?.revenue ?? 0;
-    const revenueTrend = (currentRevenue > 0 || prevRevenue > 0 || calculatedStats.totalRevenue > 0)
-      ? (currentRevenue > 0 || prevRevenue > 0
-          ? calcPct(currentRevenue || calculatedStats.totalRevenue, prevRevenue)
-          : calculatedStats.totalRevenue > 0
-            ? { value: 100, isPositive: true }
-            : undefined)
-      : undefined;
+    // Mode "Total" = pas de comparaison pertinente → masquer tous les %
+    if (selectedPeriod === "all") {
+      return { revenue: undefined, profit: undefined, projects: undefined, clients: undefined };
+    }
 
-    // Bénéfice : total actuel vs profit du mois précédent (depuis projets)
-    const prevMonthProfit = (projects || [])
-      .filter(p => {
-        const d = new Date(p.updated_at || p.created_at || 0);
-        return d >= prevMonthStart && d <= prevMonthEnd;
-      })
-      .reduce((sum, p) => sum + ((p.actual_revenue || p.budget || 0) - (p.costs || 0)), 0);
-    const profitTrend = calculatedStats.totalProfit !== 0 || prevMonthProfit !== 0
-      ? calcPct(calculatedStats.totalProfit, prevMonthProfit)
-      : undefined;
+    // Année de référence
+    const refYear = periodYear ?? currentYear;
+    const prevYear = refYear - 1;
 
-    // Chantiers : total maintenant vs total début du mois dernier (0 → N = +100%)
-    const prevTotalProjects = (projects || []).filter(p => {
-      const d = new Date(p.created_at || 0);
-      return d < prevMonthStart;
-    }).length;
-    const projectsTrend = calculatedStats.totalProjects > 0
-      ? calcPct(calculatedStats.totalProjects, prevTotalProjects)
-      : undefined;
+    // CA : factures payées année N vs N-1
+    const paidCA = (year: number) =>
+      invoices
+        .filter(inv => new Date(inv.created_at).getFullYear() === year && inv.status === "paid")
+        .reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0);
+    const revenueTrend = calcPct(paidCA(refYear), paidCA(prevYear));
 
-    // Clients : total maintenant vs total début du mois dernier
-    const prevTotalClients = (clients || []).filter((c: any) => {
-      const d = new Date(c.created_at || 0);
-      return d < prevMonthStart;
-    }).length;
-    const clientsTrend = calculatedStats.totalClients > 0
-      ? calcPct(calculatedStats.totalClients, prevTotalClients)
-      : undefined;
+    // Bénéfice : uniquement si des coûts sont renseignés dans les projets
+    const hasCostData = (projects || []).some(p => Number(p.costs || 0) > 0);
+    const profitForYear = (year: number) =>
+      (projects || [])
+        .filter(p => new Date(p.created_at || 0).getFullYear() === year)
+        .reduce((s, p) => s + ((p.actual_revenue || p.budget || 0) - (p.costs || 0)), 0);
+    const profitTrend = hasCostData ? calcPct(profitForYear(refYear), profitForYear(prevYear)) : undefined;
 
-    return {
-      revenue: revenueTrend,
-      profit: profitTrend,
-      projects: projectsTrend,
-      clients: clientsTrend,
-    };
-  }, [revenueData, calculatedStats, projects, clients]);
+    // Chantiers : créés cette année vs année précédente
+    const projectsForYear = (year: number) =>
+      (projects || []).filter(p => new Date(p.created_at || 0).getFullYear() === year).length;
+    const projectsTrend = calcPct(projectsForYear(refYear), projectsForYear(prevYear));
+
+    // Clients : ajoutés cette année vs année précédente
+    const clientsForYear = (year: number) =>
+      (clients || []).filter((c: any) => new Date(c.created_at || 0).getFullYear() === year).length;
+    const clientsTrend = calcPct(clientsForYear(refYear), clientsForYear(prevYear));
+
+    return { revenue: revenueTrend, profit: profitTrend, projects: projectsTrend, clients: clientsTrend };
+  }, [invoices, projects, clients, selectedPeriod, periodYear, currentYear, fakeDataEnabled]);
 
   const isLoading = statsLoading || projectsLoading || clientsLoading || quotesLoading;
 
