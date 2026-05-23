@@ -45,6 +45,7 @@ export interface Quote {
   created_at: string;
   updated_at: string;
   sent_at?: string;
+  client_opened_at?: string | null;
   // Colonnes de signature électronique
   signed?: boolean;
   signed_at?: string;
