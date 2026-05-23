@@ -50,11 +50,14 @@ export const AdminImpersonationProvider = ({ children }: { children: ReactNode }
 
   const startImpersonation = useCallback((companyId: string, companyName: string) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ companyId, companyName }));
+    // Override AuthContext currentCompanyId so ALL hooks picking it up see the right company
+    localStorage.setItem('currentCompanyId', companyId);
     window.location.reload();
   }, []);
 
   const stopImpersonation = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('currentCompanyId');
     window.location.reload();
   }, []);
 
