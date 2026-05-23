@@ -27,8 +27,9 @@ import { useQuotes } from "@/hooks/useQuotes";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePermissions } from "@/hooks/usePermissions";
 import { RecentProjectsWidget, CalendarWidget, MessagesWidget, RecentClientsWidget } from "@/components/widgets";
-import { useMemo, useEffect } from "react";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { useMemo, useEffect, useState } from "react";
+import { format, subMonths, startOfMonth, endOfMonth, getYear } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell, BarChart, Bar, Legend, Label } from "recharts";
@@ -45,6 +46,9 @@ const Dashboard = () => {
   // En mode "vue employé" (closer en démo), simuler le rôle employé
   const effectiveIsEmployee = isEmployee || (closerEmployeeMode && fakeDataEnabled);
   
+  const currentYear = new Date().getFullYear();
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
+
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const { data: clients, isLoading: clientsLoading } = useClients();
@@ -52,23 +56,56 @@ const Dashboard = () => {
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
 
 
+  // Années disponibles (depuis factures + projets)
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    invoices.forEach(inv => {
+      const y = new Date(inv.created_at).getFullYear();
+      if (y >= 2019) years.add(y);
+    });
+    (projects || []).forEach(p => {
+      const y = new Date(p.created_at || 0).getFullYear();
+      if (y >= 2019) years.add(y);
+    });
+    if (years.size === 0) years.add(currentYear);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [invoices, projects, currentYear]);
+
+  // Filtre période
+  const periodYear = selectedPeriod === "year" ? currentYear : selectedPeriod === "all" ? null : parseInt(selectedPeriod);
+
+  const filteredInvoices = useMemo(() => {
+    if (!periodYear) return invoices;
+    return invoices.filter(inv => new Date(inv.created_at).getFullYear() === periodYear);
+  }, [invoices, periodYear]);
+
+  const filteredProjects = useMemo(() => {
+    const list = projects || [];
+    if (!periodYear) return list;
+    return list.filter(p => new Date(p.created_at || 0).getFullYear() === periodYear);
+  }, [projects, periodYear]);
+
+  // CA depuis factures (source principale)
+  const invoiceCA = useMemo(() =>
+    filteredInvoices.reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0),
+  [filteredInvoices]);
+
+  const invoicePaid = useMemo(() =>
+    filteredInvoices.filter(inv => inv.status === "paid")
+      .reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0),
+  [filteredInvoices]);
+
   const calculatedStats = useMemo(() => {
-    const projectsList = projects || [];
-    // Calculer le CA réel depuis les projets (actual_revenue si disponible, sinon budget)
-    const totalRevenue = projectsList.reduce((sum, project) => {
+    const projectsList = filteredProjects;
+    // CA depuis factures si dispo, sinon projets
+    const projectRevenue = projectsList.reduce((sum, project) => {
       const revenue = project.actual_revenue || project.budget || 0;
       return sum + Number(revenue);
     }, 0);
+    const totalRevenue = invoicePaid > 0 ? invoicePaid : (invoiceCA > 0 ? invoiceCA : projectRevenue);
 
-    // Calculer les coûts totaux
-    const totalCosts = projectsList.reduce((sum, project) => {
-      return sum + Number(project.costs || 0);
-    }, 0);
-
-    // Calculer le bénéfice réel
+    const totalCosts = projectsList.reduce((sum, project) => sum + Number(project.costs || 0), 0);
     const totalProfit = totalRevenue - totalCosts;
-
-    // Compter directement depuis projects (source de vérité) au lieu de user_stats
     const totalProjects = projectsList.length;
     const activeProjects = projectsList.filter(p =>
       ["planifié", "en_attente", "en_cours"].includes(p.status || "")
@@ -76,16 +113,8 @@ const Dashboard = () => {
     const completedProjects = projectsList.filter(p => p.status === "terminé").length;
     const totalClients = clients?.length || 0;
 
-    return {
-      totalRevenue,
-      totalProfit,
-      totalCosts,
-      activeProjects,
-      totalClients,
-      completedProjects,
-      totalProjects,
-    };
-  }, [stats, clients, projects]);
+    return { totalRevenue, totalProfit, totalCosts, activeProjects, totalClients, completedProjects, totalProjects };
+  }, [stats, clients, filteredProjects, invoiceCA]);
 
   const alerts = useMemo(() => {
     const alertsList = [];
@@ -152,46 +181,53 @@ const Dashboard = () => {
 
   const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
-  // Calculer les données de revenus mensuels sur les 6 derniers mois
+  // Graphique mensuel — adapté à la période sélectionnée
   const revenueData = useMemo(() => {
     const months = [];
-    const now = new Date();
-    
-    // Générer les 6 derniers mois
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(now, i);
+
+    if (selectedPeriod === "all") {
+      // Vue "Total" : un point par année disponible
+      const yearSet = new Set<number>(availableYears);
+      for (const y of Array.from(yearSet).sort()) {
+        const yearRevenue = invoices
+          .filter(inv => new Date(inv.created_at).getFullYear() === y)
+          .reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0);
+        const fallback = (projects || [])
+          .filter(p => p.status === "terminé" && new Date(p.updated_at || 0).getFullYear() === y)
+          .reduce((s, p) => s + (p.actual_revenue || p.budget || 0), 0);
+        months.push({ month: String(y), revenue: yearRevenue || fallback });
+      }
+      return months;
+    }
+
+    // Vue année (current ou spécifique) : 12 mois de jan à déc
+    const year = periodYear ?? currentYear;
+    for (let m = 0; m < 12; m++) {
+      const monthDate = new Date(year, m, 1);
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
+      if (monthDate > new Date()) break; // pas de mois futurs
       const monthName = format(monthDate, "MMM", { locale: fr });
-      
-      // Calculer le CA pour ce mois depuis les factures payées
-      const monthRevenue = (invoices || [])
+      const monthRevenue = invoices
         .filter(inv => {
-          const invDate = new Date(inv.created_at);
-          return invDate >= monthStart && invDate <= monthEnd && inv.status === "paid";
+          const d = new Date(inv.created_at);
+          return d >= monthStart && d <= monthEnd;
         })
-        .reduce((sum, inv) => sum + (inv.amount_ttc || 0), 0);
-      
-      // Si pas de factures, utiliser les projets terminés dans ce mois
-      let fallbackRevenue = 0;
-      if (monthRevenue === 0 && projects) {
-        fallbackRevenue = projects
-          .filter(p => {
-            if (p.status !== "terminé" || !p.updated_at) return false;
-            const projectDate = new Date(p.updated_at);
-            return projectDate >= monthStart && projectDate <= monthEnd;
-          })
-          .reduce((sum, p) => sum + (p.actual_revenue || p.budget || 0), 0);
-      }
-      
+        .reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0);
+      const fallback = (projects || [])
+        .filter(p => {
+          if (p.status !== "terminé" || !p.updated_at) return false;
+          const d = new Date(p.updated_at);
+          return d >= monthStart && d <= monthEnd;
+        })
+        .reduce((s, p) => s + (p.actual_revenue || p.budget || 0), 0);
       months.push({
         month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-        revenue: monthRevenue || fallbackRevenue,
+        revenue: monthRevenue || fallback,
       });
     }
-    
     return months;
-  }, [invoices, projects]);
+  }, [invoices, projects, selectedPeriod, periodYear, currentYear, availableYears]);
 
   const projectStatusData = [
     { name: "Terminés", value: stats?.completed_projects || 0, fill: "#10b981" },
@@ -392,26 +428,60 @@ const Dashboard = () => {
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
             <div className="flex gap-2">
               <Link to="/analytics">
-                <Button
-                  variant="outline"
-                  className="gap-2 rounded-xl"
-                >
+                <Button variant="outline" className="gap-2 rounded-xl">
                   <BarChart3 className="w-4 h-4" />
                   <span className="hidden sm:inline">Analyses Avancées</span>
                   <span className="sm:hidden">Analyses</span>
                 </Button>
               </Link>
               <Link to="/ai-insights">
-                <Button
-                  variant="outline"
-                  className="gap-2 rounded-xl"
-                >
+                <Button variant="outline" className="gap-2 rounded-xl">
                   <Sparkles className="w-4 h-4" />
                   <span className="hidden sm:inline">Insights IA</span>
                   <span className="sm:hidden">Insights</span>
                 </Button>
               </Link>
             </div>
+
+            {/* Sélecteur de période */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-muted/40 p-1">
+              <button
+                onClick={() => setSelectedPeriod("year")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  selectedPeriod === "year"
+                    ? "bg-background shadow text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {currentYear}
+              </button>
+              <button
+                onClick={() => setSelectedPeriod("all")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  selectedPeriod === "all"
+                    ? "bg-background shadow text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Total
+              </button>
+              <Select
+                value={["year", "all"].includes(selectedPeriod) ? "" : selectedPeriod}
+                onValueChange={(v) => v && setSelectedPeriod(v)}
+              >
+                <SelectTrigger className="h-8 w-[90px] rounded-lg border-0 bg-transparent shadow-none text-sm font-medium text-muted-foreground hover:text-foreground focus:ring-0">
+                  <SelectValue placeholder="Année…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears
+                    .filter(y => y !== currentYear)
+                    .map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <Link to="/projects" className="sm:ml-auto">
               <Button className="gap-2 rounded-xl shadow-lg hover:shadow-xl transition-all">
                 <Plus className="w-4 h-4" />
@@ -425,15 +495,15 @@ const Dashboard = () => {
         {/* KPI Blocks */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <KPIBlock
-            title="Chiffre d'affaires"
-            value={new Intl.NumberFormat('fr-FR', { 
-              style: 'currency', 
-              currency: 'EUR', 
-              maximumFractionDigits: 0 
+            title="CA encaissé"
+            value={new Intl.NumberFormat('fr-FR', {
+              style: 'currency',
+              currency: 'EUR',
+              maximumFractionDigits: 0
             }).format(calculatedStats.totalRevenue)}
             icon={Euro}
             trend={trends.revenue}
-            description={`${calculatedStats.totalProjects} chantiers`}
+            description={`Factures payées`}
             delay={0.1}
             gradient="blue"
           />
@@ -476,7 +546,11 @@ const Dashboard = () => {
           <div className="lg:col-span-2 space-y-6">
             <ChartCard
               title="Évolution du chiffre d'affaires"
-              description="CA mensuel sur les 6 derniers mois"
+              description={
+                selectedPeriod === "all"
+                  ? "CA annuel — toutes années"
+                  : `CA mensuel — ${selectedPeriod === "year" ? currentYear : selectedPeriod}`
+              }
               delay={0.5}
             >
               <ResponsiveContainer width="100%" height={300}>
