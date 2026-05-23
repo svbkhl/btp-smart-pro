@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuotes } from "@/hooks/useQuotes";
@@ -563,7 +564,7 @@ const Facturation = () => {
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setViewingQuote(quote);
+                                    navigate(`/quotes/${quote.id}`);
                                   }}
                                   className="gap-2"
                                 >
