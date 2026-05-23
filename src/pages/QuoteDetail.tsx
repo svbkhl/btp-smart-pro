@@ -219,13 +219,13 @@ export default function QuoteDetail() {
     <PageLayout>
       <div className="container max-w-6xl py-6 space-y-6">
         {/* Bouton retour */}
-        <Button 
-          onClick={() => navigate('/ai?tab=quotes')} 
-          variant="ghost" 
+        <Button
+          onClick={() => navigate(-1)}
+          variant="ghost"
           className="gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour aux devis
+          Retour
         </Button>
 
         {/* Vue détaillée complète */}
