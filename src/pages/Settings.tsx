@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useExchangeGoogleCode } from "@/hooks/useGoogleCalendar";
-import { Building2, FileText, CreditCard, Shield, Bell, UserPlus, Play, Settings as SettingsIcon2, Calendar, Send } from "lucide-react";
+import { Building2, FileText, CreditCard, Shield, Bell, UserPlus, Play, Settings as SettingsIcon2, Calendar, Send, Download } from "lucide-react";
 import { LegalPagesContent } from "@/components/settings/LegalPagesSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { RelanceTemplatesSettings } from "@/components/settings/RelanceTemplatesSettings";
@@ -33,6 +33,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useFakeDataStore } from "@/store/useFakeDataStore";
 import { isSystemAdmin, isAdminEmail } from "@/config/admin";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DataExportSettings } from "@/components/settings/DataExportSettings";
 
 const Settings = () => {
   const { user, isAdmin, userRole, currentCompanyId } = useAuth();
@@ -293,6 +294,12 @@ const Settings = () => {
               <Shield className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="truncate">Sécurité</span>
             </TabsTrigger>
+            {!isEmployee && (
+              <TabsTrigger value="export" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-2.5">
+                <Download className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="truncate">Export</span>
+              </TabsTrigger>
+            )}
             </>
             )}
           </TabsList>
@@ -347,6 +354,12 @@ const Settings = () => {
           <TabsContent value="security" className="mt-0">
             <SecuritySettings />
           </TabsContent>
+
+          {!isEmployee && (
+            <TabsContent value="export" className="mt-0">
+              <DataExportSettings />
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Dialog pour les pages légales */}

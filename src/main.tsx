@@ -7,6 +7,7 @@ import { DecorativeBackgroundProvider } from './contexts/DecorativeBackgroundCon
 import { SidebarProvider } from './contexts/SidebarContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { OnboardingProvider } from './contexts/OnboardingContext';
+import { AdminImpersonationProvider } from './contexts/AdminImpersonationContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initEnv } from './lib/env';
 import './index.css';
@@ -39,9 +40,11 @@ createRoot(rootEl).render(
               }}
             >
               <AuthProvider>
-                <OnboardingProvider>
-                  <App />
-                </OnboardingProvider>
+                <AdminImpersonationProvider>
+                  <OnboardingProvider>
+                    <App />
+                  </OnboardingProvider>
+                </AdminImpersonationProvider>
               </AuthProvider>
             </BrowserRouter>
           </SidebarProvider>

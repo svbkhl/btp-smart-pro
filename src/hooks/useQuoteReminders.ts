@@ -249,10 +249,20 @@ export const useSendQuoteReminder = () => {
 
       return reminder;
     },
-    onSuccess: () => {
+    onSuccess: (reminder) => {
       queryClient.invalidateQueries({ queryKey: ["quote-reminders-history", companyId] });
       queryClient.invalidateQueries({ queryKey: ["pending-quotes-reminder", companyId] });
       toast({ title: "Relance envoyée", description: "La relance devis a été envoyée au client." });
+      if (user && companyId) {
+        supabase.from("notifications").insert({
+          user_id: user.id,
+          company_id: companyId,
+          title: `Relance devis niveau ${reminder.reminder_level}`,
+          message: `Relance envoyée à ${reminder.client_name ?? reminder.client_email} pour le devis ${reminder.quote_number ?? ""} (${(reminder.quote_amount ?? 0).toFixed(2)} €)`,
+          type: "info",
+          related_table: "quotes",
+        }).then(({ error }) => { if (error) console.warn("notif quote reminder:", error.message); });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });

@@ -17,6 +17,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/useCompanyId";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { format } from "date-fns";
@@ -37,6 +38,7 @@ interface ProjectAssignEmployeesProps {
 
 export function ProjectAssignEmployees({ projectId }: ProjectAssignEmployeesProps) {
   const { companyId } = useCompanyId();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: employees = [] } = useEmployees();
@@ -86,11 +88,24 @@ export function ProjectAssignEmployees({ projectId }: ProjectAssignEmployeesProp
 
       queryClient.invalidateQueries({ queryKey: ["project-assignments", projectId] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+
+      const emp = employees.find(e => e.id === selectedEmployeeId);
       setSelectedEmployeeId("");
       toast({
         title: "Employé affecté",
         description: "L'employé verra ce chantier dans Mes chantiers.",
       });
+
+      if (user?.id && companyId) {
+        supabase.from("notifications").insert({
+          user_id: user.id,
+          company_id: companyId,
+          title: "Employé affecté au chantier",
+          message: `${emp?.name ?? "Employé"} affecté au chantier (projet ID: ${projectId.slice(0, 8)})`,
+          type: "info",
+          related_table: "projects",
+        }).then(({ error: ne }) => { if (ne) console.warn("notif assign project:", ne.message); });
+      }
     } catch (err: any) {
       toast({
         title: "Erreur",

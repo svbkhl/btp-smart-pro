@@ -1366,6 +1366,7 @@ export const useDeleteInvoicesBulk = () => {
 // Hook pour mettre à jour le statut d'une facture
 export const useUpdateInvoiceStatus = () => {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1379,16 +1380,30 @@ export const useUpdateInvoiceStatus = () => {
         updateData.payment_status = "paid";
       }
 
-      const { error } = await supabase
+      const { data: invoice, error } = await supabase
         .from("invoices")
         .update(updateData)
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .select("invoice_number, client_name, total_ttc, amount")
+        .single();
 
       if (error) throw error;
+      return { status, invoice };
     },
-    onSuccess: () => {
+    onSuccess: ({ status, invoice }) => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      if (status === "paid" && user && companyId) {
+        const amount = (invoice?.total_ttc ?? invoice?.amount ?? 0).toFixed(2);
+        supabase.from("notifications").insert({
+          user_id: user.id,
+          company_id: companyId,
+          title: "Paiement reçu",
+          message: `Facture ${invoice?.invoice_number ?? ""} — ${invoice?.client_name ?? "Client"} : ${amount} € marquée payée`,
+          type: "success",
+          related_table: "invoices",
+        }).then(({ error }) => { if (error) console.warn("notif invoice paid:", error.message); });
+      }
     },
     onError: (error: any) => {
       toast({

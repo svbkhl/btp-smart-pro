@@ -261,11 +261,20 @@ export const useSendReminder = () => {
     onSuccess: (reminder) => {
       queryClient.invalidateQueries({ queryKey: ["payment-reminders", companyId] });
       queryClient.invalidateQueries({ queryKey: ["overdue-invoices", companyId] });
-      
       toast({
         title: "Relance envoyée",
         description: `La relance niveau ${reminder.reminder_level} a été envoyée à ${reminder.client_email}.`,
       });
+      if (user && companyId) {
+        supabase.from("notifications").insert({
+          user_id: user.id,
+          company_id: companyId,
+          title: `Relance facture niveau ${reminder.reminder_level}`,
+          message: `Relance envoyée à ${reminder.client_name ?? reminder.client_email} pour la facture ${reminder.invoice_number ?? ""} (${(reminder.invoice_amount ?? 0).toFixed(2)} €)`,
+          type: "info",
+          related_table: "invoices",
+        }).then(({ error }) => { if (error) console.warn("notif payment reminder:", error.message); });
+      }
     },
     onError: (error: Error) => {
       toast({

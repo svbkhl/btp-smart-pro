@@ -373,6 +373,20 @@ const EmployeesPlanning = () => {
 
         if (error) throw error;
         assignmentId = newAssignment.id;
+
+        // Notification affectation employé
+        if (user?.id && currentCompanyId) {
+          const emp = employees.find(e => e.id === editDialog.employeeId);
+          const proj = projects.find(p => p.id === editForm.project_id);
+          supabase.from("notifications").insert({
+            user_id: user.id,
+            company_id: currentCompanyId,
+            title: "Nouvelle affectation planning",
+            message: `${emp?.name ?? "Un employé"} affecté au chantier "${proj?.name ?? "Chantier"}" le ${editDialog.date ?? ""}`,
+            type: "info",
+            related_table: "projects",
+          }).then(({ error: ne }) => { if (ne) console.warn("notif assign:", ne.message); });
+        }
       }
 
       // Synchroniser avec Google Calendar si connecté et activé

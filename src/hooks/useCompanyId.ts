@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
+import { getAdminImpersonationOverride } from "@/contexts/AdminImpersonationContext";
 
 interface UseCompanyIdReturn {
   companyId: string | null;
@@ -33,6 +34,10 @@ export const useCompanyId = (): UseCompanyIdReturn => {
       if (!user?.id) {
         return null;
       }
+
+      // Admin impersonation override — bypasse toute vérification company_users
+      const adminOverride = getAdminImpersonationOverride();
+      if (adminOverride) return adminOverride;
 
       try {
         // 1. Vérifier si un company_id a été sélectionné manuellement (localStorage)
