@@ -305,45 +305,6 @@ export const QuoteLinesEditor = ({ quoteId, tvaRate, onTotalsChange }: QuoteLine
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Lignes du devis</h3>
         <div className="flex gap-2">
-          <Popover open={libraryPopoverOpen} onOpenChange={setLibraryPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Search className="h-4 w-4" />
-                Depuis bibliothèque
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
-              <Command>
-                <CommandInput
-                  placeholder="Rechercher dans la bibliothèque..."
-                  value={librarySearchQuery}
-                  onValueChange={setLibrarySearchQuery}
-                />
-                <CommandList>
-                  <CommandEmpty>Aucun résultat trouvé</CommandEmpty>
-                  <CommandGroup>
-                    {libraryResults.map((item) => (
-                      <CommandItem
-                        key={item.id}
-                        onSelect={() => handleAddFromLibrary(item)}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium">{item.label}</div>
-                          {item.default_unit_price_ht && (
-                            <div className="text-xs text-muted-foreground">
-                              {formatCurrency(item.default_unit_price_ht)} / {item.default_unit}
-                            </div>
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-
           <Button
             size="sm"
             onClick={() => setIsAddingLine(true)}
