@@ -60,7 +60,7 @@ const SignatureQuote = () => {
 
       // Track when client opens the quote (first time only)
       const alreadyOpened = quoteData?.client_opened_at || quoteData?.details?.client_opened_at;
-      if (quoteData && !alreadyOpened && !quoteData.signed) {
+      if (quoteData && !alreadyOpened) {
         const openedAt = new Date().toISOString();
         // Try direct column first, fall back to details JSONB
         const { error: trackError } = await supabase
