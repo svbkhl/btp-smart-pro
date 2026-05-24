@@ -558,29 +558,32 @@ const Facturation = () => {
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center gap-2 pt-2 border-t border-border/50">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/quotes/${quote.id}`);
-                                  }}
-                                  className="gap-2"
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${quote.id}`); }}
+                                  className="gap-1.5 flex-1"
                                 >
-                                  <Eye className="w-4 h-4" />
+                                  <Eye className="w-3.5 h-3.5" />
                                   Voir
                                 </Button>
+                                {quote.status !== "paid" && quote.payment_status !== "paid" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); setSendToClientDocument({ type: "quote", document: quote }); setIsSendToClientOpen(true); }}
+                                    className="gap-1.5 flex-1"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
+                                    Envoyer
+                                  </Button>
+                                )}
                                 <QuoteActionButtons
                                   quote={quote}
-                                  onEdit={() => {
-                                    setSelectedQuote(quote);
-                                    setIsEditQuoteOpen(true);
-                                  }}
-                                  onSendToClient={() => {
-                                    setSendToClientDocument({ type: "quote", document: quote });
-                                    setIsSendToClientOpen(true);
-                                  }}
+                                  compact
+                                  onEdit={() => { setSelectedQuote(quote); setIsEditQuoteOpen(true); }}
+                                  onSendToClient={() => { setSendToClientDocument({ type: "quote", document: quote }); setIsSendToClientOpen(true); }}
                                 />
                               </div>
                             </>
