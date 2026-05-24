@@ -102,7 +102,7 @@ const Dashboard = () => {
     const projectRevenue = projectsList.reduce((sum, project) => {
       return sum + Number(project.actual_revenue || project.budget || 0);
     }, 0);
-    const totalRevenue = invoicePaid > 0 ? invoicePaid : (invoiceCA > 0 ? invoiceCA : projectRevenue);
+    const totalRevenue = invoicePaid > 0 ? invoicePaid : projectRevenue;
 
     const totalCosts = projectsList.reduce((sum, project) => sum + Number(project.costs || 0), 0);
     const totalProfit = totalRevenue - totalCosts;
@@ -204,7 +204,7 @@ const Dashboard = () => {
       const yearSet = new Set<number>(availableYears);
       for (const y of Array.from(yearSet).sort()) {
         const yearRevenue = invoices
-          .filter(inv => new Date(inv.created_at).getFullYear() === y)
+          .filter(inv => inv.status === "paid" && new Date(inv.created_at).getFullYear() === y)
           .reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0);
         const fallback = (projects || [])
           .filter(p => p.status === "terminé" && new Date(p.updated_at || 0).getFullYear() === y)
@@ -224,6 +224,7 @@ const Dashboard = () => {
       const monthName = format(monthDate, "MMM", { locale: fr });
       const monthRevenue = invoices
         .filter(inv => {
+          if (inv.status !== "paid") return false;
           const d = new Date(inv.created_at);
           return d >= monthStart && d <= monthEnd;
         })
