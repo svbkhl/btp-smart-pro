@@ -22,7 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateQuote, CreateQuoteData } from "@/hooks/useQuotes";
-import { useClients, useCreateClient, getClientFullName } from "@/hooks/useClients";
+import { useClients, useCreateClient, getClientFullName, Client } from "@/hooks/useClients";
+import { CreateClientDialog } from "@/components/clients/CreateClientDialog";
 import { Loader2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,6 +46,7 @@ interface CreateQuoteDialogProps {
 export const CreateQuoteDialog = ({ open, onOpenChange }: CreateQuoteDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isNewClient, setIsNewClient] = useState(false);
+  const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
   const createQuote = useCreateQuote();
   const { data: clients } = useClients();
   const createClient = useCreateClient();
@@ -172,55 +174,39 @@ export const CreateQuoteDialog = ({ open, onOpenChange }: CreateQuoteDialogProps
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="client-select">Client</Label>
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsNewClient(!isNewClient)}
-                className="h-7 text-xs"
+                onClick={() => setIsCreateClientOpen(true)}
+                className="text-xs text-primary hover:underline"
               >
-                {isNewClient ? "Sélectionner un client existant" : "Créer un nouveau client"}
-              </Button>
+                + Créer un nouveau client
+              </button>
             </div>
-
-            {isNewClient ? (
-              <div className="space-y-2">
-                <Input
-                  id="client-name"
-                  placeholder="Nom du client"
-                  {...register("client_name")}
-                />
-                {errors.client_name && (
-                  <p className="text-sm text-destructive">{errors.client_name.message}</p>
-                )}
-                <Input
-                  id="client-email"
-                  type="email"
-                  placeholder="Email (optionnel)"
-                  {...register("client_email")}
-                />
-                {errors.client_email && (
-                  <p className="text-sm text-destructive">{errors.client_email.message}</p>
-                )}
-              </div>
-            ) : (
-              <Select
-                value={selectedClientId || ""}
-                onValueChange={(value) => setValue("client_id", value)}
-              >
-                <SelectTrigger id="client-select">
-                  <SelectValue placeholder="Sélectionner un client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {getClientFullName(client)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Select
+              value={selectedClientId || ""}
+              onValueChange={(value) => setValue("client_id", value)}
+            >
+              <SelectTrigger id="client-select">
+                <SelectValue placeholder="Sélectionner un client" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients?.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {getClientFullName(client)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          <CreateClientDialog
+            open={isCreateClientOpen}
+            onOpenChange={setIsCreateClientOpen}
+            onCreated={(newClient: Client) => {
+              setValue("client_id", newClient.id);
+              setValue("client_name", getClientFullName(newClient));
+            }}
+          />
 
           {/* Montant estimé */}
           <div className="space-y-2">
