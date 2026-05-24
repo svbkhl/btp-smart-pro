@@ -71,9 +71,9 @@ export const TopBar = () => {
 
   return (
     <div className="sticky top-0 z-30 bg-transparent backdrop-blur-none">
-      {/* Bannière impersonation admin */}
+      {/* Bannière impersonation admin — uniquement visible pour l'admin système */}
       <AnimatePresence>
-        {isImpersonating && (
+        {isImpersonating && isPlatformAdmin && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
