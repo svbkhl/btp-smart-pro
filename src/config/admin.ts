@@ -6,7 +6,7 @@
 const ENV = import.meta.env;
 
 /** Emails admin par défaut (toujours admin, jamais retiré) */
-const DEFAULT_ADMIN_EMAILS = ["sabri.khalfallah6@gmail.com", "sabri.khalallah6@gmail.com"];
+const DEFAULT_ADMIN_EMAILS = ["sabri.khalfallah6@gmail.com"];
 
 /** Emails admin depuis la variable d'environnement (séparés par virgule) */
 const ENV_EMAILS = (ENV.VITE_ADMIN_EMAILS || ENV.VITE_ADMIN_EMAIL || "")
@@ -54,7 +54,7 @@ export function isAdminEmail(email: string | undefined | null): boolean {
 }
 
 /**
- * Vérifie si l'utilisateur est admin système (metadata ou email).
+ * Vérifie si l'utilisateur est admin système (email uniquement).
  */
 export function isSystemAdmin(user: {
   email?: string | null;
@@ -63,21 +63,5 @@ export function isSystemAdmin(user: {
   app_metadata?: Record<string, unknown>;
 } | null): boolean {
   if (!user) return false;
-
-  // 1. Email dans la liste admin
-  if (isAdminEmail(user.email)) return true;
-
-  // 2. Metadata JWT (raw_user_meta_data prioritaire, puis user_metadata, app_metadata)
-  const raw = user.raw_user_meta_data as Record<string, unknown> | undefined;
-  const meta = user.user_metadata as Record<string, unknown> | undefined;
-  const app = user.app_metadata as Record<string, unknown> | undefined;
-
-  const check = (obj: Record<string, unknown> | undefined, key: string) =>
-    obj?.[key] === true || obj?.[key] === "true";
-
-  return (
-    check(raw, "is_system_admin") ||
-    check(meta, "is_system_admin") ||
-    check(app, "is_system_admin")
-  );
+  return isAdminEmail(user.email);
 }
