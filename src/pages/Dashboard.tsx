@@ -85,7 +85,7 @@ const Dashboard = () => {
     return list.filter(p => new Date(p.created_at || 0).getFullYear() === periodYear);
   }, [projects, periodYear]);
 
-  // CA depuis factures (source principale)
+  // CA depuis factures
   const invoiceCA = useMemo(() =>
     filteredInvoices.reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0),
   [filteredInvoices]);
@@ -95,6 +95,17 @@ const Dashboard = () => {
       .reduce((s, inv) => s + (inv.total_ttc || inv.amount || 0), 0),
   [filteredInvoices]);
 
+  // CA depuis devis payés (payment_status = 'paid')
+  const quotesPaid = useMemo(() => {
+    const list = quotes || [];
+    const filtered = periodYear
+      ? list.filter(q => new Date(q.created_at).getFullYear() === periodYear)
+      : list;
+    return filtered
+      .filter(q => q.payment_status === "paid" || q.status === "paid")
+      .reduce((s, q) => s + (q.total_ttc || (q as any).subtotal_ht || q.estimated_cost || 0), 0);
+  }, [quotes, periodYear]);
+
   const calculatedStats = useMemo(() => {
     const projectsList = filteredProjects;
     const hasProjects = projectsList.length > 0;
@@ -102,7 +113,8 @@ const Dashboard = () => {
     const projectRevenue = projectsList.reduce((sum, project) => {
       return sum + Number(project.actual_revenue || project.budget || 0);
     }, 0);
-    const totalRevenue = invoicePaid > 0 ? invoicePaid : projectRevenue;
+    const totalPaid = invoicePaid + quotesPaid;
+    const totalRevenue = totalPaid > 0 ? totalPaid : projectRevenue;
 
     const totalCosts = projectsList.reduce((sum, project) => sum + Number(project.costs || 0), 0);
     const totalProfit = totalRevenue - totalCosts;
@@ -128,7 +140,7 @@ const Dashboard = () => {
     const totalClients = clients?.length || 0;
 
     return { totalRevenue, totalProfit, totalCosts, activeProjects, totalClients, completedProjects, totalProjects };
-  }, [stats, clients, filteredProjects, filteredInvoices, invoiceCA, invoicePaid]);
+  }, [stats, clients, filteredProjects, filteredInvoices, invoiceCA, invoicePaid, quotesPaid]);
 
   const alerts = useMemo(() => {
     const alertsList = [];
