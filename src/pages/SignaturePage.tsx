@@ -117,7 +117,19 @@ export default function SignaturePage() {
 
         setQuote(quoteData);
         setLoading(false);
-        
+
+        // Tracker l'ouverture par le client (une seule fois)
+        if (quoteData.id && !quoteData.client_opened_at) {
+          console.log("📧 [SignaturePage] Tracking ouverture client pour:", quoteData.id);
+          supabase.rpc("track_quote_opened", { quote_id: quoteData.id })
+            .then(({ error: trackErr }) => {
+              if (trackErr) console.error("❌ [SignaturePage] track_quote_opened failed:", trackErr);
+              else console.log("✅ [SignaturePage] client_opened_at enregistré");
+            });
+        } else {
+          console.log("ℹ️ [SignaturePage] Devis déjà consulté:", quoteData.client_opened_at);
+        }
+
         // Générer le PDF pour l'aperçu (avec gestion d'erreur)
         try {
           await generatePdfPreview(quoteData);
