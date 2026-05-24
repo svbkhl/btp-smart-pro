@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { signQuote } from "@/services/aiService";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, FileSignature, X, CheckCircle2, FileText, Euro, User, Calendar, FileCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +60,15 @@ const SignatureQuote = () => {
       // Track when client opens the quote (first time only)
       const alreadyOpened = quoteData?.client_opened_at || quoteData?.details?.client_opened_at;
       if (quoteData && !alreadyOpened) {
-        await supabase.rpc("track_quote_opened", { quote_id: id });
+        console.log("📧 Tracking ouverture du devis:", id);
+        const { error: trackError } = await supabase.rpc("track_quote_opened", { quote_id: id });
+        if (trackError) {
+          console.error("❌ track_quote_opened failed:", trackError);
+        } else {
+          console.log("✅ client_opened_at mis à jour en base");
+        }
+      } else {
+        console.log("ℹ️ Devis déjà marqué comme consulté:", alreadyOpened);
       }
     } catch (error: any) {
       toast({
@@ -161,14 +168,27 @@ const SignatureQuote = () => {
     try {
       const signatureData = canvas.toDataURL("image/png");
 
-      await signQuote(id, signatureData, signerName.trim());
-
-      setSigned(true);
-      toast({
-        title: "Devis signé !",
-        description: "Le devis a été signé avec succès.",
+      // Appel RPC SECURITY DEFINER — fonctionne sans session (client anonyme)
+      const { data: result, error } = await supabase.rpc("sign_quote_anon", {
+        p_quote_id: id,
+        p_signature_data: signatureData,
+        p_signer_name: signerName.trim(),
       });
+
+      if (error) {
+        console.error("❌ sign_quote_anon RPC error:", error);
+        throw new Error(error.message || "Erreur lors de la signature");
+      }
+
+      if (result && result.success === false) {
+        console.error("❌ sign_quote_anon returned failure:", result.error);
+        throw new Error(result.error || "Impossible de signer le devis");
+      }
+
+      console.log("✅ Devis signé avec succès en base");
+      setSigned(true);
     } catch (error: any) {
+      console.error("❌ handleSign error:", error);
       toast({
         title: "Erreur",
         description: error.message || "Impossible de signer le devis",
@@ -193,19 +213,19 @@ const SignatureQuote = () => {
 
   if (signed) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <GlassCard className="p-8 max-w-md w-full text-center">
-          <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-500" />
-          <h1 className="text-2xl font-bold mb-2">Devis signé</h1>
-          <p className="text-muted-foreground mb-4">
-            Le devis a été signé avec succès
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
+        <GlassCard className="p-8 max-w-md w-full text-center space-y-4">
+          <CheckCircle2 className="w-16 h-16 mx-auto text-green-500" />
+          <h1 className="text-2xl font-bold">Merci pour votre signature !</h1>
+          <p className="text-muted-foreground">
+            Votre devis a bien été signé électroniquement. Vous pouvez fermer cette page.
           </p>
           {quote && (
-            <Badge variant="default" className="mb-4">
-              Devis {quote.quote_number || quote.id}
-            </Badge>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>Devis <strong>{quote.quote_number || quote.id.slice(0, 8)}</strong></p>
+              <p>Signé le {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
           )}
-          <Button onClick={() => navigate("/quotes")}>Retour aux devis</Button>
         </GlassCard>
       </div>
     );
