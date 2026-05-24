@@ -70,18 +70,18 @@ export default function QuoteDetailView({
   const isSigned = quote.signed || quote.status === 'signed';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* En-tête avec actions */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold">{quote.quote_number || 'Devis sans numéro'}</h2>
-            <QuoteStatusBadge 
-              status={quote.status || (quote.signed ? 'signed' : 'draft')} 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl sm:text-3xl font-bold truncate">{quote.quote_number || 'Devis sans numéro'}</h2>
+            <QuoteStatusBadge
+              status={quote.status || (quote.signed ? 'signed' : 'draft')}
               signedAt={quote.signed_at}
             />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Créé le {new Date(quote.created_at).toLocaleDateString('fr-FR', {
               day: 'numeric',
               month: 'long',
@@ -90,35 +90,35 @@ export default function QuoteDetailView({
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {onViewMessages && (
-            <Button variant="outline" onClick={onViewMessages} className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Messages
+            <Button variant="outline" size="sm" onClick={onViewMessages} className="gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span className="hidden xs:inline">Messages</span>
             </Button>
           )}
           {onDownloadPDF && (
-            <Button variant="outline" onClick={onDownloadPDF} className="gap-2">
-              <Download className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={onDownloadPDF} className="gap-1.5">
+              <Download className="h-3.5 w-3.5" />
               PDF
             </Button>
           )}
           {onSendEmail && !quote.signed && (
-            <Button variant="outline" onClick={onSendEmail} className="gap-2">
-              <Send className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={onSendEmail} className="gap-1.5">
+              <Send className="h-3.5 w-3.5" />
               Envoyer
             </Button>
           )}
           {onEdit && (
-            <Button variant="outline" onClick={onEdit} className="gap-2">
-              <Edit className="h-4 w-4" />
-              Modifier
+            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5">
+              <Edit className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Modifier</span>
             </Button>
           )}
           {onDelete && (
-            <Button variant="outline" onClick={onDelete} className="gap-2 text-red-600 hover:text-red-700">
-              <Trash2 className="h-4 w-4" />
-              Supprimer
+            <Button variant="outline" size="sm" onClick={onDelete} className="gap-1.5 text-red-600 hover:text-red-700">
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Supprimer</span>
             </Button>
           )}
         </div>
@@ -136,7 +136,7 @@ export default function QuoteDetailView({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className={`grid w-full ${quote.signed ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="details">Détails</TabsTrigger>
           <TabsTrigger value="timeline">Suivi</TabsTrigger>
           {quote.signed && <TabsTrigger value="payment">Paiement</TabsTrigger>}
@@ -194,7 +194,7 @@ export default function QuoteDetailView({
               <CardContent className="space-y-3">
                 <div>
                   <p className="text-sm text-muted-foreground">Total TTC</p>
-                  <p className="text-3xl font-bold text-primary">
+                  <p className="text-2xl sm:text-3xl font-bold text-primary">
                     {formatCurrency(quoteTotals.total_ttc || quote.estimated_cost || 0, quote.currency)}
                   </p>
                 </div>
