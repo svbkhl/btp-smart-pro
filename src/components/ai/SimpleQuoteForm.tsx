@@ -26,10 +26,11 @@ import { SendToClientModal } from "@/components/billing/SendToClientModal";
 
 interface SimpleQuoteFormProps {
   onSuccess?: () => void;
-  onPreviewStateChange?: (isOpen: boolean) => void; // Callback pour notifier le parent de l'état de l'aperçu
+  onPreviewStateChange?: (isOpen: boolean) => void;
+  initialData?: any; // Devis existant pour pré-remplissage (édition)
 }
 
-export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuoteFormProps = {}) => {
+export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange, initialData }: SimpleQuoteFormProps = {}) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
@@ -37,10 +38,10 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange }: SimpleQuote
   const { data: companySettings } = useCompanySettings();
   const updateCompanySettings = useUpdateCompanySettings();
 
-  const [prestation, setPrestation] = useState("");
-  const [surface, setSurface] = useState("");
-  const [prix, setPrix] = useState("");
-  const [clientId, setClientId] = useState<string>("");
+  const [prestation, setPrestation] = useState(initialData?.details?.prestation || initialData?.work_type || "");
+  const [surface, setSurface] = useState(initialData?.surface ? String(initialData.surface) : "");
+  const [prix, setPrix] = useState(initialData?.subtotal_ht ? String(initialData.subtotal_ht) : initialData?.estimated_cost ? String(initialData.estimated_cost) : "");
+  const [clientId, setClientId] = useState<string>(initialData?.client_id || "");
   const [tvaRate, setTvaRate] = useState<number>(
     companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20
   );
