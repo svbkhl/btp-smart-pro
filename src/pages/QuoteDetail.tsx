@@ -29,6 +29,16 @@ export default function QuoteDetail() {
     }
   }, [id]);
 
+  // Auto-refresh toutes les 30s si le devis est envoyé mais pas encore consulté
+  useEffect(() => {
+    if (!quote) return;
+    const isSent = quote.sent_at || quote.status === "sent" || quote.status === "envoyé";
+    const isOpened = quote.client_opened_at || quote.details?.client_opened_at;
+    if (!isSent || isOpened || quote.signed) return;
+    const interval = setInterval(() => loadQuote(), 30000);
+    return () => clearInterval(interval);
+  }, [quote]);
+
   const loadQuote = async () => {
     try {
       setLoading(true);
