@@ -41,6 +41,8 @@ export interface UserSettings {
   capital_social?: number | null;
   // Champ legacy potentiel (autre nom de logo_url) — toléré par le code PDF
   logo_url?: string | null;
+  // Marge bénéficiaire manuelle (% du CA, utilisée si pas de coûts chantiers)
+  profit_margin?: number | null;
   created_at: string;
   updated_at: string;
 }
