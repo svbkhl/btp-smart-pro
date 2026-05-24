@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
 import { getAdminImpersonationOverride } from "@/contexts/AdminImpersonationContext";
+import { isSystemAdmin } from "@/config/admin";
 
 interface UseCompanyIdReturn {
   companyId: string | null;
@@ -35,9 +36,9 @@ export const useCompanyId = (): UseCompanyIdReturn => {
         return null;
       }
 
-      // Admin impersonation override — bypasse toute vérification company_users
+      // Admin impersonation override — uniquement pour les vrais admins système
       const adminOverride = getAdminImpersonationOverride();
-      if (adminOverride) return adminOverride;
+      if (adminOverride && isSystemAdmin(user)) return adminOverride;
 
       try {
         // 1. Vérifier si un company_id a été sélectionné manuellement (localStorage)
