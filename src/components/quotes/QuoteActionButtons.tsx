@@ -1,15 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Send, Edit, Mail, CheckCircle, Euro } from "lucide-react";
-import { Quote, useUpdateQuote } from "@/hooks/useQuotes";
+import { Quote } from "@/hooks/useQuotes";
 import { useToast } from "@/components/ui/use-toast";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useCompanyId } from "@/hooks/useCompanyId";
 import { buildQuotePdfDownloadParams } from "@/utils/buildQuotePdfDownloadParams";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 interface QuoteActionButtonsProps {
@@ -54,12 +53,11 @@ const useQuoteEmailStatus = (quoteId: string) => {
 export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, compact = false }: QuoteActionButtonsProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { companyId } = useCompanyId();
   const { data: companyInfo } = useUserSettings();
   const [downloading, setDownloading] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const { data: emailStatus } = useQuoteEmailStatus(quote.id);
-  const updateQuote = useUpdateQuote();
+  const queryClient = useQueryClient();
 
   const isPaid = quote.payment_status === "paid" || quote.status === "paid";
 
@@ -67,12 +65,26 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, comp
     setMarkingPaid(true);
     try {
       if (isPaid) {
-        await updateQuote.mutateAsync({ id: quote.id, payment_status: "pending", status: "sent" });
+        const { error } = await supabase.rpc("update_quote_payment_status", {
+          p_quote_id: quote.id,
+          p_payment_status: "pending",
+          p_status: "sent",
+          p_paid_at: null,
+        });
+        if (error) throw error;
         toast({ title: "Devis marqué impayé", description: `${quote.quote_number} mis à jour.` });
       } else {
-        await updateQuote.mutateAsync({ id: quote.id, payment_status: "paid", status: "paid", paid_at: new Date().toISOString() });
+        const { error } = await supabase.rpc("update_quote_payment_status", {
+          p_quote_id: quote.id,
+          p_payment_status: "paid",
+          p_status: "paid",
+          p_paid_at: new Date().toISOString(),
+        });
+        if (error) throw error;
         toast({ title: "✅ Devis marqué comme payé", description: `${quote.quote_number} mis à jour.` });
       }
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["quote", quote.id] });
     } catch (error: any) {
       toast({ title: "Erreur", description: error.message || "Impossible de mettre à jour", variant: "destructive" });
     } finally {
