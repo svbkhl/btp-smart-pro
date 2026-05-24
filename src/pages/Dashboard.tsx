@@ -114,7 +114,7 @@ const Dashboard = () => {
       return sum + Number(project.actual_revenue || project.budget || 0);
     }, 0);
     const totalPaid = invoicePaid + quotesPaid;
-    const totalRevenue = totalPaid > 0 ? totalPaid : projectRevenue;
+    const totalRevenue = projectRevenue + totalPaid;
 
     const totalCosts = projectsList.reduce((sum, project) => sum + Number(project.costs || 0), 0);
     const totalProfit = totalRevenue - totalCosts;
@@ -510,7 +510,7 @@ const Dashboard = () => {
             }).format(calculatedStats.totalRevenue)}
             icon={Euro}
             trend={trends.revenue}
-            description={`Factures payées`}
+            description={`Projets + factures + devis payés`}
             delay={0.1}
             gradient="blue"
           />
