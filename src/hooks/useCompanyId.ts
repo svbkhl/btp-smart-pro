@@ -78,34 +78,45 @@ export const useCompanyId = (): UseCompanyIdReturn => {
           }
         }
         
-        // 2. Récupérer le premier company_id actif
-        const { data, error: queryError } = await supabase
-          .from("company_users")
-          .select("company_id")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: true })
-          .eq("status", "active")
-          .limit(1)
-          .maybeSingle();
-
-        // Si erreur car la colonne status n'existe pas, réessayer sans status
-        if (queryError && (queryError.code === "42703" || queryError.message?.includes('column "status" does not exist'))) {
-          logger.debug("Retrying query without status column");
-          
-          const { data: dataNoStatus, error: errorNoStatus } = await supabase
+        // 2. Récupérer le premier company_id — essayer avec status='active', puis sans filtre
+        const fetchCompanyId = async (withStatusFilter: boolean) => {
+          let query = supabase
             .from("company_users")
             .select("company_id")
             .eq("user_id", user.id)
             .order("created_at", { ascending: true })
             .limit(1)
             .maybeSingle();
-
-          if (errorNoStatus) {
-            logger.error("Error fetching company_id", errorNoStatus);
-            throw new Error("Impossible de récupérer l'entreprise de l'utilisateur");
+          if (withStatusFilter) {
+            query = supabase
+              .from("company_users")
+              .select("company_id")
+              .eq("user_id", user.id)
+              .eq("status", "active")
+              .order("created_at", { ascending: true })
+              .limit(1)
+              .maybeSingle();
           }
+          return query;
+        };
 
-          return dataNoStatus?.company_id || null;
+        let { data, error: queryError } = await fetchCompanyId(true);
+
+        // Colonne status n'existe pas → réessayer sans
+        if (queryError && (queryError.code === "42703" || queryError.message?.includes("status"))) {
+          logger.debug("Retrying query without status column");
+          const result = await fetchCompanyId(false);
+          data = result.data;
+          queryError = result.error;
+        }
+
+        // Aucun résultat avec status='active' → essayer sans filtre (status null/pending)
+        if (!queryError && !data?.company_id) {
+          logger.debug("No active company found, retrying without status filter");
+          const result = await fetchCompanyId(false);
+          if (!result.error && result.data?.company_id) {
+            data = result.data;
+          }
         }
 
         if (queryError) {
