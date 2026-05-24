@@ -125,12 +125,12 @@ export default function QuoteDetailView({
         </div>
       </div>
 
-      {/* Alerte devis signé (lecture seule) */}
-      {isReadOnly && (
+      {/* Alerte uniquement si le devis est réellement signé */}
+      {isSigned && (
         <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20">
           <Eye className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-900 dark:text-green-100">
-            ✅ <strong>Devis signé</strong> - Ce devis a été signé. Vous pouvez toujours le modifier si nécessaire.
+            ✅ <strong>Devis signé</strong> - Ce devis a été signé électroniquement.
           </AlertDescription>
         </Alert>
       )}
