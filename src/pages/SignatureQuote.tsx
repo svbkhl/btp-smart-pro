@@ -48,13 +48,12 @@ const SignatureQuote = () => {
     }
 
     try {
+      // Utiliser la fonction SECURITY DEFINER pour bypasser RLS (clients anonymes)
       const { data: quoteData, error } = await supabase
-        .from("ai_quotes")
-        .select("*")
-        .eq("id", id) // Utiliser l'UUID extrait
-        .single();
+        .rpc("get_quote_for_signing", { p_quote_id: id });
 
       if (error) throw error;
+      if (!quoteData) throw new Error("Devis introuvable");
       setQuote(quoteData);
 
       // Track when client opens the quote (first time only)
