@@ -50,17 +50,6 @@ export default function QuoteDetail() {
         .eq('id', id)
         .maybeSingle();
 
-      // Si pas trouvé, essayer dans quotes
-      if (!data) {
-        const quotesResult = await supabase
-          .from('ai_quotes')
-          .select('*')
-          .eq('id', id)
-          .maybeSingle();
-        
-        data = quotesResult.data;
-        error = quotesResult.error;
-      }
 
       if (error && error.code !== 'PGRST116') {
         throw error;
@@ -72,7 +61,7 @@ export default function QuoteDetail() {
           description: "Ce devis n'existe pas ou a été supprimé",
           variant: "destructive",
         });
-        navigate('/ai?tab=quotes');
+        navigate('/quotes');
         return;
       }
 
