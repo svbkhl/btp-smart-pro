@@ -7,6 +7,7 @@ import { downloadQuotePDF } from "@/services/pdfService";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanyId } from "@/hooks/useCompanyId";
 import { buildQuotePdfDownloadParams } from "@/utils/buildQuotePdfDownloadParams";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +54,7 @@ const useQuoteEmailStatus = (quoteId: string) => {
 export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, compact = false }: QuoteActionButtonsProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const { data: companyInfo } = useUserSettings();
   const [downloading, setDownloading] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
