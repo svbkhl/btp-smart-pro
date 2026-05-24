@@ -54,7 +54,7 @@ export interface Quote {
   signature_ip_address?: string;
   // Colonnes de paiement
   payment_status?: "pending" | "partially_paid" | "paid";
-  paid_at?: string;
+  paid_at?: string | null;
 }
 
 export interface CreateQuoteData {
@@ -83,6 +83,9 @@ export interface CreateQuoteData {
 export interface UpdateQuoteData extends Partial<CreateQuoteData> {
   id: string;
   sent_at?: string;
+  status?: "draft" | "sent" | "accepted" | "rejected" | "expired" | "signed" | "paid";
+  payment_status?: "pending" | "partially_paid" | "paid";
+  paid_at?: string | null;
 }
 
 // Hook pour récupérer tous les devis
