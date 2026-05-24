@@ -3,12 +3,13 @@
  * Affiche les boutons pour créer un nouveau devis
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Sparkles } from "lucide-react";
 import { SimpleQuoteForm } from "./SimpleQuoteForm";
 import { DetailedQuoteEditor } from "@/components/quotes/DetailedQuoteEditor";
 import { useToast } from "@/components/ui/use-toast";
+import { useLocation } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +23,24 @@ type QuoteKind = "simple" | "detailed" | null;
 
 export default function AIQuotesTab() {
   const { toast } = useToast();
+  const location = useLocation();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [quoteKind, setQuoteKind] = useState<QuoteKind>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [editQuoteData, setEditQuoteData] = useState<any>(null);
+
+  // Détecter une navigation depuis la page "Voir" (bouton Modifier)
+  useEffect(() => {
+    const state = location.state as { editQuote?: any; editMode?: string } | null;
+    if (state?.editQuote) {
+      const mode: QuoteKind = state.editMode === "detailed" ? "detailed" : "simple";
+      setEditQuoteData(state.editQuote);
+      setQuoteKind(mode);
+      setShowCreateForm(true);
+      // Nettoyer l'état pour éviter réouverture au retour
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
 
   return (
     <div className="space-y-6">
@@ -142,35 +158,39 @@ export default function AIQuotesTab() {
 
             {quoteKind === "simple" ? (
               <SimpleQuoteForm
-                key="simple-quote-form"
+                key={editQuoteData?.id || "simple-quote-form"}
+                initialData={editQuoteData || undefined}
                 onSuccess={() => {
                   setShowCreateForm(false);
                   setQuoteKind(null);
                   setIsPreviewOpen(false);
+                  setEditQuoteData(null);
                 }}
                 onPreviewStateChange={(isOpen) => {
                   setIsPreviewOpen(isOpen);
                 }}
               />
             ) : (
-              // Flow détaillé : DetailedQuoteEditor (éditeur direct, sans wizard)
               <DetailedQuoteEditor
+                key={editQuoteData?.id || "detailed-quote-form"}
+                existingQuoteId={editQuoteData?.id || undefined}
+                existingQuote={editQuoteData || undefined}
                 onSuccess={(quoteId) => {
-                  console.log("✅ Devis détaillé créé:", quoteId);
                   toast({
-                    title: "Devis créé",
-                    description: "Le devis détaillé a été créé avec succès",
+                    title: editQuoteData ? "Devis modifié" : "Devis créé",
+                    description: "Le devis détaillé a été enregistré avec succès",
                   });
-                  // Ne pas fermer automatiquement, l'utilisateur peut continuer à éditer
                 }}
                 onCancel={() => {
                   setQuoteKind(null);
                   setShowCreateForm(false);
+                  setEditQuoteData(null);
                 }}
                 onClose={() => {
                   setQuoteKind(null);
                   setShowCreateForm(false);
                   setIsPreviewOpen(false);
+                  setEditQuoteData(null);
                 }}
               />
             )}
