@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useClients, getClientFullName } from "@/hooks/useClients";
+import { useClients, getClientFullName, Client } from "@/hooks/useClients";
+import { CreateClientDialog } from "@/components/clients/CreateClientDialog";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { useCreateDetailedQuote, useUpdateDetailedQuote } from "@/hooks/useDetailedQuotes";
 import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
@@ -90,6 +91,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
 
   // État du devis
   const [clientId, setClientId] = useState<string>("");
+  const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
   const [tvaRate, setTvaRate] = useState<number>(
     companySettings?.default_tva_rate || companySettings?.default_quote_tva_rate || 0.20
   );
@@ -971,7 +973,18 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
         <div className="space-y-4">
           {/* Sélection client */}
           <div className="space-y-2">
-            <Label htmlFor="client">Client *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="client">Client *</Label>
+              {!quoteId && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreateClientOpen(true)}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  + Créer un nouveau client
+                </button>
+              )}
+            </div>
             <Select
               value={clientId}
               onValueChange={setClientId}
@@ -994,6 +1007,14 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               </p>
             )}
           </div>
+
+          <CreateClientDialog
+            open={isCreateClientOpen}
+            onOpenChange={setIsCreateClientOpen}
+            onCreated={(newClient: Client) => {
+              setClientId(newClient.id);
+            }}
+          />
 
           {/* TVA 293B */}
           <div className="space-y-2">
