@@ -66,7 +66,8 @@ export default function QuoteDetailView({
     total_ttc: tva293b ? (quote.subtotal_ht ?? quote.estimated_cost ?? 0) : (quote.total_ttc ?? (quote.estimated_cost ?? 0) * (1 + tvaRate)),
   });
 
-  const isReadOnly = quote.signed || quote.status === 'signed';
+  // La page de détail est toujours en lecture seule — modifier passe par le bouton "Modifier"
+  const isReadOnly = true;
   const isSigned = quote.signed || quote.status === 'signed';
 
   return (
