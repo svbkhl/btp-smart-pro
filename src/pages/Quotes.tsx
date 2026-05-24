@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useQuotes, Quote, useDeleteQuote } from "@/hooks/useQuotes";
+import { supabase } from "@/integrations/supabase/client";
 import { QuoteActionButtons } from "@/components/quotes/QuoteActionButtons";
 import { EditQuoteDialog } from "@/components/quotes/EditQuoteDialog";
 import { QuoteDisplay } from "@/components/ai/QuoteDisplay";
@@ -59,8 +60,17 @@ const Quotes = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const handleView = (quote: Quote) => {
+  const handleView = async (quote: Quote) => {
     setViewingQuote(quote);
+    // Fetch fresh data to get latest client_opened_at, payment_status, etc.
+    try {
+      const { data } = await supabase
+        .from('ai_quotes')
+        .select('*')
+        .eq('id', quote.id)
+        .maybeSingle();
+      if (data) setViewingQuote(data as Quote);
+    } catch {}
   };
 
   const handleEdit = (quote: Quote) => {
