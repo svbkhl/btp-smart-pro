@@ -97,24 +97,41 @@ const Dashboard = () => {
 
   const calculatedStats = useMemo(() => {
     const projectsList = filteredProjects;
-    // CA depuis factures si dispo, sinon projets
+    const hasProjects = projectsList.length > 0;
+
     const projectRevenue = projectsList.reduce((sum, project) => {
-      const revenue = project.actual_revenue || project.budget || 0;
-      return sum + Number(revenue);
+      return sum + Number(project.actual_revenue || project.budget || 0);
     }, 0);
     const totalRevenue = invoicePaid > 0 ? invoicePaid : (invoiceCA > 0 ? invoiceCA : projectRevenue);
 
     const totalCosts = projectsList.reduce((sum, project) => sum + Number(project.costs || 0), 0);
     const totalProfit = totalRevenue - totalCosts;
-    const totalProjects = projectsList.length;
-    const activeProjects = projectsList.filter(p =>
-      ["planifié", "en_attente", "en_cours"].includes(p.status || "")
-    ).length;
-    const completedProjects = projectsList.filter(p => p.status === "terminé").length;
+
+    // Chantiers : table projects si disponible, sinon factures comme proxy
+    let totalProjects: number;
+    let activeProjects: number;
+    let completedProjects: number;
+
+    if (hasProjects) {
+      totalProjects = projectsList.length;
+      activeProjects = projectsList.filter(p =>
+        ["planifié", "en_attente", "en_cours"].includes(p.status || "")
+      ).length;
+      completedProjects = projectsList.filter(p => p.status === "terminé").length;
+    } else {
+      // Fallback : chaque facture = 1 chantier
+      totalProjects = filteredInvoices.length;
+      // Actifs = factures non payées (en cours de prestation)
+      activeProjects = filteredInvoices.filter(inv =>
+        ["draft", "sent", "signed"].includes(inv.status)
+      ).length;
+      completedProjects = filteredInvoices.filter(inv => inv.status === "paid").length;
+    }
+
     const totalClients = clients?.length || 0;
 
     return { totalRevenue, totalProfit, totalCosts, activeProjects, totalClients, completedProjects, totalProjects };
-  }, [stats, clients, filteredProjects, invoiceCA]);
+  }, [stats, clients, filteredProjects, filteredInvoices, invoiceCA, invoicePaid]);
 
   const alerts = useMemo(() => {
     const alertsList = [];
@@ -505,7 +522,7 @@ const Dashboard = () => {
             value={calculatedStats.activeProjects.toString()}
             icon={FolderKanban}
             trend={trends.projects}
-            description={`${calculatedStats.totalProjects} projets au total`}
+            description={`${calculatedStats.totalProjects} au total${filteredProjects.length === 0 && filteredInvoices.length > 0 ? " (via factures)" : ""}`}
             delay={0.3}
             gradient="blue"
           />
