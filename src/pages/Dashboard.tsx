@@ -26,6 +26,7 @@ import { useClients } from "@/hooks/useClients";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { RecentProjectsWidget, CalendarWidget, MessagesWidget, RecentClientsWidget } from "@/components/widgets";
 import { useMemo, useEffect, useState } from "react";
 import { format, subMonths, startOfMonth, endOfMonth, getYear } from "date-fns";
@@ -54,6 +55,7 @@ const Dashboard = () => {
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: quotes, isLoading: quotesLoading } = useQuotes();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
+  const { data: companySettings } = useUserSettings();
 
 
   // Années disponibles (depuis factures + projets)
@@ -105,7 +107,12 @@ const Dashboard = () => {
     const totalRevenue = invoicePaid > 0 ? invoicePaid : (invoiceCA > 0 ? invoiceCA : projectRevenue);
 
     const totalCosts = projectsList.reduce((sum, project) => sum + Number(project.costs || 0), 0);
-    const totalProfit = totalRevenue - totalCosts;
+    const profitMargin = companySettings?.profit_margin ?? null;
+    const totalProfit = totalCosts > 0
+      ? totalRevenue - totalCosts
+      : profitMargin != null
+        ? Math.round(totalRevenue * (profitMargin / 100))
+        : 0;
 
     // Chantiers : table projects si disponible, sinon factures comme proxy
     let totalProjects: number;
@@ -127,8 +134,8 @@ const Dashboard = () => {
 
     const totalClients = clients?.length || 0;
 
-    return { totalRevenue, totalProfit, totalCosts, activeProjects, totalClients, completedProjects, totalProjects };
-  }, [stats, clients, filteredProjects, filteredInvoices, invoiceCA, invoicePaid]);
+    return { totalRevenue, totalProfit, totalCosts, activeProjects, totalClients, completedProjects, totalProjects, profitMargin };
+  }, [stats, clients, filteredProjects, filteredInvoices, invoiceCA, invoicePaid, companySettings]);
 
   const alerts = useMemo(() => {
     const alertsList = [];
@@ -502,15 +509,21 @@ const Dashboard = () => {
             gradient="blue"
           />
           <KPIBlock
-            title="Bénéfice total"
-            value={new Intl.NumberFormat('fr-FR', { 
-              style: 'currency', 
-              currency: 'EUR', 
-              maximumFractionDigits: 0 
+            title="Bénéfice estimé"
+            value={new Intl.NumberFormat('fr-FR', {
+              style: 'currency',
+              currency: 'EUR',
+              maximumFractionDigits: 0
             }).format(calculatedStats.totalProfit)}
             icon={TrendingUp}
             trend={trends.profit}
-            description={`Coûts: ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(calculatedStats.totalCosts)}`}
+            description={
+              calculatedStats.totalCosts > 0
+                ? `Coûts: ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(calculatedStats.totalCosts)}`
+                : calculatedStats.profitMargin != null
+                  ? `Marge ${calculatedStats.profitMargin}% appliquée`
+                  : "Définir une marge dans Paramètres"
+            }
             delay={0.2}
             gradient={calculatedStats.totalProfit >= 0 ? "green" : "orange"}
           />
