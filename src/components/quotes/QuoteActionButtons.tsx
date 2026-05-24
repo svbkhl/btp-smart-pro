@@ -107,32 +107,38 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
   const isSigned = quote.signed || quote.status === "signed";
 
   const getEmailBadge = () => {
-    if (!emailStatus) return (
-      <Badge variant="outline" className="gap-1 text-xs text-muted-foreground border-muted">
-        <Mail className="w-3 h-3" />
-        Non envoyé
-      </Badge>
-    );
     const status = (emailStatus as any);
-    if (status.opened_at || status.status === "opened") return (
+    if (status?.opened_at || status?.status === "opened") return (
       <Badge variant="outline" className="gap-1 text-xs text-green-600 border-green-300 bg-green-50 dark:bg-green-950/30">
         <CheckCircle className="w-3 h-3" />
         Ouvert
       </Badge>
     );
-    if (status.status === "sent" || status.status === "delivered") return (
+    if (status?.status === "sent" || status?.status === "delivered") return (
       <Badge variant="outline" className="gap-1 text-xs text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/30">
         <CheckCircle className="w-3 h-3" />
         Envoyé
       </Badge>
     );
-    if (status.status === "failed") return (
+    if (status?.status === "failed") return (
       <Badge variant="outline" className="gap-1 text-xs text-red-600 border-red-300 bg-red-50 dark:bg-red-950/30">
         <Mail className="w-3 h-3" />
         Échec envoi
       </Badge>
     );
-    return null;
+    // Fallback : utiliser sent_at du devis lui-même
+    if (quote.sent_at || quote.status === "sent" || quote.status === "signed" || quote.status === "paid") return (
+      <Badge variant="outline" className="gap-1 text-xs text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/30">
+        <CheckCircle className="w-3 h-3" />
+        Envoyé
+      </Badge>
+    );
+    return (
+      <Badge variant="outline" className="gap-1 text-xs text-muted-foreground border-muted">
+        <Mail className="w-3 h-3" />
+        Non envoyé
+      </Badge>
+    );
   };
 
   return (
