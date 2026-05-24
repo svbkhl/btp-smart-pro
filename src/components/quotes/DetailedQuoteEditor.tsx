@@ -4,7 +4,7 @@
  * Crée le devis en DB uniquement lors de la sauvegarde
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompany
 import { useCreateDetailedQuote, useUpdateDetailedQuote } from "@/hooks/useDetailedQuotes";
 import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Save, FileText, User, MapPin } from "lucide-react";
+import { Loader2, Save, FileText, User, MapPin, Eye, EyeOff, Tag } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanyId } from "@/hooks/useCompanyId";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,7 +48,9 @@ import { SendToClientModal } from "@/components/billing/SendToClientModal";
 interface DetailedQuoteEditorProps {
   onSuccess?: (quoteId: string) => void;
   onCancel?: () => void;
-  onClose?: () => void; // Callback pour fermer complètement (fermer le dialog)
+  onClose?: () => void;
+  existingQuoteId?: string; // Édition d'un devis existant
+  existingQuote?: any;       // Données du devis existant pour pré-remplissage
 }
 
 // Types locaux pour sections et lignes en mémoire
@@ -66,9 +68,10 @@ interface LocalLine {
   quantity: number | null;
   unit_price_ht: number | null;
   position: number;
+  isDiscount?: boolean; // Ligne de remise
 }
 
-export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQuoteEditorProps) => {
+export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuoteId, existingQuote }: DetailedQuoteEditorProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { companyId } = useCompanyId();
@@ -102,10 +105,11 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
   const [localSections, setLocalSections] = useState<LocalSection[]>([]);
   const [localLines, setLocalLines] = useState<LocalLine[]>([]);
   
-  // État après création DB
-  const [quoteId, setQuoteId] = useState<string | null>(null);
+  // État après création DB (ou quoteId existant si édition)
+  const [quoteId, setQuoteId] = useState<string | null>(existingQuoteId || null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [showLivePreview, setShowLivePreview] = useState(false);
   const [quoteTotals, setQuoteTotals] = useState({
     subtotal_ht: 0,
     total_tva: 0,
@@ -119,13 +123,26 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
   const { data: quotes = [] } = useQuotes();
   const previewQuote = quotes.find(q => q.id === quoteId);
 
-  // Charger les préférences au montage
+  // Pré-remplir depuis le devis existant (édition)
   useEffect(() => {
-    if (companySettings) {
+    if (existingQuote) {
+      if (existingQuote.client_id) setClientId(existingQuote.client_id);
+      if (existingQuote.tva_rate != null) {
+        setTvaRate(existingQuote.tva_rate);
+        setTvaRateInput((existingQuote.tva_rate * 100).toFixed(2));
+      }
+      if (existingQuote.tva_non_applicable_293b != null) setTva293b(existingQuote.tva_non_applicable_293b);
+      if (existingQuote.details?.note) setQuoteNote(existingQuote.details.note);
+    }
+  }, [existingQuote]);
+
+  // Charger les préférences par défaut (uniquement si pas d'édition)
+  useEffect(() => {
+    if (companySettings && !existingQuote) {
       setTvaRate(companySettings.default_tva_rate || companySettings.default_quote_tva_rate || 0.20);
       setTva293b(companySettings.default_tva_293b || false);
     }
-  }, [companySettings]);
+  }, [companySettings, existingQuote]);
 
   // Recalculer les totaux quand sections/lignes changent
   useEffect(() => {
@@ -266,6 +283,21 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
 
   const handleDeleteLine = (lineId: string) => {
     setLocalLines(lines => lines.filter(l => l.id !== lineId));
+  };
+
+  const handleAddDiscountLine = (sectionId: string) => {
+    const sectionLines = localLines.filter(l => l.section_id === sectionId);
+    const newLine: LocalLine = {
+      id: `temp-line-${Date.now()}`,
+      section_id: sectionId,
+      label: "Remise",
+      unit: "forfait",
+      quantity: 1,
+      unit_price_ht: 0,
+      position: sectionLines.length,
+      isDiscount: true,
+    };
+    setLocalLines([...localLines, newLine]);
   };
 
   // Sauvegarder le devis (créer en DB + sauvegarder sections/lignes)
@@ -899,12 +931,39 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
     );
   }
 
+  // Aperçu en direct (calcul depuis l'état local)
+  const livePreviewData = useMemo(() => {
+    if (!showLivePreview || !selectedClient) return null;
+    return {
+      client: selectedClient,
+      sections: localSections,
+      lines: localLines,
+      totals: quoteTotals,
+    };
+  }, [showLivePreview, selectedClient, localSections, localLines, quoteTotals]);
+
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${showLivePreview && selectedClient ? "xl:grid xl:grid-cols-2 xl:gap-6 xl:space-y-0" : ""}`}>
+      {/* Colonne gauche : formulaire */}
+      <div className="space-y-6">
+
       {/* Paramètres devis */}
       <GlassCard className="p-4 sm:p-6">
         <div className="space-y-2 sm:space-y-4 mb-4">
-          <h3 className="text-base sm:text-lg font-semibold">Paramètres du devis</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-semibold">Paramètres du devis</h3>
+            {clientId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLivePreview(v => !v)}
+                className="gap-2"
+              >
+                {showLivePreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showLivePreview ? "Masquer aperçu" : "Aperçu en direct"}
+              </Button>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-muted-foreground">
             Configurez le client et les options de TVA
           </p>
@@ -1047,70 +1106,92 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                         .filter(line => line.section_id === section.id)
                         .map((line) => {
                           const lineTotal = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
+                          const isDiscount = line.isDiscount;
                           return (
-                            <div key={line.id} className="space-y-3 p-3 rounded-lg border border-border/50 bg-background/50">
+                            <div key={line.id} className={`space-y-3 p-3 rounded-lg border ${isDiscount ? "border-orange-300 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-700" : "border-border/50 bg-background/50"}`}>
+                              {isDiscount && (
+                                <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                  <Tag className="w-3 h-3" />
+                                  Remise / Réduction
+                                </div>
+                              )}
                               {/* Ligne 1: Champ Prestation (pleine largeur) */}
-                              <LineLabelInput
-                                className="w-full text-base min-h-[48px] px-4 py-3"
-                                value={line.label}
-                                onChange={(label) => handleUpdateLine(line.id, { label })}
-                                onSelect={async (item) => {
-                                  handleUpdateLine(line.id, {
-                                    label: item.label,
-                                    unit: item.unit || "u",
-                                    unit_price_ht: item.price || 0,
-                                  });
-                                  if (item.label.trim() && item.unit) {
-                                    try {
-                                      await upsertLineLibrary.mutateAsync({
-                                        label: item.label.trim(),
-                                        default_unit: item.unit,
-                                        default_unit_price_ht: item.price,
-                                      });
-                                    } catch (error) {
-                                      console.warn("⚠️ Erreur sauvegarde bibliothèque ligne:", error);
+                              {isDiscount ? (
+                                <Input
+                                  className="w-full text-base min-h-[48px] px-4 py-3 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                                  value={line.label}
+                                  onChange={(e) => handleUpdateLine(line.id, { label: e.target.value })}
+                                  placeholder="Description de la remise"
+                                />
+                              ) : (
+                                <LineLabelInput
+                                  className="w-full text-base min-h-[48px] px-4 py-3"
+                                  value={line.label}
+                                  onChange={(label) => handleUpdateLine(line.id, { label })}
+                                  onSelect={async (item) => {
+                                    handleUpdateLine(line.id, {
+                                      label: item.label,
+                                      unit: item.unit || "u",
+                                      unit_price_ht: item.price || 0,
+                                    });
+                                    if (item.label.trim() && item.unit) {
+                                      try {
+                                        await upsertLineLibrary.mutateAsync({
+                                          label: item.label.trim(),
+                                          default_unit: item.unit,
+                                          default_unit_price_ht: item.price,
+                                        });
+                                      } catch (error) {
+                                        console.warn("⚠️ Erreur sauvegarde bibliothèque ligne:", error);
+                                      }
                                     }
-                                  }
-                                }}
-                                placeholder="Prestation (description complète)"
-                              />
-                              
+                                  }}
+                                  placeholder="Prestation (description complète)"
+                                />
+                              )}
+
                               {/* Ligne 2: Unité, Quantité, Prix HT, Total, Supprimer */}
                               <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center w-full">
-                                <div className="flex gap-2 flex-1">
-                                  <Select
-                                    value={line.unit}
-                                    onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
-                                  >
-                                    <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="m²">m²</SelectItem>
-                                      <SelectItem value="ml">ml</SelectItem>
-                                      <SelectItem value="h">h</SelectItem>
-                                      <SelectItem value="u">u</SelectItem>
-                                      <SelectItem value="forfait">forfait</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <Input
-                                    type="number"
-                                    className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
-                                    value={line.quantity ?? ""}
-                                    onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
-                                    placeholder="Qté"
-                                  />
-                                </div>
+                                {!isDiscount && (
+                                  <div className="flex gap-2 flex-1">
+                                    <Select
+                                      value={line.unit}
+                                      onValueChange={(value) => handleUpdateLine(line.id, { unit: value })}
+                                    >
+                                      <SelectTrigger className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="m²">m²</SelectItem>
+                                        <SelectItem value="ml">ml</SelectItem>
+                                        <SelectItem value="h">h</SelectItem>
+                                        <SelectItem value="u">u</SelectItem>
+                                        <SelectItem value="forfait">forfait</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      className="flex-1 sm:w-[140px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                                      value={line.quantity ?? ""}
+                                      onChange={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) || null })}
+                                      placeholder="Qté"
+                                    />
+                                  </div>
+                                )}
                                 <div className="flex gap-2 items-center flex-1 sm:flex-initial">
                                   <Input
                                     type="number"
-                                    className="flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                                    className={`flex-1 sm:w-[160px] text-base min-h-[48px] px-3 sm:px-4 py-3 font-medium bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10 ${isDiscount ? "text-orange-600 dark:text-orange-400" : ""}`}
                                     value={line.unit_price_ht ?? ""}
-                                    onChange={(e) => handleUpdateLine(line.id, { unit_price_ht: parseFloat(e.target.value) || null })}
-                                    placeholder="Prix HT"
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || null;
+                                      // Pour les remises, stocker en négatif automatiquement si positif
+                                      handleUpdateLine(line.id, { unit_price_ht: isDiscount && val !== null && val > 0 ? -val : val });
+                                    }}
+                                    placeholder={isDiscount ? "Montant remise" : "Prix HT"}
                                   />
-                                  <div className="min-w-[80px] sm:w-[140px] text-right font-semibold text-sm sm:text-base min-h-[48px] flex items-center justify-end whitespace-nowrap">
-                                    {lineTotal.toFixed(2)} €
+                                  <div className={`min-w-[80px] sm:w-[140px] text-right font-semibold text-sm sm:text-base min-h-[48px] flex items-center justify-end whitespace-nowrap ${isDiscount || lineTotal < 0 ? "text-orange-600 dark:text-orange-400" : ""}`}>
+                                    {isDiscount ? `- ${Math.abs(lineTotal).toFixed(2)} €` : `${lineTotal.toFixed(2)} €`}
                                   </div>
                                   <Button
                                     variant="ghost"
@@ -1119,23 +1200,33 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
                                     className="min-h-[48px] min-w-[48px] text-xl font-bold flex-shrink-0"
                                   >
                                     ×
-              </Button>
+                                  </Button>
                                 </div>
                               </div>
                             </div>
                           );
                         })}
 
-              <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddLine(section.id)}
-                        className="mt-2"
-                      >
-                        + Ajouter une ligne
-              </Button>
-            </div>
-          </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddLine(section.id)}
+                        >
+                          + Ajouter une ligne
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddDiscountLine(section.id)}
+                          className="gap-1 text-orange-600 border-orange-300 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-950/30"
+                        >
+                          <Tag className="w-3 h-3" />
+                          Remise
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -1218,6 +1309,111 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose }: DetailedQu
           </Button>
         </div>
       </div>
+      )}
+      </div> {/* fin colonne gauche */}
+
+      {/* Colonne droite : aperçu en direct */}
+      {showLivePreview && livePreviewData && (
+        <div className="space-y-4">
+          <GlassCard className="p-4 sticky top-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Eye className="w-4 h-4 text-primary" />
+              <h3 className="font-semibold text-sm">Aperçu en direct</h3>
+            </div>
+            <div className="bg-white text-black p-4 rounded-lg text-xs max-h-[80vh] overflow-y-auto">
+              {/* En-tête entreprise */}
+              <div className="mb-4 pb-4 border-b-2 border-gray-300">
+                <div className="flex justify-between items-start">
+                  <div>
+                    {companyInfo?.company_logo_url && (
+                      <img src={companyInfo.company_logo_url} alt="Logo" className="h-10 mb-2 object-contain" />
+                    )}
+                    <p className="font-bold text-sm">{companyInfo?.company_name || "Nom de l'entreprise"}</p>
+                    {(companyInfo?.address || companyInfo?.city) && (
+                      <p className="text-gray-600">{[companyInfo.address, companyInfo.city].filter(Boolean).join(", ")}</p>
+                    )}
+                    {companyInfo?.phone && <p className="text-gray-600">{companyInfo.phone}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-base">DEVIS</p>
+                    <p className="text-gray-500">Date: {new Date().toLocaleDateString("fr-FR")}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Client */}
+              <div className="mb-4 p-2 bg-gray-50 rounded">
+                <p className="font-semibold">{livePreviewData.client.name}</p>
+                {livePreviewData.client.location && <p className="text-gray-600">{livePreviewData.client.location}</p>}
+                {livePreviewData.client.email && <p className="text-gray-600">{livePreviewData.client.email}</p>}
+              </div>
+
+              {/* Sections et lignes */}
+              {livePreviewData.sections.length > 0 && (
+                <div className="mb-4 space-y-3">
+                  {livePreviewData.sections.map((section, idx) => {
+                    const sLines = livePreviewData.lines.filter(l => l.section_id === section.id);
+                    if (sLines.length === 0 && !section.title) return null;
+                    return (
+                      <div key={section.id}>
+                        {section.title && (
+                          <p className="font-semibold text-xs mb-1 text-blue-700">{idx + 1}. {section.title}</p>
+                        )}
+                        {sLines.length > 0 && (
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-gray-100">
+                                <th className="text-left p-1 border">Désignation</th>
+                                <th className="text-center p-1 border">Qté</th>
+                                <th className="text-right p-1 border">P.U. HT</th>
+                                <th className="text-right p-1 border">Total HT</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sLines.map(line => {
+                                const total = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
+                                return (
+                                  <tr key={line.id} className={line.isDiscount ? "text-orange-600 bg-orange-50" : ""}>
+                                    <td className="p-1 border">{line.label || <span className="text-gray-400 italic">—</span>}</td>
+                                    <td className="text-center p-1 border">{line.isDiscount ? "1" : (line.quantity ?? "—")}</td>
+                                    <td className="text-right p-1 border">{(line.unit_price_ht ?? 0).toFixed(2)} €</td>
+                                    <td className="text-right p-1 border font-medium">{total.toFixed(2)} €</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Totaux */}
+              <div className="flex justify-end">
+                <table className="text-xs border-collapse w-48">
+                  <tbody>
+                    <tr>
+                      <td className="p-1 border text-right">Total HT</td>
+                      <td className="p-1 border text-right font-medium">{livePreviewData.totals.subtotal_ht.toFixed(2)} €</td>
+                    </tr>
+                    {!tva293b && (
+                      <tr>
+                        <td className="p-1 border text-right">TVA ({(effectiveTvaRate * 100).toFixed(0)}%)</td>
+                        <td className="p-1 border text-right">{livePreviewData.totals.total_tva.toFixed(2)} €</td>
+                      </tr>
+                    )}
+                    <tr className="bg-gray-100 font-bold">
+                      <td className="p-1 border text-right">Total TTC</td>
+                      <td className="p-1 border text-right text-blue-700">{livePreviewData.totals.total_ttc.toFixed(2)} €</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
       )}
     </div>
   );
