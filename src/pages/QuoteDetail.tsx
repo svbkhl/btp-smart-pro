@@ -80,9 +80,14 @@ export default function QuoteDetail() {
   };
 
   const handleEdit = () => {
-    toast({
-      title: "ℹ️ Modification",
-      description: "La modification des devis n'est pas encore disponible",
+    if (!quote) return;
+    // Naviguer vers l'éditeur avec les données du devis
+    const mode = quote.mode === "detailed" ? "detailed" : "simple";
+    navigate("/ai?tab=quotes", {
+      state: {
+        editQuote: quote,
+        editMode: mode,
+      },
     });
   };
 
