@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { signQuote } from "@/services/aiService";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, FileSignature, X, CheckCircle2, FileText } from "lucide-react";
+import { Loader2, FileSignature, X, CheckCircle2, FileText, Euro, User, Calendar, FileCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { extractUUID } from "@/utils/uuidExtractor";
 
 const SignatureQuote = () => {
@@ -86,35 +87,56 @@ const SignatureQuote = () => {
     }
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ("touches" in e) {
+      const touch = e.touches[0] || e.changedTouches[0];
+      return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
+    }
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     setIsDrawing(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
+    const pos = getPos(e, canvas);
     ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.moveTo(pos.x, pos.y);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     if (!isDrawing) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    const pos = getPos(e, canvas);
+    ctx.lineTo(pos.x, pos.y);
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e?: React.MouseEvent | React.TouchEvent) => {
+    e?.preventDefault();
     setIsDrawing(false);
+  };
+
+  const isCanvasEmpty = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return true;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return true;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return !imageData.data.some((v, i) => i % 4 === 3 && v > 0);
   };
 
   const clearSignature = () => {
@@ -129,7 +151,16 @@ const SignatureQuote = () => {
     if (!id || !signerName.trim()) {
       toast({
         title: "Information manquante",
-        description: "Veuillez saisir votre nom et signer",
+        description: "Veuillez saisir votre nom complet",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isCanvasEmpty()) {
+      toast({
+        title: "Signature manquante",
+        description: "Veuillez dessiner votre signature dans le cadre",
         variant: "destructive",
       });
       return;
@@ -208,20 +239,56 @@ const SignatureQuote = () => {
     );
   }
 
+  const totalTtc = quote.total_ttc || quote.estimated_cost || 0;
+  const totalHt = quote.subtotal_ht || quote.estimated_cost || 0;
+  const tva293b = quote.tva_non_applicable_293b ?? false;
+  const formattedAmount = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: quote.currency || 'EUR', minimumFractionDigits: 2 }).format(totalTtc);
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
-      <GlassCard className="p-8 max-w-2xl w-full">
+      <GlassCard className="p-6 sm:p-8 max-w-2xl w-full">
         <div className="space-y-6">
           <div className="text-center">
-            <FileSignature className="w-16 h-16 mx-auto mb-4 text-primary" />
-            <h1 className="text-3xl font-bold mb-2">Signature de devis</h1>
-            <p className="text-muted-foreground">
-              Veuillez signer le devis <strong>{quote.quote_number || quote.id}</strong>
+            <FileSignature className="w-12 h-12 mx-auto mb-3 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold mb-1">Signature de devis</h1>
+            <p className="text-muted-foreground text-sm">
+              Devis <strong>{quote.quote_number || quote.id.slice(0,8)}</strong>
             </p>
+          </div>
+
+          {/* Récapitulatif devis */}
+          <div className="rounded-xl border bg-muted/40 p-4 space-y-3">
             {quote.client_name && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Client: {quote.client_name}
-              </p>
+              <div className="flex items-center gap-2 text-sm">
+                <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="font-medium">{quote.client_name}</span>
+              </div>
+            )}
+            {quote.created_at && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4 shrink-0" />
+                <span>Émis le {new Date(quote.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+            )}
+            {(quote.details?.description || quote.details?.prestation) && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <FileCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="line-clamp-2">{quote.details?.description || quote.details?.prestation}</span>
+              </div>
+            )}
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                <Euro className="w-4 h-4" />
+                <span>Montant total {tva293b ? 'HT (TVA non applicable)' : 'TTC'}</span>
+              </div>
+              <span className="text-2xl font-bold text-primary">{formattedAmount}</span>
+            </div>
+            {!tva293b && totalHt > 0 && totalHt !== totalTtc && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>HT</span>
+                <span>{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: quote.currency || 'EUR' }).format(totalHt)}</span>
+              </div>
             )}
           </div>
 
@@ -249,6 +316,10 @@ const SignatureQuote = () => {
                   onMouseMove={draw}
                   onMouseUp={stopDrawing}
                   onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  onTouchCancel={stopDrawing}
                 />
               </div>
               <Button
