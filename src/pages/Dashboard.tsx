@@ -119,13 +119,10 @@ const Dashboard = () => {
       ).length;
       completedProjects = projectsList.filter(p => p.status === "terminé").length;
     } else {
-      // Fallback : chaque facture = 1 chantier
+      // Fallback : chaque facture = 1 chantier terminé (facturer = travail fini)
       totalProjects = filteredInvoices.length;
-      // Actifs = factures non payées (en cours de prestation)
-      activeProjects = filteredInvoices.filter(inv =>
-        ["draft", "sent", "signed"].includes(inv.status)
-      ).length;
       completedProjects = filteredInvoices.filter(inv => inv.status === "paid").length;
+      activeProjects = 0; // impossible à déterminer depuis les factures seules
     }
 
     const totalClients = clients?.length || 0;
