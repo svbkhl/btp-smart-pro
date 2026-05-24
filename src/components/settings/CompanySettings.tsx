@@ -57,6 +57,7 @@ export const CompanySettings = () => {
     brand_color: "",
     ape_code: "",
     capital_social: "",
+    profit_margin: "",
   });
 
   // Référence pour éviter les réinitialisations pendant la saisie
@@ -91,6 +92,7 @@ export const CompanySettings = () => {
           brand_color: settings.brand_color ?? "",
           ape_code: settings.ape_code ?? "",
           capital_social: settings.capital_social != null ? String(settings.capital_social) : "",
+          profit_margin: settings.profit_margin != null ? String(settings.profit_margin) : "",
         });
         setSavedSignatureData(currentSignature);
         setSavedSignatureName(settings.signature_name || "");
@@ -211,6 +213,7 @@ export const CompanySettings = () => {
         capital_social: formData.capital_social ? Number(formData.capital_social) : null,
         brand_color: formData.brand_color || null,
         ape_code: formData.ape_code || null,
+        profit_margin: formData.profit_margin ? Number(formData.profit_margin) : null,
       } as any;
       await updateSettings.mutateAsync(payload);
       // Garder companies.name en sync avec le nom affiché (sidebar + paramètres)
@@ -415,6 +418,23 @@ export const CompanySettings = () => {
                   placeholder="Ex: 10000"
                   className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profit_margin">Marge bénéficiaire estimée (%)</Label>
+                <Input
+                  id="profit_margin"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max="100"
+                  value={formData.profit_margin}
+                  onChange={(e) => setFormData((p) => ({ ...p, profit_margin: e.target.value }))}
+                  placeholder="Ex: 30"
+                  className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Utilisée pour estimer le bénéfice dans le tableau de bord lorsqu'aucun coût de chantier n'est saisi.
+                </p>
               </div>
             </div>
           </div>
