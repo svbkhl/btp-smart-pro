@@ -87,6 +87,7 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, comp
       }
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["quote", quote.id] });
+      queryClient.refetchQueries({ queryKey: ["quotes"] });
     } catch (error: any) {
       toast({ title: "Erreur", description: error.message || "Impossible de mettre à jour", variant: "destructive" });
     } finally {
