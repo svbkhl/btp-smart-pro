@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -921,6 +922,7 @@ export const AIQuoteGenerator = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { companyId } = useCompanyId();
+  const queryClient = useQueryClient();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: companyInfo } = useUserSettings();
   const createClient = useCreateClient();
@@ -1161,6 +1163,9 @@ export const AIQuoteGenerator = () => {
       const newQuoteId = response.quote?.id || null;
       setQuoteId(newQuoteId);
       
+      // Invalider le cache React Query pour que la liste se mette à jour immédiatement
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+
       console.log("✅ Quote créé avec succès:", {
         quoteId: newQuoteId,
         quoteNumber: currentQuoteNumber,
