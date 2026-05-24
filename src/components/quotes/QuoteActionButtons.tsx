@@ -17,6 +17,7 @@ interface QuoteActionButtonsProps {
   onEdit?: () => void;
   onSend?: () => void;
   onSendToClient?: () => void;
+  compact?: boolean; // mode carte : seulement "Marquer payé"
 }
 
 const useQuoteEmailStatus = (quoteId: string) => {
@@ -50,7 +51,7 @@ const useQuoteEmailStatus = (quoteId: string) => {
   });
 };
 
-export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: QuoteActionButtonsProps) => {
+export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, compact = false }: QuoteActionButtonsProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { companyId } = useCompanyId();
@@ -141,6 +142,22 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
     );
   };
 
+  // Mode compact (carte) : uniquement le bouton Marquer payé
+  if (compact) {
+    return (
+      <Button
+        variant={isPaid ? "outline" : "default"}
+        size="sm"
+        onClick={handleTogglePaid}
+        disabled={markingPaid}
+        className={`gap-1.5 flex-1 ${isPaid ? "text-green-600 border-green-400 bg-green-50 hover:bg-green-100 dark:bg-green-950/30" : ""}`}
+      >
+        <Euro className="w-3.5 h-3.5" />
+        {isPaid ? "Payé ✓" : "Marquer payé"}
+      </Button>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {getEmailBadge()}
@@ -159,18 +176,12 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
       )}
 
       {onSendToClient && !isSigned && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onSendToClient}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={onSendToClient} className="gap-2">
           <Send className="w-4 h-4" />
           Envoyer au client
         </Button>
       )}
 
-      {/* Marquer payé / impayé */}
       <Button
         variant={isPaid ? "outline" : "default"}
         size="sm"
@@ -182,13 +193,7 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient }: Qu
         {isPaid ? "Marquer impayé" : "Marquer payé"}
       </Button>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleDownloadPDF}
-        disabled={downloading}
-        className="gap-2"
-      >
+      <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading} className="gap-2">
         <Download className="w-4 h-4" />
         PDF
       </Button>
