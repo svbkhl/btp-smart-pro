@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isSystemAdmin } from '@/config/admin';
 
 interface Company {
   id: string;
@@ -28,14 +29,24 @@ export const AdminImpersonationProvider = ({ children }: { children: ReactNode }
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setImpersonatedCompanyId(parsed.companyId);
-        setImpersonatedCompanyName(parsed.companyName);
+    // Vérifier si l'utilisateur courant est admin avant de restaurer l'impersonation
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data?.user;
+      if (user && !isSystemAdmin(user)) {
+        // Effacer toute impersonation persistée pour les non-admins
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem('currentCompanyId');
+        return;
       }
-    } catch {}
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setImpersonatedCompanyId(parsed.companyId);
+          setImpersonatedCompanyName(parsed.companyName);
+        }
+      } catch {}
+    });
   }, []);
 
   const fetchCompanies = useCallback(async () => {
