@@ -21,10 +21,56 @@ export const useOverdueInvoices = () => {
         return [];
       }
 
-      const { data, error } = await supabase.rpc('get_overdue_invoices');
+      const today = new Date().toISOString().split('T')[0];
+      const { data: invoices, error } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, client_id, client_name, client_email, total_ttc, amount, due_date, status, payment_status')
+        .eq('company_id', companyId)
+        .lt('due_date', today)
+        .neq('payment_status', 'paid')
+        .neq('status', 'paid')
+        .order('due_date', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as OverdueInvoice[];
+
+      const invoiceIds = (invoices || []).map(inv => inv.id);
+      const remindersMap: Record<string, { last_reminder_level: number; last_reminder_sent_at: string; reminder_count: number }> = {};
+
+      if (invoiceIds.length > 0) {
+        const { data: reminders } = await supabase
+          .from('payment_reminders')
+          .select('invoice_id, reminder_level, sent_at')
+          .in('invoice_id', invoiceIds)
+          .eq('status', 'sent');
+
+        (reminders || []).forEach(r => {
+          if (!remindersMap[r.invoice_id]) {
+            remindersMap[r.invoice_id] = { last_reminder_level: 0, last_reminder_sent_at: '', reminder_count: 0 };
+          }
+          remindersMap[r.invoice_id].reminder_count++;
+          if (r.reminder_level > remindersMap[r.invoice_id].last_reminder_level) {
+            remindersMap[r.invoice_id].last_reminder_level = r.reminder_level;
+            remindersMap[r.invoice_id].last_reminder_sent_at = r.sent_at || '';
+          }
+        });
+      }
+
+      const now = Date.now();
+      return (invoices || []).map(inv => ({
+        id: inv.id,
+        invoice_number: inv.invoice_number,
+        client_id: inv.client_id,
+        client_name: inv.client_name,
+        client_email: inv.client_email,
+        amount_ttc: inv.total_ttc ?? inv.amount ?? 0,
+        due_date: inv.due_date,
+        days_overdue: Math.floor((now - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)),
+        status: inv.status,
+        payment_status: inv.payment_status,
+        last_reminder_sent_at: remindersMap[inv.id]?.last_reminder_sent_at,
+        last_reminder_level: remindersMap[inv.id]?.last_reminder_level ?? 0,
+        reminder_count: remindersMap[inv.id]?.reminder_count ?? 0,
+      })) as OverdueInvoice[];
     },
     enabled: !!user && !isLoadingCompanyId && !!companyId,
     ...QUERY_CONFIG.MODERATE,
