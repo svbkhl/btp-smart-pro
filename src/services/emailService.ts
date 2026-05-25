@@ -217,19 +217,45 @@ export const sendQuoteEmail = async (params: SendQuoteEmailParams) => {
         }
       }
 
-      // Préparer les données du devis pour le PDF
-      const quoteResult = {
-        estimatedCost: quote.estimated_cost,
-        workSteps: quote.details?.workSteps || [],
-        materials: quote.details?.materials || [],
-        description: quote.details?.description || "",
-        quote_number: quote.quote_number,
-        format: quote.details?.format,
-      };
+      // Charger sections et lignes pour les devis détaillés
+      const { data: quoteSections = [] } = await supabase
+        .from("quote_sections")
+        .select("id, title, position")
+        .eq("quote_id", validQuoteId)
+        .order("position");
+
+      const { data: quoteLines = [] } = await supabase
+        .from("quote_lines")
+        .select("*")
+        .eq("quote_id", validQuoteId)
+        .order("position");
+
+      const effectiveTvaRate = (quote.tva_non_applicable_293b ? 0 : (quote.tva_rate ?? 0.20));
+      const quoteMode = quote.mode === "detailed" || quoteLines.length > 0 ? "detailed" : "simple";
+
+      const pdfLines = quoteLines.map((l: any) => ({
+        label: l.label,
+        description: l.description,
+        unit: l.unit || "",
+        quantity: l.quantity || 0,
+        unit_price_ht: l.unit_price_ht || 0,
+        total_ht: l.total_ht,
+        tva_rate: effectiveTvaRate,
+        total_tva: quote.tva_non_applicable_293b ? 0 : l.total_ht * effectiveTvaRate,
+        total_ttc: quote.tva_non_applicable_293b ? l.total_ht : l.total_ht * (1 + effectiveTvaRate),
+        section_id: l.section_id,
+      }));
+
+      const subtotal_ht = quote.subtotal_ht ?? quote.estimated_cost ?? 0;
+      const total_ttc = quote.total_ttc ?? (subtotal_ht * (1 + effectiveTvaRate));
 
       // Générer le PDF en base64
       const pdfData = await generateQuotePDFBase64({
-        result: quoteResult,
+        result: {
+          estimatedCost: total_ttc,
+          quote_number: quote.quote_number,
+          description: quote.details?.description || "",
+        },
         companyInfo: {
           companyName: companySettings?.company_name || "Votre Entreprise",
           legalForm: companySettings?.legal_form || "",
@@ -244,6 +270,14 @@ export const sendQuoteEmail = async (params: SendQuoteEmailParams) => {
         clientInfo,
         quoteDate: new Date(quote.created_at),
         quoteNumber: params.quoteNumber,
+        mode: quoteMode,
+        tvaRate: effectiveTvaRate,
+        tva293b: quote.tva_non_applicable_293b ?? false,
+        sections: quoteSections,
+        lines: pdfLines,
+        subtotal_ht,
+        total_tva: quote.tva_non_applicable_293b ? 0 : (quote.total_tva ?? subtotal_ht * effectiveTvaRate),
+        total_ttc,
         signatureData: quote.signature_data || undefined,
         signedBy: quote.signed_by || undefined,
         signedAt: quote.signed_at || undefined,
