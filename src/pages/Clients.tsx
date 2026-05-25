@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useClients, useDeleteClient, getClientFullName } from "@/hooks/useClients";
 import { ClientForm } from "@/components/ClientForm";
-import { Plus, Search, Users, Mail, Phone, MapPin, Trash2, Edit } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MapPin, Trash2, Edit, Download } from "lucide-react";
+import { exportToExcel } from "@/utils/exportExcel";
 import { useToast } from "@/components/ui/use-toast";
 import { safeAction } from "@/utils/safeAction";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -108,13 +109,33 @@ const Clients = () => {
               Gérez vos clients et leurs informations
             </p>
           </div>
-          <Button onClick={() => {
-            setEditingClient(null);
-            setIsFormOpen(true);
-          }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nouveau client
-          </Button>
+          <div className="flex gap-2">
+            {filteredClients.length > 0 && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => exportToExcel(filteredClients, 'clients', [
+                  { header: 'Nom', key: row => getClientFullName(row) },
+                  { header: 'Email', key: 'email' },
+                  { header: 'Téléphone', key: 'phone' },
+                  { header: 'Adresse', key: 'location' },
+                  { header: 'Type', key: 'type' },
+                  { header: 'Société', key: 'company_name' },
+                  { header: 'SIRET', key: 'siret' },
+                ])}
+              >
+                <Download className="w-4 h-4" />
+                Excel
+              </Button>
+            )}
+            <Button onClick={() => {
+              setEditingClient(null);
+              setIsFormOpen(true);
+            }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nouveau client
+            </Button>
+          </div>
         </div>
 
         {/* Barre de recherche */}
