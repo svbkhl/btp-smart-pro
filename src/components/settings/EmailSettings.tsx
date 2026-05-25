@@ -7,7 +7,7 @@ import { EmailSignatureEditor } from "@/components/EmailSignatureEditor";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { sendEmail } from "@/services/emailService";
+import { sendMessage } from "@/services/messageService";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -102,12 +102,14 @@ Cordialement,
 BTP Smart Pro
       `;
 
-      await sendEmail({
-        to: user.email || emailConfig.from_email || emailConfig.smtp_user || "",
+      await sendMessage({
+        messageType: "notification",
+        recipientEmail: user.email || emailConfig.from_email || emailConfig.smtp_user || "",
+        recipientName: "Test",
         subject: "Test de configuration email - BTP Smart Pro",
-        html: testEmailHtml,
-        text: testEmailText,
-        type: "notification",
+        body: testEmailText,
+        bodyHtml: testEmailHtml,
+        bodyText: testEmailText,
       });
 
       console.log("✅ Email de test envoyé avec succès");
