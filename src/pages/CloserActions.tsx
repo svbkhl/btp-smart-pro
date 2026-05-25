@@ -106,7 +106,7 @@ export default function CloserActions() {
         version: current.version ?? 1,
       };
       localStorage.setItem(key, JSON.stringify(payload));
-    } catch (_) {}
+    } catch (e) { console.warn('[CloserActions] localStorage error:', e); }
     // URL avec vue= pour appliquer le mode au chargement de /demo (sécurité si localStorage pas encore lu)
     const vue = employeeMode ? "employe" : "patron";
     window.location.href = `/demo?vue=${vue}`;
