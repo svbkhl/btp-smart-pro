@@ -164,17 +164,21 @@ export default function QuoteDetail() {
           email: quote.client_email || "",
           phone: "",
         },
+        quoteDate: quote.created_at ? new Date(quote.created_at) : new Date(),
+        quoteNumber: quote.quote_number,
         surface: quote.details?.surface || "",
         workType: quote.details?.prestation || "",
       });
 
-      // Télécharger le PDF
+      // Télécharger le PDF (compatible mobile)
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `devis-${quote.quote_number || id}.pdf`;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
 
       toast({
         title: "✅ PDF téléchargé",
