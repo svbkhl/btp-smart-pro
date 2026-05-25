@@ -4,7 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { sendEmail } from "./emailService";
+import { sendMessage } from "./messageService";
 
 /**
  * @deprecated Les URLs /payment/* ne sont plus servies — préférez un lien Stripe ou autre envoyé manuellement.
@@ -81,11 +81,14 @@ export async function sendPaymentLinkAfterSignature(
     </html>
   `;
 
-  await sendEmail({
-    to: signature.client_email,
+  await sendMessage({
+    messageType: "confirmation",
+    recipientEmail: signature.client_email,
+    recipientName: signature.client_name || "Client",
     subject: `Document signé — ${documentType} ${documentNumber}`,
-    html: emailHtml,
-    type: "payment_confirmation",
+    body: `Merci d'avoir signé le ${documentType} ${documentNumber}.`,
+    bodyHtml: emailHtml,
+    bodyText: `Merci d'avoir signé le ${documentType} ${documentNumber}.`,
   });
 
   console.log("✅ [paymentLinkService] Email post-signature envoyé à:", signature.client_email);
