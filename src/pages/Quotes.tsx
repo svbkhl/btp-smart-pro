@@ -70,7 +70,7 @@ const Quotes = () => {
         .eq('id', quote.id)
         .maybeSingle();
       if (data) setViewingQuote(data as Quote);
-    } catch {}
+    } catch (e) { console.error('[Quotes] Erreur chargement du devis:', e); }
   };
 
   const handleEdit = (quote: Quote) => {
