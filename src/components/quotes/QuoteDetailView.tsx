@@ -29,9 +29,13 @@ import QuotePaymentSection from "./QuotePaymentSection";
 import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuoteLines } from "@/hooks/useQuoteLines";
+import { useQuoteSections } from "@/hooks/useQuoteSections";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { computeQuoteTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
 import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
+import { downloadQuotePDF } from "@/services/pdfService";
+import { useToast } from "@/hooks/use-toast";
 
 interface QuoteDetailViewProps {
   quote: any;
@@ -54,12 +58,72 @@ export default function QuoteDetailView({
 }: QuoteDetailViewProps) {
   const [activeTab, setActiveTab] = useState("details");
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
   const tvaRate = quote.tva_rate ?? 0.20;
   const tva293b = quote.tva_non_applicable_293b ?? false;
-  // Toujours charger les lignes pour détecter les devis détaillés sans mode en base
   const { data: lines = [] } = useQuoteLines(quote.id);
-  // Mode détaillé si explicitement marqué OU si des lignes existent (rétrocompat)
+  const { data: sections = [] } = useQuoteSections(quote.id);
+  const { data: userSettings } = useUserSettings();
   const quoteMode = quote.mode === "detailed" || lines.length > 0 ? "detailed" : "simple";
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      const effectiveTvaRate = tva293b ? 0 : tvaRate;
+      const pdfLines = lines.map(l => ({
+        label: l.label,
+        description: l.description,
+        unit: l.unit || "",
+        quantity: l.quantity || 0,
+        unit_price_ht: l.unit_price_ht || 0,
+        total_ht: l.total_ht,
+        tva_rate: effectiveTvaRate,
+        total_tva: tva293b ? 0 : l.total_ht * effectiveTvaRate,
+        total_ttc: tva293b ? l.total_ht : l.total_ht * (1 + effectiveTvaRate),
+        section_id: l.section_id,
+      }));
+      const pdfSections = sections.map(s => ({ id: s.id, title: s.title, position: s.position }));
+
+      const companyInfo = {
+        companyName: userSettings?.company_name || "",
+        address: userSettings?.address || "",
+        city: userSettings?.city || "",
+        postalCode: userSettings?.postal_code || "",
+        phone: userSettings?.phone || "",
+        email: userSettings?.email || "",
+        siret: userSettings?.siret || "",
+        vatNumber: userSettings?.vat_number || "",
+        logoUrl: userSettings?.company_logo_url || "",
+      };
+
+      const subtotal_ht = quote.subtotal_ht ?? quote.estimated_cost ?? 0;
+      const total_ttc = quote.total_ttc ?? (subtotal_ht * (1 + effectiveTvaRate));
+
+      await downloadQuotePDF({
+        result: { estimatedCost: total_ttc, quote_number: quote.quote_number },
+        companyInfo,
+        clientInfo: { name: quote.client_name || "" },
+        quoteDate: quote.created_at ? new Date(quote.created_at) : new Date(),
+        quoteNumber: quote.quote_number,
+        mode: quoteMode,
+        tvaRate: effectiveTvaRate,
+        tva293b,
+        sections: pdfSections,
+        lines: pdfLines,
+        subtotal_ht,
+        total_tva: tva293b ? 0 : (quote.total_tva ?? subtotal_ht * effectiveTvaRate),
+        total_ttc,
+        signatureData: quote.signature_data || undefined,
+        signedBy: quote.signed_by || undefined,
+        signedAt: quote.signed_at || undefined,
+      });
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message || "Impossible de générer le PDF", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
   const [quoteTotals, setQuoteTotals] = useState({
     subtotal_ht: quote.subtotal_ht ?? quote.estimated_cost ?? 0,
     total_tva: tva293b ? 0 : (quote.total_tva ?? (quote.estimated_cost ?? 0) * tvaRate),
@@ -98,8 +162,8 @@ export default function QuoteDetailView({
               <span className="hidden xs:inline">Messages</span>
             </Button>
           )}
-          {onDownloadPDF && (
-            <Button variant="outline" size="sm" onClick={onDownloadPDF} className="gap-1.5">
+          {(onDownloadPDF || true) && (
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading} className="gap-1.5">
               <Download className="h-3.5 w-3.5" />
               PDF
             </Button>
