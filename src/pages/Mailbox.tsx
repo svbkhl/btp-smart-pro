@@ -32,7 +32,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useEmailMessages, EmailMessage } from "@/hooks/useEmailMessages";
-import { sendEmail } from "@/services/emailService";
+import { sendMessage } from "@/services/messageService";
 
 interface Email {
   id: string;
@@ -222,12 +222,14 @@ const Mailbox = () => {
       // Convertir le texte en HTML simple
       const htmlBody = composeData.body.replace(/\n/g, "<br>");
       
-      await sendEmail({
-        to: composeData.to,
+      await sendMessage({
+        messageType: "notification",
+        recipientEmail: composeData.to,
+        recipientName: composeData.to,
         subject: composeData.subject,
-        html: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${htmlBody}</div>`,
-        text: composeData.body,
-        type: "notification",
+        body: composeData.body,
+        bodyHtml: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${htmlBody}</div>`,
+        bodyText: composeData.body,
       });
 
       console.log("✅ Email envoyé avec succès");
