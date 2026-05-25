@@ -32,13 +32,54 @@ export const usePendingQuotesForReminder = (days?: number) => {
     queryFn: async () => {
       if (!user || !companyId) return [];
 
-      const { data, error } = await supabase.rpc("get_pending_quotes_for_reminder", {
-        p_company_id: companyId,
-        p_days: effectiveDays,
-      });
+      const cutoffDate = new Date(Date.now() - effectiveDays * 24 * 60 * 60 * 1000).toISOString();
+      const { data: quotes, error } = await supabase
+        .from('ai_quotes')
+        .select('id, quote_number, client_id, client_name, client_email, total_ttc, estimated_cost, sent_at, updated_at, status')
+        .eq('company_id', companyId)
+        .eq('status', 'sent')
+        .lt('sent_at', cutoffDate)
+        .order('sent_at', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as PendingQuote[];
+
+      const quoteIds = (quotes || []).map(q => q.id);
+      const remindersMap: Record<string, { last_reminder_level: number; last_reminder_sent_at: string; reminder_count: number }> = {};
+
+      if (quoteIds.length > 0) {
+        const { data: reminders } = await supabase
+          .from('quote_reminders')
+          .select('quote_id, reminder_level, sent_at')
+          .in('quote_id', quoteIds)
+          .eq('status', 'sent');
+
+        (reminders || []).forEach(r => {
+          if (!remindersMap[r.quote_id]) {
+            remindersMap[r.quote_id] = { last_reminder_level: 0, last_reminder_sent_at: '', reminder_count: 0 };
+          }
+          remindersMap[r.quote_id].reminder_count++;
+          if (r.reminder_level > remindersMap[r.quote_id].last_reminder_level) {
+            remindersMap[r.quote_id].last_reminder_level = r.reminder_level;
+            remindersMap[r.quote_id].last_reminder_sent_at = r.sent_at || '';
+          }
+        });
+      }
+
+      const now = Date.now();
+      return (quotes || []).map(q => ({
+        id: q.id,
+        quote_number: q.quote_number,
+        client_id: q.client_id,
+        client_name: q.client_name,
+        client_email: q.client_email,
+        amount_ttc: q.total_ttc ?? q.estimated_cost ?? 0,
+        sent_at_quote: q.sent_at || q.updated_at,
+        days_since_sent: Math.floor((now - new Date(q.sent_at || q.updated_at).getTime()) / (1000 * 60 * 60 * 24)),
+        status: q.status,
+        last_reminder_sent_at: remindersMap[q.id]?.last_reminder_sent_at,
+        last_reminder_level: remindersMap[q.id]?.last_reminder_level ?? 0,
+        reminder_count: remindersMap[q.id]?.reminder_count ?? 0,
+      })) as PendingQuote[];
     },
     enabled: !!user && !isLoadingCompanyId && !!companyId,
     ...QUERY_CONFIG.MODERATE,
