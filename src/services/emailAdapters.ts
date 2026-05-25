@@ -39,13 +39,11 @@ export async function sendQuoteEmail(params: SendQuoteParams) {
   // Préparer le contenu avec civilité et prénom
   const civility = params.clientCivility || '';
   const firstName = params.clientFirstName || '';
-  const greetingName = civility && firstName 
-    ? `${civility} ${firstName}`
-    : civility 
-      ? `${civility} ${params.clientName}`
-      : firstName
-        ? firstName
-        : params.clientName;
+  // Éviter de dupliquer le titre si client_name le contient déjà
+  const nameAlreadyHasCiv = /^\s*(M\.|Mme|Mlle|Dr\.|Me)\s+/i.test(params.clientName || '');
+  const greetingName = nameAlreadyHasCiv
+    ? params.clientName
+    : [civility, firstName, params.clientName].filter(Boolean).join(' ').trim() || params.clientName;
   
   const subject = `Devis ${params.quoteNumber} - ${params.clientName}`;
   
