@@ -45,7 +45,7 @@ export const AdminImpersonationProvider = ({ children }: { children: ReactNode }
           setImpersonatedCompanyId(parsed.companyId);
           setImpersonatedCompanyName(parsed.companyName);
         }
-      } catch {}
+      } catch (e) { console.warn('[AdminImpersonation] localStorage parse error:', e); }
     });
   }, []);
 
