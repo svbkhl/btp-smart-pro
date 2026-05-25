@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { calculateFromTTC } from '@/utils/priceCalculations';
 import { formatClientBlock, clientRowToBlockInput } from '@/utils/formatClientBlock';
 import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
