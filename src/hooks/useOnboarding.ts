@@ -43,7 +43,7 @@ export function useOnboarding() {
           const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
           parsed[user.id] = true;
           localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(parsed));
-        } catch (_) {}
+        } catch (e) { console.warn('[Onboarding] localStorage error:', e); }
         return true;
       }
       // Fallback localStorage (guide déjà passé dans ce navigateur)
