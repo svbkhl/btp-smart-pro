@@ -12,8 +12,6 @@
 import { sendMessage, SendMessageParams } from "./messageService";
 import { supabase } from "@/integrations/supabase/client";
 import { generateInvoicePDFAsBase64 } from "./invoicePdfService";
-import { generateQuotePDFBase64 } from "./pdfService";
-import { useUserSettings } from "@/hooks/useUserSettings";
 
 // =====================================================
 // ADAPTER: Envoi de devis
