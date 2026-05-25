@@ -12,12 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { TextLibraryButton } from "@/components/facturation/TextLibraryButton";
 import { PaymentRemindersManager } from "@/components/reminders/PaymentRemindersManager";
 import { QuoteRemindersManager } from "@/components/reminders/QuoteRemindersManager";
-import { 
-  Search, 
-  FileText, 
-  Receipt, 
-  Plus, 
-  Euro, 
+import {
+  Search,
+  FileText,
+  Receipt,
+  Plus,
+  Euro,
   Calendar,
   User,
   CheckCircle2,
@@ -30,8 +30,10 @@ import {
   TrendingUp,
   AlertCircle,
   Eye,
-  Trash2
+  Trash2,
+  Download,
 } from "lucide-react";
+import { exportToExcel } from "@/utils/exportExcel";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Link, useNavigate } from "react-router-dom";
@@ -453,14 +455,32 @@ const Facturation = () => {
                       <span className="text-xs sm:text-sm text-muted-foreground">
                         {filteredQuotes.length} devis disponible{filteredQuotes.length > 1 ? 's' : ''}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectionModeQuotes(true)}
-                        className="gap-2 w-full sm:w-auto"
-                      >
-                        Sélectionner
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 flex-1 sm:flex-none"
+                          onClick={() => exportToExcel(filteredQuotes, 'devis', [
+                            { header: 'N° Devis', key: 'quote_number' },
+                            { header: 'Client', key: 'client_name' },
+                            { header: 'Date', key: row => row.created_at ? new Date(row.created_at).toLocaleDateString('fr-FR') : '' },
+                            { header: 'Montant HT (€)', key: row => row.total_ht ?? '' },
+                            { header: 'Montant TTC (€)', key: row => row.total_ttc ?? row.estimated_cost ?? '' },
+                            { header: 'Statut', key: 'status' },
+                          ])}
+                        >
+                          <Download className="w-4 h-4" />
+                          Excel
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectionModeQuotes(true)}
+                          className="gap-2 flex-1 sm:flex-none"
+                        >
+                          Sélectionner
+                        </Button>
+                      </div>
                     </div>
                   </GlassCard>
                 )}
@@ -750,15 +770,36 @@ const Facturation = () => {
                       <span className="text-xs sm:text-sm text-muted-foreground">
                         {filteredInvoices.length} facture{filteredInvoices.length > 1 ? 's' : ''} disponible{filteredInvoices.length > 1 ? 's' : ''}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectionModeInvoices(true)}
-                        className="gap-2 w-full sm:w-auto"
-                      >
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 flex-1 sm:flex-none"
+                          onClick={() => exportToExcel(filteredInvoices, 'factures', [
+                            { header: 'N° Facture', key: 'invoice_number' },
+                            { header: 'Client', key: 'client_name' },
+                            { header: 'Date', key: row => row.created_at ? new Date(row.created_at).toLocaleDateString('fr-FR') : '' },
+                            { header: 'Échéance', key: row => row.due_date ? new Date(row.due_date).toLocaleDateString('fr-FR') : '' },
+                            { header: 'Montant HT (€)', key: row => row.total_ht ?? row.amount_ht ?? '' },
+                            { header: 'TVA (€)', key: row => row.tva ?? row.vat_amount ?? '' },
+                            { header: 'Montant TTC (€)', key: row => row.total_ttc ?? row.amount ?? '' },
+                            { header: 'Statut', key: 'status' },
+                            { header: 'Paiement', key: 'payment_status' },
+                          ])}
+                        >
+                          <Download className="w-4 h-4" />
+                          Excel
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectionModeInvoices(true)}
+                          className="gap-2 flex-1 sm:flex-none"
+                        >
                         Sélectionner
                       </Button>
                     </div>
+                  </div>
                   </GlassCard>
                 )}
 
