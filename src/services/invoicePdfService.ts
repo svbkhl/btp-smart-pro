@@ -4,6 +4,8 @@ import { UserSettings } from '@/hooks/useUserSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { formatClientBlock, clientRowToBlockInput } from '@/utils/formatClientBlock';
 import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
+import { renderEauperation } from '@/services/pdf/renderEauperation';
+import { getTheme } from '@/services/pdf/themes';
 
 async function fetchClientRow(invoice: Invoice) {
   if (!invoice.client_id) return undefined;
@@ -469,6 +471,19 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
   try {
     const { invoice, companyInfo } = params;
 
+    // Thème Eau'pération Sanitaire
+    const theme = getTheme(companyInfo?.company_id);
+    if (theme.id === 'eauperation') {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const clientRow = await fetchClientRow(invoice);
+      await renderEauperation(doc, { mode: 'facture', invoice, companyInfo, clientRow });
+      const fileName = invoice.invoice_number
+        ? `Facture-${invoice.invoice_number}.pdf`
+        : `Facture-${formatDate(invoice.created_at).replace(/\s/g, '-')}.pdf`;
+      doc.save(fileName);
+      return;
+    }
+
     if (shouldUseEditorialV2(companyInfo)) {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const clientRow = await fetchClientRow(invoice);
@@ -496,6 +511,15 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
 export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParams): Promise<string> {
   try {
     const { invoice, companyInfo } = params;
+
+    // Thème Eau'pération Sanitaire
+    const theme = getTheme(companyInfo?.company_id);
+    if (theme.id === 'eauperation') {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const clientRow = await fetchClientRow(invoice);
+      await renderEauperation(doc, { mode: 'facture', invoice, companyInfo, clientRow });
+      return doc.output('dataurlstring').split(',')[1] ?? '';
+    }
 
     if (shouldUseEditorialV2(companyInfo)) {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });

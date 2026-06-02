@@ -31,6 +31,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuoteLines } from "@/hooks/useQuoteLines";
 import { useQuoteSections } from "@/hooks/useQuoteSections";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useClients } from "@/hooks/useClients";
 import { computeQuoteTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
 import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
@@ -65,6 +66,7 @@ export default function QuoteDetailView({
   const { data: lines = [] } = useQuoteLines(quote.id);
   const { data: sections = [] } = useQuoteSections(quote.id);
   const { data: userSettings } = useUserSettings();
+  const { data: clients = [] } = useClients();
   const quoteMode = quote.mode === "detailed" || lines.length > 0 ? "detailed" : "simple";
 
   const handleDownloadPDF = async () => {
@@ -86,15 +88,25 @@ export default function QuoteDetailView({
       const pdfSections = sections.map(s => ({ id: s.id, title: s.title, position: s.position }));
 
       const companyInfo = {
+        company_id: userSettings?.company_id || "",
         companyName: userSettings?.company_name || "",
+        company_name: userSettings?.company_name || "",
         address: userSettings?.address || "",
         city: userSettings?.city || "",
         postalCode: userSettings?.postal_code || "",
+        postal_code: userSettings?.postal_code || "",
         phone: userSettings?.phone || "",
         email: userSettings?.email || "",
         siret: userSettings?.siret || "",
         vatNumber: userSettings?.vat_number || "",
+        vat_number: userSettings?.vat_number || "",
         logoUrl: userSettings?.company_logo_url || "",
+        company_logo_url: userSettings?.company_logo_url || "",
+        signature_name: userSettings?.signature_name || "",
+        terms_and_conditions: userSettings?.terms_and_conditions || "",
+        legal_form: userSettings?.legal_form || "",
+        ape_code: userSettings?.ape_code || "",
+        invoice_template_version: userSettings?.invoice_template_version || "",
       };
 
       const subtotal_ht = quote.subtotal_ht ?? quote.estimated_cost ?? 0;
@@ -103,7 +115,18 @@ export default function QuoteDetailView({
       await downloadQuotePDF({
         result: { estimatedCost: total_ttc, quote_number: quote.quote_number },
         companyInfo,
-        clientInfo: { name: quote.client_name || "" },
+        clientInfo: (() => {
+        // Enrichir avec les données du client si disponibles
+        const clientRecord = clients.find(c => c.id === quote.client_id);
+        return {
+          name: quote.client_name || clientRecord?.name || "",
+          civility: clientRecord?.titre || undefined,
+          firstName: (clientRecord as any)?.prenom || undefined,
+          email: quote.client_email || clientRecord?.email || undefined,
+          phone: quote.client_phone || clientRecord?.phone || undefined,
+          location: quote.client_address || clientRecord?.location || undefined,
+        };
+      })(),
         quoteDate: quote.created_at ? new Date(quote.created_at) : new Date(),
         quoteNumber: quote.quote_number,
         mode: quoteMode,

@@ -2,6 +2,8 @@ import jsPDF from 'jspdf';
 import { calculateFromTTC } from '@/utils/priceCalculations';
 import { formatClientBlock, clientRowToBlockInput } from '@/utils/formatClientBlock';
 import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
+import { renderEauperation } from '@/services/pdf/renderEauperation';
+import { getTheme } from '@/services/pdf/themes';
 import type { Invoice } from '@/hooks/useInvoices';
 import type { UserSettings } from '@/hooks/useUserSettings';
 
@@ -182,6 +184,43 @@ export async function downloadQuotePDF(
       total_ttc,
     } = params;
 
+    // Thème Eau'pération Sanitaire — renderer custom (navy/rouge/cyan).
+    const companyId = (companyInfo as any)?.company_id as string | undefined;
+    const theme = getTheme(companyId);
+    if (theme.id === 'eauperation') {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      await renderEauperation(doc, {
+        mode: 'devis',
+        companyInfo: companyInfo as UserSettings,
+        clientInfo: {
+          name:      clientInfo.name,
+          civility:  clientInfo.civility,
+          firstName: clientInfo.firstName,
+          phone:     clientInfo.phone,
+          email:     clientInfo.email,
+          location:  clientInfo.location,
+          address:   (clientInfo as any).address,
+        },
+        quoteNumber:  quoteNumber || '',
+        quoteDate:    quoteDate,
+        sections:     (sections || []) as any,
+        lines:        (lines    || []) as any,
+        subtotalHT:   subtotal_ht ?? 0,
+        totalTVA:     total_tva   ?? 0,
+        totalTTC:     total_ttc   ?? 0,
+        tva293b:      tva293b,
+        signatureData: signatureData,
+        signedBy:     signedBy,
+        signedAt:     signedAt,
+      });
+      const fileName = quoteNumber
+        ? `Devis-${quoteNumber}.pdf`
+        : `Devis-${formatDate(quoteDate).replace(/\s/g, '-')}.pdf`;
+      if (options?.asBlob) return doc.output('blob');
+      if (options?.preview) { openPdfBlobInNewTab(doc, fileName); } else { doc.save(fileName); }
+      return;
+    }
+
     // V2 éditorial : si activé sur l'entreprise, déléguer au renderer partagé.
     const editorialEnabled = (companyInfo as any)?.invoice_template_version === 'v2-editorial';
     if (editorialEnabled) {
@@ -302,7 +341,16 @@ export async function downloadQuotePDF(
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     const companyName = companyInfo.companyName || companyInfo.company_name || 'Votre Entreprise';
-    doc.text(companyName, margin + (logoLoaded ? 40 : 5), yPosition + 15);
+    const headerX = margin + (logoLoaded ? 40 : 5);
+    doc.text(companyName, headerX, yPosition + 14);
+
+    // Nom du responsable (signature_name) sous le nom de l'entreprise
+    const contactName = (companyInfo as any).signature_name || (companyInfo as any).contact_name;
+    if (contactName) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(contactName, headerX, yPosition + 22);
+    }
 
     // Titre "DEVIS" à droite
     doc.setFontSize(24);
@@ -490,11 +538,66 @@ export async function downloadQuotePDF(
       let totalTVA = 0;
       let totalTTC = 0;
 
+      // Positions des colonnes — adaptées selon présence TVA
+      // Sans TVA (293B) : plus de place pour la Désignation
+      const COL = tva293b ? {
+        ref:     margin + 2,
+        desig:   margin + 13,
+        desigW:  78,
+        unite:   margin + 92,
+        pu:      margin + 112,
+        qty:     margin + 137,
+        ht:      margin + 148,
+        tva:     0,  // absent
+        ttc:     rightX,
+      } : {
+        ref:     margin + 2,
+        desig:   margin + 13,
+        desigW:  65,
+        unite:   margin + 79,
+        pu:      margin + 98,
+        qty:     margin + 123,
+        ht:      margin + 134,
+        tva:     margin + 157,
+        ttc:     rightX,
+      };
+
+      // Helper : dessine l'en-tête de tableau
+      const renderTableHeader = () => {
+        if (yPosition + 8 > pageHeight - margin - 20) {
+          doc.addPage();
+          yPosition = margin;
+        }
+        doc.setFillColor(...primaryColor);
+        doc.rect(margin, yPosition, contentWidth, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Réf',           COL.ref,   yPosition + 5.5);
+        doc.text('Désignation',   COL.desig, yPosition + 5.5);
+        doc.text('Unité',         COL.unite, yPosition + 5.5);
+        doc.text('Prix unit. HT', COL.pu,    yPosition + 5.5);
+        doc.text('Qté',           COL.qty,   yPosition + 5.5);
+        doc.text('Prix HT',       COL.ht,    yPosition + 5.5);
+        if (!tva293b) doc.text('TVA', COL.tva, yPosition + 5.5);
+        doc.text('Total TTC', COL.ttc, yPosition + 5.5, { align: 'right' });
+        yPosition += 8;
+        doc.setTextColor(...textColor);
+        doc.setFont('helvetica', 'normal');
+      };
+
       // Parcourir chaque section
       sectionsWithLines.forEach(({ section, lines: sectionLines }, sectionIndex) => {
-        // Titre de section
+        // --- Titre de section (multi-ligne) ---
         if (section) {
-          if (yPosition > pageHeight - 60) {
+          // Construire toutes les lignes du titre (gère les \n + retour à la ligne auto)
+          const rawTitle = `${sectionIndex + 1}. ${section.title}`;
+          const titleWrapped: string[] = rawTitle.split('\n').flatMap(
+            (l) => doc.splitTextToSize(l, contentWidth) as string[]
+          );
+          const titleBlockH = titleWrapped.length * 5 + 4;
+
+          if (yPosition + titleBlockH + 20 > pageHeight - margin) {
             doc.addPage();
             yPosition = margin;
           }
@@ -502,99 +605,77 @@ export async function downloadQuotePDF(
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(...primaryColor);
-          doc.text(`${sectionIndex + 1}. ${section.title}`, margin, yPosition);
-          yPosition += 8;
+          // Première ligne en gras 12pt
+          doc.text(titleWrapped[0], margin, yPosition);
+          yPosition += 6;
+
+          // Lignes suivantes (ex : description longue) en normal 9pt
+          if (titleWrapped.length > 1) {
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...textColor);
+            titleWrapped.slice(1).forEach((tl) => {
+              doc.text(tl, margin, yPosition);
+              yPosition += 4.5;
+            });
+          }
+          yPosition += 3;
         }
 
-        // En-tête du tableau
-        if (yPosition > pageHeight - 50) {
-          doc.addPage();
-          yPosition = margin;
-        }
-
-        doc.setFillColor(...primaryColor);
-        doc.rect(margin, yPosition, contentWidth, 8, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Réf', margin + 2, yPosition + 5.5);
-        doc.text('Désignation', margin + 15, yPosition + 5.5);
-        doc.text('Unité', margin + 80, yPosition + 5.5);
-        doc.text('Prix unit. HT', margin + 100, yPosition + 5.5);
-        doc.text('Qté', margin + 125, yPosition + 5.5);
-        doc.text('Prix HT', margin + 140, yPosition + 5.5);
-        if (!tva293b) {
-          doc.text('TVA', margin + 160, yPosition + 5.5);
-        }
-        doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
-        yPosition += 8;
-
-        doc.setTextColor(...textColor);
-        doc.setFont('helvetica', 'normal');
+        renderTableHeader();
 
         sectionLines.forEach((line, lineIndex) => {
-          // Numérotation (1.1, 1.2, etc.)
-          const lineNumber = section ? `${sectionIndex + 1}.${lineIndex + 1}` : `${lineIndex + 1}`;
+          const lineNumber = section
+            ? `${sectionIndex + 1}.${lineIndex + 1}`
+            : `${lineIndex + 1}`;
 
-          if (yPosition > pageHeight - 50) {
+          // Calculer la hauteur réelle de la ligne AVANT de la dessiner
+          const labelLines = doc.splitTextToSize(
+            line.label || '', COL.desigW
+          ) as string[];
+          const lineHeight = Math.max(7, labelLines.length * 4 + 3);
+
+          // Saut de page si la ligne ne rentre pas
+          if (yPosition + lineHeight > pageHeight - margin - 20) {
             doc.addPage();
             yPosition = margin;
-            // Réafficher l'en-tête
-            doc.setFillColor(...primaryColor);
-            doc.rect(margin, yPosition, contentWidth, 8, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Réf', margin + 2, yPosition + 5.5);
-            doc.text('Désignation', margin + 15, yPosition + 5.5);
-            doc.text('Unité', margin + 80, yPosition + 5.5);
-            doc.text('Prix unit. HT', margin + 100, yPosition + 5.5);
-            doc.text('Qté', margin + 125, yPosition + 5.5);
-            doc.text('Prix HT', margin + 140, yPosition + 5.5);
-            if (!tva293b) {
-              doc.text('TVA', margin + 160, yPosition + 5.5);
-            }
-            doc.text('Total TTC', rightX, yPosition + 5.5, { align: 'right' });
-            yPosition += 8;
-            doc.setTextColor(...textColor);
-            doc.setFont('helvetica', 'normal');
+            renderTableHeader();
           }
 
-          const lineHeight = 6;
+          // Fond alterné — utiliser la hauteur réelle
           if (lineIndex % 2 === 0) {
             doc.setFillColor(...lightGray);
-            doc.rect(margin, yPosition - 2, contentWidth, lineHeight, 'F');
+            doc.rect(margin, yPosition, contentWidth, lineHeight, 'F');
           }
 
           doc.setFontSize(8);
-          // Réf (numérotation)
-          doc.text(lineNumber, margin + 2, yPosition + 4);
-          // Désignation
-          const labelText = doc.splitTextToSize(line.label || '', 60)[0];
-          doc.text(labelText, margin + 15, yPosition + 4);
-          // Unité
-          doc.text(line.unit || '-', margin + 80, yPosition + 4);
-          // Prix unitaire HT
-          doc.text(line.unit_price_ht ? formatCurrency(line.unit_price_ht) : '-', margin + 100, yPosition + 4);
-          // Quantité
-          doc.text(line.quantity?.toString() || '-', margin + 125, yPosition + 4);
-          // Prix HT
-          doc.text(formatCurrency(line.total_ht), margin + 140, yPosition + 4);
-          // TVA (si pas 293B)
-          if (!tva293b) {
-            doc.text(`${(line.tva_rate * 100).toFixed(1)}%`, margin + 160, yPosition + 4);
-          }
-          // Total TTC
-          doc.text(formatCurrency(line.total_ttc), rightX, yPosition + 4, { align: 'right' });
 
-          totalHT += line.total_ht;
+          // Réf
+          doc.text(lineNumber, COL.ref, yPosition + 4);
+
+          // Désignation — toutes les lignes wrappées
+          labelLines.forEach((lbl, i) => {
+            doc.text(lbl, COL.desig, yPosition + 4 + i * 4);
+          });
+
+          // Colonnes numériques : centrées verticalement sur la hauteur de la ligne
+          const midY = yPosition + lineHeight / 2 + 1.5;
+          doc.text(line.unit || '-',                                       COL.unite, midY);
+          doc.text(line.unit_price_ht ? formatCurrency(line.unit_price_ht) : '-', COL.pu, midY);
+          doc.text((line.quantity ?? 1).toString(),                        COL.qty,   midY);
+          doc.text(formatCurrency(line.total_ht),                          COL.ht,    midY);
+          if (!tva293b) {
+            doc.text(`${(line.tva_rate * 100).toFixed(1)}%`, COL.tva, midY);
+          }
+          doc.text(formatCurrency(line.total_ttc), COL.ttc, midY, { align: 'right' });
+
+          totalHT  += line.total_ht;
           totalTVA += line.total_tva;
           totalTTC += line.total_ttc;
           yPosition += lineHeight;
         });
 
-        // Espace entre sections
-        yPosition += 3;
+        yPosition += 4; // espace entre sections
       });
 
       // Totaux
@@ -847,18 +928,27 @@ export async function downloadQuotePDF(
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(100, 100, 100);
-    const conditions = [
-      'Ce devis est valable 30 jours à compter de la date d\'émission.',
-      'Les prix sont exprimés en euros, toutes taxes comprises.',
-      'Les travaux débuteront après acceptation du devis et versement d\'un acompte si demandé.',
-    ];
+
+    // Conditions : custom (terms_and_conditions) ou défaut
+    const customTerms = (companyInfo as any).terms_and_conditions as string | undefined;
+    const conditions = customTerms
+      ? customTerms.split('\n').filter(Boolean)
+      : [
+          "Ce devis est valable 30 jours à compter de la date d'émission.",
+          'Les prix sont exprimés en euros, toutes taxes comprises.',
+          "Les travaux débuteront après acceptation du devis et versement d'un acompte si demandé.",
+        ];
+
     conditions.forEach((condition) => {
       if (yPosition > pageHeight - 20) {
         doc.addPage();
         yPosition = margin;
       }
-      doc.text(condition, margin, yPosition);
-      yPosition += 5;
+      const condLines = doc.splitTextToSize(condition, contentWidth) as string[];
+      condLines.forEach((cl) => {
+        doc.text(cl, margin, yPosition);
+        yPosition += 4.5;
+      });
     });
 
     // ============================================
