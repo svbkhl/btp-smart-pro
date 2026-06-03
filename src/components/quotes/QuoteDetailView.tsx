@@ -141,8 +141,9 @@ export default function QuoteDetailView({
         signedBy: quote.signed_by || undefined,
         signedAt: quote.signed_at || undefined,
       });
+      toast({ title: "✅ PDF généré", description: `Devis ${quote.quote_number} téléchargé.` });
     } catch (error: any) {
-      toast({ title: "Erreur", description: error.message || "Impossible de générer le PDF", variant: "destructive" });
+      toast({ title: "Erreur PDF", description: error.message || "Impossible de générer le PDF", variant: "destructive" });
     } finally {
       setIsDownloading(false);
     }
