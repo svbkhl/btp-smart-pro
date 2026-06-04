@@ -170,6 +170,12 @@ async function ensureEauperationFonts(doc: jsPDF): Promise<boolean> {
     for (const spec of EAUP_FONTS) {
       doc.addFont(spec.file, spec.family, spec.weight);
     }
+    // addFont swallows parse errors via PubSub — verify fonts actually registered
+    const registered = (doc as any).getFontList?.() ?? {};
+    if (!registered['Archivo'] || !registered['Manrope']) {
+      fontLoadPromise = Promise.resolve(false); // permanently use helvetica
+      return false;
+    }
   }
   return ok;
 }
