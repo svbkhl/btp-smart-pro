@@ -101,7 +101,7 @@ function euro(amount: number | undefined): string {
   const n = typeof amount === "string" ? parseFloat(amount) : amount;
   if (isNaN(n)) return "0,00 €";
   const [int, dec] = n.toFixed(2).split(".");
-  return `${(int ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, " ")},${dec ?? "00"} €`;
+  return `${(int ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, " ")},${dec ?? "00"} €`;
 }
 
 function fdate(d: Date | string | null | undefined): string {
@@ -309,9 +309,9 @@ function buildCOL(tva293b: boolean) {
   const mx = A4.mx;
   if (tva293b) {
     return {
-      ref:    mx + 2,  desig:  mx + 12, desigW: 80,
-      unite:  mx + 93, pu:     mx + 113, qty:    mx + 138,
-      ht:     mx + 149, tva:   0,
+      ref:    mx + 2,  desig:  mx + 12, desigW: 78,
+      unite:  mx + 93, pu:     mx + 116, qty:    mx + 138,
+      ht:     mx + 158, tva:   0,
     };
   }
   return {
@@ -510,15 +510,14 @@ async function renderDevisTable(
     // Section title
     if (section) {
       const rawTitle = `${gi + 1}. ${section.title}`;
+      doc.setFont(fontsOk ? "Archivo" : "helvetica", "bold");
+      doc.setFontSize(10);
       const titleWrapped: string[] = rawTitle
         .split("\n")
         .flatMap((l) => doc.splitTextToSize(l, contentW()) as string[]);
       const titleBlockH = titleWrapped.length * 5 + 4;
 
       if (y + titleBlockH + 20 > A4.h - A4.my) { doc.addPage(); y = A4.my; }
-
-      doc.setFont(fontsOk ? "Archivo" : "helvetica", "bold");
-      doc.setFontSize(10);
       tx(doc, C.primary);
       doc.text(titleWrapped[0]!, A4.mx, y);
       y += 5.5;
