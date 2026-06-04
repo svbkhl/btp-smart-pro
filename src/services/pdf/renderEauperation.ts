@@ -327,7 +327,7 @@ export async function renderEauperation(
   doc: jsPDF,
   params: EauperationRenderParams
 ): Promise<void> {
-  const fontsOk = await ensureEauperationFonts(doc);
+  const fontsOk = false; // custom fonts disabled — jsPDF cannot parse these TTF files
   const C = eauperationTheme.colors;
   const titleFont = fontsOk ? "Archivo" : "helvetica";
   const bodyFont  = fontsOk ? "Manrope" : "helvetica";
