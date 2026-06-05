@@ -3,7 +3,7 @@
  * Inclut : Infos, Timeline, Section Paiement, Historique
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,9 +35,9 @@ import { useClients } from "@/hooks/useClients";
 import { computeQuoteTotals, formatCurrency, formatTvaRate } from "@/utils/quoteCalculations";
 import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
-import { downloadQuotePDF } from "@/services/pdfService";
+import { downloadQuotePDF, generateQuotePDFBase64 } from "@/services/pdfService";
 import { useToast } from "@/hooks/use-toast";
-import { QuotePdfEmbed } from "./QuotePdfEmbed";
+import { Loader2 } from "lucide-react";
 
 interface QuoteDetailViewProps {
   quote: any;
@@ -61,6 +61,10 @@ export default function QuoteDetailView({
   const [activeTab, setActiveTab] = useState("details");
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const pdfUrlRef = useRef<string | null>(null);
   const { toast } = useToast();
   const tvaRate = quote.tva_rate ?? 0.20;
   const tva293b = quote.tva_non_applicable_293b ?? false;
@@ -69,6 +73,99 @@ export default function QuoteDetailView({
   const { data: userSettings } = useUserSettings();
   const { data: clients = [] } = useClients();
   const quoteMode = quote.mode === "detailed" || lines.length > 0 ? "detailed" : "simple";
+
+  const buildPdfParams = () => {
+    const effectiveTvaRate = tva293b ? 0 : tvaRate;
+    const clientRecord = (clients as any[]).find((c: any) => c.id === quote.client_id);
+    const pdfLines = (lines as any[]).map((l: any) => ({
+      label: l.label,
+      description: l.description,
+      unit: l.unit || "",
+      quantity: l.quantity || 0,
+      unit_price_ht: l.unit_price_ht || 0,
+      total_ht: l.total_ht,
+      tva_rate: effectiveTvaRate,
+      total_tva: tva293b ? 0 : l.total_ht * effectiveTvaRate,
+      total_ttc: tva293b ? l.total_ht : l.total_ht * (1 + effectiveTvaRate),
+      section_id: l.section_id,
+    }));
+    const pdfSections = (sections as any[]).map((s: any) => ({ id: s.id, title: s.title, position: s.position }));
+    const subtotal_ht = quote.subtotal_ht ?? quote.estimated_cost ?? 0;
+    const total_ttc = quote.total_ttc ?? (subtotal_ht * (1 + effectiveTvaRate));
+    return {
+      result: { estimatedCost: total_ttc, quote_number: quote.quote_number },
+      companyInfo: {
+        company_id: userSettings?.company_id || "",
+        companyName: userSettings?.company_name || "",
+        company_name: userSettings?.company_name || "",
+        address: userSettings?.address || "",
+        city: userSettings?.city || "",
+        postalCode: userSettings?.postal_code || "",
+        postal_code: userSettings?.postal_code || "",
+        phone: userSettings?.phone || "",
+        email: userSettings?.email || "",
+        siret: userSettings?.siret || "",
+        vatNumber: userSettings?.vat_number || "",
+        vat_number: userSettings?.vat_number || "",
+        logoUrl: userSettings?.company_logo_url || "",
+        company_logo_url: userSettings?.company_logo_url || "",
+        signature_name: userSettings?.signature_name || "",
+        terms_and_conditions: userSettings?.terms_and_conditions || "",
+        legal_form: userSettings?.legal_form || "",
+        ape_code: userSettings?.ape_code || "",
+        invoice_template_version: userSettings?.invoice_template_version || "",
+      },
+      clientInfo: {
+        name: quote.client_name || clientRecord?.name || "",
+        civility: clientRecord?.titre || undefined,
+        firstName: clientRecord?.prenom || undefined,
+        email: quote.client_email || clientRecord?.email || undefined,
+        phone: quote.client_phone || clientRecord?.phone || undefined,
+        location: quote.client_address || clientRecord?.location || undefined,
+      },
+      quoteDate: quote.created_at ? new Date(quote.created_at) : new Date(),
+      quoteNumber: quote.quote_number,
+      mode: lines.length > 0 ? "detailed" : "simple" as "detailed" | "simple",
+      tvaRate: effectiveTvaRate,
+      tva293b,
+      sections: pdfSections,
+      lines: pdfLines,
+      subtotal_ht,
+      total_tva: tva293b ? 0 : (quote.total_tva ?? subtotal_ht * effectiveTvaRate),
+      total_ttc,
+      signatureData: quote.signature_data || undefined,
+      signedBy: quote.signed_by || undefined,
+      signedAt: quote.signed_at || undefined,
+    };
+  };
+
+  const handleTabChange = async (tab: string) => {
+    setActiveTab(tab);
+    if (tab === "pdf" && !pdfUrl && !pdfLoading) {
+      setPdfLoading(true);
+      setPdfError(null);
+      try {
+        const params = buildPdfParams();
+        const { base64 } = await generateQuotePDFBase64(params);
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = url;
+        setPdfUrl(url);
+      } catch (e: any) {
+        setPdfError(e?.message || "Impossible de générer l'aperçu PDF");
+      } finally {
+        setPdfLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => { if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current); };
+  }, []);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -225,7 +322,7 @@ export default function QuoteDetailView({
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className={`grid w-full ${quote.signed ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="details">Détails</TabsTrigger>
           <TabsTrigger value="pdf">PDF</TabsTrigger>
@@ -440,7 +537,24 @@ export default function QuoteDetailView({
 
         {/* Onglet PDF */}
         <TabsContent value="pdf">
-          <QuotePdfEmbed quote={quote} />
+          {pdfLoading && (
+            <div className="flex min-h-[70vh] items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span>Génération de l&apos;aperçu PDF…</span>
+            </div>
+          )}
+          {pdfError && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {pdfError}
+            </div>
+          )}
+          {pdfUrl && !pdfLoading && (
+            <iframe
+              title={`Aperçu ${quote.quote_number}`}
+              src={`${pdfUrl}#toolbar=1`}
+              className="h-[min(75vh,900px)] w-full rounded-lg border border-border bg-muted/30"
+            />
+          )}
         </TabsContent>
 
         {/* Onglet Timeline */}
