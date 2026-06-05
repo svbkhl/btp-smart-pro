@@ -519,18 +519,10 @@ async function renderDevisTable(
 
       if (y + titleBlockH + 20 > A4.h - A4.my) { doc.addPage(); y = A4.my; }
       tx(doc, C.primary);
-      doc.text(titleWrapped[0]!, A4.mx, y);
-      y += 5.5;
-
-      if (titleWrapped.length > 1) {
-        doc.setFont(bodyFont, "normal");
-        doc.setFontSize(8.5);
-        tx(doc, C.ink);
-        titleWrapped.slice(1).forEach((tl) => {
-          doc.text(tl, A4.mx, y);
-          y += 4.5;
-        });
-      }
+      titleWrapped.forEach((tl) => {
+        doc.text(tl, A4.mx, y);
+        y += 5.5;
+      });
       y += 2;
     }
 
