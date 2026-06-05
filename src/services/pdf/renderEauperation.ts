@@ -298,7 +298,7 @@ function drawTableHeader(
   doc.text("UNITÉ",      COL.unite, y + 5.5);
   doc.text("PRIX HT",    COL.pu,    y + 5.5);
   doc.text("QTÉ",        COL.qty,   y + 5.5);
-  doc.text("TOTAL HT",   COL.ht,    y + 5.5);
+  doc.text("TOTAL HT",   COL.ht,    y + 5.5, tva293b ? { align: "right" } : undefined);
   if (!tva293b) doc.text("TVA", COL.tva, y + 5.5);
   doc.text("TOTAL TTC",  rightX,    y + 5.5, { align: "right" });
 
@@ -575,7 +575,7 @@ async function renderDevisTable(
       doc.text(line.unit || "-",                                            COL.unite, midY);
       doc.text(line.unit_price_ht != null ? euro(line.unit_price_ht) : "-", COL.pu,    midY);
       doc.text(String(line.quantity ?? 1),                                   COL.qty,   midY);
-      doc.text(euro(line.total_ht),                                          COL.ht,    midY);
+      doc.text(euro(line.total_ht),                                          COL.ht,    midY, tva293b ? { align: "right" } : undefined);
       if (!tva293b) {
         doc.text(`${(line.tva_rate * 100).toFixed(0)}%`, COL.tva, midY);
       }
@@ -658,6 +658,38 @@ function renderFactureTable(
     const totalHT  = invoice.total_ht  ?? calcHT;
     const hasVAT   = (invoice.tva ?? 0) > 0;
     const tva293b  = !hasVAT;
+
+    y = renderTotalsBlock(doc, { ht: totalHT, ttc: totalTTC, tva293b }, y, fontsOk);
+  } else {
+    // No service_lines — show description row + totals
+    const totalTTC = invoice.total_ttc ?? invoice.amount ?? 0;
+    const totalHT  = invoice.total_ht  ?? totalTTC;
+    const hasVAT   = (invoice.tva ?? 0) > 0;
+    const tva293b  = !hasVAT;
+
+    if (y + 10 > A4.h - A4.my - 60) { doc.addPage(); y = A4.my; }
+
+    fx(doc, C.primary);
+    doc.rect(A4.mx, y, contentW(), 8, "F");
+    tx(doc, C.onPrimary);
+    doc.setFontSize(7.5);
+    doc.setFont(fontsOk ? "Archivo" : "helvetica", "bold");
+    doc.text("DÉSIGNATION", A4.mx + 2, y + 5.5);
+    doc.text("TOTAL HT",    rightX,     y + 5.5, { align: "right" });
+    y += 8;
+
+    const desc = invoice.description || fallbackDesc;
+    if (y + 8 > A4.h - A4.my - 30) { doc.addPage(); y = A4.my; }
+    fx(doc, C.soft);
+    const descWrapped = doc.splitTextToSize(desc.slice(0, 120), contentW() * 0.76) as string[];
+    const rowH = Math.max(8, descWrapped.length * 4 + 2);
+    doc.rect(A4.mx, y, contentW(), rowH, "F");
+    doc.setFontSize(8.5);
+    doc.setFont(bodyFont, "normal");
+    tx(doc, C.ink);
+    descWrapped.forEach((l, i) => doc.text(l, A4.mx + 2, y + 4 + i * 4));
+    doc.text(euro(totalHT), rightX, y + rowH / 2 + 1.5, { align: "right" });
+    y += rowH;
 
     y = renderTotalsBlock(doc, { ht: totalHT, ttc: totalTTC, tva293b }, y, fontsOk);
   }

@@ -37,6 +37,7 @@ import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { useToast } from "@/hooks/use-toast";
+import { QuotePdfEmbed } from "./QuotePdfEmbed";
 
 interface QuoteDetailViewProps {
   quote: any;
@@ -225,8 +226,9 @@ export default function QuoteDetailView({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full ${quote.signed ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <TabsList className={`grid w-full ${quote.signed ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="details">Détails</TabsTrigger>
+          <TabsTrigger value="pdf">PDF</TabsTrigger>
           <TabsTrigger value="timeline">Suivi</TabsTrigger>
           {quote.signed && <TabsTrigger value="payment">Paiement</TabsTrigger>}
         </TabsList>
@@ -436,6 +438,11 @@ export default function QuoteDetailView({
           )}
         </TabsContent>
 
+        {/* Onglet PDF */}
+        <TabsContent value="pdf">
+          <QuotePdfEmbed quote={quote} />
+        </TabsContent>
+
         {/* Onglet Timeline */}
         <TabsContent value="timeline">
           <Card>
@@ -455,4 +462,5 @@ export default function QuoteDetailView({
     </div>
   );
 }
+
 
