@@ -138,7 +138,18 @@ export const SendToClientModal = ({
   };
 
   const handleSend = async () => {
-    if (recipients.length === 0) {
+    let finalRecipients = recipients;
+    if (finalRecipients.length === 0 && emailInput.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailInput.trim())) {
+        toast({ title: "Email invalide", description: "Veuillez saisir un email valide", variant: "destructive" });
+        return;
+      }
+      finalRecipients = [emailInput.trim()];
+      setRecipients(finalRecipients);
+      setEmailInput("");
+    }
+    if (finalRecipients.length === 0) {
       toast({
         title: "Email requis",
         description: "Veuillez ajouter au moins un destinataire",
@@ -175,7 +186,7 @@ export const SendToClientModal = ({
             {
               body: {
                 quote_id: document.id,
-                signer_email: recipients[0],
+                signer_email: finalRecipients[0],
                 signer_name: document?.client_name || "Client",
               },
             }
@@ -232,7 +243,7 @@ export const SendToClientModal = ({
       }
 
       // Envoyer à tous les destinataires
-      const allRecipients = [...recipients];
+      const allRecipients = [...finalRecipients];
       if (ccEmail.trim()) allRecipients.push(ccEmail.trim());
 
       for (const recipientEmail of allRecipients) {
@@ -431,7 +442,7 @@ export const SendToClientModal = ({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Annuler
           </Button>
-          <Button onClick={handleSend} disabled={loading || recipients.length === 0} className="gap-2 rounded-xl">
+          <Button onClick={handleSend} disabled={loading || (recipients.length === 0 && !emailInput.trim())} className="gap-2 rounded-xl">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />

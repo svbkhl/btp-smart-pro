@@ -119,16 +119,7 @@ export default function QuoteDetail() {
     }
   };
 
-  const handleSendEmail = async () => {
-    if (!quote.client_email) {
-      toast({
-        title: "❌ Email manquant",
-        description: "Ce devis n'a pas d'adresse email client",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const handleSendEmail = () => {
     setShowSendModal(true);
   };
 
@@ -251,14 +242,11 @@ export default function QuoteDetail() {
           <SendToClientModal
             open={showSendModal}
             onOpenChange={setShowSendModal}
-            quote={quote}
-            onSuccess={() => {
+            documentType="quote"
+            document={quote}
+            onSent={() => {
               setShowSendModal(false);
-              loadQuote(); // Rafraîchir le devis
-              toast({
-                title: "✅ Email envoyé",
-                description: "Le devis a été envoyé au client avec succès",
-              });
+              loadQuote();
             }}
           />
         )}

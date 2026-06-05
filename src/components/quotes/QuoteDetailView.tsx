@@ -8,9 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  User, 
+import {
+  FileText,
+  User,
   Calendar,
   DollarSign,
   Mail,
@@ -21,7 +21,8 @@ import {
   Edit,
   Trash2,
   Eye,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from "lucide-react";
 import QuoteStatusBadge from "./QuoteStatusBadge";
 import QuoteTimeline from "./QuoteTimeline";
@@ -37,7 +38,6 @@ import { SignatureDisplay } from "@/components/shared/SignatureDisplay";
 import { SendToClientModal } from "@/components/billing/SendToClientModal";
 import { downloadQuotePDF, generateQuotePDFBase64 } from "@/services/pdfService";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
 
 interface QuoteDetailViewProps {
   quote: any;
@@ -576,5 +576,6 @@ export default function QuoteDetailView({
     </div>
   );
 }
+
 
 
