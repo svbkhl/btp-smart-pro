@@ -609,6 +609,7 @@ export const useDeleteQuote = () => {
     },
     onSuccess: (_, deletedQuoteId) => {
       logger.info("useDeleteQuote: Quote deleted successfully", { deletedQuoteId });
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
       toast({
         title: "Devis supprimé",
         description: "Le devis a été supprimé définitivement.",

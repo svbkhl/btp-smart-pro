@@ -614,6 +614,17 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
   const canEdit = !!clientId; // Peut éditer dès qu'un client est sélectionné
   const hasContent = localSections.length > 0 || localLines.length > 0;
 
+  // useMemo doit être ici (avant tout return conditionnel) pour respecter les règles des hooks
+  const livePreviewData = useMemo(() => {
+    if (!showLivePreview || !selectedClient) return null;
+    return {
+      client: selectedClient,
+      sections: localSections,
+      lines: localLines,
+      totals: quoteTotals,
+    };
+  }, [showLivePreview, selectedClient, localSections, localLines, quoteTotals]);
+
   // Handler pour télécharger le PDF
   const handleDownloadPDF = async () => {
     if (!previewQuote || !selectedClient || !companyInfo) return;
@@ -932,17 +943,6 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       </div>
     );
   }
-
-  // Aperçu en direct (calcul depuis l'état local)
-  const livePreviewData = useMemo(() => {
-    if (!showLivePreview || !selectedClient) return null;
-    return {
-      client: selectedClient,
-      sections: localSections,
-      lines: localLines,
-      totals: quoteTotals,
-    };
-  }, [showLivePreview, selectedClient, localSections, localLines, quoteTotals]);
 
   return (
     <div className={`space-y-6 ${showLivePreview && selectedClient ? "xl:grid xl:grid-cols-2 xl:gap-6 xl:space-y-0" : ""}`}>
