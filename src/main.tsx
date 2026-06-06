@@ -20,6 +20,10 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      // Données considérées fraîches 5 min → pas de refetch entre navigations
+      staleTime: 5 * 60 * 1000,
+      // Garder en cache 15 min après que le composant est démonté
+      gcTime: 15 * 60 * 1000,
     },
   },
 });
@@ -53,5 +57,3 @@ createRoot(rootEl).render(
     </QueryClientProvider>
   </ErrorBoundary>
 );
-
-
