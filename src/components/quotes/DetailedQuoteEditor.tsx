@@ -25,7 +25,7 @@ import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompany
 import { useCreateDetailedQuote, useUpdateDetailedQuote } from "@/hooks/useDetailedQuotes";
 import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Save, FileText, User, MapPin, Eye, EyeOff, Tag } from "lucide-react";
+import { Loader2, Save, FileText, User, MapPin, Eye, EyeOff, Tag, Edit } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanyId } from "@/hooks/useCompanyId";
 import { supabase } from "@/integrations/supabase/client";
@@ -716,7 +716,15 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               Devis {previewQuote.quote_number}
             </h2>
             <div className="flex flex-wrap gap-2">
-              <Button variant="default" onClick={() => navigate("/facturation")} className="gap-2">
+              <Button
+                variant="default"
+                onClick={() => setIsPreviewOpen(false)}
+                className="gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                Modifier le devis
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/facturation")} className="gap-2">
                 <FileText className="w-4 h-4" />
                 Ouvrir dans facturation
               </Button>
@@ -728,7 +736,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
                 <Download className="w-4 h-4" />
                 Télécharger PDF
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   setIsPreviewOpen(false);
                   if (onClose) {
@@ -736,8 +744,8 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
                   } else if (onCancel) {
                     onCancel();
                   }
-                }} 
-                variant="outline" 
+                }}
+                variant="outline"
                 className="gap-2"
               >
                 <X className="w-4 h-4" />
@@ -1306,28 +1314,54 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
           )}
         </div>
         <div className="flex gap-2">
-          {onCancel && (
-            <Button variant="outline" onClick={onCancel}>
-              Annuler
-            </Button>
+          {quoteId ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (onClose) onClose();
+                  else if (onCancel) onCancel();
+                }}
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Terminer
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => setIsPreviewOpen(true)}
+                className="gap-2"
+              >
+                <Eye className="w-4 h-4" />
+                Voir l'aperçu
+              </Button>
+            </>
+          ) : (
+            <>
+              {onCancel && (
+                <Button variant="outline" onClick={onCancel}>
+                  Annuler
+                </Button>
+              )}
+              <Button
+                onClick={handleSave}
+                disabled={!clientId || isSaving || (localSections.length === 0 && localLines.length === 0)}
+                className="gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Création en cours...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Créer le devis
+                  </>
+                )}
+              </Button>
+            </>
           )}
-          <Button
-            onClick={handleSave}
-              disabled={!clientId || isSaving || (localSections.length === 0 && localLines.length === 0)}
-            className="gap-2"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                  Création en cours...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                  Créer le devis
-              </>
-            )}
-          </Button>
         </div>
       </div>
       )}
