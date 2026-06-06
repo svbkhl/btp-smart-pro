@@ -23,7 +23,6 @@ import { useClients, getClientFullName, Client } from "@/hooks/useClients";
 import { CreateClientDialog } from "@/components/clients/CreateClientDialog";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/useCompanySettings";
 import { useCreateDetailedQuote, useUpdateDetailedQuote } from "@/hooks/useDetailedQuotes";
-import { QuoteSectionsEditor } from "./QuoteSectionsEditor";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, FileText, User, MapPin, Eye, EyeOff, Tag, Edit } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -146,6 +145,36 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
     }
   }, [companySettings, existingQuote]);
 
+  // Charger les sections DB dans l'état local quand on édite un devis existant
+  useEffect(() => {
+    if (quoteId && sections.length > 0 && localSections.length === 0) {
+      setLocalSections(
+        [...sections]
+          .sort((a, b) => a.position - b.position)
+          .map(s => ({ id: s.id, title: s.title, position: s.position }))
+      );
+    }
+  }, [quoteId, sections]);
+
+  // Charger les lignes DB dans l'état local quand on édite un devis existant
+  useEffect(() => {
+    if (quoteId && lines.length > 0 && localLines.length === 0) {
+      setLocalLines(
+        [...lines]
+          .sort((a, b) => a.position - b.position)
+          .map(l => ({
+            id: l.id,
+            section_id: l.section_id,
+            label: l.label,
+            unit: l.unit || "u",
+            quantity: l.quantity,
+            unit_price_ht: l.unit_price_ht,
+            position: l.position,
+          }))
+      );
+    }
+  }, [quoteId, lines]);
+
   // Recalculer les totaux quand sections/lignes changent
   useEffect(() => {
     const effectiveTvaRate = tva293b ? 0 : tvaRate;
@@ -154,7 +183,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       unit_price_ht: line.unit_price_ht ?? 0,
       tva_rate: effectiveTvaRate,
     }));
-    
+
     const totals = computeQuoteTotals(linesForCalc, effectiveTvaRate, tva293b);
     setQuoteTotals(totals);
   }, [localLines, tvaRate, tva293b]);
@@ -325,21 +354,45 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       }
 
       console.log("🔧 [DetailedQuoteEditor] Sauvegarde devis détaillé:", {
+        mode: quoteId ? "UPDATE" : "CREATE",
         client_id: clientId,
         sections_count: localSections.length,
         lines_count: localLines.length,
       });
 
-      // 1. Créer le devis en DB
-      const newQuote = await createDetailedQuote.mutateAsync({
-        client_id: clientId,
-        client_name: getClientFullName(selectedClient),
+      // 1. Créer ou mettre à jour le devis en DB
+      let targetQuoteId: string;
+
+      if (quoteId) {
+        // UPDATE : devis existant — mettre à jour les métadonnées
+        targetQuoteId = quoteId;
+        await supabase
+          .from("ai_quotes")
+          .update({
+            client_id: clientId || undefined,
+            client_name: getClientFullName(selectedClient),
             tva_rate: tva293b ? 0 : tvaRate,
             tva_non_applicable_293b: tva293b,
-      });
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", quoteId);
 
-      console.log("✅ [DetailedQuoteEditor] Devis créé:", newQuote.id);
-      setQuoteId(newQuote.id);
+        // Supprimer toutes les lignes puis sections existantes
+        await supabase.from("quote_lines").delete().eq("quote_id", quoteId);
+        await supabase.from("quote_sections").delete().eq("quote_id", quoteId);
+        console.log("✅ [DetailedQuoteEditor] Sections/lignes existantes supprimées");
+      } else {
+        // CREATE : nouveau devis
+        const newQuote = await createDetailedQuote.mutateAsync({
+          client_id: clientId,
+          client_name: getClientFullName(selectedClient),
+          tva_rate: tva293b ? 0 : tvaRate,
+          tva_non_applicable_293b: tva293b,
+        });
+        targetQuoteId = newQuote.id;
+        setQuoteId(newQuote.id);
+        console.log("✅ [DetailedQuoteEditor] Devis créé:", newQuote.id);
+      }
 
 
       // 2. Créer les sections en DB (si table existe) + sauvegarder dans bibliothèque
@@ -372,7 +425,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
           }
           
           const dbSection = await createSection.mutateAsync({
-            quote_id: newQuote.id,
+            quote_id: targetQuoteId,
             title: localSection.title.trim(),
             position: i,
           });
@@ -438,7 +491,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
             }
 
             await createLine.mutateAsync({
-              quote_id: newQuote.id,
+              quote_id: targetQuoteId,
               section_id: realSectionId, // UUID réel de la section créée en DB
               label: localLine.label.trim(),
               unit: localLine.unit || null,
@@ -480,7 +533,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
           
           // Mettre à jour le devis avec les totaux calculés
           await updateDetailedQuote.mutateAsync({
-            id: newQuote.id,
+            id: targetQuoteId,
             subtotal_ht: totals.subtotal_ht,
             total_tva: totals.total_tva,
             total_ttc: totals.total_ttc,
@@ -493,7 +546,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
           // Essayer l'RPC en fallback si elle existe
           try {
             const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
-              p_quote_id: newQuote.id,
+              p_quote_id: targetQuoteId,
             });
             if (rpcError) {
               console.warn("⚠️ RPC recompute aussi en erreur:", rpcError);
@@ -508,7 +561,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
         // Pas de lignes, totaux à 0
         try {
           await updateDetailedQuote.mutateAsync({
-            id: newQuote.id,
+            id: targetQuoteId,
             subtotal_ht: 0,
             total_tva: 0,
             total_ttc: 0,
@@ -583,19 +636,24 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       }
 
       toast({
-        title: "Devis créé",
+        title: quoteId ? "Devis modifié" : "Devis créé",
         description: phrasesAdded > 0
           ? `Le devis a été sauvegardé. ${phrasesAdded} phrase(s) ajoutée(s) à la Bibliothèque de phrases.`
           : phrasesTableMissing && (localSections.some(s => s.title?.trim()) || localLines.some(l => l.label?.trim()))
-            ? "Le devis a été créé. Pour enregistrer les phrases ici, exécutez la migration create_text_snippets_fixed.sql dans Supabase (SQL Editor)."
-            : "Le devis a été créé et sauvegardé avec succès",
+            ? "Le devis a été enregistré. Pour enregistrer les phrases ici, exécutez la migration create_text_snippets_fixed.sql dans Supabase (SQL Editor)."
+            : "Le devis a été enregistré avec succès",
       });
 
-      // Ouvrir l'aperçu après création
+      // Invalider le cache pour forcer le rechargement des données DB
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["quote-sections", targetQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["quote-lines", targetQuoteId] });
+
+      // Ouvrir l'aperçu après sauvegarde
       setIsPreviewOpen(true);
 
       if (onSuccess) {
-        onSuccess(newQuote.id);
+        onSuccess(targetQuoteId);
       }
     } catch (error: any) {
       console.error("❌ Erreur sauvegarde devis:", error);
@@ -996,7 +1054,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
             <Select
               value={clientId}
               onValueChange={setClientId}
-              disabled={clientsLoading || !!quoteId}
+              disabled={clientsLoading}
             >
               <SelectTrigger id="client" className="bg-transparent backdrop-blur-xl border-white/20 dark:border-white/10">
                 <SelectValue placeholder="Sélectionner un client" />
@@ -1084,17 +1142,6 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
             </p>
               </div>
           <div>
-            {quoteId ? (
-              // Mode DB : utiliser QuoteSectionsEditor si devis déjà créé
-            <QuoteSectionsEditor
-              quoteId={quoteId}
-              tvaRate={effectiveTvaRate}
-              tva293b={tva293b}
-              onTotalsChange={setQuoteTotals}
-              onTva293bChange={handleTva293bChange}
-            />
-            ) : (
-              // Mode local : éditeur en mémoire
               <div className="space-y-4">
                 {/* Bouton ajouter section */}
                 <Button onClick={handleAddSection} variant="outline" className="gap-2">
@@ -1258,7 +1305,6 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
                   </div>
                 ))}
               </div>
-            )}
           </div>
         </GlassCard>
       ) : (
@@ -1328,12 +1374,21 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
                 Terminer
               </Button>
               <Button
-                variant="default"
-                onClick={() => setIsPreviewOpen(true)}
+                onClick={handleSave}
+                disabled={!clientId || isSaving || (localSections.length === 0 && localLines.length === 0)}
                 className="gap-2"
               >
-                <Eye className="w-4 h-4" />
-                Voir l'aperçu
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Enregistrer les modifications
+                  </>
+                )}
               </Button>
             </>
           ) : (
