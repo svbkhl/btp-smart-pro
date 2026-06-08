@@ -32,7 +32,7 @@ import { useCreateQuoteSection } from "@/hooks/useQuoteSections";
 import { useCreateQuoteLine } from "@/hooks/useQuoteLines";
 import { useSearchQuoteSectionLibrary, useUpsertQuoteSectionLibrary } from "@/hooks/useQuoteSectionLibrary";
 import { useSearchQuoteLineLibrary, useUpsertQuoteLineLibrary } from "@/hooks/useQuoteLineLibrary";
-import { computeQuoteTotals, type QuoteLine } from "@/utils/quoteCalculations";
+import { computeQuoteTotals, computeLineTotals, type QuoteLine } from "@/utils/quoteCalculations";
 import { SectionTitleInput } from "./SectionTitleInput";
 import { LineLabelInput } from "./LineLabelInput";
 import { QuoteDisplay } from "@/components/ai/QuoteDisplay";
@@ -423,29 +423,35 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
             console.warn(`⚠️ Section sans titre ignorée: ${localSection.id}`);
             continue;
           }
-          
-          const dbSection = await createSection.mutateAsync({
-            quote_id: targetQuoteId,
-            title: localSection.title.trim(),
-            position: i,
-          });
+
+          const { data: dbSection, error: sectionInsertError } = await supabase
+            .from("quote_sections")
+            .insert({
+              quote_id: targetQuoteId,
+              company_id: companyId,
+              title: localSection.title.trim(),
+              position: i,
+            })
+            .select("id")
+            .single();
+
+          if (sectionInsertError) throw sectionInsertError;
+
           sectionMap.set(localSection.id, dbSection.id);
           sectionsCreated = true;
           console.log(`✅ Section créée: ${localSection.title} (temp: ${localSection.id}) -> DB UUID: ${dbSection.id}`);
         }
       } catch (sectionError: any) {
         console.error("❌ Erreur création sections:", sectionError);
-        // Si les sections ne peuvent pas être créées, on ne peut pas créer les lignes non plus
-        // (car les lignes ont besoin de section_id)
         if (sectionError.message?.includes("Could not find") || sectionError.code === "PGRST204" || sectionError.message?.includes("404")) {
-      toast({
+          toast({
             title: "⚠️ Tables manquantes",
             description: "Les tables quote_sections et quote_lines ne sont pas disponibles. Veuillez exécuter la migration SQL dans Supabase.",
-        variant: "destructive",
-      });
+            variant: "destructive",
+          });
           // On continue quand même pour sauvegarder le quote de base
         } else {
-          throw sectionError; // Propager les autres erreurs
+          throw sectionError; // Propager les autres erreurs (RLS, réseau, etc.)
         }
       }
 
@@ -472,6 +478,7 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       
       // Ensuite créer les lignes en DB (SEULEMENT si sections créées)
       let linesCreated = false;
+      const effectiveTvaRateForLines = tva293b ? 0 : tvaRate;
       if (sectionsCreated && localLines.length > 0) {
         try {
           let linePosition = 0;
@@ -490,15 +497,30 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               continue;
             }
 
-            await createLine.mutateAsync({
-              quote_id: targetQuoteId,
-              section_id: realSectionId, // UUID réel de la section créée en DB
-              label: localLine.label.trim(),
-              unit: localLine.unit || null,
-              quantity: localLine.quantity || null,
-              unit_price_ht: localLine.unit_price_ht || null,
-              position: linePosition++,
+            const lineTotals = computeLineTotals({
+              quantity: localLine.quantity ?? null,
+              unit_price_ht: localLine.unit_price_ht ?? null,
+              tva_rate: effectiveTvaRateForLines,
             });
+
+            const { error: lineInsertError } = await supabase
+              .from("quote_lines")
+              .insert({
+                quote_id: targetQuoteId,
+                company_id: companyId,
+                section_id: realSectionId,
+                label: localLine.label.trim(),
+                unit: localLine.unit || null,
+                quantity: localLine.quantity || null,
+                unit_price_ht: localLine.unit_price_ht || null,
+                position: linePosition++,
+                tva_rate: effectiveTvaRateForLines,
+                total_ht: lineTotals.total_ht,
+                total_tva: lineTotals.total_tva,
+                total_ttc: lineTotals.total_ttc,
+              });
+
+            if (lineInsertError) throw lineInsertError;
             linesCreated = true;
           }
           console.log(`✅ ${localLines.length} ligne(s) créée(s) avec mapping sections correct`);
@@ -510,6 +532,8 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               description: "La table quote_lines n'est pas disponible. Veuillez exécuter la migration SQL.",
               variant: "destructive",
             });
+          } else {
+            throw lineError; // Propager les autres erreurs (RLS, réseau, etc.)
           }
         }
       } else if (localLines.length > 0 && !sectionsCreated) {
@@ -646,8 +670,8 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
 
       // Invalider le cache pour forcer le rechargement des données DB
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["quote-sections", targetQuoteId] });
-      queryClient.invalidateQueries({ queryKey: ["quote-lines", targetQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["quote_sections", targetQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["quote_lines", targetQuoteId] });
 
       // Ouvrir l'aperçu après sauvegarde
       setIsPreviewOpen(true);
