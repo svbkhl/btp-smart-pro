@@ -542,58 +542,57 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
 
       const detailsPayload = quoteNote.trim() ? { note: quoteNote.trim() } : {};
 
-      // 4. Recalculer les totaux (sans RPC, calcul frontend + UPDATE)
-      // Si des lignes ont été créées, recalculer les totaux depuis les lignes
+      // 4. Recalculer les totaux — appels Supabase directs, pas de mutation hook
       if (linesCreated && localLines.length > 0) {
-        try {
-          // Calculer les totaux depuis les lignes locales
+        // Primaire : RPC serveur (SECURITY DEFINER, aucun problème de companyId)
+        const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
+          p_quote_id: targetQuoteId,
+        });
+
+        if (rpcError) {
+          // Fallback : calcul frontend + UPDATE direct sans filtre companyId (RLS protège)
+          console.warn("⚠️ RPC totaux échouée, fallback frontend:", rpcError);
           const linesForCalc = localLines.map(line => ({
             quantity: line.quantity ?? 0,
             unit_price_ht: line.unit_price_ht ?? 0,
-            tva_rate: tva293b ? 0 : tvaRate,
+            tva_rate: effectiveTvaRateForLines,
           }));
-          
           const totals = computeQuoteTotals(linesForCalc, tvaRate, tva293b);
-          
-          // Mettre à jour le devis avec les totaux calculés
-          await updateDetailedQuote.mutateAsync({
-            id: targetQuoteId,
-            subtotal_ht: totals.subtotal_ht,
-            total_tva: totals.total_tva,
-            total_ttc: totals.total_ttc,
-            details: detailsPayload,
-          });
-          
-          console.log("✅ Totaux recalculés et mis à jour:", totals);
-        } catch (calcError: any) {
-          console.warn("⚠️ Erreur recalcul totaux:", calcError);
-          // Essayer l'RPC en fallback si elle existe
-          try {
-            const { error: rpcError } = await supabase.rpc("recompute_quote_totals_with_293b", {
-              p_quote_id: targetQuoteId,
-            });
-            if (rpcError) {
-              console.warn("⚠️ RPC recompute aussi en erreur:", rpcError);
-            } else {
-              console.log("✅ Totaux recalculés via RPC");
-            }
-          } catch (rpcError: any) {
-            console.warn("⚠️ RPC n'existe pas ou erreur:", rpcError);
-          }
+          const { error: fallbackError } = await supabase
+            .from("ai_quotes")
+            .update({
+              subtotal_ht: totals.subtotal_ht,
+              total_tva: totals.total_tva,
+              total_ttc: totals.total_ttc,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", targetQuoteId);
+          if (fallbackError) throw new Error(`Impossible de mettre à jour les totaux : ${fallbackError.message}`);
+          console.log("✅ Totaux mis à jour via fallback frontend:", totals);
+        } else {
+          console.log("✅ Totaux recalculés via RPC");
+        }
+
+        // Mettre à jour le champ details séparément (le RPC ne le touche pas)
+        if (Object.keys(detailsPayload).length > 0) {
+          await supabase
+            .from("ai_quotes")
+            .update({ details: detailsPayload })
+            .eq("id", targetQuoteId);
         }
       } else {
-        // Pas de lignes, totaux à 0
-        try {
-          await updateDetailedQuote.mutateAsync({
-            id: targetQuoteId,
+        // Pas de lignes → totaux à 0, direct Supabase
+        const { error: zeroError } = await supabase
+          .from("ai_quotes")
+          .update({
             subtotal_ht: 0,
             total_tva: 0,
             total_ttc: 0,
             details: detailsPayload,
-          });
-        } catch (updateError: any) {
-          console.warn("⚠️ Erreur mise à jour totaux vides:", updateError);
-        }
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", targetQuoteId);
+        if (zeroError) throw new Error(`Erreur mise à jour totaux : ${zeroError.message}`);
       }
 
       // 5. Sauvegarder les préférences
