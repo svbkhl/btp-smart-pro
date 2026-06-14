@@ -572,40 +572,35 @@ export const useDeleteQuote = () => {
         .eq("company_id", companyId); // Filtrer par company_id pour isolation multi-tenant
 
       if (error) throw error;
-      
-      // Attendre un peu pour s'assurer que la suppression est complète
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       return id;
     },
     onMutate: async (deletedId) => {
       const validUuid = extractUUID(deletedId);
-      
+
       // Annuler les requêtes en cours
       await queryClient.cancelQueries({ queryKey: ["quotes", companyId] });
-      
-      // Sauvegarder les données actuelles
-      const previousQuotes = queryClient.getQueryData<Quote[]>(["quotes", companyId]);
-      
-      // Supprimer optimistiquement de la liste
-      if (previousQuotes) {
-        const filtered = previousQuotes.filter((quote: Quote) => {
+
+      // Sauvegarder toutes les entrées du cache correspondant au préfixe (fuzzy match)
+      // La clé réelle est ["quotes", companyId, isEmployee] — setQueryData exact rate serait raté
+      const previousQueriesData = queryClient.getQueriesData<Quote[]>({ queryKey: ["quotes", companyId] });
+
+      // Supprimer optimistiquement de TOUTES les variantes de la clé (["quotes", companyId, true/false])
+      queryClient.setQueriesData<Quote[]>({ queryKey: ["quotes", companyId] }, (old) => {
+        if (!old) return old;
+        return old.filter((quote: Quote) => {
           const quoteId = quote.id || "";
           const quoteUuid = extractUUID(quoteId);
           return quoteUuid !== validUuid && quoteId !== deletedId;
         });
-        
-        queryClient.setQueryData<Quote[]>(["quotes", companyId], filtered);
-        logger.debug("useDeleteQuote: Optimistic delete", { before: previousQuotes.length, after: filtered.length });
-      }
-      
+      });
+
       // Supprimer le cache du devis individuel
       queryClient.removeQueries({ queryKey: ["quote", deletedId, companyId] });
       if (validUuid && validUuid !== deletedId) {
         queryClient.removeQueries({ queryKey: ["quote", validUuid, companyId] });
       }
-      
-      return { previousQuotes };
+
+      return { previousQueriesData };
     },
     onSuccess: (_, deletedQuoteId) => {
       logger.info("useDeleteQuote: Quote deleted successfully", { deletedQuoteId });
@@ -616,9 +611,11 @@ export const useDeleteQuote = () => {
       });
     },
     onError: (error: any, _deletedId, context) => {
-      // Rollback en cas d'erreur
-      if (context?.previousQuotes) {
-        queryClient.setQueryData(["quotes", companyId], context.previousQuotes);
+      // Rollback en cas d'erreur — restaurer chaque entrée du cache sauvegardée
+      if (context?.previousQueriesData) {
+        context.previousQueriesData.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       
       toast({
@@ -696,6 +693,75 @@ export const useDeleteQuotesBulk = () => {
       toast({
         title: "Erreur",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+// Hook pour marquer un devis comme envoyé manuellement (envoi hors application)
+export const useMarkQuoteAsSent = () => {
+  const { user } = useAuth();
+  const { companyId } = useCompanyId();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("User not authenticated");
+      if (!companyId) throw new Error("No company_id available");
+
+      const validUuid = extractUUID(id);
+      if (!validUuid) throw new Error("Invalid quote ID format");
+
+      const { data, error } = await supabase
+        .from("ai_quotes")
+        .update({ status: "sent", sent_at: new Date().toISOString() })
+        .eq("id", validUuid)
+        .eq("company_id", companyId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Quote;
+    },
+    onMutate: async (id) => {
+      const validUuid = extractUUID(id);
+      await queryClient.cancelQueries({ queryKey: ["quotes", companyId] });
+
+      const previousQueriesData = queryClient.getQueriesData<Quote[]>({ queryKey: ["quotes", companyId] });
+
+      queryClient.setQueriesData<Quote[]>({ queryKey: ["quotes", companyId] }, (old) => {
+        if (!old) return old;
+        return old.map((q) =>
+          q.id === id || extractUUID(q.id) === validUuid
+            ? { ...q, status: "sent" as const, sent_at: new Date().toISOString() }
+            : q
+        );
+      });
+
+      return { previousQueriesData };
+    },
+    onSuccess: (updatedQuote) => {
+      queryClient.setQueriesData<Quote[]>({ queryKey: ["quotes", companyId] }, (old) => {
+        if (!old) return old;
+        return old.map((q) => q.id === updatedQuote.id ? updatedQuote : q);
+      });
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      toast({
+        title: "Devis marqué comme envoyé",
+        description: "Le statut a été mis à jour. Les relances automatiques sont activées.",
+      });
+    },
+    onError: (error: any, _id, context) => {
+      if (context?.previousQueriesData) {
+        context.previousQueriesData.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour le statut",
         variant: "destructive",
       });
     },
