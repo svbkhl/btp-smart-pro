@@ -424,18 +424,11 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
             continue;
           }
 
-          const { data: dbSection, error: sectionInsertError } = await supabase
-            .from("quote_sections")
-            .insert({
-              quote_id: targetQuoteId,
-              company_id: companyId,
-              title: localSection.title.trim(),
-              position: i,
-            })
-            .select("id")
-            .single();
-
-          if (sectionInsertError) throw sectionInsertError;
+          const dbSection = await createSection.mutateAsync({
+            quote_id: targetQuoteId,
+            title: localSection.title.trim(),
+            position: i,
+          });
 
           sectionMap.set(localSection.id, dbSection.id);
           sectionsCreated = true;
@@ -497,30 +490,16 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               continue;
             }
 
-            const lineTotals = computeLineTotals({
-              quantity: localLine.quantity ?? null,
-              unit_price_ht: localLine.unit_price_ht ?? null,
+            await createLine.mutateAsync({
+              quote_id: targetQuoteId,
+              section_id: realSectionId,
+              label: localLine.label.trim(),
+              unit: localLine.unit || undefined,
+              quantity: localLine.quantity || undefined,
+              unit_price_ht: localLine.unit_price_ht || undefined,
+              position: linePosition++,
               tva_rate: effectiveTvaRateForLines,
             });
-
-            const { error: lineInsertError } = await supabase
-              .from("quote_lines")
-              .insert({
-                quote_id: targetQuoteId,
-                company_id: companyId,
-                section_id: realSectionId,
-                label: localLine.label.trim(),
-                unit: localLine.unit || null,
-                quantity: localLine.quantity || null,
-                unit_price_ht: localLine.unit_price_ht || null,
-                position: linePosition++,
-                tva_rate: effectiveTvaRateForLines,
-                total_ht: lineTotals.total_ht,
-                total_tva: lineTotals.total_tva,
-                total_ttc: lineTotals.total_ttc,
-              });
-
-            if (lineInsertError) throw lineInsertError;
             linesCreated = true;
           }
           console.log(`✅ ${localLines.length} ligne(s) créée(s) avec mapping sections correct`);
