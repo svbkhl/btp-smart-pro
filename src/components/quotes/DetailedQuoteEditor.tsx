@@ -362,10 +362,15 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
 
       // 1. Créer ou mettre à jour le devis en DB
       let targetQuoteId: string;
+      // quoteCompanyId = company_id réel du devis en DB (set par trigger JWT côté serveur)
+      // On N'utilise PAS companyId du hook pour les INSERTs sections/lignes car il peut être
+      // null sur un appareil lent (React Query pas encore chargé) → bug 0€ chez Bechir
+      let quoteCompanyId: string;
 
       if (quoteId) {
         // UPDATE : devis existant — mettre à jour les métadonnées
         targetQuoteId = quoteId;
+        quoteCompanyId = companyId!;
         await supabase
           .from("ai_quotes")
           .update({
@@ -390,8 +395,10 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
           tva_non_applicable_293b: tva293b,
         });
         targetQuoteId = newQuote.id;
+        // Utiliser le company_id retourné par le DB (set par trigger JWT) — jamais null
+        quoteCompanyId = (newQuote as any).company_id || companyId!;
         setQuoteId(newQuote.id);
-        console.log("✅ [DetailedQuoteEditor] Devis créé:", newQuote.id);
+        console.log("✅ [DetailedQuoteEditor] Devis créé:", newQuote.id, "company_id:", quoteCompanyId);
       }
 
 
@@ -424,19 +431,24 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
             continue;
           }
 
-          const dbSection = await createSection.mutateAsync({
-            quote_id: targetQuoteId,
-            title: localSection.title.trim(),
-            position: i,
-          });
-
-          sectionMap.set(localSection.id, dbSection.id);
+          const { data: dbSection, error: sectionInsertError } = await supabase
+            .from("quote_sections")
+            .insert({
+              quote_id: targetQuoteId,
+              company_id: quoteCompanyId,
+              title: localSection.title.trim(),
+              position: i,
+            })
+            .select("id")
+            .single();
+          if (sectionInsertError) throw sectionInsertError;
+          sectionMap.set(localSection.id, dbSection!.id);
           sectionsCreated = true;
-          console.log(`✅ Section créée: ${localSection.title} (temp: ${localSection.id}) -> DB UUID: ${dbSection.id}`);
+          console.log(`✅ Section créée: ${localSection.title} (temp: ${localSection.id}) -> DB UUID: ${dbSection!.id}`);
         }
       } catch (sectionError: any) {
         console.error("❌ Erreur création sections:", sectionError);
-        if (sectionError.message?.includes("Could not find") || sectionError.code === "PGRST204" || sectionError.message?.includes("404")) {
+        if (sectionError.code === "PGRST204") {
           toast({
             title: "⚠️ Tables manquantes",
             description: "Les tables quote_sections et quote_lines ne sont pas disponibles. Veuillez exécuter la migration SQL dans Supabase.",
@@ -490,22 +502,34 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               continue;
             }
 
-            await createLine.mutateAsync({
-              quote_id: targetQuoteId,
-              section_id: realSectionId,
-              label: localLine.label.trim(),
-              unit: localLine.unit || undefined,
-              quantity: localLine.quantity || undefined,
-              unit_price_ht: localLine.unit_price_ht || undefined,
-              position: linePosition++,
-              tva_rate: effectiveTvaRateForLines,
-            });
+            const lineQty = localLine.quantity ?? 0;
+            const lineUnitPrice = localLine.unit_price_ht ?? 0;
+            const lineTotalHt = lineQty * lineUnitPrice;
+            const lineTotalTva = lineTotalHt * effectiveTvaRateForLines;
+            const lineTotalTtc = lineTotalHt + lineTotalTva;
+            const { error: lineInsertError } = await supabase
+              .from("quote_lines")
+              .insert({
+                quote_id: targetQuoteId,
+                section_id: realSectionId,
+                company_id: quoteCompanyId,
+                label: localLine.label.trim(),
+                unit: localLine.unit || null,
+                quantity: localLine.quantity ?? null,
+                unit_price_ht: localLine.unit_price_ht ?? null,
+                tva_rate: effectiveTvaRateForLines,
+                total_ht: lineTotalHt,
+                total_tva: lineTotalTva,
+                total_ttc: lineTotalTtc,
+                position: linePosition++,
+              });
+            if (lineInsertError) throw lineInsertError;
             linesCreated = true;
           }
           console.log(`✅ ${localLines.length} ligne(s) créée(s) avec mapping sections correct`);
         } catch (lineError: any) {
           console.error("❌ Erreur création lignes:", lineError);
-          if (lineError.message?.includes("Could not find") || lineError.code === "PGRST204" || lineError.message?.includes("404")) {
+          if (lineError.code === "PGRST204") {
             toast({
               title: "⚠️ Table quote_lines manquante",
               description: "La table quote_lines n'est pas disponible. Veuillez exécuter la migration SQL.",
