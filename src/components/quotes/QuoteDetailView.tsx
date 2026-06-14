@@ -4,17 +4,12 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   FileText,
   User,
-  Calendar,
-  DollarSign,
-  Mail,
-  Phone,
   MapPin,
   Download,
   Send,
@@ -330,209 +325,214 @@ export default function QuoteDetailView({
           {quote.signed && <TabsTrigger value="payment">Paiement</TabsTrigger>}
         </TabsList>
 
-        {/* Onglet Détails */}
-        <TabsContent value="details" className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Informations client */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Client
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Nom</p>
-                  <p className="font-semibold">{quote.client_name || 'Non spécifié'}</p>
+        {/* Onglet Détails — rendu complet du devis (même modèle que le post-save preview) */}
+        <TabsContent value="details">
+          <div className="bg-white text-black p-6 rounded-lg max-w-4xl mx-auto quote-display" id="quote-to-export">
+            {/* En-tête */}
+            <div className="mb-6 pb-6 border-b-2 border-gray-300">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  {userSettings?.company_logo_url && (
+                    <img src={userSettings.company_logo_url} alt="Logo" className="h-16 mb-4 object-contain" />
+                  )}
+                  <div className="space-y-1">
+                    <h1 className="text-2xl font-bold">{userSettings?.company_name || "Nom de l'entreprise"}</h1>
+                    {(userSettings?.address || userSettings?.postal_code || userSettings?.city) && (
+                      <p className="text-sm text-gray-600">
+                        {[userSettings.address, userSettings.postal_code && userSettings.city ? `${userSettings.postal_code} ${userSettings.city}` : userSettings.city || userSettings.postal_code].filter(Boolean).join(', ')}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
+                      {userSettings?.phone && <span>Tél: {userSettings.phone}</span>}
+                      {userSettings?.email && <span>Email: {userSettings.email}</span>}
+                    </div>
+                  </div>
                 </div>
-                {quote.client_email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${quote.client_email}`} className="text-sm text-blue-600 hover:underline">
-                      {quote.client_email}
-                    </a>
-                  </div>
-                )}
-                {quote.client_phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${quote.client_phone}`} className="text-sm text-blue-600 hover:underline">
-                      {quote.client_phone}
-                    </a>
-                  </div>
-                )}
-                {quote.client_address && (
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <p className="text-sm">{quote.client_address}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Informations financières */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Montant
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total TTC</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-primary">
-                    {formatCurrency(quoteTotals.total_ttc || quote.estimated_cost || 0, quote.currency)}
+                <div className="text-right">
+                  <h2 className="text-3xl font-bold mb-2">DEVIS</h2>
+                  {quote.quote_number && (
+                    <p className="text-sm text-gray-600">N° {quote.quote_number}</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-1">
+                    Date: {new Date(quote.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total HT</span>
-                  <span className="font-medium">
-                    {formatCurrency(quoteTotals.subtotal_ht || quote.estimated_cost || 0, quote.currency)}
-                  </span>
+              </div>
+            </div>
+
+            {/* Client */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Client
+              </h3>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="font-semibold text-lg">{quote.client_name || 'Non spécifié'}</p>
+                {(() => {
+                  const clientRecord = (clients as any[]).find((c: any) => c.id === quote.client_id);
+                  const location = quote.client_address || clientRecord?.location;
+                  const email = quote.client_email || clientRecord?.email;
+                  const phone = quote.client_phone || clientRecord?.phone;
+                  return (
+                    <>
+                      {location && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          <MapPin className="h-4 w-4 inline mr-1" />
+                          {location}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
+                        {email && <span>Email: {email}</span>}
+                        {phone && <span>Tél: {phone}</span>}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Sections et lignes */}
+            {sections.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-base font-semibold mb-3">Détail des prestations</h3>
+                <div className="space-y-6">
+                  {[...sections]
+                    .sort((a, b) => a.position - b.position)
+                    .map((section, sectionIdx) => {
+                      const sectionLines = lines
+                        .filter((line) => line.section_id === section.id)
+                        .sort((a, b) => a.position - b.position);
+                      if (sectionLines.length === 0) return null;
+                      const effectiveTvaRate = tva293b ? 0 : tvaRate;
+                      return (
+                        <div key={section.id}>
+                          <h4 className="font-semibold text-base mb-3 text-primary">
+                            {sectionIdx + 1}. {section.title}
+                          </h4>
+                          <div className="overflow-x-auto border border-white/20 rounded-lg">
+                            <table className="w-full text-sm">
+                              <thead className="bg-primary text-white">
+                                <tr>
+                                  <th className="text-left p-3">Désignation</th>
+                                  <th className="text-center p-3">Unité</th>
+                                  <th className="text-right p-3">Qté</th>
+                                  <th className="text-right p-3">Prix unit. HT</th>
+                                  <th className="text-right p-3">Prix HT</th>
+                                  {!tva293b && <th className="text-right p-3">TVA</th>}
+                                  <th className="text-right p-3">Total TTC</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sectionLines.map((line) => {
+                                  const lineHt = line.total_ht ?? ((line.quantity ?? 0) * (line.unit_price_ht ?? 0));
+                                  const lineTva = !tva293b ? lineHt * effectiveTvaRate : 0;
+                                  const lineTtc = lineHt + lineTva;
+                                  return (
+                                    <tr key={line.id} className="border-b hover:bg-gray-50">
+                                      <td className="p-3">{line.label}</td>
+                                      <td className="text-center p-3">{line.unit || "-"}</td>
+                                      <td className="text-right p-3">{(line.quantity ?? 0).toFixed(2)}</td>
+                                      <td className="text-right p-3">{(line.unit_price_ht ?? 0).toFixed(2)} €</td>
+                                      <td className="text-right p-3 font-medium">{lineHt.toFixed(2)} €</td>
+                                      {!tva293b && <td className="text-right p-3">{lineTva.toFixed(2)} €</td>}
+                                      <td className="text-right p-3 font-medium">{lineTtc.toFixed(2)} €</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
-                {!tva293b && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">TVA ({formatTvaRate(tvaRate)})</span>
-                    <span className="font-medium">
-                      {formatCurrency(quoteTotals.total_tva || 0, quote.currency)}
-                    </span>
-                  </div>
-                )}
-                {tva293b && (
-                  <div className="text-xs text-muted-foreground italic">
-                    TVA non applicable - Article 293 B du CGI
-                  </div>
-                )}
-                {quoteMode === "detailed" && (
-                  <div className="pt-2 border-t">
-                    <Badge variant="outline" className="text-xs">
-                      Mode détaillé
-                    </Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            )}
 
-          {/* Description / Note */}
-          {(quote.details?.description || quote.details?.note) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Description / Note
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {quote.details?.description && (
-                  <p className="text-sm whitespace-pre-wrap">{quote.details.description}</p>
-                )}
-                {quote.details?.note && (
-                  <p className="text-sm whitespace-pre-wrap mt-2">{quote.details.note}</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
+            {/* Note */}
+            {(quote.details?.description || quote.details?.note) && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm font-semibold mb-1 text-gray-700">Note</p>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                  {quote.details?.note || quote.details?.description}
+                </p>
+              </div>
+            )}
 
-          {/* Sections et lignes détaillées (mode detailed) */}
-          {quoteMode === "detailed" && !isReadOnly && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Sections et lignes du devis</CardTitle>
-                <CardDescription>
-                  Gérez les sections (corps de métier) et lignes détaillées avec quantités, unités et prix
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <QuoteSectionsEditor
-                  quoteId={quote.id}
-                  tvaRate={tvaRate}
-                  tva293b={tva293b}
-                  onTotalsChange={setQuoteTotals}
+            {/* Totaux */}
+            <div className="mb-6">
+              <div className="flex justify-end">
+                <div className="w-80">
+                  <table className="w-full border-collapse border">
+                    <tbody>
+                      <tr>
+                        <td className="border p-3 text-right">Total HT</td>
+                        <td className="border p-3 text-right font-medium">
+                          {quoteTotals.subtotal_ht.toFixed(2)} €
+                        </td>
+                      </tr>
+                      {!tva293b && (
+                        <tr>
+                          <td className="border p-3 text-right">TVA ({(tvaRate * 100).toFixed(0)}%)</td>
+                          <td className="border p-3 text-right">{quoteTotals.total_tva.toFixed(2)} €</td>
+                        </tr>
+                      )}
+                      {tva293b && (
+                        <tr>
+                          <td className="border p-3 text-right text-sm text-muted-foreground">
+                            TVA non applicable (Art. 293 B du CGI)
+                          </td>
+                          <td className="border p-3 text-right">0,00 €</td>
+                        </tr>
+                      )}
+                      <tr className="bg-primary/10">
+                        <td className="border p-3 text-right font-bold text-lg">Total à payer (TTC)</td>
+                        <td className="border p-3 text-right font-bold text-lg text-primary">
+                          {quoteTotals.total_ttc.toFixed(2)} €
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Pied de page */}
+            {(userSettings?.legal_form || userSettings?.siret || userSettings?.vat_number) && (
+              <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+                {[userSettings?.legal_form, userSettings?.siret && `SIRET: ${userSettings.siret}`, userSettings?.vat_number && `TVA: ${userSettings.vat_number}`].filter(Boolean).join(' — ')}
+              </div>
+            )}
+
+            {/* Signature électronique (si signée) */}
+            {isSigned && quote.signature_data && (
+              <div className="mt-6">
+                <SignatureDisplay
+                  signatureData={quote.signature_data}
+                  signerName={quote.signer_name}
+                  signedAt={quote.signed_at}
                 />
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            )}
 
-          {/* Affichage lignes en lecture seule (si signé) */}
-          {quoteMode === "detailed" && isReadOnly && lines.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Lignes du devis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {lines.map((line) => {
-                    const totals = computeQuoteTotals([line], tvaRate);
-                    return (
-                      <div key={line.id} className="p-4 bg-muted/50 rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold">{line.label}</p>
-                            {line.description && (
-                              <p className="text-sm text-muted-foreground mt-1">{line.description}</p>
-                            )}
-                            <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                              {line.quantity && line.unit && (
-                                <span>
-                                  {line.quantity} {line.unit}
-                                </span>
-                              )}
-                              {line.unit_price_ht && (
-                                <span>
-                                  {formatCurrency(line.unit_price_ht)} / {line.unit || "u"}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-primary">
-                              {formatCurrency(totals.total_ttc)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              HT: {formatCurrency(totals.subtotal_ht)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Détails des travaux (mode simple ou fallback) */}
-          {quoteMode === "simple" && quote.details?.workSteps && quote.details.workSteps.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Détails des prestations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {quote.details.workSteps.map((step: any, index: number) => (
-                    <div key={index} className="p-4 bg-muted/50 rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-semibold">{step.step || `Prestation ${index + 1}`}</p>
-                          {step.description && (
-                            <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
-                          )}
-                        </div>
-                        {step.cost && (
-                          <p className="font-bold text-primary">
-                            {formatCurrency(step.cost)}
-                          </p>
-                        )}
-                      </div>
+            {/* Bloc signature vierge (si pas encore signée) */}
+            {!isSigned && (
+              <div className="mt-8 pt-4 border-t-2 border-gray-300">
+                <div className="flex justify-between items-end">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600 mb-2">
+                      Devis reçu avant exécution des travaux, bon pour accord
+                    </p>
+                    <div className="mt-6">
+                      <p className="text-xs text-gray-600 border-t border-gray-300 pt-2 w-48">
+                        Signature et date
+                      </p>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* Onglet PDF */}
