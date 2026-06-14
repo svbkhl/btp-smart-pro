@@ -1432,96 +1432,161 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               <Eye className="w-4 h-4 text-primary" />
               <h3 className="font-semibold text-sm">Aperçu en direct</h3>
             </div>
-            <div className="bg-white text-black p-4 rounded-lg text-xs max-h-[80vh] overflow-y-auto">
-              {/* En-tête entreprise */}
-              <div className="mb-4 pb-4 border-b-2 border-gray-300">
+            <div className="bg-white text-black p-6 rounded-lg text-xs max-h-[80vh] overflow-y-auto quote-display">
+              {/* En-tête */}
+              <div className="mb-6 pb-6 border-b-2 border-gray-300">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1">
                     {companyInfo?.company_logo_url && (
-                      <img src={companyInfo.company_logo_url} alt="Logo" className="h-10 mb-2 object-contain" />
+                      <img src={companyInfo.company_logo_url} alt="Logo" className="h-16 mb-4 object-contain" />
                     )}
-                    <p className="font-bold text-sm">{companyInfo?.company_name || "Nom de l'entreprise"}</p>
-                    {(companyInfo?.address || companyInfo?.city) && (
-                      <p className="text-gray-600">{[companyInfo.address, companyInfo.city].filter(Boolean).join(", ")}</p>
-                    )}
-                    {companyInfo?.phone && <p className="text-gray-600">{companyInfo.phone}</p>}
+                    <div className="space-y-1">
+                      <h1 className="text-2xl font-bold">{companyInfo?.company_name || "Nom de l'entreprise"}</h1>
+                      {(companyInfo?.address || companyInfo?.postal_code || companyInfo?.city) && (
+                        <p className="text-sm text-gray-600">
+                          {[companyInfo.address, companyInfo.postal_code && companyInfo.city ? `${companyInfo.postal_code} ${companyInfo.city}` : companyInfo.city || companyInfo.postal_code].filter(Boolean).join(', ')}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
+                        {companyInfo?.phone && <span>Tél: {companyInfo.phone}</span>}
+                        {companyInfo?.email && <span>Email: {companyInfo.email}</span>}
+                      </div>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-base">DEVIS</p>
-                    <p className="text-gray-500">Date: {new Date().toLocaleDateString("fr-FR")}</p>
+                    <h2 className="text-3xl font-bold mb-2">DEVIS</h2>
+                    <p className="text-sm text-gray-600">Date: {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Client */}
-              <div className="mb-4 p-2 bg-gray-50 rounded">
-                <p className="font-semibold">{livePreviewData.client.name}</p>
-                {livePreviewData.client.location && <p className="text-gray-600">{livePreviewData.client.location}</p>}
-                {livePreviewData.client.email && <p className="text-gray-600">{livePreviewData.client.email}</p>}
+              {/* Informations client */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Client
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="font-semibold text-lg">{livePreviewData.client.name}</p>
+                  {livePreviewData.client.location && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      <MapPin className="h-4 w-4 inline mr-1" />
+                      {livePreviewData.client.location}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
+                    {livePreviewData.client.email && <span>Email: {livePreviewData.client.email}</span>}
+                    {(livePreviewData.client as any).phone && <span>Tél: {(livePreviewData.client as any).phone}</span>}
+                  </div>
+                </div>
               </div>
 
               {/* Sections et lignes */}
               {livePreviewData.sections.length > 0 && (
-                <div className="mb-4 space-y-3">
-                  {livePreviewData.sections.map((section, idx) => {
-                    const sLines = livePreviewData.lines.filter(l => l.section_id === section.id);
-                    if (sLines.length === 0 && !section.title) return null;
-                    return (
-                      <div key={section.id}>
-                        {section.title && (
-                          <p className="font-semibold text-xs mb-1 text-blue-700">{idx + 1}. {section.title}</p>
-                        )}
-                        {sLines.length > 0 && (
-                          <table className="w-full text-xs border-collapse">
-                            <thead>
-                              <tr className="bg-gray-100">
-                                <th className="text-left p-1 border">Désignation</th>
-                                <th className="text-center p-1 border">Qté</th>
-                                <th className="text-right p-1 border">P.U. HT</th>
-                                <th className="text-right p-1 border">Total HT</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sLines.map(line => {
-                                const total = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
-                                return (
-                                  <tr key={line.id} className={line.isDiscount ? "text-orange-600 bg-orange-50" : ""}>
-                                    <td className="p-1 border">{line.label || <span className="text-gray-400 italic">—</span>}</td>
-                                    <td className="text-center p-1 border">{line.isDiscount ? "1" : (line.quantity ?? "—")}</td>
-                                    <td className="text-right p-1 border">{(line.unit_price_ht ?? 0).toFixed(2)} €</td>
-                                    <td className="text-right p-1 border font-medium">{total.toFixed(2)} €</td>
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-3">Détail des prestations</h3>
+                  <div className="space-y-6">
+                    {livePreviewData.sections
+                      .sort((a, b) => a.position - b.position)
+                      .map((section, sectionIdx) => {
+                        const sectionLines = livePreviewData.lines
+                          .filter(l => l.section_id === section.id)
+                          .sort((a, b) => a.position - b.position);
+                        if (sectionLines.length === 0) return null;
+                        return (
+                          <div key={section.id}>
+                            <h4 className="font-semibold text-base mb-3 text-primary">
+                              {sectionIdx + 1}. {section.title}
+                            </h4>
+                            <div className="overflow-x-auto border border-white/20 dark:border-white/10 rounded-lg bg-transparent backdrop-blur-xl">
+                              <table className="w-full text-sm">
+                                <thead className="bg-primary text-white">
+                                  <tr>
+                                    <th className="text-left p-3">Désignation</th>
+                                    <th className="text-center p-3">Unité</th>
+                                    <th className="text-right p-3">Qté</th>
+                                    <th className="text-right p-3">Prix unit. HT</th>
+                                    <th className="text-right p-3">Prix HT</th>
+                                    {!tva293b && <th className="text-right p-3">TVA</th>}
+                                    <th className="text-right p-3">Total TTC</th>
                                   </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
-                    );
-                  })}
+                                </thead>
+                                <tbody>
+                                  {sectionLines.map(line => {
+                                    const lineHt = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
+                                    const lineTva = !tva293b ? lineHt * effectiveTvaRate : 0;
+                                    const lineTtc = lineHt + lineTva;
+                                    return (
+                                      <tr key={line.id} className="border-b hover:bg-gray-50">
+                                        <td className="p-3">{line.label}</td>
+                                        <td className="text-center p-3">{line.unit || "-"}</td>
+                                        <td className="text-right p-3">{(line.quantity ?? 0).toFixed(2)}</td>
+                                        <td className="text-right p-3">{(line.unit_price_ht ?? 0).toFixed(2)} €</td>
+                                        <td className="text-right p-3 font-medium">{lineHt.toFixed(2)} €</td>
+                                        {!tva293b && <td className="text-right p-3">{lineTva.toFixed(2)} €</td>}
+                                        <td className="text-right p-3 font-medium">{lineTtc.toFixed(2)} €</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               )}
 
               {/* Totaux */}
-              <div className="flex justify-end">
-                <table className="text-xs border-collapse w-48">
-                  <tbody>
-                    <tr>
-                      <td className="p-1 border text-right">Total HT</td>
-                      <td className="p-1 border text-right font-medium">{livePreviewData.totals.subtotal_ht.toFixed(2)} €</td>
-                    </tr>
-                    {!tva293b && (
-                      <tr>
-                        <td className="p-1 border text-right">TVA ({(effectiveTvaRate * 100).toFixed(0)}%)</td>
-                        <td className="p-1 border text-right">{livePreviewData.totals.total_tva.toFixed(2)} €</td>
-                      </tr>
-                    )}
-                    <tr className="bg-gray-100 font-bold">
-                      <td className="p-1 border text-right">Total TTC</td>
-                      <td className="p-1 border text-right text-blue-700">{livePreviewData.totals.total_ttc.toFixed(2)} €</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="mb-6">
+                <div className="flex justify-end">
+                  <div className="w-80">
+                    <table className="w-full border-collapse border">
+                      <tbody>
+                        <tr>
+                          <td className="border p-3 text-right">Total HT</td>
+                          <td className="border p-3 text-right font-medium">{livePreviewData.totals.subtotal_ht.toFixed(2)} €</td>
+                        </tr>
+                        {!tva293b && (
+                          <tr>
+                            <td className="border p-3 text-right">TVA ({effectiveTvaRate * 100}%)</td>
+                            <td className="border p-3 text-right">{livePreviewData.totals.total_tva.toFixed(2)} €</td>
+                          </tr>
+                        )}
+                        {tva293b && (
+                          <tr>
+                            <td className="border p-3 text-right text-sm text-muted-foreground">TVA non applicable (Art. 293 B du CGI)</td>
+                            <td className="border p-3 text-right">0,00 €</td>
+                          </tr>
+                        )}
+                        <tr className="bg-primary/10">
+                          <td className="border p-3 text-right font-bold text-lg">Total à payer (TTC)</td>
+                          <td className="border p-3 text-right font-bold text-lg text-primary">{livePreviewData.totals.total_ttc.toFixed(2)} €</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pied de page */}
+              {(companyInfo?.legal_form || companyInfo?.siret || companyInfo?.vat_number) && (
+                <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+                  {[companyInfo?.legal_form, companyInfo?.siret && `SIRET: ${companyInfo.siret}`, companyInfo?.vat_number && `TVA: ${companyInfo.vat_number}`].filter(Boolean).join(' — ')}
+                </div>
+              )}
+
+              {/* Signature */}
+              <div className="mt-8 pt-4 border-t-2 border-gray-300">
+                <div className="flex justify-between items-end">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600 mb-2">Devis reçu avant exécution des travaux, bon pour accord</p>
+                    <div className="mt-6">
+                      <p className="text-xs text-gray-600 border-t border-gray-300 pt-2 w-48">Signature et date</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </GlassCard>
