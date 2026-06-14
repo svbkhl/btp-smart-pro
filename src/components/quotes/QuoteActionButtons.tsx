@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Send, Edit, Mail, CheckCircle, Euro } from "lucide-react";
-import { Quote } from "@/hooks/useQuotes";
+import { Quote, useMarkQuoteAsSent } from "@/hooks/useQuotes";
 import { useToast } from "@/components/ui/use-toast";
 import { downloadQuotePDF } from "@/services/pdfService";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -60,6 +60,7 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, comp
   const [markingPaid, setMarkingPaid] = useState(false);
   const { data: emailStatus } = useQuoteEmailStatus(quote.id);
   const queryClient = useQueryClient();
+  const markAsSent = useMarkQuoteAsSent();
 
   const isPaid = quote.payment_status === "paid" || quote.status === "paid";
 
@@ -187,6 +188,19 @@ export const QuoteActionButtons = ({ quote, onEdit, onSend, onSendToClient, comp
         <Button variant="outline" size="sm" onClick={onSend} className="gap-2">
           <Send className="w-4 h-4" />
           Envoyer
+        </Button>
+      )}
+
+      {quote.status === "draft" && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => markAsSent.mutate(quote.id)}
+          disabled={markAsSent.isPending}
+          className="gap-2 text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-950/30"
+        >
+          <CheckCircle className="w-4 h-4" />
+          {markAsSent.isPending ? "..." : "Marquer envoyé"}
         </Button>
       )}
 
