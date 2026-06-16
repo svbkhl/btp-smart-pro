@@ -422,16 +422,18 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       }
       
       // Ensuite créer les sections en DB (OBLIGATOIRE avant les lignes)
+      // Valider que toutes les sections ont un titre
+      const untitledSections = localSections.filter(s => !s.title.trim());
+      if (untitledSections.length > 0) {
+        throw new Error(`${untitledSections.length === 1 ? "Une section n'a pas de titre" : `${untitledSections.length} sections n'ont pas de titre`}. Veuillez renseigner tous les titres de section.`);
+      }
+
       let sectionsCreated = false;
       try {
         for (let i = 0; i < localSections.length; i++) {
           const localSection = localSections[i];
-          if (!localSection.title.trim()) {
-            console.warn(`⚠️ Section sans titre ignorée: ${localSection.id}`);
-            continue;
-          }
 
-          const { data: dbSection, error: sectionInsertError } = await supabase
+          const { data: insertedSections, error: sectionInsertError } = await supabase
             .from("quote_sections")
             .insert({
               quote_id: targetQuoteId,
@@ -439,9 +441,12 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               title: localSection.title.trim(),
               position: i,
             })
-            .select("id")
-            .single();
+            .select("id");
           if (sectionInsertError) throw sectionInsertError;
+          if (!insertedSections || insertedSections.length === 0) {
+            throw new Error("Section non insérée (0 lignes retournées). Vérifiez les permissions.");
+          }
+          const dbSection = insertedSections[0];
           sectionMap.set(localSection.id, dbSection!.id);
           sectionsCreated = true;
           console.log(`✅ Section créée: ${localSection.title} (temp: ${localSection.id}) -> DB UUID: ${dbSection!.id}`);
