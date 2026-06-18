@@ -577,16 +577,15 @@ export const useDeleteQuote = () => {
     onMutate: async (deletedId) => {
       const validUuid = extractUUID(deletedId);
 
-      // Annuler les requêtes en cours
-      await queryClient.cancelQueries({ queryKey: ["quotes", companyId] });
+      // Annuler toutes les requêtes quotes en cours (préfixe large)
+      await queryClient.cancelQueries({ queryKey: ["quotes"] });
 
-      // Sauvegarder toutes les entrées du cache correspondant au préfixe (fuzzy match)
-      // La clé réelle est ["quotes", companyId, isEmployee] — setQueryData exact rate serait raté
-      const previousQueriesData = queryClient.getQueriesData<Quote[]>({ queryKey: ["quotes", companyId] });
+      // Sauvegarder toutes les entrées du cache pour rollback
+      const previousQueriesData = queryClient.getQueriesData<Quote[]>({ queryKey: ["quotes"] });
 
-      // Supprimer optimistiquement de TOUTES les variantes de la clé (["quotes", companyId, true/false])
-      queryClient.setQueriesData<Quote[]>({ queryKey: ["quotes", companyId] }, (old) => {
-        if (!old) return old;
+      // Supprimer optimistiquement de TOUTES les variantes ["quotes", *, *]
+      queryClient.setQueriesData<Quote[]>({ queryKey: ["quotes"] }, (old) => {
+        if (!Array.isArray(old)) return old;
         return old.filter((quote: Quote) => {
           const quoteId = quote.id || "";
           const quoteUuid = extractUUID(quoteId);
@@ -595,16 +594,17 @@ export const useDeleteQuote = () => {
       });
 
       // Supprimer le cache du devis individuel
-      queryClient.removeQueries({ queryKey: ["quote", deletedId, companyId] });
+      queryClient.removeQueries({ queryKey: ["quote", deletedId] });
       if (validUuid && validUuid !== deletedId) {
-        queryClient.removeQueries({ queryKey: ["quote", validUuid, companyId] });
+        queryClient.removeQueries({ queryKey: ["quote", validUuid] });
       }
 
       return { previousQueriesData };
     },
     onSuccess: (_, deletedQuoteId) => {
       logger.info("useDeleteQuote: Quote deleted successfully", { deletedQuoteId });
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      // refetchType: "none" — l'update optimiste est déjà appliqué, on marque juste stale
+      queryClient.invalidateQueries({ queryKey: ["quotes"], refetchType: "none" });
       toast({
         title: "Devis supprimé",
         description: "Le devis a été supprimé définitivement.",
@@ -767,4 +767,5 @@ export const useMarkQuoteAsSent = () => {
     },
   });
 };
+
 
