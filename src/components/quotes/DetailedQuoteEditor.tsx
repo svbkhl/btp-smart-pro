@@ -435,12 +435,6 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
       }
       
       // Ensuite créer les sections en DB (OBLIGATOIRE avant les lignes)
-      // Valider que toutes les sections ont un titre
-      const untitledSections = localSections.filter(s => !s.title.trim());
-      if (untitledSections.length > 0) {
-        throw new Error(`${untitledSections.length === 1 ? "Une section n'a pas de titre" : `${untitledSections.length} sections n'ont pas de titre`}. Veuillez renseigner tous les titres de section.`);
-      }
-
       let sectionsCreated = false;
       try {
         for (let i = 0; i < localSections.length; i++) {
