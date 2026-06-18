@@ -353,6 +353,19 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
         throw new Error("Client introuvable");
       }
 
+      // Valider les titres de sections AVANT toute création en DB (évite les devis orphelins 0€)
+      const untitledSections = localSections.filter(s => !s.title.trim());
+      if (untitledSections.length > 0) {
+        toast({
+          title: "Titre manquant",
+          description: untitledSections.length === 1
+            ? "Une section n'a pas de titre. Remplissez le titre avant de sauvegarder."
+            : `${untitledSections.length} sections n'ont pas de titre. Remplissez tous les titres avant de sauvegarder.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       console.log("🔧 [DetailedQuoteEditor] Sauvegarde devis détaillé:", {
         mode: quoteId ? "UPDATE" : "CREATE",
         client_id: clientId,
