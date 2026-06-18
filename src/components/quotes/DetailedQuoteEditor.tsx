@@ -1468,60 +1468,43 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
               <Eye className="w-4 h-4 text-primary" />
               <h3 className="font-semibold text-sm">Aperçu en direct</h3>
             </div>
-            <div className="bg-white text-black p-6 rounded-lg text-xs max-h-[80vh] overflow-y-auto quote-display">
-              {/* En-tête */}
-              <div className="mb-6 pb-6 border-b-2 border-gray-300">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
+            <div className="bg-white text-black rounded-lg text-xs max-h-[80vh] overflow-y-auto quote-display" style={{fontFamily:"sans-serif"}}>
+              {/* Bannière navy Eau'pération */}
+              <div style={{background:"#1B3A5C",padding:"12px 16px",position:"relative",borderTop:"3px solid #E0342B"}}>
+                <div style={{borderTop:"2px solid #2BB7C6",position:"absolute",top:0,left:0,right:0}} />
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
                     {companyInfo?.company_logo_url && (
-                      <img src={companyInfo.company_logo_url} alt="Logo" className="h-16 mb-4 object-contain" />
+                      <img src={companyInfo.company_logo_url} alt="Logo" style={{height:"40px",objectFit:"contain",background:"white",borderRadius:"4px",padding:"2px"}} />
                     )}
-                    <div className="space-y-1">
-                      <h1 className="text-2xl font-bold">{companyInfo?.company_name || "Nom de l'entreprise"}</h1>
-                      {(companyInfo?.address || companyInfo?.postal_code || companyInfo?.city) && (
-                        <p className="text-sm text-gray-600">
-                          {[companyInfo.address, companyInfo.postal_code && companyInfo.city ? `${companyInfo.postal_code} ${companyInfo.city}` : companyInfo.city || companyInfo.postal_code].filter(Boolean).join(', ')}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
-                        {companyInfo?.phone && <span>Tél: {companyInfo.phone}</span>}
-                        {companyInfo?.email && <span>Email: {companyInfo.email}</span>}
-                      </div>
+                    <div>
+                      <p style={{color:"white",fontWeight:"bold",fontSize:"13px",margin:0}}>{companyInfo?.company_name || "Eau'pération Sanitaire"}</p>
+                      {companyInfo?.phone && <p style={{color:"#2BB7C6",fontSize:"10px",margin:"1px 0"}}>{companyInfo.phone}</p>}
+                      {companyInfo?.city && <p style={{color:"#aac4d8",fontSize:"9px",margin:0}}>Plombier — {companyInfo.city}</p>}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <h2 className="text-3xl font-bold mb-2">DEVIS</h2>
-                    <p className="text-sm text-gray-600">Date: {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  <div style={{textAlign:"right"}}>
+                    <p style={{color:"white",fontWeight:"bold",fontSize:"20px",margin:0,letterSpacing:"2px"}}>DEVIS</p>
+                    <p style={{color:"#aac4d8",fontSize:"9px",margin:"2px 0 0"}}>{new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</p>
                   </div>
                 </div>
+                {/* Liseré rouge bas */}
+                <div style={{position:"absolute",bottom:0,right:0,width:"6px",top:0,background:"#E0342B"}} />
               </div>
 
-              {/* Informations client */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Client
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="font-semibold text-lg">{livePreviewData.client.name}</p>
-                  {livePreviewData.client.location && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      <MapPin className="h-4 w-4 inline mr-1" />
-                      {livePreviewData.client.location}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
-                    {livePreviewData.client.email && <span>Email: {livePreviewData.client.email}</span>}
-                    {(livePreviewData.client as any).phone && <span>Tél: {(livePreviewData.client as any).phone}</span>}
-                  </div>
+              <div style={{padding:"12px 16px"}}>
+                {/* Bloc client */}
+                <div style={{background:"#F4F6F9",borderRadius:"6px",padding:"10px 12px",marginBottom:"12px",borderLeft:"3px solid #2BB7C6"}}>
+                  <p style={{color:"#6b7785",fontSize:"9px",fontWeight:"bold",letterSpacing:"1px",marginBottom:"4px"}}>CLIENT</p>
+                  <p style={{fontWeight:"bold",fontSize:"11px",color:"#1f2a37",margin:"0 0 2px"}}>{livePreviewData.client.name}</p>
+                  {livePreviewData.client.location && <p style={{color:"#6b7785",fontSize:"9px",margin:"1px 0"}}>{livePreviewData.client.location}</p>}
+                  {livePreviewData.client.email && <p style={{color:"#6b7785",fontSize:"9px",margin:"1px 0"}}>{livePreviewData.client.email}</p>}
+                  {(livePreviewData.client as any).phone && <p style={{color:"#6b7785",fontSize:"9px",margin:"1px 0"}}>Tél. {(livePreviewData.client as any).phone}</p>}
                 </div>
-              </div>
 
-              {/* Sections et lignes */}
-              {livePreviewData.sections.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-base font-semibold mb-3">Détail des prestations</h3>
-                  <div className="space-y-6">
+                {/* Sections et lignes */}
+                {livePreviewData.sections.length > 0 && (
+                  <div style={{marginBottom:"12px"}}>
                     {livePreviewData.sections
                       .sort((a, b) => a.position - b.position)
                       .map((section, sectionIdx) => {
@@ -1530,99 +1513,100 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
                           .sort((a, b) => a.position - b.position);
                         if (sectionLines.length === 0) return null;
                         return (
-                          <div key={section.id}>
-                            <h4 className="font-semibold text-base mb-3 text-primary">
-                              {sectionIdx + 1}. {section.title}
-                            </h4>
-                            <div className="overflow-x-auto border border-white/20 dark:border-white/10 rounded-lg bg-transparent backdrop-blur-xl">
-                              <table className="w-full text-sm">
-                                <thead className="bg-primary text-white">
-                                  <tr>
-                                    <th className="text-left p-3">Désignation</th>
-                                    <th className="text-center p-3">Unité</th>
-                                    <th className="text-right p-3">Qté</th>
-                                    <th className="text-right p-3">Prix unit. HT</th>
-                                    <th className="text-right p-3">Prix HT</th>
-                                    {!tva293b && <th className="text-right p-3">TVA</th>}
-                                    <th className="text-right p-3">Total TTC</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {sectionLines.map(line => {
-                                    const lineHt = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
-                                    const lineTva = !tva293b ? lineHt * effectiveTvaRate : 0;
-                                    const lineTtc = lineHt + lineTva;
-                                    return (
-                                      <tr key={line.id} className="border-b hover:bg-gray-50">
-                                        <td className="p-3">{line.label}</td>
-                                        <td className="text-center p-3">{line.unit || "-"}</td>
-                                        <td className="text-right p-3">{(line.quantity ?? 0).toFixed(2)}</td>
-                                        <td className="text-right p-3">{(line.unit_price_ht ?? 0).toFixed(2)} €</td>
-                                        <td className="text-right p-3 font-medium">{lineHt.toFixed(2)} €</td>
-                                        {!tva293b && <td className="text-right p-3">{lineTva.toFixed(2)} €</td>}
-                                        <td className="text-right p-3 font-medium">{lineTtc.toFixed(2)} €</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                          <div key={section.id} style={{marginBottom:"10px"}}>
+                            {/* En-tête section navy */}
+                            <div style={{background:"#1B3A5C",padding:"5px 8px",display:"flex",alignItems:"center",gap:"4px"}}>
+                              <div style={{width:"3px",height:"12px",background:"#E0342B",flexShrink:0}} />
+                              <span style={{color:"white",fontWeight:"bold",fontSize:"9px",letterSpacing:"0.5px"}}>{sectionIdx + 1}. {section.title.toUpperCase()}</span>
                             </div>
+                            {/* En-tête colonnes */}
+                            <div style={{display:"grid",gridTemplateColumns:"1fr 40px 40px 55px 55px" + (!tva293b ? " 45px" : "") + " 55px",background:"#0F2438",padding:"3px 8px",gap:"4px"}}>
+                              {["DÉSIGNATION","UNITÉ","QTÉ","PRIX HT","TOTAL HT",...(!tva293b?["TVA"]:[]),"TOTAL TTC"].map((h,i) => (
+                                <span key={i} style={{color:"#aac4d8",fontSize:"7px",fontWeight:"bold",textAlign:i===0?"left":"right"}}>{h}</span>
+                              ))}
+                            </div>
+                            {/* Lignes */}
+                            {sectionLines.map((line, li) => {
+                              const lineHt = (line.quantity ?? 0) * (line.unit_price_ht ?? 0);
+                              const lineTva = !tva293b ? lineHt * effectiveTvaRate : 0;
+                              const lineTtc = lineHt + lineTva;
+                              return (
+                                <div key={line.id} style={{display:"grid",gridTemplateColumns:"1fr 40px 40px 55px 55px" + (!tva293b ? " 45px" : "") + " 55px",padding:"4px 8px",gap:"4px",background:li%2===0?"#F4F6F9":"white",borderBottom:"1px solid #e6eaef"}}>
+                                  <span style={{color:"#1f2a37",fontSize:"8px"}}>{line.label}</span>
+                                  <span style={{color:"#6b7785",fontSize:"8px",textAlign:"right"}}>{line.unit || "-"}</span>
+                                  <span style={{color:"#6b7785",fontSize:"8px",textAlign:"right"}}>{(line.quantity ?? 0).toFixed(2)}</span>
+                                  <span style={{color:"#6b7785",fontSize:"8px",textAlign:"right"}}>{(line.unit_price_ht ?? 0).toFixed(2)} €</span>
+                                  <span style={{color:"#1f2a37",fontSize:"8px",fontWeight:"500",textAlign:"right"}}>{lineHt.toFixed(2)} €</span>
+                                  {!tva293b && <span style={{color:"#6b7785",fontSize:"8px",textAlign:"right"}}>{lineTva.toFixed(2)} €</span>}
+                                  <span style={{color:"#1B3A5C",fontSize:"8px",fontWeight:"bold",textAlign:"right"}}>{lineTtc.toFixed(2)} €</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Totaux */}
-              <div className="mb-6">
-                <div className="flex justify-end">
-                  <div className="w-80">
-                    <table className="w-full border-collapse border">
-                      <tbody>
-                        <tr>
-                          <td className="border p-3 text-right">Total HT</td>
-                          <td className="border p-3 text-right font-medium">{livePreviewData.totals.subtotal_ht.toFixed(2)} €</td>
-                        </tr>
-                        {!tva293b && (
-                          <tr>
-                            <td className="border p-3 text-right">TVA ({effectiveTvaRate * 100}%)</td>
-                            <td className="border p-3 text-right">{livePreviewData.totals.total_tva.toFixed(2)} €</td>
-                          </tr>
-                        )}
-                        {tva293b && (
-                          <tr>
-                            <td className="border p-3 text-right text-sm text-muted-foreground">TVA non applicable (Art. 293 B du CGI)</td>
-                            <td className="border p-3 text-right">0,00 €</td>
-                          </tr>
-                        )}
-                        <tr className="bg-primary/10">
-                          <td className="border p-3 text-right font-bold text-lg">Total à payer (TTC)</td>
-                          <td className="border p-3 text-right font-bold text-lg text-primary">{livePreviewData.totals.total_ttc.toFixed(2)} €</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {/* Totaux — boîte navy à droite */}
+                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:"12px"}}>
+                  <div style={{background:"#1B3A5C",borderRadius:"6px",padding:"10px 14px",minWidth:"180px",borderLeft:"3px solid #E0342B"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:"24px",marginBottom:"4px"}}>
+                      <span style={{color:"#aac4d8",fontSize:"9px"}}>Total HT</span>
+                      <span style={{color:"white",fontSize:"9px"}}>{livePreviewData.totals.subtotal_ht.toFixed(2)} €</span>
+                    </div>
+                    {!tva293b ? (
+                      <div style={{display:"flex",justifyContent:"space-between",gap:"24px",marginBottom:"4px"}}>
+                        <span style={{color:"#aac4d8",fontSize:"9px"}}>TVA {(effectiveTvaRate*100).toFixed(0)}%</span>
+                        <span style={{color:"white",fontSize:"9px"}}>{livePreviewData.totals.total_tva.toFixed(2)} €</span>
+                      </div>
+                    ) : (
+                      <div style={{marginBottom:"4px"}}>
+                        <span style={{color:"#aac4d8",fontSize:"8px"}}>TVA non applicable (Art. 293 B)</span>
+                      </div>
+                    )}
+                    <div style={{borderTop:"1px solid #2BB7C6",paddingTop:"6px",display:"flex",justifyContent:"space-between",gap:"24px"}}>
+                      <span style={{color:"white",fontSize:"10px",fontWeight:"bold"}}>TOTAL TTC</span>
+                      <span style={{color:"#2BB7C6",fontSize:"11px",fontWeight:"bold"}}>{livePreviewData.totals.total_ttc.toFixed(2)} €</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conditions de règlement */}
+                <div style={{background:"#F4F6F9",borderRadius:"6px",padding:"8px 10px",marginBottom:"12px",borderLeft:"3px solid #E0342B"}}>
+                  <p style={{color:"#1B3A5C",fontWeight:"bold",fontSize:"8px",letterSpacing:"0.5px",marginBottom:"6px"}}>CONDITIONS DE RÈGLEMENT</p>
+                  {["Acompte matériel : la totalité du matériel est réglée à la commande, avant le début des travaux.","Solde : le solde des travaux est réglé à la livraison, en fin de chantier."].map((c,i) => (
+                    <div key={i} style={{display:"flex",gap:"6px",marginBottom:"3px"}}>
+                      <span style={{color:"#E0342B",fontSize:"8px",flexShrink:0}}>•</span>
+                      <span style={{color:"#1f2a37",fontSize:"8px"}}>{c}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Carrés de signatures */}
+                <div style={{display:"flex",gap:"12px",marginTop:"8px"}}>
+                  <div style={{flex:1,border:"1px solid #e6eaef",borderRadius:"6px",padding:"8px",minHeight:"70px"}}>
+                    <p style={{color:"#1B3A5C",fontSize:"8px",fontWeight:"bold",marginBottom:"4px",borderBottom:"1px solid #e6eaef",paddingBottom:"3px"}}>BON POUR ACCORD — CLIENT</p>
+                    <p style={{color:"#6b7785",fontSize:"7px",marginBottom:"2px"}}>Devis reçu avant exécution des travaux</p>
+                    <p style={{color:"#6b7785",fontSize:"7px"}}>Lu et approuvé — Signature précédée de la mention</p>
+                    <div style={{marginTop:"20px",borderTop:"1px solid #1B3A5C",paddingTop:"2px"}}>
+                      <span style={{color:"#6b7785",fontSize:"7px"}}>Signature et date</span>
+                    </div>
+                  </div>
+                  <div style={{flex:1,border:"1px solid #e6eaef",borderRadius:"6px",padding:"8px",minHeight:"70px"}}>
+                    <p style={{color:"#1B3A5C",fontSize:"8px",fontWeight:"bold",marginBottom:"4px",borderBottom:"1px solid #e6eaef",paddingBottom:"3px"}}>CACHET ET SIGNATURE — ENTREPRISE</p>
+                    <div style={{marginTop:"20px",borderTop:"1px solid #1B3A5C",paddingTop:"2px"}}>
+                      <span style={{color:"#6b7785",fontSize:"7px"}}>{companyInfo?.company_name || "Eau'pération Sanitaire"}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Pied de page */}
-              {(companyInfo?.legal_form || companyInfo?.siret || companyInfo?.vat_number) && (
-                <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
-                  {[companyInfo?.legal_form, companyInfo?.siret && `SIRET: ${companyInfo.siret}`, companyInfo?.vat_number && `TVA: ${companyInfo.vat_number}`].filter(Boolean).join(' — ')}
-                </div>
-              )}
-
-              {/* Signature */}
-              <div className="mt-8 pt-4 border-t-2 border-gray-300">
-                <div className="flex justify-between items-end">
-                  <div className="flex-1">
-                    <p className="text-xs text-gray-600 mb-2">Devis reçu avant exécution des travaux, bon pour accord</p>
-                    <div className="mt-6">
-                      <p className="text-xs text-gray-600 border-t border-gray-300 pt-2 w-48">Signature et date</p>
-                    </div>
-                  </div>
-                </div>
+              {/* Pied de page navy */}
+              <div style={{background:"#0F2438",padding:"6px 16px",borderTop:"2px solid #2BB7C6",textAlign:"center"}}>
+                <p style={{color:"#aac4d8",fontSize:"8px",margin:0}}>
+                  {[companyInfo?.company_name,companyInfo?.siret&&`SIRET ${companyInfo.siret}`,companyInfo?.email].filter(Boolean).join(" · ")}
+                </p>
               </div>
             </div>
           </GlassCard>
