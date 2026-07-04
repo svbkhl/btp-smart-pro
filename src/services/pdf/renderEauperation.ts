@@ -452,7 +452,7 @@ export async function renderEauperation(
   y = renderConditions(doc, y, fontsOk);
 
   // ── Signature (devis seulement) ────────────────────────────────────────────
-  if (params.mode === "devis" && (params.signatureData || params.signedBy)) {
+  if (params.mode === "devis") {
     y = await renderSignature(doc, params, y, fontsOk);
   }
 
@@ -810,27 +810,52 @@ async function renderSignature(
   yStart: number,
   fontsOk: boolean
 ): Promise<number> {
-  const C    = eauperationTheme.colors;
+  const C     = eauperationTheme.colors;
   const bFont = fontsOk ? "Manrope" : "helvetica";
+  const tFont = fontsOk ? "Archivo" : "helvetica";
   let y = yStart + 6;
 
   if (y > A4.h - A4.my - 55) { doc.addPage(); y = A4.my; }
 
-  if (params.signatureData) {
-    try {
-      const sImg = await loadImg(params.signatureData);
-      const sh = 20;
-      const sw = (sImg.width / sImg.height) * sh;
-      doc.addImage(sImg, "PNG", A4.mx, y, sw, sh);
-      y += sh + 5;
-    } catch { /* skip */ }
+  const isSigned = Boolean(params.signatureData || params.signedBy);
+
+  if (isSigned) {
+    if (params.signatureData) {
+      try {
+        const sImg = await loadImg(params.signatureData);
+        const sh = 20;
+        const sw = (sImg.width / sImg.height) * sh;
+        doc.addImage(sImg, "PNG", A4.mx, y, sw, sh);
+        y += sh + 5;
+      } catch { /* skip */ }
+    }
+
+    doc.setFont(bFont, "normal");
+    doc.setFontSize(8.5);
+    tx(doc, C.muted);
+    if (params.signedBy)  { doc.text(`Signé par : ${params.signedBy}`, A4.mx, y); y += 4.5; }
+    if (params.signedAt)  { doc.text(`Le : ${params.signedAt}`,         A4.mx, y); y += 4.5; }
+
+    return y;
   }
 
-  doc.setFont(bFont, "normal");
+  // Devis non signé : carré à signer (signature manuscrite / impression papier)
+  doc.setFont(tFont, "bold");
   doc.setFontSize(8.5);
+  tx(doc, C.primary);
+  doc.text("BON POUR ACCORD", A4.mx, y);
+  y += 4;
+
+  doc.setFont(bFont, "normal");
+  doc.setFontSize(7.5);
   tx(doc, C.muted);
-  if (params.signedBy)  { doc.text(`Signé par : ${params.signedBy}`, A4.mx, y); y += 4.5; }
-  if (params.signedAt)  { doc.text(`Le : ${params.signedAt}`,         A4.mx, y); y += 4.5; }
+  doc.text("Date et signature précédée de la mention « Lu et approuvé, bon pour accord »", A4.mx, y);
+  y += 6;
+
+  dx(doc, C.line);
+  doc.setLineWidth(0.3);
+  doc.rect(A4.mx, y, 80, 25);
+  y += 30;
 
   return y;
 }
