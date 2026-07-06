@@ -50,6 +50,7 @@ const Analytics = lazy(() => import('./pages/Analytics'));
 const TextLibrary = lazy(() => import('./pages/TextLibrary'));
 const PaymentReminders = lazy(() => import('./pages/PaymentReminders'));
 const AIInsights = lazy(() => import('./pages/AIInsights'));
+const Agents = lazy(() => import('./pages/Agents'));
 const Settings = lazy(() => import('./pages/Settings'));
 const GoogleCalendarIntegration = lazy(() =>
   import('./pages/GoogleCalendarIntegration').then(m => ({ default: m.GoogleCalendarIntegration }))
@@ -167,6 +168,7 @@ function App() {
           <Route path="/text-library" element={<ProtectedRoute><TextLibrary /></ProtectedRoute>} />
           <Route path="/payment-reminders" element={<ProtectedRoute><PaymentReminders /></ProtectedRoute>} />
           <Route path="/ai-insights" element={<ProtectedRoute><AIInsights /></ProtectedRoute>} />
+          <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/settings/integrations/google" element={<ProtectedRoute><GoogleCalendarIntegration /></ProtectedRoute>} />
           <Route path="/clients-quotes" element={<ProtectedRoute><ClientsAndQuotes /></ProtectedRoute>} />
           <Route path="/employees-rh" element={<ProtectedRoute><EmployeesAndRH /></ProtectedRoute>} />

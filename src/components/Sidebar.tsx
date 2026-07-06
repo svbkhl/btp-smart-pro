@@ -10,6 +10,7 @@ import {
   CalendarDays,
   Mail,
   Brain,
+  Bot,
   Settings,
   BarChart3,
   BookText,
@@ -105,6 +106,8 @@ const baseMenuGroups: Array<{ items: Array<MenuItem & { feature?: string | null;
     items: [
       // 7️⃣ IA (nécessite la permission ai.access)
       { icon: Brain, label: "IA", path: "/ai", feature: "ia_assistant", employeeAccess: true, requiredPermission: "ai.access" },
+      // 7️⃣bis Agents IA — automatisations (mêmes conditions d'accès que IA)
+      { icon: Bot, label: "Agents IA", path: "/agents", feature: "ia_assistant", employeeAccess: false, requiredPermission: "ai.access" },
     ],
   },
   {
