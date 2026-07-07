@@ -50,4 +50,5 @@ export const EAUPERATION_HEADER = {
  * (devis + factures). Laisser une chaîne vide masque la ligne.
  * Remplacer par : "Assurance décennale : <ASSUREUR> — contrat n° <NUMERO>".
  */
-export const EAUPERATION_DECENNALE = "";
+export const EAUPERATION_DECENNALE =
+  "Assurance décennale : ERGO (distribuée par Solly Azar) — Contrat n° 0090000835 — Activité couverte : 5.1";
