@@ -16,6 +16,7 @@ import { formatClientBlock, clientRowToBlockInput } from "@/utils/formatClientBl
 import {
   EAUPERATION_LOGO_URL,
   EAUPERATION_HEADER,
+  EAUPERATION_DECENNALE,
   eauperationTheme,
 } from "./themes/eauperation";
 import type { RGB } from "./themes/types";
@@ -839,23 +840,32 @@ async function renderSignature(
     return y;
   }
 
-  // Devis non signé : carré à signer (signature manuscrite / impression papier)
+  // Devis non signé : deux cadres de signature (client + entreprise)
+  const gap = 10;
+  const frameW = (contentW() - gap) / 2;
+  const frameH = 28;
+  const leftX = A4.mx;
+  const rightColX = A4.mx + frameW + gap;
+
   doc.setFont(tFont, "bold");
   doc.setFontSize(8.5);
   tx(doc, C.primary);
-  doc.text("BON POUR ACCORD", A4.mx, y);
+  doc.text("BON POUR ACCORD — LE CLIENT", leftX, y);
+  doc.text("L'ENTREPRISE", rightColX, y);
   y += 4;
 
   doc.setFont(bFont, "normal");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   tx(doc, C.muted);
-  doc.text("Date et signature précédée de la mention « Lu et approuvé, bon pour accord »", A4.mx, y);
-  y += 6;
+  doc.text('Date + mention « Lu et approuvé, bon pour accord »', leftX, y);
+  doc.text("Cachet et signature", rightColX, y);
+  y += 3;
 
   dx(doc, C.line);
   doc.setLineWidth(0.3);
-  doc.rect(A4.mx, y, 80, 25);
-  y += 30;
+  doc.rect(leftX, y, frameW, frameH);
+  doc.rect(rightColX, y, frameW, frameH);
+  y += frameH + 4;
 
   return y;
 }
@@ -867,6 +877,15 @@ function renderFooter(doc: jsPDF, ci: UserSettings | undefined, fontsOk: boolean
   const bFont   = fontsOk ? "Manrope" : "helvetica";
   const footerH = 10;
   const footerY = A4.h - footerH - 2;
+
+  // Assurance décennale (mention légale), juste au-dessus de la barre
+  const decennale = EAUPERATION_DECENNALE.trim();
+  if (decennale) {
+    doc.setFont(bFont, "normal");
+    doc.setFontSize(7);
+    tx(doc, C.muted);
+    doc.text(decennale, A4.w / 2, footerY - 3, { align: "center" });
+  }
 
   // NavyDeep bar
   fx(doc, C.primaryDeep);

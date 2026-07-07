@@ -12,7 +12,7 @@ export const eauperationTheme: PdfTheme = {
     primary:     [27,  58,  92],   // navy     #1B3A5C
     primaryDeep: [15,  36,  56],   // navyDeep #0F2438
     accent:      [224, 52,  43],   // red      #E0342B
-    accent2:     [43,  183, 198],  // cyan     #2BB7C6
+    accent2:     [0,   174, 239],  // bleu goutte d'eau #00AEEF (ex-turquoise #2BB7C6)
     ink:         [31,  42,  55],   // ink      #1f2a37
     muted:       [107, 119, 133],  // muted    #6b7785
     line:        [230, 234, 239],  // line     #e6eaef
@@ -41,6 +41,13 @@ export const EAUPERATION_HEADER = {
   phone1: "06 28 82 10 60",
   phone2: "09 82 51 19 55",
   city:   "Plombier à Feigères — Haute-Savoie 74",
-  stars:  "★ 5/5 Google",
+  stars:  "5/5 Google",
   tagline: "Dépannage · Urgences 24h · Devis gratuit",
 } as const;
+
+/**
+ * Assurance décennale — affichée dans les mentions légales du pied de page
+ * (devis + factures). Laisser une chaîne vide masque la ligne.
+ * Remplacer par : "Assurance décennale : <ASSUREUR> — contrat n° <NUMERO>".
+ */
+export const EAUPERATION_DECENNALE = "";
