@@ -32,7 +32,7 @@ export interface RenderInvoiceEditorialParams {
   invoice: Invoice;
   companyInfo?: UserSettings;
   /** Données client résolues (déjà chargées depuis Supabase). */
-  clientRow?: { name?: string | null; titre?: string | null; prenom?: string | null; phone?: string | null; location?: string | null };
+  clientRow?: { name?: string | null; titre?: string | null; prenom?: string | null; email?: string | null; phone?: string | null; location?: string | null };
   mode?: DocMode;
 }
 
@@ -245,8 +245,9 @@ export async function renderInvoiceEditorial(
     doc.text(clientRow.phone, col2X, rightY);
     rightY += 4;
   }
-  if (invoice.client_email) {
-    doc.text(invoice.client_email, col2X, rightY);
+  const clientEmail = invoice.client_email || clientRow?.email;
+  if (clientEmail) {
+    doc.text(clientEmail, col2X, rightY);
     rightY += 4;
   }
 

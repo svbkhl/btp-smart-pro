@@ -74,6 +74,7 @@ export async function buildQuotePdfDownloadParams(
       phone: quote.client_phone,
       location: quote.client_address,
     },
+    clientId: quote.client_id,
     surface: "",
     workType: "",
     quoteDate: new Date(quote.created_at),

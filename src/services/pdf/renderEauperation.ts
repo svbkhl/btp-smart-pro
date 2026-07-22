@@ -13,6 +13,7 @@ import jsPDF from "jspdf";
 import type { UserSettings } from "@/hooks/useUserSettings";
 import type { Invoice } from "@/hooks/useInvoices";
 import { formatClientBlock, clientRowToBlockInput } from "@/utils/formatClientBlock";
+import { stripBuildingUnit } from "@/utils/formatAddress";
 import {
   EAUPERATION_LOGO_URL,
   EAUPERATION_HEADER,
@@ -76,6 +77,7 @@ interface EauperationFactureParams {
     name?: string | null;
     titre?: string | null;
     prenom?: string | null;
+    email?: string | null;
     phone?: string | null;
     location?: string | null;
   };
@@ -346,7 +348,9 @@ export async function renderEauperation(
   tx(doc, C.ink);
 
   const emetteurLines: string[] = [];
-  if (ci?.address)     emetteurLines.push(ci.address.trim());
+  // Adresse émetteur sans n° de bâtiment / porte / appartement
+  const emitterAddress = stripBuildingUnit(ci?.address);
+  if (emitterAddress)  emetteurLines.push(emitterAddress);
   if (ci?.postal_code || ci?.city) {
     emetteurLines.push(`${ci?.postal_code ?? ""} ${ci?.city ?? ""}`.trim());
   }
@@ -385,6 +389,7 @@ export async function renderEauperation(
   let clientLines: string[] = [];
   let clientPhone = "";
   let clientAddr  = "";
+  let clientEmail = "";
 
   if (params.mode === "devis") {
     const inf = params.clientInfo;
@@ -397,6 +402,7 @@ export async function renderEauperation(
     );
     clientPhone = inf.phone || "";
     clientAddr  = inf.address || inf.location || "";
+    clientEmail = inf.email || "";
   } else {
     const cr = params.clientRow;
     clientLines = formatClientBlock(
@@ -408,9 +414,14 @@ export async function renderEauperation(
     );
     clientPhone = cr?.phone || "";
     clientAddr  = params.invoice.client_address || cr?.location || "";
+    clientEmail = params.invoice.client_email || cr?.email || "";
   }
 
-  const clientBlockH = 28;
+  // Hauteur dynamique : label + nom (2 lignes max) + adresse + tél + email
+  const clientNameCount = Math.min(Math.max(clientLines.length, 1), 2);
+  const clientMetaCount =
+    (clientAddr ? 1 : 0) + (clientPhone ? 1 : 0) + (clientEmail ? 1 : 0);
+  const clientBlockH = Math.max(28, 8 + clientNameCount * 5 + clientMetaCount * 4.5 + 5);
   // Fond soft + bordure cyan à gauche
   fx(doc, C.soft);
   doc.roundedRect(A4.mx, y, contentW, clientBlockH, 2, 2, "F");
@@ -438,7 +449,8 @@ export async function renderEauperation(
   doc.setFontSize(8.5);
   tx(doc, C.muted);
   if (clientAddr)  { doc.text(clientAddr,  A4.mx + 6, cy); cy += 4.5; }
-  if (clientPhone) { doc.text(`Tél. ${clientPhone}`, A4.mx + 6, cy); }
+  if (clientPhone) { doc.text(`Tél. ${clientPhone}`, A4.mx + 6, cy); cy += 4.5; }
+  if (clientEmail) { doc.text(clientEmail, A4.mx + 6, cy); }
 
   y += clientBlockH + 6;
 
@@ -897,11 +909,13 @@ function renderFooter(doc: jsPDF, ci: UserSettings | undefined, fontsOk: boolean
 
   const parts: string[] = [];
   if (ci?.company_name) parts.push(ci.company_name);
-  if (ci?.address || ci?.city) {
+  const footerAddress = stripBuildingUnit(ci?.address);
+  if (footerAddress || ci?.city) {
     parts.push(
-      [`${ci?.address ?? ""}`, `${ci?.postal_code ?? ""} ${ci?.city ?? ""}`]
+      [footerAddress, `${ci?.postal_code ?? ""} ${ci?.city ?? ""}`]
         .filter(Boolean)
         .map((s) => s.trim())
+        .filter(Boolean)
         .join(", ")
     );
   }

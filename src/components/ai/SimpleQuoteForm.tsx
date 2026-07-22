@@ -280,6 +280,7 @@ export const SimpleQuoteForm = ({ onSuccess, onPreviewStateChange, initialData }
           phone: currentQuote.client_phone,
           location: currentQuote.client_address,
         },
+        clientId: currentQuote.client_id,
         surface: currentQuote.surface.toString(),
         workType: currentQuote.prestation,
         quoteDate: new Date(currentQuote.created_at),

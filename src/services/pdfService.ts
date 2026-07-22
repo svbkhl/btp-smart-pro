@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { calculateFromTTC } from '@/utils/priceCalculations';
 import { formatClientBlock, clientRowToBlockInput } from '@/utils/formatClientBlock';
+import { enrichClientInfoFromDb } from '@/utils/enrichClientInfo';
 import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
 import { renderEauperation } from '@/services/pdf/renderEauperation';
 import { getTheme } from '@/services/pdf/themes';
@@ -66,6 +67,8 @@ export interface DownloadQuotePDFParams {
   result: QuoteResult;
   companyInfo: CompanyInfo;
   clientInfo: ClientInfo;
+  clientId?: string; // Fiche client liée — pour compléter les infos manquantes
+
   surface?: string;
   workType?: string;
   region?: string;
@@ -164,7 +167,8 @@ export async function downloadQuotePDF(
     const {
       result,
       companyInfo,
-      clientInfo,
+      clientInfo: rawClientInfo,
+      clientId,
       surface,
       workType,
       region,
@@ -183,6 +187,13 @@ export async function downloadQuotePDF(
       total_tva,
       total_ttc,
     } = params;
+
+    // Compléter les infos client manquantes (civilité, prénom, email, tél, adresse)
+    // depuis la fiche client — couvre aussi les anciens devis incomplets.
+    const clientInfo = (await enrichClientInfoFromDb(
+      rawClientInfo,
+      clientId
+    )) as ClientInfo;
 
     // Thème Eau'pération Sanitaire — renderer custom (navy/rouge/cyan).
     const companyId = (companyInfo as any)?.company_id as string | undefined;
@@ -261,6 +272,7 @@ export async function downloadQuotePDF(
           name: clientInfo.name,
           titre: clientInfo.civility ?? null,
           prenom: clientInfo.firstName ?? null,
+          email: clientInfo.email,
           phone: clientInfo.phone,
           location: clientInfo.address || clientInfo.location,
         },

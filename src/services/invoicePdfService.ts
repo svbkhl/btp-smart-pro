@@ -7,14 +7,48 @@ import { renderInvoiceEditorial } from '@/services/pdf/renderInvoiceEditorial';
 import { renderEauperation } from '@/services/pdf/renderEauperation';
 import { getTheme } from '@/services/pdf/themes';
 
-async function fetchClientRow(invoice: Invoice) {
-  if (!invoice.client_id) return undefined;
-  const { data } = await supabase
-    .from('clients')
-    .select('name, titre, prenom, phone, location')
-    .eq('id', invoice.client_id)
-    .single();
-  return data ?? undefined;
+const CLIENT_COLUMNS = 'name, titre, prenom, email, phone, location';
+
+interface InvoiceClientRow {
+  name?: string | null;
+  titre?: string | null;
+  prenom?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+}
+
+// La table `clients` n'est pas présente dans les types Supabase générés :
+// on passe par un builder non typé (mêmes requêtes que useClients).
+const clientsTable = () => (supabase as any).from('clients');
+
+/**
+ * Récupère la fiche client d'une facture pour compléter les infos affichées.
+ * Lookup par client_id, sinon par nom exact — couvre les anciennes factures
+ * créées sans lien client. Fail-safe : renvoie undefined en cas d'erreur.
+ */
+async function fetchClientRow(invoice: Invoice): Promise<InvoiceClientRow | undefined> {
+  try {
+    if (invoice.client_id) {
+      const { data } = await clientsTable()
+        .select(CLIENT_COLUMNS)
+        .eq('id', invoice.client_id)
+        .maybeSingle();
+      if (data) return data as InvoiceClientRow;
+    }
+    if (invoice.client_name?.trim()) {
+      const { data } = await clientsTable()
+        .select(CLIENT_COLUMNS)
+        .eq('name', invoice.client_name.trim())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return (data as InvoiceClientRow | null) ?? undefined;
+    }
+  } catch {
+    /* fail-safe : la génération du PDF ne doit pas échouer ici */
+  }
+  return undefined;
 }
 
 function shouldUseEditorialV2(companyInfo?: UserSettings): boolean {
@@ -79,20 +113,17 @@ async function generateInvoicePdfDoc(params: DownloadInvoicePDFParams): Promise<
   let clientRow: { titre?: string | null; prenom?: string | null; name?: string | null } = {};
   let clientPhone = '';
   let clientAddress = invoice.client_address || '';
+  let clientEmail = invoice.client_email || '';
 
-  if (invoice.client_id) {
-    const { data: client } = await supabase
-      .from('clients')
-      .select('name, titre, prenom, phone, location')
-      .eq('id', invoice.client_id)
-      .single();
-
-    if (client) {
-      clientRow = { titre: client.titre, prenom: client.prenom, name: client.name };
-      clientPhone = client.phone || '';
-      if (client.location && !clientAddress) {
-        clientAddress = client.location;
-      }
+  const client = await fetchClientRow(invoice);
+  if (client) {
+    clientRow = { titre: client.titre, prenom: client.prenom, name: client.name };
+    clientPhone = client.phone || '';
+    if (client.location && !clientAddress) {
+      clientAddress = client.location;
+    }
+    if (client.email && !clientEmail) {
+      clientEmail = client.email;
     }
   }
 
@@ -229,9 +260,9 @@ async function generateInvoicePdfDoc(params: DownloadInvoicePDFParams): Promise<
   }
   let contactLine = '';
   if (clientPhone) contactLine += `Tél: ${clientPhone}`;
-  if (invoice.client_email) {
+  if (clientEmail) {
     if (contactLine) contactLine += ' - ';
-    contactLine += `Email: ${invoice.client_email}`;
+    contactLine += `Email: ${clientEmail}`;
   }
   if (contactLine) doc.text(contactLine, margin + 5, metaY);
 
