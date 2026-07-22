@@ -155,6 +155,7 @@ export default function QuoteDetail() {
           email: quote.client_email || "",
           phone: "",
         },
+        clientId: quote.client_id,
         quoteDate: quote.created_at ? new Date(quote.created_at) : new Date(),
         quoteNumber: quote.quote_number,
         surface: quote.details?.surface || "",

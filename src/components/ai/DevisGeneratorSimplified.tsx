@@ -230,6 +230,7 @@ export default function DevisGenerator() {
           phone: client ? (clients?.find((c) => c.id === client)?.phone || newClient.tel) : newClient.tel,
           location: client ? (clients?.find((c) => c.id === client)?.location || newClient.adresse) : newClient.adresse,
         },
+        clientId: client || undefined,
         surface,
         workType: workType === "Autre" ? customWorkType : workType,
         region,

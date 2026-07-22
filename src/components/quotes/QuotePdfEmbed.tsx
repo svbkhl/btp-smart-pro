@@ -94,6 +94,7 @@ export function QuotePdfEmbed({ quote }: QuotePdfEmbedProps) {
             phone: quote.client_phone || clientRecord?.phone || undefined,
             location: quote.client_address || clientRecord?.location || undefined,
           },
+          clientId: quote.client_id,
           quoteDate: quote.created_at ? new Date(quote.created_at) : new Date(),
           quoteNumber: quote.quote_number,
           mode: lines.length > 0 ? "detailed" : "simple",

@@ -7,7 +7,7 @@ import { PDF_COLORS_HEX, HTML_PAGE_PX, HTML_FONT_SIZE_PX } from "@/services/pdf/
 interface InvoicePreviewProps {
   invoice: Invoice;
   companyInfo?: UserSettings;
-  clientRow?: { name?: string | null; titre?: string | null; prenom?: string | null; phone?: string | null; location?: string | null };
+  clientRow?: { name?: string | null; titre?: string | null; prenom?: string | null; email?: string | null; phone?: string | null; location?: string | null };
   mode?: "facture" | "devis";
 }
 
@@ -129,7 +129,9 @@ export function InvoicePreview({ invoice, companyInfo, clientRow, mode = "factur
               <div>{invoice.client_address || clientRow?.location}</div>
             )}
             {clientRow?.phone && <div>{clientRow.phone}</div>}
-            {invoice.client_email && <div>{invoice.client_email}</div>}
+            {(invoice.client_email || clientRow?.email) && (
+              <div>{invoice.client_email || clientRow?.email}</div>
+            )}
           </div>
         </div>
       </section>

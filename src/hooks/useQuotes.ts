@@ -19,6 +19,8 @@ export interface Quote {
   company_id?: string; // Multi-tenant
   client_name: string;
   client_email?: string;
+  client_phone?: string;
+  client_address?: string;
   client_id?: string; // Lien vers clients
   project_id?: string;
   quote_number: string;
@@ -355,6 +357,7 @@ export const useCreateQuote = () => {
             phone: quote.client_phone,
             location: quote.client_address,
           },
+          clientId: quote.client_id,
           surface: "",
           workType: "",
           region: "",

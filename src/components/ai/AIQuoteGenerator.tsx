@@ -1309,6 +1309,7 @@ export const AIQuoteGenerator = () => {
           phone: isNewClient ? clientPhone : selectedClient?.phone,
           location: isNewClient ? clientAddress : selectedClient?.location,
         },
+        clientId: isNewClient ? undefined : selectedClient?.id,
         surface,
         workType: workType === "Autre" ? customWorkType : workType,
         region,

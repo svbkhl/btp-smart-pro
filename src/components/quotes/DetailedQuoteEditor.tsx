@@ -755,10 +755,13 @@ export const DetailedQuoteEditor = ({ onSuccess, onCancel, onClose, existingQuot
         companyInfo,
         clientInfo: {
           name: selectedClient.name,
+          civility: selectedClient.titre,
+          firstName: selectedClient.prenom,
           email: selectedClient.email,
           phone: selectedClient.phone,
           location: selectedClient.location,
         },
+        clientId: selectedClient.id,
         quoteDate: new Date(previewQuote.created_at),
         quoteNumber: previewQuote.quote_number,
         mode: "detailed",
