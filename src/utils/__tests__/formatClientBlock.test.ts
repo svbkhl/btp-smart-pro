@@ -217,4 +217,27 @@ describe("clientRowToBlockInput — mapping legacy", () => {
     expect(r.type).toBe("PARTICULIER");
     expect(r.company_name).toBeUndefined();
   });
+
+  it("particulier : prénom ET nom apparaissent tous les deux (ticket FACTURE-2026-009)", () => {
+    // Cas Borrel Franck : name = nom de famille, prenom = prénom.
+    // Avant le fix, seul "M. Franck" sortait (le nom partait en legacy_name, ignoré).
+    const r = clientRowToBlockInput({
+      name: "Borrel",
+      titre: "M.",
+      prenom: "Franck",
+    });
+    expect(r.type).toBe("PARTICULIER");
+    expect(r.contact_first_name).toBe("Franck");
+    expect(r.contact_last_name).toBe("Borrel");
+    expect(formatClientBlock(r)).toEqual(["M. Franck Borrel"]);
+  });
+
+  it("particulier : name contenant déjà le prénom ne le duplique pas", () => {
+    const r = clientRowToBlockInput({
+      name: "Jean Dupont",
+      titre: "M.",
+      prenom: "Jean",
+    });
+    expect(formatClientBlock(r)).toEqual(["M. Jean Dupont"]);
+  });
 });

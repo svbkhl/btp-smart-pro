@@ -264,12 +264,31 @@ export function clientRowToBlockInput(row: LegacyClientRow): ClientBlockInput {
     resolvedLegacy = null;
   }
 
+  // Particulier avec prénom + name legacy : `name` est le nom de famille.
+  // Le laisser en legacy_name le ferait disparaître dès qu'un prénom existe
+  // (formatClientBlock ignore legacy quand fullContact est non vide) →
+  // "M. Franck" au lieu de "M. Franck Borrel". On le promeut donc en
+  // contact_last_name, en retirant le prénom s'il y est déjà répété
+  // (name = "Jean Dupont" + prenom = "Jean" → last_name = "Dupont").
+  let resolvedLastName = lastName;
+  if (type === "PARTICULIER" && !resolvedLastName && firstName && resolvedLegacy) {
+    const stripped = extractCivilityPrefix(resolvedLegacy).rest;
+    const fn = firstName.trim().toLowerCase();
+    const remainder = stripped
+      .split(/\s+/)
+      .filter((w) => w.toLowerCase() !== fn)
+      .join(" ")
+      .trim();
+    resolvedLastName = remainder || null;
+    resolvedLegacy = null;
+  }
+
   return {
     type,
     company_name: resolvedCompany ?? undefined,
     contact_civility: civility,
     contact_first_name: firstName ?? undefined,
-    contact_last_name: lastName ?? undefined,
+    contact_last_name: resolvedLastName ?? undefined,
     legacy_name: resolvedLegacy ?? undefined,
   };
 }

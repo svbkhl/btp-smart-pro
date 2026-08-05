@@ -175,7 +175,11 @@ export const useInvoices = () => {
               amount, due_date, paid_date, created_at, updated_at,
               client_name, client_email,
               total_ht, total_ttc, tva,
-              vat_regime, vat_rate_snapshot, vat_legal_mention, service_date
+              vat_regime, vat_rate_snapshot, vat_legal_mention, service_date,
+              invoice_lines (
+                id, invoice_id, position, label, description, unit,
+                quantity, unit_price_ht, total_ht, tva_rate, total_tva, total_ttc
+              )
             `)
             .eq("company_id", companyId);
           if (isEmployee && user) {
