@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCompanyId } from "./useCompanyId";
 import { logger } from "@/utils/logger";
-import { queryWithTimeout } from "@/utils/queryWithTimeout";
 import { FAKE_USER_SETTINGS } from "@/fakeData/userSettings";
 
 export interface UserSettings {
@@ -58,65 +57,60 @@ export const useUserSettings = () => {
 
   return useQuery({
     queryKey: ["user_settings", companyId],
+    // Pas de queryWithTimeout ici : un timeout renverrait null, que React Query
+    // mettrait en cache 1h (staleTime) → PDF génériques "Votre Entreprise".
+    // En cas d'erreur on throw pour laisser React Query retenter (retry: 2).
     queryFn: async () => {
-      return queryWithTimeout(
-        async () => {
-          if (!user) throw new Error("User not authenticated");
-          if (!companyId) {
-            throw new Error("User must be a member of a company");
-          }
+      if (!user) throw new Error("User not authenticated");
+      if (!companyId) {
+        throw new Error("User must be a member of a company");
+      }
 
-          const { data, error } = await supabase
-            .from("user_settings")
-            .select("*")
-            .eq("company_id", companyId)
-            .maybeSingle();
+      const { data, error } = await supabase
+        .from("user_settings")
+        .select("*")
+        .eq("company_id", companyId)
+        .maybeSingle();
 
-          if (error) {
-            throw error;
-          }
+      if (error) {
+        throw error;
+      }
 
-          // Si les settings n'existent pas, créer un enregistrement avec user_id et company_id (requis)
-          if (!data) {
-            const { data: newSettings, error: insertError } = await supabase
-              .from("user_settings")
-              .insert({
-                user_id: user.id,
-                company_id: companyId,
-              })
-              .select()
-              .single();
+      // Si les settings n'existent pas, créer un enregistrement avec user_id et company_id (requis)
+      if (!data) {
+        const { data: newSettings, error: insertError } = await supabase
+          .from("user_settings")
+          .insert({
+            user_id: user.id,
+            company_id: companyId,
+          })
+          .select()
+          .single();
 
-            if (insertError) {
-              // Si erreur d'insertion et fake data activé, retourner fake data
-              const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
-              if (isFakeDataEnabled()) {
-                return FAKE_USER_SETTINGS;
-              }
-              throw insertError;
-            }
-
-            if (!newSettings) {
-              throw new Error("Failed to create user settings");
-            }
-
-            return newSettings as UserSettings;
-          }
-
-          // Si fake data activé, retourner fake data
+        if (insertError) {
+          // Si erreur d'insertion et fake data activé, retourner fake data
           const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
           if (isFakeDataEnabled()) {
             return FAKE_USER_SETTINGS;
           }
-
-          // data existe forcément ici car on a vérifié !data plus haut
-          return data as UserSettings;
-        },
-        {
-          timeout: 5000,
-          fallback: FAKE_USER_SETTINGS,
+          throw insertError;
         }
-      );
+
+        if (!newSettings) {
+          throw new Error("Failed to create user settings");
+        }
+
+        return newSettings as UserSettings;
+      }
+
+      // Si fake data activé, retourner fake data
+      const { isFakeDataEnabled } = await import("@/utils/queryWithTimeout");
+      if (isFakeDataEnabled()) {
+        return FAKE_USER_SETTINGS;
+      }
+
+      // data existe forcément ici car on a vérifié !data plus haut
+      return data as UserSettings;
     },
     enabled: !!user && !isLoadingCompanyId && !!companyId,
     staleTime: 60 * 60 * 1000, // 1 heure - données rarement modifiées

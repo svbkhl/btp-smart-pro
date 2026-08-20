@@ -51,6 +51,46 @@ async function fetchClientRow(invoice: Invoice): Promise<InvoiceClientRow | unde
   return undefined;
 }
 
+/**
+ * Filet de sécurité : si le caller n'a pas pu fournir les settings entreprise
+ * (hook pas encore chargé, cache null…), on les récupère directement en base.
+ * Sans company_id, getTheme() retomberait sur le template générique
+ * "Votre Entreprise" au lieu du modèle personnalisé du client.
+ */
+async function resolveCompanyInfo(companyInfo?: UserSettings): Promise<UserSettings | undefined> {
+  if (companyInfo?.company_id) return companyInfo;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return companyInfo;
+
+    let companyId: string | null = null;
+    try {
+      companyId = localStorage.getItem(`selectedCompanyId_${user.id}`);
+    } catch {
+      /* localStorage indisponible (mode privé…) */
+    }
+    if (!companyId) {
+      const { data: membership } = await (supabase as any)
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      companyId = membership?.company_id ?? null;
+    }
+    if (!companyId) return companyInfo;
+
+    const { data } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('company_id', companyId)
+      .maybeSingle();
+    return (data as UserSettings | null) ?? companyInfo;
+  } catch {
+    return companyInfo;
+  }
+}
+
 function shouldUseEditorialV2(companyInfo?: UserSettings): boolean {
   return companyInfo?.invoice_template_version === 'v2-editorial';
 }
@@ -500,7 +540,8 @@ async function generateInvoicePdfDoc(params: DownloadInvoicePDFParams): Promise<
 
 export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Promise<void> {
   try {
-    const { invoice, companyInfo } = params;
+    const { invoice } = params;
+    const companyInfo = await resolveCompanyInfo(params.companyInfo);
 
     // Thème Eau'pération Sanitaire
     const theme = getTheme(companyInfo?.company_id);
@@ -526,7 +567,7 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
       return;
     }
 
-    const doc = await generateInvoicePdfDoc(params);
+    const doc = await generateInvoicePdfDoc({ invoice, companyInfo });
     const fileName = invoice.invoice_number
       ? `Facture-${invoice.invoice_number}.pdf`
       : `Facture-${formatDate(invoice.created_at).replace(/\s/g, '-')}.pdf`;
@@ -541,7 +582,8 @@ export async function downloadInvoicePDF(params: DownloadInvoicePDFParams): Prom
 
 export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParams): Promise<string> {
   try {
-    const { invoice, companyInfo } = params;
+    const { invoice } = params;
+    const companyInfo = await resolveCompanyInfo(params.companyInfo);
 
     // Thème Eau'pération Sanitaire
     const theme = getTheme(companyInfo?.company_id);
@@ -559,7 +601,7 @@ export async function generateInvoicePDFAsBase64(params: DownloadInvoicePDFParam
       return doc.output('dataurlstring').split(',')[1] ?? '';
     }
 
-    const doc = await generateInvoicePdfDoc(params);
+    const doc = await generateInvoicePdfDoc({ invoice, companyInfo });
     return doc.output('dataurlstring').split(',')[1] ?? '';
   } catch (error) {
     console.error('[Invoice PDF] Erreur lors de la génération du PDF en base64:', error);
